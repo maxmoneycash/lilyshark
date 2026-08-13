@@ -1,6 +1,6 @@
 # Lilyshark UI references
 
-These ten images are the visual contract for the 320 x 240 T-Deck interface.
+These ten images are the visual contract for the 320 x 240 T-Deck interface. They define nine primary screens; `02-node-roster.png` and `04-dense-node-roster.png` are alternate density studies for the same roster view.
 
 | File | Screen pattern |
 | --- | --- |
