@@ -1,6 +1,6 @@
 # Flashing Lilyshark on a LILYGO T-Deck
 
-Lilyshark currently ships as developer-alpha firmware. The repository produces reproducible ESP32-S3 images and checksums, but the current build has not yet completed a physical T-Deck smoke test. Read the [hardware validation boundary](../README.md#project-status) before installing it.
+Lilyshark currently ships as developer-alpha firmware. The repository produces deterministic ESP32-S3 images and checksums from the same checkout, host, and pinned toolchain. GitHub Actions on `ubuntu-24.04` is the canonical release environment. The current build has not yet completed a physical T-Deck smoke test, so read the [hardware validation boundary](../README.md#project-status) before installing it.
 
 ## What you need
 
@@ -19,10 +19,10 @@ If this is your only T-Deck, plan the return path before flashing. Export the cu
 Clone the exact release tag, then download only the merged factory image and checksum manifest:
 
 ```sh
-git clone --depth 1 --branch v0.1.0-alpha.2 https://github.com/maxmoneycash/lilyshark.git
+git clone --depth 1 --branch v0.1.0-alpha.3 https://github.com/maxmoneycash/lilyshark.git
 cd lilyshark
 mkdir -p dist
-release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.2'
+release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.3'
 curl --fail --location "${release_base}/lilyshark-tdeck.factory.bin" \
   --output dist/lilyshark-tdeck.factory.bin
 curl --fail --location "${release_base}/SHA256SUMS" \
@@ -56,6 +56,14 @@ This runs PlatformIO 6.1.19 with the Intel HEX dependency required by the ESP32 
 | `dist/lilyshark-tdeck.bin` | Lilyshark application only | `0x10000` |
 | `dist/lilyshark-tdeck.elf` | Debug symbols | Do not flash |
 | `dist/SHA256SUMS` | Checksums for all three artifacts | Do not flash |
+
+The script derives `SOURCE_DATE_EPOCH` from the checked-out Git commit so
+compiler-provided date and time strings remain stable. To run the release build
+twice and verify that every artifact is byte-identical:
+
+```sh
+./scripts/verify_reproducible_release.sh
+```
 
 Verify the files manually if you are moving them between machines:
 

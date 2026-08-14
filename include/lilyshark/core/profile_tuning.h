@@ -16,6 +16,14 @@ namespace lilyshark {
 [[nodiscard]] RadioProfile cycleProfileSpreadingFactor(const RadioProfile &profile) noexcept;
 [[nodiscard]] RadioProfile cycleProfileCodingRate(const RadioProfile &profile) noexcept;
 
+// Returns the protocol-defined preamble for the profile's bandwidth and
+// spreading factor. Protocols without a fixed rule retain the supplied value.
+[[nodiscard]] std::uint16_t derivePreambleSymbols(const RadioProfile &profile) noexcept;
+
+// Infers the policy missing from the version 1 saved-profile format. Only an
+// exact Meshtastic occupied-band center can become an explicit slot.
+[[nodiscard]] bool inferLegacyFrequencyTuningPolicy(RadioProfile &profile) noexcept;
+
 // True when the profile uses one of the supported regional tuning bands and
 // standard LoRa values. This is also the validation boundary for settings
 // restored from nonvolatile storage.

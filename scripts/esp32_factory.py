@@ -5,6 +5,7 @@ Meshtastic/ESPEasy factory-image pattern. The resulting image is flashed at
 address 0x0; firmware.bin remains the OTA/application image for 0x10000.
 """
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -49,6 +50,10 @@ def create_factory_image(source, target, env):
     for section in env.subst(env.get("FLASH_EXTRA_IMAGES")):
         address, image = section.split(" ", 1)
         command.extend((address, image))
+        if int(address, 0) == 0xE000:
+            # Retain the exact OTA boot selector used by the merge so the
+            # standalone validator can prove all four factory-image regions.
+            shutil.copyfile(image, env.subst("$BUILD_DIR/boot_app0.bin"))
     command.extend(("0x10000", firmware))
 
     print(f"Generating factory image: {output}")

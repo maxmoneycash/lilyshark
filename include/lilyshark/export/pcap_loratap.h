@@ -19,11 +19,13 @@ enum class PcapWriteResult : std::uint8_t {
     AlreadyStarted,
     InvalidBandwidth,
     SinkError,
+    InvalidFrame,
 };
 
-// Writes classic little-endian PCAP containing LoRaTap v0 packets. All
-// temporary buffers are fixed-size stack storage and payloads stream directly
-// to the sink.
+// Writes classic little-endian PCAP containing LoRaTap v0 packets. Each packet
+// record is assembled in fixed-size stack storage and passed to the sink in one
+// write call. PCAP timestamps preserve RawFrame's boot-relative monotonic
+// microseconds; they are not Unix wall time.
 class PcapLoraTapWriter
 {
   public:

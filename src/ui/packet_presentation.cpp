@@ -4,6 +4,7 @@
 #include "lilyshark/protocols/reticulum_decoder.h"
 
 #include <cstdint>
+#include <limits>
 
 namespace lilyshark {
 
@@ -111,6 +112,22 @@ bool contributesToNodeSummary(const FrameRecord &record) noexcept
     return record.raw.rf.crc != CrcStatus::Invalid &&
            record.decoded.state != DecodeState::Malformed &&
            record.decoded.hasField(FieldSource) && record.decoded.source != 0U;
+}
+
+bool contributesToExistingNodeCrcErrors(const FrameRecord &record, bool identity_established,
+                                        ProtocolId protocol, std::uint32_t source) noexcept
+{
+    return identity_established && record.raw.rf.crc == CrcStatus::Invalid &&
+           record.decoded.state != DecodeState::Malformed &&
+           record.decoded.hasField(FieldSource) && record.decoded.source != 0U &&
+           record.decoded.protocol == protocol && record.decoded.source == source;
+}
+
+std::uint16_t incrementedNodeCrcErrorCount(std::uint16_t current) noexcept
+{
+    return current == std::numeric_limits<std::uint16_t>::max()
+               ? current
+               : static_cast<std::uint16_t>(current + 1U);
 }
 
 } // namespace lilyshark

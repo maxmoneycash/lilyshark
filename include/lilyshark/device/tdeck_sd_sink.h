@@ -27,12 +27,15 @@ class TDeckSdByteSink final : public ByteSink
     bool openNextCapture(char *path, std::size_t path_capacity,
                          const char *extension = ".pcap") noexcept;
     bool write(const std::uint8_t *data, std::size_t length) noexcept override;
-    void flush() noexcept;
+    // Flushes buffered data and verifies that the file position and visible
+    // size still cover every byte accepted by write().
+    bool flush() noexcept;
     void close() noexcept;
     bool isOpen() const noexcept;
 
   private:
     fs::File file_{};
+    std::size_t expected_size_ = 0;
 };
 
 } // namespace lilyshark

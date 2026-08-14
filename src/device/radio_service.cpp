@@ -21,6 +21,7 @@ constexpr std::uint32_t kSx1262MaximumFrequencyHz = 960000000;
 constexpr float kSpectrumReceiverBandwidthKhz = 234.3F;
 constexpr std::uint32_t kInterFrequencySettleMs = 5;
 constexpr std::uint32_t kReceiveRetryMs = 500;
+constexpr std::uint32_t kConfigureRecoveryMs = 1000;
 
 bool deadlineReached(std::uint32_t now, std::uint32_t started, std::uint32_t limit) noexcept
 {
@@ -30,6 +31,33 @@ bool deadlineReached(std::uint32_t now, std::uint32_t started, std::uint32_t lim
 std::uint64_t monotonicMicros() noexcept
 {
     return static_cast<std::uint64_t>(esp_timer_get_time());
+}
+
+std::uint32_t receivedLoRaAirtimeUs(SX1262 &radio, const RadioProfile &profile,
+                                    const LoRaRxMetadata &metadata,
+                                    std::size_t packet_length) noexcept
+{
+    if (metadata.coding_rate_denominator == 0U || profile.bandwidth_hz == 0U) {
+        return 0U;
+    }
+
+    DataRate_t data_rate{};
+    data_rate.lora.spreadingFactor = profile.spreading_factor;
+    data_rate.lora.bandwidth = static_cast<float>(profile.bandwidth_hz) / 1000.0F;
+    data_rate.lora.codingRate = metadata.coding_rate_denominator;
+
+    PacketConfig_t packet_config{};
+    packet_config.lora.preambleLength = profile.preamble_symbols;
+    packet_config.lora.implicitHeader = profile.implicit_header;
+    packet_config.lora.crcEnabled = metadata.crc == CrcStatus::Valid ||
+                                    metadata.crc == CrcStatus::Invalid;
+    const float symbol_length_ms =
+        static_cast<float>(std::uint32_t{1} << profile.spreading_factor) /
+        data_rate.lora.bandwidth;
+    packet_config.lora.ldrOptimize = symbol_length_ms >= 16.0F;
+
+    return static_cast<std::uint32_t>(radio.calculateTimeOnAir(
+        RADIOLIB_MODEM_LORA, data_rate, packet_config, packet_length));
 }
 
 } // namespace
@@ -166,6 +194,7 @@ bool TDeckRadioService::configure(const RadioProfile &profile) noexcept
         profile.coding_rate_denominator == 0) {
         status_.last_error = RADIOLIB_ERR_INVALID_FREQUENCY;
         status_.initialized = false;
+        configure_recovery_.clear();
         return false;
     }
 
@@ -191,9 +220,11 @@ bool TDeckRadioService::configure(const RadioProfile &profile) noexcept
     status_.last_error = state;
     status_.initialized = state == RADIOLIB_ERR_NONE;
     if (!status_.initialized) {
+        configure_recovery_.schedule(millis(), kConfigureRecoveryMs);
         return false;
     }
 
+    configure_recovery_.clear();
     radio_.setDio1Action(onDio1);
     resumeReceive();
     return status_.receiving;
@@ -231,21 +262,50 @@ void TDeckRadioService::consumeInterrupt() noexcept
     }
 
     std::uint8_t payload[kMaxFrameBytes]{};
+    // readData() clears the IRQ flags. Preserve them first so an invalid
+    // explicit header cannot make getLoRaRxHeaderInfo() expose stale register
+    // values from an earlier packet.
+    const RadioLibIrqFlags_t irq_flags = radio_.getIrqFlags();
     const std::int16_t state = radio_.readData(payload, packet_length);
     status_.last_error = state;
 
     if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_ERR_CRC_MISMATCH) {
+        const bool crc_failed = state == RADIOLIB_ERR_CRC_MISMATCH;
+        LoRaRxMetadata rx_metadata{};
+        if (profile_.implicit_header) {
+            rx_metadata = resolveLoRaRxMetadata(false, 0U, false,
+                                                profile_.coding_rate_denominator,
+                                                profile_.crc_enabled, crc_failed);
+        } else {
+            const bool header_valid =
+                (irq_flags & RADIOLIB_SX126X_IRQ_HEADER_VALID) != 0U &&
+                (irq_flags & RADIOLIB_SX126X_IRQ_HEADER_ERR) == 0U;
+            std::uint8_t header_coding_rate = 0;
+            bool header_has_crc = false;
+            if (header_valid &&
+                radio_.getLoRaRxHeaderInfo(&header_coding_rate, &header_has_crc) ==
+                    RADIOLIB_ERR_NONE) {
+                rx_metadata = resolveLoRaRxMetadata(true, header_coding_rate,
+                                                    header_has_crc,
+                                                    profile_.coding_rate_denominator,
+                                                    profile_.crc_enabled, crc_failed);
+            } else {
+                rx_metadata = unavailableExplicitLoRaRxMetadata(crc_failed);
+            }
+        }
+
         RawFrame frame{};
         frame.assignPayload(payload, packet_length);
         frame.rf.timestamp_us = monotonicMicros();
-        frame.rf.present_fields = RfFieldTimestamp | RfFieldFrequency | RfFieldBandwidth |
-                                  RfFieldFrequencyError | RfFieldRssi | RfFieldSnr |
-                                  RfFieldPreamble | RfFieldSyncWord | RfFieldProfile |
-                                  RfFieldSpreadingFactor | RfFieldCodingRate |
-                                  RfFieldRadioStatus | RfFieldAirtime;
+        frame.rf.present_fields = resolveLoRaRxPresentFields(
+            RfFieldTimestamp | RfFieldFrequency | RfFieldBandwidth | RfFieldFrequencyError |
+                RfFieldRssi | RfFieldSnr | RfFieldPreamble | RfFieldSyncWord | RfFieldProfile |
+                RfFieldSpreadingFactor | RfFieldCodingRate | RfFieldRadioStatus | RfFieldAirtime,
+            rx_metadata);
         frame.rf.center_frequency_hz = profile_.center_frequency_hz;
         frame.rf.bandwidth_hz = profile_.bandwidth_hz;
-        frame.rf.airtime_us = radio_.getTimeOnAir(packet_length);
+        frame.rf.airtime_us = receivedLoRaAirtimeUs(radio_, profile_, rx_metadata,
+                                                    packet_length);
         frame.rf.rssi_dbm_x10 = static_cast<std::int16_t>(radio_.getRSSI() * 10.0F);
         frame.rf.snr_db_x10 = static_cast<std::int16_t>(radio_.getSNR() * 10.0F);
         frame.rf.frequency_error_hz = static_cast<std::int32_t>(radio_.getFrequencyError());
@@ -253,11 +313,11 @@ void TDeckRadioService::consumeInterrupt() noexcept
         frame.rf.sync_word = profile_.sync_word;
         frame.rf.profile_id = profile_.id;
         frame.rf.spreading_factor = profile_.spreading_factor;
-        frame.rf.coding_rate_denominator = profile_.coding_rate_denominator;
+        frame.rf.coding_rate_denominator = rx_metadata.coding_rate_denominator;
         frame.rf.radio_status = state;
         frame.rf.modulation = profile_.modulation;
         frame.rf.direction = FrameDirection::Receive;
-        frame.rf.crc = state == RADIOLIB_ERR_NONE ? CrcStatus::Valid : CrcStatus::Invalid;
+        frame.rf.crc = rx_metadata.crc;
         frame.rf.implicit_header = profile_.implicit_header;
         frame.rf.inverted_iq = profile_.inverted_iq;
 
@@ -284,6 +344,11 @@ void TDeckRadioService::consumeInterrupt() noexcept
 
 void TDeckRadioService::poll() noexcept
 {
+    if (!status_.initialized &&
+        configure_recovery_.shouldAttempt(millis(), spectrum_status_.active())) {
+        configure(profile_);
+        return;
+    }
     if (spectrum_status_.active()) {
         pollSpectrumSweep();
         return;
@@ -499,6 +564,7 @@ void TDeckRadioService::stop() noexcept
     status_.receiving = false;
     status_.initialized = false;
     next_receive_retry_ms_ = 0;
+    configure_recovery_.clear();
     dio1_pending_ = false;
     if (instance_ == this) {
         instance_ = nullptr;

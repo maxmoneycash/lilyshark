@@ -25,7 +25,9 @@
 #if defined(LILYSHARK_DEVICE)
 #include "lilyshark/core/builtin_profiles.h"
 #include "lilyshark/core/capture_runtime.h"
+#include "lilyshark/core/profile_settings.h"
 #include "lilyshark/core/profile_tuning.h"
+#include "lilyshark/core/survey_accumulator.h"
 #include "lilyshark/device/hardware_status.h"
 #include "lilyshark/device/radio_service.h"
 #include "lilyshark/device/screenshot.h"
@@ -135,13 +137,13 @@ bool pcap_recording = false;
 bool native_capture_recording = false;
 bool survey_running = false;
 bool survey_has_result = false;
+SurveyAccumulator survey_accumulator{};
 std::uint32_t last_ui_refresh_ms = 0;
 std::uint32_t last_hardware_ui_refresh_ms = 0;
 std::uint32_t last_dynamic_ui_refresh_ms = 0;
 std::uint32_t last_capture_flush_ms = 0;
 std::uint32_t last_screenshot_gap_ms = 0;
 std::uint32_t survey_started_ms = 0;
-std::uint64_t survey_baseline_sequence = 0;
 SpectrumSweepState observed_spectrum_state = SpectrumSweepState::Idle;
 std::uint16_t observed_spectrum_points = 0;
 std::uint64_t traffic_selected_sequence = 0;
@@ -297,6 +299,10 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
 {
     std::size_t count = 0;
     const auto &store = capture_runtime.frames();
+
+    // Preserve the newest-node policy while allowing the selected identities
+    // to be replayed chronologically below. CRC-invalid records never create
+    // an identity.
     for(std::size_t offset = 0; offset < store.size(); ++offset) {
         const FrameRecord *record = store.newest(offset);
         if(record == nullptr || !contributesToNodeSummary(*record)) continue;
@@ -310,16 +316,31 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
             if(count == summaries.size()) continue;
             summaries[index].protocol = record->decoded.protocol;
             summaries[index].id = record->decoded.source;
-            summaries[index].last_seen_us = record->raw.rf.timestamp_us;
-            summaries[index].latest_snr_x10 = record->raw.rf.snr_db_x10;
-            summaries[index].latest_rssi_x10 = record->raw.rf.rssi_dbm_x10;
             ++count;
         }
+    }
+
+    for(std::size_t offset = 0; offset < store.size(); ++offset) {
+        const FrameRecord *record = store.at(offset);
+        if(record == nullptr) continue;
+
+        std::size_t index = 0;
+        for(; index < count; ++index) {
+            if(summaries[index].protocol == record->decoded.protocol &&
+               summaries[index].id == record->decoded.source) break;
+        }
+        if(index == count) continue;
+
         LiveNodeSummary &summary = summaries[index];
-        summary.snr_sum_x10 += record->raw.rf.snr_db_x10;
-        if(summary.frames != UINT16_MAX) ++summary.frames;
-        if(record->raw.rf.crc == CrcStatus::Invalid && summary.crc_errors != UINT16_MAX) {
-            ++summary.crc_errors;
+        if(contributesToNodeSummary(*record)) {
+            summary.last_seen_us = record->raw.rf.timestamp_us;
+            summary.latest_snr_x10 = record->raw.rf.snr_db_x10;
+            summary.latest_rssi_x10 = record->raw.rf.rssi_dbm_x10;
+            summary.snr_sum_x10 += record->raw.rf.snr_db_x10;
+            if(summary.frames != UINT16_MAX) ++summary.frames;
+        } else if(contributesToExistingNodeCrcErrors(*record, summary.frames != 0U,
+                                                     summary.protocol, summary.id)) {
+            summary.crc_errors = incrementedNodeCrcErrorCount(summary.crc_errors);
         }
     }
     return count;
@@ -1182,27 +1203,7 @@ void build_survey(lv_obj_t * parent)
         ? (millis() - survey_started_ms)
         : (survey_has_result ? 60000U : 0U);
     const std::uint32_t bounded_ms = elapsed_ms > 60000U ? 60000U : elapsed_ms;
-    const std::uint64_t captured = capture_runtime.frames().totalSeen() >= survey_baseline_sequence
-        ? capture_runtime.frames().totalSeen() - survey_baseline_sequence : 0;
-
-    std::array<std::uint32_t, 8> node_ids{};
-    std::size_t node_count = 0;
-    std::int16_t best_snr = INT16_MIN;
-    std::uint32_t crc_errors = 0;
-    const auto &store = capture_runtime.frames();
-    for(std::size_t index = 0; index < store.size(); ++index) {
-        const FrameRecord *record = store.at(index);
-        if(record == nullptr || record->sequence <= survey_baseline_sequence) continue;
-        if(record->raw.rf.snr_db_x10 > best_snr) best_snr = record->raw.rf.snr_db_x10;
-        if(record->raw.rf.crc == CrcStatus::Invalid) ++crc_errors;
-        if(record->decoded.hasField(FieldSource)) {
-            bool known = false;
-            for(std::size_t node = 0; node < node_count; ++node) {
-                if(node_ids[node] == record->decoded.source) known = true;
-            }
-            if(!known && node_count < node_ids.size()) node_ids[node_count++] = record->decoded.source;
-        }
-    }
+    const SurveySnapshot &survey = survey_accumulator.snapshot();
 
     put_label(parent, survey_running ? "CAPTURING" : (survey_has_result ? "SURVEY COMPLETE" : "READY"),
               survey_running ? 44 : 23, 47,
@@ -1218,15 +1219,20 @@ void build_survey(lv_obj_t * parent)
     if(fill > 0) theme::rect(progress, 3, 3, fill, 17, theme::lime());
 
     std::snprintf(line, sizeof(line), "FRAMES          %llu",
-                  static_cast<unsigned long long>(captured));
+                  static_cast<unsigned long long>(survey.total_frames));
     put_label(parent, line, 10, 121, theme::text(), &font_mono_semibold_12);
-    std::snprintf(line, sizeof(line), "SOURCES         %u", static_cast<unsigned>(node_count));
+    std::snprintf(line, sizeof(line), "SOURCES         %u%s",
+                  static_cast<unsigned>(survey.unique_sources),
+                  survey.unique_sources_overflowed ? "+" : "");
     put_label(parent, line, 10, 143, theme::text(), &font_mono_semibold_12);
-    if(best_snr == INT16_MIN) std::snprintf(line, sizeof(line), "BEST SNR        --");
-    else std::snprintf(line, sizeof(line), "BEST SNR        %+.1f dB", static_cast<double>(best_snr) / 10.0);
+    if(!survey.has_best_snr) std::snprintf(line, sizeof(line), "BEST SNR        --");
+    else std::snprintf(line, sizeof(line), "BEST SNR        %+.1f dB",
+                       static_cast<double>(survey.best_snr_db_x10) / 10.0);
     put_label(parent, line, 10, 165, theme::text(), &font_mono_semibold_12);
-    std::snprintf(line, sizeof(line), "CRC ERRORS      %lu", static_cast<unsigned long>(crc_errors));
-    put_label(parent, line, 10, 187, crc_errors == 0 ? theme::cyan() : theme::fault(), &font_mono_10);
+    std::snprintf(line, sizeof(line), "CRC ERRORS      %llu",
+                  static_cast<unsigned long long>(survey.crc_invalid_frames));
+    put_label(parent, line, 10, 187,
+              survey.crc_invalid_frames == 0 ? theme::cyan() : theme::fault(), &font_mono_10);
     theme::rule_line(parent, 0, 211, 320);
     put_label(parent, survey_running ? "SURVEY RUNNING" : "ENTER  START 60s SURVEY", 54, 216,
               survey_running ? theme::text_muted() : theme::cyan(), &font_mono_semibold_12);
@@ -1549,19 +1555,22 @@ void on_radio_frame(const RawFrame &frame, const RadioProfile &profile, void *) 
                                 traffic_selected_sequence == previous_newest->sequence);
     const IngestResult ingest = capture_runtime.ingest(frame, profile);
     if(follow_newest) traffic_selected_sequence = ingest.sequence;
+    const FrameRecord *stored = capture_runtime.frames().newest();
+    if(survey_running && stored != nullptr) survey_accumulator.ingest(*stored);
     if(native_capture_recording) {
-        const FrameRecord *stored = capture_runtime.frames().newest();
         last_native_capture_result = stored != nullptr
             ? native_capture_writer.write(*stored)
             : LilysharkCaptureWriteResult::InvalidFrame;
         if(last_native_capture_result == LilysharkCaptureWriteResult::SinkError) {
             native_capture_recording = false;
+            native_capture_sink.close();
         }
     }
     if(pcap_recording) {
         last_pcap_result = pcap_writer.write(frame);
         if(last_pcap_result == PcapWriteResult::SinkError) {
             pcap_recording = false;
+            pcap_sink.close();
         }
     }
     live_data_dirty = true;
@@ -1578,60 +1587,32 @@ bool update_live_hardware_labels() noexcept
     return changed;
 }
 
-constexpr std::size_t saved_profile_size = 16;
-
-void put_profile_u16(std::uint8_t *bytes, std::uint16_t value) noexcept
+bool write_saved_profile(const RadioProfile &profile) noexcept
 {
-    bytes[0] = static_cast<std::uint8_t>(value);
-    bytes[1] = static_cast<std::uint8_t>(value >> 8U);
-}
-
-void put_profile_u32(std::uint8_t *bytes, std::uint32_t value) noexcept
-{
-    bytes[0] = static_cast<std::uint8_t>(value);
-    bytes[1] = static_cast<std::uint8_t>(value >> 8U);
-    bytes[2] = static_cast<std::uint8_t>(value >> 16U);
-    bytes[3] = static_cast<std::uint8_t>(value >> 24U);
-}
-
-std::uint16_t get_profile_u16(const std::uint8_t *bytes) noexcept
-{
-    return static_cast<std::uint16_t>(bytes[0]) |
-           static_cast<std::uint16_t>(static_cast<std::uint16_t>(bytes[1]) << 8U);
-}
-
-std::uint32_t get_profile_u32(const std::uint8_t *bytes) noexcept
-{
-    return static_cast<std::uint32_t>(bytes[0]) |
-           (static_cast<std::uint32_t>(bytes[1]) << 8U) |
-           (static_cast<std::uint32_t>(bytes[2]) << 16U) |
-           (static_cast<std::uint32_t>(bytes[3]) << 24U);
+    if(!profile_preferences_ready) return false;
+    std::uint8_t bytes[kSavedProfileV2Size]{};
+    return encodeSavedProfileV2(profile, bytes, sizeof(bytes)) &&
+           profile_preferences.putBytes("profile", bytes, sizeof(bytes)) == sizeof(bytes);
 }
 
 bool load_saved_profile(RadioProfile &profile) noexcept
 {
     profile_preferences_ready = profile_preferences.begin("lilyshark", false);
-    if(!profile_preferences_ready ||
-       profile_preferences.getBytesLength("profile") != saved_profile_size) {
+    if(!profile_preferences_ready) return false;
+
+    const std::size_t stored_size = profile_preferences.getBytesLength("profile");
+    if(stored_size != kSavedProfileV1Size && stored_size != kSavedProfileV2Size) {
         return false;
     }
 
-    std::uint8_t bytes[saved_profile_size]{};
-    if(profile_preferences.getBytes("profile", bytes, sizeof(bytes)) != sizeof(bytes) ||
-       bytes[0] != 'L' || bytes[1] != 'P' || bytes[2] != 1U) {
-        return false;
+    std::uint8_t bytes[kSavedProfileV2Size]{};
+    if(profile_preferences.getBytes("profile", bytes, stored_size) != stored_size) return false;
+    RadioProfile candidate{};
+    const SavedProfileDecodeResult result = decodeSavedProfile(bytes, stored_size, candidate);
+    if(result == SavedProfileDecodeResult::Invalid) return false;
+    if(result == SavedProfileDecodeResult::MigratedV1 && !write_saved_profile(candidate)) {
+        Serial.println("Lilyshark saved profile loaded but v2 migration was not saved");
     }
-
-    const std::uint16_t profile_id = get_profile_u16(&bytes[4]);
-    const RadioProfile *base = findBuiltinProfile(profile_id);
-    if(base == nullptr) return false;
-
-    RadioProfile candidate = *base;
-    candidate.center_frequency_hz = get_profile_u32(&bytes[6]);
-    candidate.bandwidth_hz = get_profile_u32(&bytes[10]);
-    candidate.spreading_factor = bytes[14];
-    candidate.coding_rate_denominator = bytes[15];
-    if(!isSupportedTunedProfile(candidate)) return false;
 
     for(std::size_t index = 0; index < builtinProfileCount(); ++index) {
         if(builtinProfiles()[index].id == candidate.id) {
@@ -1645,20 +1626,7 @@ bool load_saved_profile(RadioProfile &profile) noexcept
 
 bool save_active_profile() noexcept
 {
-    if(!profile_preferences_ready) return false;
-    const RadioProfile &profile = radio_service.activeProfile();
-    if(!isSupportedTunedProfile(profile)) return false;
-
-    std::uint8_t bytes[saved_profile_size]{};
-    bytes[0] = 'L';
-    bytes[1] = 'P';
-    bytes[2] = 1U;
-    put_profile_u16(&bytes[4], profile.id);
-    put_profile_u32(&bytes[6], profile.center_frequency_hz);
-    put_profile_u32(&bytes[10], profile.bandwidth_hz);
-    bytes[14] = profile.spreading_factor;
-    bytes[15] = profile.coding_rate_denominator;
-    return profile_preferences.putBytes("profile", bytes, sizeof(bytes)) == sizeof(bytes);
+    return write_saved_profile(radio_service.activeProfile());
 }
 
 void cycle_active_profile() noexcept
@@ -1686,7 +1654,10 @@ void apply_tuned_profile(const RadioProfile &candidate, const char *action) noex
     if(candidate.center_frequency_hz == current.center_frequency_hz &&
        candidate.bandwidth_hz == current.bandwidth_hz &&
        candidate.spreading_factor == current.spreading_factor &&
-       candidate.coding_rate_denominator == current.coding_rate_denominator) {
+       candidate.coding_rate_denominator == current.coding_rate_denominator &&
+       candidate.preamble_symbols == current.preamble_symbols &&
+       candidate.frequency_tuning_policy == current.frequency_tuning_policy &&
+       candidate.frequency_slot == current.frequency_slot) {
         Serial.printf("Lilyshark profile tune ignored: %s\n", action);
         return;
     }
@@ -1805,10 +1776,10 @@ void handle_navigation_key(uint32_t key)
             current_screen = Screen::node_detail;
             build_current_screen();
         } else if(current_screen == Screen::survey && !survey_running) {
+            survey_accumulator.reset();
             survey_running = true;
             survey_has_result = false;
             survey_started_ms = millis();
-            survey_baseline_sequence = capture_runtime.frames().totalSeen();
             build_current_screen();
         }
 #else
@@ -2140,14 +2111,20 @@ void device_touch_read(lv_indev_t *, lv_indev_data_t *data)
 void poll_touch()
 {
     static uint32_t next_poll_ms = 0;
-    if(!touch_service.present()) return;
+    if(!touch_service.present()) {
+        touch_was_pressed = false;
+        return;
+    }
 
     const uint32_t now = millis();
     if(now < next_poll_ms) return;
     next_poll_ms = now + 16U;
 
     const bool was_pressed = touch_was_pressed;
-    if(!touch_service.poll()) return;
+    if(!touch_service.poll()) {
+        touch_was_pressed = false;
+        return;
+    }
     const TouchPoint point = touch_service.point();
     touch_was_pressed = point.pressed;
     if(point.pressed) touch_last_point = point;
@@ -2235,6 +2212,15 @@ void set_keyboard_brightness(uint8_t value)
     Wire.endTransmission();
 }
 
+[[noreturn]] void halt_device_startup(const char *message)
+{
+    Serial.printf("Lilyshark fatal: %s\n", message);
+    Serial.flush();
+    while(true) {
+        delay(1000);
+    }
+}
+
 } // namespace
 
 void setup()
@@ -2273,18 +2259,19 @@ void setup()
     }
 
     spectrum_buffer = static_cast<uint8_t *>(ps_malloc(spectrum_buffer_size));
-    if(spectrum_buffer == nullptr) spectrum_buffer = static_cast<uint8_t *>(malloc(spectrum_buffer_size));
     if(spectrum_buffer == nullptr) {
-        Serial.println("Spectrum buffer allocation failed");
+        Serial.println("Spectrum unavailable: PSRAM allocation failed");
     }
 
     lv_init();
     lv_tick_set_cb(device_tick_ms);
     lv_display_t * display = lv_display_create(theme::screen_width, theme::screen_height);
+    if(display == nullptr) halt_device_startup("LVGL display allocation failed");
     lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(display, device_draw_buffer, nullptr, sizeof(device_draw_buffer), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(display, device_flush);
     lv_indev_t *touch = lv_indev_create();
+    if(touch == nullptr) halt_device_startup("LVGL touch input allocation failed");
     lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(touch, device_touch_read);
 
@@ -2292,11 +2279,13 @@ void setup()
     if(sd_mounted && pcap_sink.openNextCapture(pcap_path, sizeof(pcap_path))) {
         last_pcap_result = pcap_writer.begin();
         pcap_recording = last_pcap_result == PcapWriteResult::Ok;
+        if(!pcap_recording) pcap_sink.close();
     }
     if(sd_mounted && native_capture_sink.openNextCapture(native_capture_path, sizeof(native_capture_path),
                                                        kLilysharkCaptureExtension)) {
         last_native_capture_result = native_capture_writer.begin();
         native_capture_recording = last_native_capture_result == LilysharkCaptureWriteResult::Ok;
+        if(!native_capture_recording) native_capture_sink.close();
     }
     Serial.printf("Lilyshark SD capture: %s%s%s\n", pcap_recording ? "recording " : "unavailable",
                   pcap_recording ? pcap_path : "", sd_mounted ? "" : " (no card)");
@@ -2310,7 +2299,7 @@ void setup()
     RadioProfile initial_profile = builtinProfiles()[active_profile_index];
     bool restored_profile = load_saved_profile(initial_profile);
     bool radio_ready = radio_service.begin(initial_profile, on_radio_frame, nullptr);
-    if(!radio_ready && restored_profile) {
+    if(!radio_ready && restored_profile && !radio_service.status().initialized) {
         Serial.println("Lilyshark saved profile failed; retrying its built-in preset");
         restored_profile = false;
         initial_profile = builtinProfiles()[active_profile_index];
@@ -2320,9 +2309,11 @@ void setup()
         }
     }
     update_live_radio_label();
+    const char *radio_state = radio_ready ? "listening" :
+        (radio_service.status().initialized ? "recovering" : "failed");
     Serial.printf("Lilyshark radio: %s%s (%s, error %d)\n", initial_profile.name,
                   restored_profile ? " [saved settings]" : "",
-                  radio_ready ? "listening" : "failed", radio_service.status().last_error);
+                  radio_state, radio_service.status().last_error);
 
     build_current_screen();
     Serial.println("Lilyshark UI ready");
@@ -2356,8 +2347,18 @@ void loop()
     }
     if(now - last_capture_flush_ms >= 5000U) {
         last_capture_flush_ms = now;
-        if(pcap_recording) pcap_sink.flush();
-        if(native_capture_recording) native_capture_sink.flush();
+        if(pcap_recording && !pcap_sink.flush()) {
+            pcap_recording = false;
+            last_pcap_result = PcapWriteResult::SinkError;
+            pcap_sink.close();
+            live_data_dirty = true;
+        }
+        if(native_capture_recording && !native_capture_sink.flush()) {
+            native_capture_recording = false;
+            last_native_capture_result = LilysharkCaptureWriteResult::SinkError;
+            native_capture_sink.close();
+            live_data_dirty = true;
+        }
     }
     if(live_data_dirty && now - last_ui_refresh_ms >= 250U) {
         live_data_dirty = false;

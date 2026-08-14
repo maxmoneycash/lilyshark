@@ -1,4 +1,5 @@
 #include "lilyshark/core/builtin_profiles.h"
+#include "lilyshark/core/profile_tuning.h"
 
 namespace lilyshark {
 namespace {
@@ -6,7 +7,7 @@ namespace {
 RadioProfile makeProfile(std::uint16_t id, const char *name, ProtocolId protocol,
                          std::uint32_t frequency_hz, std::uint32_t bandwidth_hz,
                          std::uint8_t spreading_factor, std::uint8_t coding_rate,
-                         std::uint16_t sync_word, std::uint16_t preamble) noexcept
+                         std::uint16_t sync_word) noexcept
 {
     RadioProfile profile{};
     profile.id = id;
@@ -18,7 +19,10 @@ RadioProfile makeProfile(std::uint16_t id, const char *name, ProtocolId protocol
     profile.spreading_factor = spreading_factor;
     profile.coding_rate_denominator = coding_rate;
     profile.sync_word = sync_word;
-    profile.preamble_symbols = preamble;
+    if (protocol == ProtocolId::Meshtastic) {
+        profile.frequency_tuning_policy = FrequencyTuningPolicy::DefaultHashed;
+    }
+    profile.preamble_symbols = derivePreambleSymbols(profile);
     profile.tx_power_dbm = 10;
     profile.crc_enabled = true;
     profile.implicit_header = false;
@@ -29,17 +33,17 @@ RadioProfile makeProfile(std::uint16_t id, const char *name, ProtocolId protocol
 const RadioProfile profiles[] = {
     // US LongFast center frequency follows Meshtastic's DJB2 slot selection:
     // 902 + 0.125 + (19 * 0.250) = 906.875 MHz.
-    makeProfile(1, "MESHTASTIC US LF", ProtocolId::Meshtastic, 906875000U, 250000U, 11, 5, 0x2b, 16),
+    makeProfile(1, "MESHTASTIC US LF", ProtocolId::Meshtastic, 906875000U, 250000U, 11, 5, 0x2b),
     // MeshCore's current USA/Canada recommendation.
-    makeProfile(2, "MESHCORE US", ProtocolId::MeshCore, 910525000U, 62500U, 7, 5, 0x1424, 32),
+    makeProfile(2, "MESHCORE US", ProtocolId::MeshCore, 910525000U, 62500U, 7, 5, 0x1424),
     // Widely deployed legacy/example MeshCore profile.
-    makeProfile(3, "MESHCORE LEGACY", ProtocolId::MeshCore, 915000000U, 250000U, 10, 5, 0x1424, 16),
+    makeProfile(3, "MESHCORE LEGACY", ProtocolId::MeshCore, 915000000U, 250000U, 10, 5, 0x1424),
     // Official RNode documentation example, intentionally labeled as an
     // example because Reticulum/RNode PHY settings are user-defined.
-    makeProfile(4, "RNODE EXAMPLE EU", ProtocolId::Reticulum, 867200000U, 125000U, 8, 5, 0x1424, 18),
+    makeProfile(4, "RNODE EXAMPLE EU", ProtocolId::Reticulum, 867200000U, 125000U, 8, 5, 0x1424),
     // A US-band starting point for deployment-defined RNode settings. This is
     // not a universal Reticulum channel; tune it to the peer interface.
-    makeProfile(5, "RNODE EXAMPLE US", ProtocolId::Reticulum, 915000000U, 125000U, 8, 5, 0x1424, 18),
+    makeProfile(5, "RNODE EXAMPLE US", ProtocolId::Reticulum, 915000000U, 125000U, 8, 5, 0x1424),
 };
 
 } // namespace

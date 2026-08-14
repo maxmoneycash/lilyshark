@@ -8,6 +8,15 @@
 
 namespace lilyshark {
 
+enum class FrequencyTuningPolicy : std::uint8_t {
+    // MeshCore and Reticulum centers are deployment-defined values.
+    DeploymentDefined = 0,
+    // Meshtastic derives the slot from its primary-channel name hash.
+    DefaultHashed,
+    // A user frequency step selects and then preserves a numeric slot.
+    ExplicitSlot,
+};
+
 struct RadioProfile {
     static constexpr std::size_t kNameCapacity = 24;
 
@@ -17,6 +26,8 @@ struct RadioProfile {
     Modulation modulation = Modulation::LoRa;
     std::uint32_t center_frequency_hz = 0;
     std::uint32_t bandwidth_hz = 0;
+    FrequencyTuningPolicy frequency_tuning_policy = FrequencyTuningPolicy::DeploymentDefined;
+    std::uint16_t frequency_slot = 0;
     std::uint32_t bit_rate_bps = 0;
     std::uint32_t frequency_deviation_hz = 0;
     std::uint16_t preamble_symbols = 0;

@@ -1,6 +1,7 @@
 #include "lilyshark/export/pcap_loratap.h"
 
 #include <cstdint>
+#include <cstring>
 #include <limits>
 
 namespace lilyshark {
@@ -8,6 +9,8 @@ namespace {
 
 constexpr std::size_t kPcapGlobalHeaderSize = 24;
 constexpr std::size_t kPcapRecordHeaderSize = 16;
+constexpr std::size_t kPcapRecordBufferSize =
+    kPcapRecordHeaderSize + kLoraTapV0HeaderSize + kMaxFrameBytes;
 
 void putLe16(std::uint8_t *destination, std::uint16_t value) noexcept
 {
@@ -135,6 +138,9 @@ PcapWriteResult PcapLoraTapWriter::write(const RawFrame &frame) noexcept
     if (!started_) {
         return PcapWriteResult::NotStarted;
     }
+    if (frame.captured_length > kMaxFrameBytes || frame.original_length < frame.captured_length) {
+        return PcapWriteResult::InvalidFrame;
+    }
 
     std::uint8_t bandwidth = 0;
     if (!bandwidthCode(frame.rf.bandwidth_hz, bandwidth)) {
@@ -151,13 +157,13 @@ PcapWriteResult PcapLoraTapWriter::write(const RawFrame &frame) noexcept
     const std::uint32_t original_length =
         static_cast<std::uint32_t>(kLoraTapV0HeaderSize + frame.original_length);
 
-    std::uint8_t prefix[kPcapRecordHeaderSize + kLoraTapV0HeaderSize]{};
-    putLe32(prefix + 0, seconds);
-    putLe32(prefix + 4, microseconds);
-    putLe32(prefix + 8, captured_length);
-    putLe32(prefix + 12, original_length);
+    std::uint8_t record[kPcapRecordBufferSize]{};
+    putLe32(record + 0, seconds);
+    putLe32(record + 4, microseconds);
+    putLe32(record + 8, captured_length);
+    putLe32(record + 12, original_length);
 
-    std::uint8_t *loratap = prefix + kPcapRecordHeaderSize;
+    std::uint8_t *loratap = record + kPcapRecordHeaderSize;
     loratap[0] = 0;
     loratap[1] = 0;
     putBe16(loratap + 2, static_cast<std::uint16_t>(kLoraTapV0HeaderSize));
@@ -170,8 +176,13 @@ PcapWriteResult PcapLoraTapWriter::write(const RawFrame &frame) noexcept
     loratap[13] = encodeSnr(frame.rf);
     loratap[14] = encodeSyncWord(frame.rf.sync_word);
 
-    if (!sink_.write(prefix, sizeof(prefix)) ||
-        (frame.captured_length != 0 && !sink_.write(frame.bytes, frame.captured_length))) {
+    if (frame.captured_length != 0) {
+        std::memcpy(record + kPcapRecordHeaderSize + kLoraTapV0HeaderSize, frame.bytes,
+                    frame.captured_length);
+    }
+    const std::size_t record_size =
+        kPcapRecordHeaderSize + kLoraTapV0HeaderSize + frame.captured_length;
+    if (!sink_.write(record, record_size)) {
         failed_ = true;
         return PcapWriteResult::SinkError;
     }

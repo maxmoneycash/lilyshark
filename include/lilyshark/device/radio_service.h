@@ -24,6 +24,90 @@ struct RadioStatus {
     std::int16_t last_profile_error = 0;
 };
 
+struct LoRaRxMetadata {
+    std::uint8_t coding_rate_denominator = 0;
+    CrcStatus crc = CrcStatus::Unknown;
+};
+
+constexpr std::uint8_t sx126xLoRaCodingRateDenominator(std::uint8_t header_code) noexcept
+{
+    switch (header_code) {
+    case 0:
+        return 0;
+    case 1:
+    case 5:
+        return 5;
+    case 2:
+    case 6:
+        return 6;
+    case 3:
+        return 7;
+    case 4:
+    case 7:
+        return 8;
+    default:
+        return 0;
+    }
+}
+
+constexpr std::uint32_t resolveLoRaRxPresentFields(std::uint32_t present_fields,
+                                                   const LoRaRxMetadata &metadata) noexcept
+{
+    const std::uint32_t coding_rate_field = static_cast<std::uint32_t>(RfFieldCodingRate);
+    const std::uint32_t airtime_field = static_cast<std::uint32_t>(RfFieldAirtime);
+    return metadata.coding_rate_denominator == 0U
+               ? present_fields & ~(coding_rate_field | airtime_field)
+               : present_fields | coding_rate_field | airtime_field;
+}
+
+constexpr LoRaRxMetadata resolveLoRaRxMetadata(bool header_info_available,
+                                                std::uint8_t header_coding_rate,
+                                                bool header_has_crc,
+                                                std::uint8_t configured_coding_rate,
+                                                bool configured_crc_enabled,
+                                                bool crc_failed) noexcept
+{
+    LoRaRxMetadata metadata{};
+    metadata.coding_rate_denominator =
+        header_info_available ? sx126xLoRaCodingRateDenominator(header_coding_rate)
+                              : configured_coding_rate;
+    const bool crc_present = header_info_available ? header_has_crc : configured_crc_enabled;
+    metadata.crc = crc_failed ? CrcStatus::Invalid
+                              : (crc_present ? CrcStatus::Valid : CrcStatus::NotPresent);
+    return metadata;
+}
+
+constexpr LoRaRxMetadata unavailableExplicitLoRaRxMetadata(bool crc_failed) noexcept
+{
+    return LoRaRxMetadata{0U, crc_failed ? CrcStatus::Invalid : CrcStatus::Unknown};
+}
+
+class RadioRecoverySchedule
+{
+  public:
+    void schedule(std::uint32_t now_ms, std::uint32_t delay_ms) noexcept
+    {
+        retry_at_ms_ = now_ms + delay_ms;
+        scheduled_ = true;
+    }
+
+    void clear() noexcept
+    {
+        retry_at_ms_ = 0;
+        scheduled_ = false;
+    }
+
+    bool shouldAttempt(std::uint32_t now_ms, bool spectrum_active) const noexcept
+    {
+        return scheduled_ && !spectrum_active &&
+               static_cast<std::int32_t>(now_ms - retry_at_ms_) >= 0;
+    }
+
+  private:
+    std::uint32_t retry_at_ms_ = 0;
+    bool scheduled_ = false;
+};
+
 #if defined(LILYSHARK_DEVICE)
 
 class TDeckRadioService
@@ -77,6 +161,7 @@ class TDeckRadioService
     std::uint32_t spectrum_point_started_ms_ = 0;
     std::uint32_t spectrum_generation_ = 0;
     std::uint32_t next_receive_retry_ms_ = 0;
+    RadioRecoverySchedule configure_recovery_{};
 
     static TDeckRadioService *instance_;
     static volatile bool dio1_pending_;

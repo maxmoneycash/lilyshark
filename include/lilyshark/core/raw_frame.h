@@ -51,6 +51,7 @@ enum RfField : std::uint32_t {
 // Integer units keep captures stable across desktop and embedded targets.
 // RSSI and SNR use tenths of a decibel so the radio task never needs strings.
 struct RfMetadata {
+    // Monotonic microseconds since device boot. This is not Unix wall time.
     std::uint64_t timestamp_us = 0;
     std::uint32_t present_fields = RfFieldNone;
     std::uint32_t center_frequency_hz = 0;
