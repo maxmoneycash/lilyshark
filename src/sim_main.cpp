@@ -2013,6 +2013,97 @@ bool run_simulator_interaction_test() noexcept
     std::fprintf(stderr, "Lilyshark simulator interaction test passed\n");
     return true;
 }
+
+constexpr std::size_t simulator_frame_pixel_count =
+    static_cast<std::size_t>(theme::screen_width) *
+    static_cast<std::size_t>(theme::screen_height);
+alignas(4) std::array<std::uint16_t, simulator_frame_pixel_count> simulator_frame_buffer{};
+
+void simulator_frame_flush(lv_display_t *display, const lv_area_t *, std::uint8_t *) noexcept
+{
+    lv_display_flush_ready(display);
+}
+
+std::uint64_t hash_simulator_frame() noexcept
+{
+    // Hash logical RGB565 values in a fixed byte order so the golden output is
+    // independent of host endianness.
+    std::uint64_t hash = 14695981039346656037ULL;
+    for(const std::uint16_t pixel : simulator_frame_buffer) {
+        hash ^= static_cast<std::uint8_t>(pixel >> 8U);
+        hash *= 1099511628211ULL;
+        hash ^= static_cast<std::uint8_t>(pixel & 0xffU);
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+bool run_simulator_render_test() noexcept
+{
+    constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
+        0x5be023a703b40378ULL,
+        0x21bdb9b2a5dac652ULL,
+        0x52ca6055741ab80cULL,
+        0xc10d6ea78f5d9e95ULL,
+        0x3cbf2663619237aeULL,
+        0x6bb9662debb8ed87ULL,
+        0x50293e8705d75336ULL,
+        0xba60c5cd5d026f64ULL,
+        0x66e13c696b3242eaULL,
+    }};
+
+    lv_display_t *display = lv_display_create(theme::screen_width, theme::screen_height);
+    if(!expect_simulator_state(display != nullptr, "headless display allocation")) return false;
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, simulator_frame_buffer.data(), nullptr,
+                           sizeof(simulator_frame_buffer), LV_DISPLAY_RENDER_MODE_FULL);
+    lv_display_set_flush_cb(display, simulator_frame_flush);
+
+    std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> observed_hashes{};
+    const std::uint16_t background = lv_color_to_u16(theme::background());
+    bool passed = true;
+    for(std::size_t index = 0; index < static_cast<std::size_t>(Screen::count); ++index) {
+        current_screen = static_cast<Screen>(index);
+        build_current_screen();
+        lv_refr_now(display);
+
+        const std::uint64_t hash = hash_simulator_frame();
+        observed_hashes[index] = hash;
+        std::size_t foreground_pixels = 0;
+        for(const std::uint16_t pixel : simulator_frame_buffer) {
+            if(pixel != background) ++foreground_pixels;
+        }
+
+        std::fprintf(stderr,
+                     "Lilyshark render %s: fnv1a=%016llx foreground=%zu\n",
+                     screen_names[index], static_cast<unsigned long long>(hash),
+                     foreground_pixels);
+        if(foreground_pixels < 1000U) {
+            std::fprintf(stderr, "Simulator render failed: %s is nearly blank\n",
+                         screen_names[index]);
+            passed = false;
+        }
+        if(hash != expected_hashes[index]) {
+            std::fprintf(stderr,
+                         "Simulator render failed: %s expected %016llx\n",
+                         screen_names[index],
+                         static_cast<unsigned long long>(expected_hashes[index]));
+            passed = false;
+        }
+    }
+
+    for(std::size_t left = 0; left < observed_hashes.size(); ++left) {
+        for(std::size_t right = left + 1; right < observed_hashes.size(); ++right) {
+            if(observed_hashes[left] == observed_hashes[right]) {
+                std::fprintf(stderr, "Simulator render failed: %s and %s are identical\n",
+                             screen_names[left], screen_names[right]);
+                passed = false;
+            }
+        }
+    }
+    if(passed) std::fprintf(stderr, "Lilyshark simulator render test passed\n");
+    return passed;
+}
 #endif
 
 void handle_key(lv_event_t * event)
@@ -2028,7 +2119,9 @@ int main(int argc, char ** argv)
     const bool soak_mode = argc > 1 && std::strcmp(argv[1], "--soak") == 0;
     const bool interaction_test_mode =
         argc > 1 && std::strcmp(argv[1], "--interaction-test") == 0;
-    if(argc > 1 && !soak_mode && !interaction_test_mode) {
+    const bool render_test_mode =
+        argc > 1 && std::strcmp(argv[1], "--render-test") == 0;
+    if(argc > 1 && !soak_mode && !interaction_test_mode && !render_test_mode) {
         const int requested = std::atoi(argv[1]);
         if(requested >= 1 && requested <= static_cast<int>(Screen::count)) {
             current_screen = static_cast<Screen>(requested - 1);
@@ -2036,6 +2129,10 @@ int main(int argc, char ** argv)
     }
 
     lv_init();
+
+    if(render_test_mode) {
+        return run_simulator_render_test() ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
 
     lv_display_t * display = lv_sdl_window_create(theme::screen_width, theme::screen_height);
     lv_sdl_window_set_title(display, "Lilyshark Simulator");
@@ -2323,6 +2420,7 @@ void setup()
     device_display.fillScreen(TFT_BLACK);
     pinMode(tdeck::backlight_pin, OUTPUT);
     set_backlight(12);
+    Serial.println("Lilyshark display: ready");
 
     Wire.begin(tdeck::i2c_sda_pin, tdeck::i2c_scl_pin, tdeck::i2c_frequency_hz);
     set_keyboard_brightness(96);

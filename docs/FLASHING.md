@@ -19,10 +19,10 @@ If this is your only T-Deck, plan the return path before flashing. Export the cu
 Clone the exact release tag, then download only the merged factory image and checksum manifest:
 
 ```sh
-git clone --depth 1 --branch v0.1.0-alpha.4 https://github.com/maxmoneycash/lilyshark.git
+git clone --depth 1 --branch v0.1.0-alpha.5 https://github.com/maxmoneycash/lilyshark.git
 cd lilyshark
 mkdir -p dist
-release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.4'
+release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.5'
 curl --fail --location "${release_base}/lilyshark-tdeck.factory.bin" \
   --output dist/lilyshark-tdeck.factory.bin
 curl --fail --location "${release_base}/SHA256SUMS" \
@@ -139,7 +139,28 @@ Use the merged factory image when the installed bootloader or partition table is
 
 ## Watch the first boot
 
-Open the serial monitor at 115200 baud after flashing:
+Insert a writable microSD card, then run the bounded startup checker with the
+exact T-Deck serial port:
+
+```sh
+python3 scripts/smoke_tdeck.py /dev/cu.usbmodem1101 \
+  --seconds 20 \
+  --log /tmp/lilyshark-first-boot.log
+```
+
+On Linux, use the exact `/dev/ttyACM*` path. `--auto` is also available, but it
+continues only when exactly one eligible USB modem or ACM device exists. The
+checker reads at 115200 baud for a fixed interval. It does not flash the device
+or send serial data. If no startup lines appear after it begins listening,
+press the T-Deck reset button once.
+
+A pass means one boot reached the display, touch, PCAP capture, native capture,
+SX1262 listening, and UI-ready milestones without a fatal message. A missing
+microSD card, failed peripheral, radio recovery state, missing milestone, or
+restart produces a nonzero exit status and names the failed check. Keep the raw
+log with the firmware build being tested.
+
+For an open-ended interactive session, use PlatformIO's serial monitor:
 
 ```sh
 uvx --from platformio==6.1.19 platformio device monitor \

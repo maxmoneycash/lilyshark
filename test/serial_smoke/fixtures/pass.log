@@ -1,0 +1,8 @@
+ESP-ROM:esp32s3-20210327
+Lilyshark starting
+Lilyshark display: ready
+Lilyshark touch: ready (0x5D)
+Lilyshark SD capture: recording /lilyshark/capture-0001.pcap
+Lilyshark native capture: recording /lilyshark/capture-0001.lscap
+Lilyshark radio: Meshtastic Default (listening, error 0)
+Lilyshark UI ready

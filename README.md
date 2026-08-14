@@ -205,9 +205,9 @@ The scan state machine gives the SX1262 exclusive ownership during a sweep. It h
 
 | Area | Evidence in this repository | Physical T-Deck status |
 | --- | --- | --- |
-| Nine-screen LVGL interface | Simulator builds and runs with checked-in preview images | Pending display smoke test |
-| T-Deck hardware target | Pinned PlatformIO environment produces app, factory, and ELF artifacts | Boot not yet observed on hardware |
-| SX1262 frame capture | RadioLib service, ISR handoff, CRC-mismatch path, bounded store, tests around core records | Reception and long-run recovery pending |
+| Nine-screen LVGL interface | Exact 320x240 framebuffer comparisons, interaction tests, and checked-in previews cover every view | Pending display smoke test |
+| T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts; a bounded read-only serial checker verifies first-boot milestones | Boot not yet observed on hardware |
+| SX1262 frame capture | The real radio service runs against host fakes covering configure, IRQ/read/rearm order, CRC mismatch, retry, scan, restore, and recovery | Reception and long-run recovery pending |
 | Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Live over-air sample pending |
 | MeshCore decoder | Version 1 structural and malformed-frame tests | Live over-air sample pending |
 | Reticulum/RNode decoder | Header-one/header-two, IFAC-marker, split, and malformed-frame tests | Live RNode sample pending |
@@ -219,7 +219,7 @@ The scan state machine gives the SX1262 exclusive ownership during a sweep. It h
 | Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | ADC calibration and serial receiver test pending |
 | Spectrum scan | Request/result tests plus radio restore state machine | Experimental; complete hardware validation pending |
 
-The host suite compiles with warnings as errors and runs under AddressSanitizer and UndefinedBehaviorSanitizer. The checked-in GitHub Actions workflow is configured to run the same suite, build both targets, and upload firmware artifacts after a successful workflow run.
+The host suite compiles with warnings as errors and runs under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator test renders every view into a full 320x240 RGB565 buffer and checks its exact pixels, content threshold, and uniqueness. The serial checker is fixture-tested and reads without writing to the port. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
 
 ## Build and test
 
@@ -287,6 +287,13 @@ Pass a view number to open that screen at launch:
 .pio/build/simulator/program 2
 ```
 
+Render all nine views without opening an SDL window and compare their exact
+framebuffers with the checked-in expectations:
+
+```sh
+.pio/build/simulator/program --render-test
+```
+
 Run the simulator as one long-lived process that rebuilds every view once per second. With no argument, the runner stops after 24 hours and fails on an early exit or fatal diagnostic:
 
 ```sh
@@ -310,7 +317,7 @@ The guarded flash script accepts an explicit serial device, verifies the factory
 # ./scripts/flash_tdeck.sh /dev/ttyACM0         # Linux example
 ```
 
-`./scripts/flash_tdeck.sh --auto` proceeds only when it finds exactly one eligible USB modem or ACM serial device. The script stops when the port, artifact, or checksum is ambiguous.
+`./scripts/flash_tdeck.sh --auto` proceeds only when it finds exactly one eligible USB modem or ACM serial device. The script stops when the port, artifact, or checksum is ambiguous. After flashing, `scripts/smoke_tdeck.py` records a bounded 115200-baud startup log and checks the display, touch, storage, radio, and UI milestones without sending data to the device.
 
 Use the factory image for a fresh install. The application-only image at `0x10000` is for updates on a T-Deck that already has the matching Lilyshark bootloader and partition table. Full instructions, serial monitoring, expected files, and recovery boundaries are in [docs/FLASHING.md](docs/FLASHING.md).
 
