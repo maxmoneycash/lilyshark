@@ -289,6 +289,29 @@ void testMeshCoreProtectedAndMalformedFrames()
     assert(decoded.kind == PacketKind::Unknown);
     assert(static_cast<std::uint8_t>(MeshCoreDecoder::payloadType(decoded)) == 12U);
 
+    // MeshCore d9296435 Packet::writeTo and Mesh::createRawData permit a
+    // RAW_CUSTOM frame with an empty payload. Its path descriptor is still
+    // present, so this valid frame ends at byte two.
+    const std::uint8_t empty_raw_custom_bytes[] = {0x3d, 0x00};
+    RawFrame empty_raw_custom{};
+    assert(empty_raw_custom.assignPayload(empty_raw_custom_bytes, sizeof(empty_raw_custom_bytes)));
+    assert(registry.decode(empty_raw_custom, profile, decoded) == DecodeResult::Matched);
+    assert(decoded.state == DecodeState::HeaderOnly);
+    assert(decoded.kind == PacketKind::Data);
+    assert(MeshCoreDecoder::payloadType(decoded) == MeshCorePayloadType::RawCustom);
+    assert(decoded.payload_offset == 2);
+    assert(decoded.payload_length == 0);
+
+    constexpr std::uint8_t empty_payload_types[] = {10U, 11U, 12U, 13U, 14U};
+    for(const std::uint8_t payload_type : empty_payload_types) {
+        const std::uint8_t empty_payload_bytes[] = {
+            static_cast<std::uint8_t>((payload_type << 2U) | 0x01U), 0x00U};
+        RawFrame empty_payload{};
+        assert(empty_payload.assignPayload(empty_payload_bytes, sizeof(empty_payload_bytes)));
+        assert(registry.decode(empty_payload, profile, decoded) == DecodeResult::Malformed);
+        assert(decoded.state == DecodeState::Malformed);
+    }
+
     const std::uint8_t invalid_path_bytes[] = {0x01, 0xc1, 0xaa};
     RawFrame invalid_path{};
     assert(invalid_path.assignPayload(invalid_path_bytes, sizeof(invalid_path_bytes)));

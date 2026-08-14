@@ -24,6 +24,7 @@
 #include "theme.h"
 #if defined(LILYSHARK_DEVICE)
 #include "lilyshark/core/builtin_profiles.h"
+#include "lilyshark/core/monotonic_time.h"
 #include "lilyshark/core/capture_runtime.h"
 #include "lilyshark/core/profile_settings.h"
 #include "lilyshark/core/profile_tuning.h"
@@ -31,6 +32,7 @@
 #include "lilyshark/device/hardware_status.h"
 #include "lilyshark/device/radio_service.h"
 #include "lilyshark/device/screenshot.h"
+#include "lilyshark/device/tdeck_display_init.h"
 #include "lilyshark/device/touch.h"
 #include "lilyshark/device/tdeck_sd_sink.h"
 #include "lilyshark/export/lilyshark_capture.h"
@@ -2289,7 +2291,7 @@ void poll_touch()
     }
 
     const uint32_t now = millis();
-    if(now < next_poll_ms) return;
+    if(!monotonicDeadlineReached(now, next_poll_ms)) return;
     next_poll_ms = now + 16U;
 
     const bool was_pressed = touch_was_pressed;
@@ -2370,7 +2372,7 @@ void poll_keyboard()
 {
     static uint32_t next_read_ms = 0;
     const uint32_t now = millis();
-    if(now < next_read_ms) return;
+    if(!monotonicDeadlineReached(now, next_read_ms)) return;
     next_read_ms = now + 20;
 
     const uint8_t received = Wire.requestFrom(tdeck::keyboard_address, static_cast<uint8_t>(1));
@@ -2408,17 +2410,19 @@ void setup()
     pinMode(tdeck::sd_cs_pin, OUTPUT);
     pinMode(tdeck::radio_cs_pin, OUTPUT);
     pinMode(tdeck::display_cs_pin, OUTPUT);
+    pinMode(tdeck::backlight_pin, OUTPUT);
     digitalWrite(tdeck::sd_cs_pin, HIGH);
     digitalWrite(tdeck::radio_cs_pin, HIGH);
     digitalWrite(tdeck::display_cs_pin, HIGH);
+    digitalWrite(tdeck::backlight_pin, LOW);
     delay(500);
 
     pinMode(tdeck::spi_miso_pin, INPUT_PULLUP);
     SPI.begin(tdeck::spi_sck_pin, tdeck::spi_miso_pin, tdeck::spi_mosi_pin);
     device_display.begin();
+    applyTDeckDisplayInit(device_display);
     device_display.setRotation(1);
     device_display.fillScreen(TFT_BLACK);
-    pinMode(tdeck::backlight_pin, OUTPUT);
     set_backlight(12);
     Serial.println("Lilyshark display: ready");
 
@@ -2523,7 +2527,9 @@ void loop()
     }
     if(now - last_hardware_ui_refresh_ms >= 1000U) {
         last_hardware_ui_refresh_ms = now;
-        redraw = update_live_hardware_labels() || update_live_radio_label() || redraw;
+        const bool hardware_labels_changed = update_live_hardware_labels();
+        const bool radio_label_changed = update_live_radio_label();
+        redraw = hardware_labels_changed || radio_label_changed || redraw;
     }
     if(now - last_capture_flush_ms >= 5000U) {
         last_capture_flush_ms = now;
@@ -2543,7 +2549,7 @@ void loop()
     if(live_data_dirty && now - last_ui_refresh_ms >= 250U) {
         live_data_dirty = false;
         last_ui_refresh_ms = now;
-        if(current_screen != Screen::spectrum && current_screen != Screen::map) {
+        if(current_screen != Screen::map) {
             redraw = true;
         }
     }

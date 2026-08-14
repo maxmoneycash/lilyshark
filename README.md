@@ -206,20 +206,20 @@ The scan state machine gives the SX1262 exclusive ownership during a sweep. It h
 | Area | Evidence in this repository | Physical T-Deck status |
 | --- | --- | --- |
 | Nine-screen LVGL interface | Exact 320x240 framebuffer comparisons, interaction tests, and checked-in previews cover every view | Pending display smoke test |
-| T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts; a bounded read-only serial checker verifies first-boot milestones | Boot not yet observed on hardware |
+| T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts. A host test checks every command, data byte, and delay in the panel initialization sequence against LilyGO T-Deck commit `274ddaa`. TFT_eSPI 2.5.43 is pinned with the upstream one-line SPI2 register fix at [`880ec0e`](https://github.com/maxmoneycash/TFT_eSPI/commit/880ec0e4657c0de56d28cc250bdbbe863386021e), and a compile-time guard rejects an invalid ESP32-S3 register base. The device shell also runs against host peripheral fakes. | Boot and panel output not yet observed on hardware |
 | SX1262 frame capture | The real radio service runs against host fakes covering configure, IRQ/read/rearm order, CRC mismatch, retry, scan, restore, and recovery | Reception and long-run recovery pending |
 | Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Live over-air sample pending |
-| MeshCore decoder | Version 1 structural and malformed-frame tests | Live over-air sample pending |
+| MeshCore decoder | Version 1 structural and malformed-frame tests, including the legal empty `RAW_CUSTOM` form | Live over-air sample pending |
 | Reticulum/RNode decoder | Header-one/header-two, IFAC-marker, split, and malformed-frame tests | Live RNode sample pending |
 | Radio profile tuning | Sanitizer tests cover regional frequency stepping, BW, SF, CR, and persisted-value validation | Keyboard tuning and restart persistence pending |
 | `.lscap` export | Byte-exact writer tests and documented v1 layout | microSD write test pending |
 | LoRaTap PCAP | Byte-exact writer tests for the DLT 270 record layout | microSD and desktop-open test pending |
 | BMP screenshots | RGB565-to-BMP tests and unique-path device writer | Display readback and microSD test pending |
-| Touch, keyboard, and trackball | Input services compile; touch transform has host tests | Calibration and interaction test pending |
+| Touch, keyboard, and trackball | Input services compile; host tests cover the touch transform and polling deadlines across the 32-bit `millis()` rollover | On-device input, calibration, and interaction tests pending |
 | Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | ADC calibration and serial receiver test pending |
 | Spectrum scan | Request/result tests plus radio restore state machine | Experimental; complete hardware validation pending |
 
-The host suite compiles with warnings as errors and runs under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator test renders every view into a full 320x240 RGB565 buffer and checks its exact pixels, content threshold, and uniqueness. The serial checker is fixture-tested and reads without writing to the port. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
+The standalone C++ tests compile with warnings as errors and run under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator test renders every view into a full 320x240 RGB565 buffer and checks its exact pixels, content threshold, and uniqueness. The serial checker is fixture-tested and reads without writing to the port. Alpha.6 also executes the device setup and loop under AddressSanitizer and UndefinedBehaviorSanitizer through host peripheral fakes, including startup ordering and missing-hardware behavior. These checks do not replace the pending physical display and input smoke tests. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
 
 ## Build and test
 
