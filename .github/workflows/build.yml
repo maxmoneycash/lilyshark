@@ -56,9 +56,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  verify-artifact:
+    needs: test-and-build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download staged firmware
+        uses: actions/download-artifact@v8
+        with:
+          name: lilyshark-tdeck-${{ github.sha }}
+          path: dist
+
+      - name: Verify staged firmware checksums
+        run: cd dist && sha256sum --check SHA256SUMS
+
   publish-alpha:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: test-and-build
+    needs: [test-and-build, verify-artifact]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
