@@ -172,6 +172,20 @@ for screen in 1 2 3 4 5 6 7 8 9; do
   fi
 done
 
+echo "Testing simulator navigation and state transitions"
+interaction_log="${test_dir}/simulator-interaction.log"
+set +e
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+  "${timeout_command}" 10 .pio/build/simulator/program --interaction-test >"${interaction_log}" 2>&1
+interaction_result=$?
+set -e
+if [[ ${interaction_result} -ne 0 ]] || \
+   ! grep -q '^Lilyshark simulator interaction test passed$' "${interaction_log}"; then
+  echo "Simulator interaction test did not complete" >&2
+  cat "${interaction_log}" >&2
+  exit 1
+fi
+
 echo "Smoke testing continuous simulator cycling"
 soak_log="${test_dir}/simulator-soak.log"
 set +e
