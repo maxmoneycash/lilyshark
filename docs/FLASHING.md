@@ -19,10 +19,10 @@ If this is your only T-Deck, plan the return path before flashing. Export the cu
 Clone the exact release tag, then download only the merged factory image and checksum manifest:
 
 ```sh
-git clone --depth 1 --branch v0.1.0-alpha.5 https://github.com/maxmoneycash/lilyshark.git
+git clone --depth 1 --branch v0.1.0-alpha.6 https://github.com/maxmoneycash/lilyshark.git
 cd lilyshark
 mkdir -p dist
-release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.5'
+release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.6'
 curl --fail --location "${release_base}/lilyshark-tdeck.factory.bin" \
   --output dist/lilyshark-tdeck.factory.bin
 curl --fail --location "${release_base}/SHA256SUMS" \

@@ -135,6 +135,9 @@ build_and_run radio_service_integration \
 build_and_run radio_recovery \
   test/radio_recovery/test_radio_recovery.cpp
 
+build_and_run monotonic_time \
+  test/monotonic_time/test_monotonic_time.cpp
+
 build_and_run radio_metadata \
   test/radio_metadata/test_radio_metadata.cpp
 
@@ -145,6 +148,9 @@ build_and_run touch_mapping \
 build_and_run screenshot \
   src/device/screenshot.cpp \
   test/screenshot/test_screenshot.cpp
+
+build_and_run tdeck_display_init \
+  test/tdeck_display_init/test_tdeck_display_init.cpp
 
 echo "Testing lscap_reader"
 python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
@@ -188,6 +194,9 @@ pio=(
 
 echo "Building simulator"
 "${pio[@]}" run -e simulator
+
+echo "Testing the real T-Deck setup and loop under native hardware fakes"
+"${pio[@]}" test -e device-shell-test -f test_device_shell
 
 if command -v timeout >/dev/null 2>&1; then
   timeout_command="$(command -v timeout)"

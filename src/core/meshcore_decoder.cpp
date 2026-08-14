@@ -104,7 +104,11 @@ DecodeResult MeshCoreDecoder::decode(const RawFrame &frame, const RadioProfile &
     }
     cursor += path_bytes;
 
-    if (cursor >= frame.captured_length) {
+    // Dispatcher::tryParsePacket accepts a zero-length remainder, and
+    // Mesh::createRawData can emit one. Keep that documented RAW_CUSTOM edge
+    // without presenting empty known control or multipart packets as valid.
+    if (cursor == frame.captured_length &&
+        type != static_cast<std::uint8_t>(MeshCorePayloadType::RawCustom)) {
         return malformed(output);
     }
 

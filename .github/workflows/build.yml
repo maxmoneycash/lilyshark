@@ -82,7 +82,11 @@ jobs:
 
           This build has passed the sanitizer-backed host suite, all nine simulator smoke tests, the pinned ESP32-S3 build, and byte-level factory-image validation. It has not yet completed the physical T-Deck smoke test, so treat it as test firmware and report the first-boot serial log.
 
-          This alpha adds a bounded read-only first-boot serial checker, direct host execution of the real radio-service state machine, and exact 320x240 pixel checks for every simulator view. These checks strengthen the software evidence while the physical T-Deck smoke test remains pending.
+          Alpha.6 fixes two T-Deck display setup bugs. TFT_eSPI 2.5.43 ignored the configured `INIT_SEQUENCE_2` flag, so Lilyshark now applies the exact LilyGO command sequence pinned to T-Deck commit `274ddaa0d04fcf8acd43643f52d81c565326c984`. Its default ESP32-S3 port mapping also resolved direct SPI writes to address zero under Arduino 2.0.17. Lilyshark pins the upstream one-line SPI2 correction on top of 2.5.43, preserves the shared global SPI object, and fails compilation if the register base is invalid. The backlight stays off through panel initialization and landscape rotation. It turns on after the initial black fill. A host test checks every command, data byte, and delay. Physical panel output remains pending.
+
+          Input polling now remains correct across the ESP32 `millis()` rollover. Status refreshes evaluate hardware and radio changes independently. The MeshCore decoder accepts the legal empty `RAW_CUSTOM` frame.
+
+          Alpha.6 adds host execution of the device setup and loop through peripheral fakes. It retains alpha.5's bounded read-only serial checker, direct fake-backed execution of the real radio-service state machine, and exact 320x240 render checks for all nine views.
 
           - Flash `lilyshark-tdeck.factory.bin` at `0x0` for a fresh install.
           - Use `lilyshark-tdeck.bin` at `0x10000` only with the matching Lilyshark bootloader and partition table.
