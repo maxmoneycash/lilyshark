@@ -1,11 +1,20 @@
-# Lilyshark
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/lilyshark-wordmark-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/brand/lilyshark-wordmark-black.svg">
+    <img src="assets/brand/lilyshark-wordmark-black.svg" alt="" width="520">
+  </picture>
+</p>
 
-**A watch-only Meshtastic field analyzer for the LILYGO T-Deck.**
+<h1 align="center">Lilyshark</h1>
+<p align="center"><strong>A watch-only Meshtastic field analyzer for the LILYGO T-Deck.</strong></p>
 
-[![Status: UI prototype](https://img.shields.io/badge/status-UI%20prototype-F2CE58)](#project-status)
-[![Target: LILYGO T-Deck](https://img.shields.io/badge/target-LILYGO%20T--Deck-66F05A)](#target-hardware)
-[![LVGL 9.3](https://img.shields.io/badge/LVGL-9.3-71D8DF)](https://lvgl.io/)
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-F0F4EF)](LICENSE)
+<p align="center">
+  <a href="#project-status"><img alt="Status: UI prototype" src="https://img.shields.io/badge/status-UI%20prototype-F2CE58"></a>
+  <a href="#target-hardware"><img alt="Target: LILYGO T-Deck" src="https://img.shields.io/badge/target-LILYGO%20T--Deck-66F05A"></a>
+  <a href="https://lvgl.io/"><img alt="LVGL 9.3" src="https://img.shields.io/badge/LVGL-9.3-71D8DF"></a>
+  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-F0F4EF"></a>
+</p>
 
 Lilyshark is being built to turn a second T-Deck into a dedicated instrument for understanding a Meshtastic network. It will watch packet traffic, radio activity, node health, routing metadata, and failures on the device itself.
 
@@ -195,6 +204,7 @@ Pass a number on launch to open a specific screen:
 include/theme.h             Shared colors, spacing, typography, and LVGL helpers
 src/sim_main.cpp            Simulator shell and all nine diagnostic screens
 src/fonts/                  Generated LVGL font sources
+assets/brand/               Transparent SVG wordmark and color variants
 assets/fonts/               Original OFL font files and licenses
 design/references/          Ten target hardware mockups and their screen map
 platformio.ini              Reproducible native simulator environment
