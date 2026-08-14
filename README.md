@@ -28,7 +28,7 @@ The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/rele
 ## What Lilyshark shows
 
 - A live frame feed with capture time, protocol, source and destination when the protocol exposes them, packet type, route or hop data, and SNR
-- Packet detail with decoded header fields, integrity state, complete RF metadata, and a raw hex view
+- Packet detail with decoded header fields, integrity state, available RF metadata, and a raw hex view
 - Protocol-aware node activity and short signal histories when a stable node identity is available
 - A color spectrum view built from the SX1262 spectral-scan histogram
 - Channel activity, observed airtime, packet rate, CRC failures, and recent utilization
@@ -132,7 +132,35 @@ Insert a writable microSD card before boot. Lilyshark mounts it, creates `/lilys
 | LoRaTap PCAP | `/lilyshark/capture-####.pcap` | Standard PCAP with DLT 270 LoRaTap records for Wireshark and compatible tools. |
 | Screenshot | `/lilyshark/screenshot-####.bmp` | Pixel-exact 320x240, uncompressed 24-bit BMP captured from the device display when `S` is pressed. |
 
-LoRaTap v0 cannot represent every bandwidth exactly. The included MeshCore 62.5 kHz profile therefore continues recording `.lscap` while the Events view reports the PCAP bandwidth limit. Profiles at 125 kHz or exact multiples can produce LoRaTap records. Capture sinks flush every five seconds during normal operation.
+LoRaTap v0 cannot represent every bandwidth exactly. The included MeshCore 62.5 kHz profile therefore continues recording `.lscap` while the Events view reports the PCAP bandwidth limit. Profiles at 125 kHz or exact multiples can produce LoRaTap records. Capture sinks flush every five seconds during normal operation. A short write or a post-flush size mismatch closes that file and latches a storage error; after reinserting a card, reboot Lilyshark to open new capture files.
+
+Capture timestamps are monotonic microseconds since boot. That preserves order
+and intervals, but the original T-Deck has no dependable real-time clock, so
+classic PCAP cannot provide trustworthy wall time yet. Wireshark may display a
+1970-era absolute date; use its relative-time columns for these captures.
+
+Validate a capture on the host before processing it:
+
+```sh
+python3 scripts/lscap.py validate capture-0001.lscap
+```
+
+Dump the file header followed by one JSON object per frame, which works well
+with streaming tools such as `jq`:
+
+```sh
+python3 scripts/lscap.py dump capture-0001.lscap
+```
+
+Use `--pretty` when you want one indented JSON document with a `records` array:
+
+```sh
+python3 scripts/lscap.py dump --pretty capture-0001.lscap
+```
+
+The reader keeps signed RF values as signed JSON numbers. It also includes the
+raw enum and flag values, readable names for known values, unknown flag bits,
+reserved bytes, header extensions, and the payload as hexadecimal.
 
 Saving a BMP uses the display and microSD on the shared SPI bus. Reception stays armed, but polling pauses while the image is written, so a busy channel can lose frames. The Events view reports the measured screenshot capture gap.
 
@@ -215,6 +243,18 @@ Run the sanitizer-backed C++ tests without PlatformIO builds:
 ./scripts/build_release.sh
 ```
 
+The release build pins compiler date and time macros to the current Git commit.
+To prove determinism on the same host with the pinned toolchain, run two
+forced-clean builds and compare every output byte:
+
+```sh
+./scripts/verify_reproducible_release.sh
+```
+
+GitHub Actions is the canonical release environment (`ubuntu-24.04`). A build
+on another operating system can embed different tool paths, so use the tagged
+release assets when you need the published checksums exactly.
+
 The script runs the pinned T-Deck build and writes:
 
 ```text
@@ -227,7 +267,8 @@ dist/SHA256SUMS                   SHA-256 checksums
 The equivalent direct firmware build is:
 
 ```sh
-uvx --with pip==25.2 --with intelhex==2.3.0 --from platformio==6.1.19 \
+SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" \
+  uvx --with pip==25.2 --with intelhex==2.3.0 --from platformio==6.1.19 \
   platformio run -e t-deck
 ```
 
@@ -311,7 +352,7 @@ The T-Deck is the first hardware target. The capture record, decoder registry, a
 
 - [x] Build all nine reference-driven simulator screens.
 - [x] Add the ESP32-S3/T-Deck target and reproducible factory image.
-- [x] Capture SX1262 frames and CRC mismatches with complete available RF metadata.
+- [x] Capture SX1262 frames and CRC mismatches with configured channel settings, measured signal metrics, and explicit-header coding-rate/CRC metadata.
 - [x] Add profile-gated structural decoders for Meshtastic, MeshCore, and Reticulum/RNode.
 - [x] Add persistent on-device frequency, bandwidth, spreading-factor, and coding-rate tuning.
 - [x] Add `.lscap`, LoRaTap PCAP, and BMP output on microSD.

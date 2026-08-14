@@ -9,6 +9,7 @@ from pathlib import Path
 
 BOOTLOADER_OFFSET = 0x0000
 PARTITIONS_OFFSET = 0x8000
+BOOT_APP_OFFSET = 0xE000
 APPLICATION_OFFSET = 0x10000
 
 
@@ -18,6 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app", required=True, type=Path)
     parser.add_argument("--bootloader", required=True, type=Path)
     parser.add_argument("--partitions", required=True, type=Path)
+    parser.add_argument("--boot-app", required=True, type=Path)
     return parser.parse_args()
 
 
@@ -49,6 +51,7 @@ def main() -> None:
     app = read_nonempty(args.app)
     bootloader = read_nonempty(args.bootloader)
     partitions = read_nonempty(args.partitions)
+    boot_app = read_nonempty(args.boot_app)
 
     if bootloader[0] != 0xE9:
         raise SystemExit("bootloader does not start with an ESP image header")
@@ -57,11 +60,13 @@ def main() -> None:
 
     require_slice(factory, BOOTLOADER_OFFSET, bootloader, "bootloader")
     require_slice(factory, PARTITIONS_OFFSET, partitions, "partition table")
+    require_slice(factory, BOOT_APP_OFFSET, boot_app, "OTA boot selector")
     require_slice(factory, APPLICATION_OFFSET, app, "application")
 
     print(
         "Factory image verified: "
         f"bootloader {len(bootloader)} B, partitions {len(partitions)} B, "
+        f"boot selector {len(boot_app)} B, "
         f"application {len(app)} B"
     )
 

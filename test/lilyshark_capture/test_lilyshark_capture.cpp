@@ -14,8 +14,15 @@ using namespace lilyshark;
 class FixedSink final : public ByteSink
 {
   public:
+    explicit FixedSink(std::size_t fail_on_write = 0) noexcept : fail_on_write_(fail_on_write) {}
+
     bool write(const std::uint8_t *data, std::size_t length) noexcept override
     {
+        ++write_count_;
+        last_write_length_ = length;
+        if (write_count_ == fail_on_write_) {
+            return false;
+        }
         if ((data == nullptr && length != 0) || size_ + length > bytes_.size()) {
             return false;
         }
@@ -28,10 +35,15 @@ class FixedSink final : public ByteSink
 
     const std::uint8_t *data() const noexcept { return bytes_.data(); }
     std::size_t size() const noexcept { return size_; }
+    std::size_t writeCount() const noexcept { return write_count_; }
+    std::size_t lastWriteLength() const noexcept { return last_write_length_; }
 
   private:
     std::array<std::uint8_t, 512> bytes_{};
     std::size_t size_ = 0;
+    std::size_t fail_on_write_ = 0;
+    std::size_t write_count_ = 0;
+    std::size_t last_write_length_ = 0;
 };
 
 FrameRecord makeRecord()
@@ -82,6 +94,7 @@ void testExactVersionOneBytesAnd62500HzBandwidth()
     assert(writer.begin() == LilysharkCaptureWriteResult::Ok);
     assert(writer.begin() == LilysharkCaptureWriteResult::AlreadyStarted);
     assert(writer.write(makeRecord()) == LilysharkCaptureWriteResult::Ok);
+    assert(sink.writeCount() == 2);
 
     const std::uint8_t expected[] = {
         // File header.
@@ -134,11 +147,34 @@ void testInvalidFrameDoesNotWritePartialRecord()
     frame.original_length = frame.captured_length - 1;
     assert(writer.write(frame) == LilysharkCaptureWriteResult::InvalidFrame);
     assert(sink.size() == header_size);
+    assert(sink.writeCount() == 1);
 
     frame = makeRecord().raw;
     frame.captured_length = static_cast<std::uint16_t>(kMaxFrameBytes + 1);
+    frame.original_length = frame.captured_length;
     assert(writer.write(frame) == LilysharkCaptureWriteResult::InvalidFrame);
     assert(sink.size() == header_size);
+    assert(sink.writeCount() == 1);
+}
+
+void testFailedRecordWriteLeavesOnlyFileHeader()
+{
+    FixedSink sink{2};
+    LilysharkCaptureWriter writer(sink);
+    assert(writer.begin() == LilysharkCaptureWriteResult::Ok);
+    const std::size_t header_size = sink.size();
+
+    RawFrame frame = makeRecord().raw;
+    frame.captured_length = static_cast<std::uint16_t>(kMaxFrameBytes);
+    frame.original_length = frame.captured_length;
+    assert(writer.write(frame) == LilysharkCaptureWriteResult::SinkError);
+
+    assert(sink.writeCount() == 2);
+    assert(sink.lastWriteLength() == kLilysharkCaptureRecordHeaderSize + kMaxFrameBytes);
+    assert(sink.size() == header_size);
+    assert(writer.failed());
+    assert(writer.write(frame) == LilysharkCaptureWriteResult::SinkError);
+    assert(sink.writeCount() == 2);
 }
 
 } // namespace
@@ -148,6 +184,7 @@ int main()
     testExactVersionOneBytesAnd62500HzBandwidth();
     testBareFrameUsesZeroSequence();
     testInvalidFrameDoesNotWritePartialRecord();
+    testFailedRecordWriteLeavesOnlyFileHeader();
     std::puts("Lilyshark capture tests passed");
     return 0;
 }

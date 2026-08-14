@@ -14,8 +14,15 @@ using namespace lilyshark;
 class FixedSink final : public ByteSink
 {
   public:
+    explicit FixedSink(std::size_t fail_on_write = 0) noexcept : fail_on_write_(fail_on_write) {}
+
     bool write(const std::uint8_t *data, std::size_t length) noexcept override
     {
+        ++write_count_;
+        last_write_length_ = length;
+        if (write_count_ == fail_on_write_) {
+            return false;
+        }
         if ((data == nullptr && length != 0) || size_ + length > bytes_.size()) {
             return false;
         }
@@ -28,10 +35,15 @@ class FixedSink final : public ByteSink
 
     const std::uint8_t *data() const noexcept { return bytes_.data(); }
     std::size_t size() const noexcept { return size_; }
+    std::size_t writeCount() const noexcept { return write_count_; }
+    std::size_t lastWriteLength() const noexcept { return last_write_length_; }
 
   private:
     std::array<std::uint8_t, 1024> bytes_{};
     std::size_t size_ = 0;
+    std::size_t fail_on_write_ = 0;
+    std::size_t write_count_ = 0;
+    std::size_t last_write_length_ = 0;
 };
 
 void expectBytes(const FixedSink &sink, const std::uint8_t *expected, std::size_t length)
@@ -66,6 +78,7 @@ void testExactGlobalHeaderAndPacketBytes()
     assert(writer.begin() == PcapWriteResult::Ok);
     assert(writer.begin() == PcapWriteResult::AlreadyStarted);
     assert(writer.write(makeFrame()) == PcapWriteResult::Ok);
+    assert(sink.writeCount() == 2);
 
     const std::uint8_t expected[] = {
         // Classic PCAP, little endian, v2.4, snaplen 270, DLT_LORATAP 270.
@@ -151,6 +164,48 @@ void testMalformedBandwidthWritesNothing()
     assert(sink.size() == header_size);
 }
 
+void testMalformedFrameLengthsWriteNothing()
+{
+    FixedSink sink{};
+    PcapLoraTapWriter writer(sink);
+    assert(writer.begin() == PcapWriteResult::Ok);
+    const std::size_t header_size = sink.size();
+
+    RawFrame frame = makeFrame();
+    frame.original_length = static_cast<std::uint16_t>(frame.captured_length - 1U);
+    assert(writer.write(frame) == PcapWriteResult::InvalidFrame);
+    assert(sink.size() == header_size);
+    assert(sink.writeCount() == 1);
+
+    frame = makeFrame();
+    frame.captured_length = static_cast<std::uint16_t>(kMaxFrameBytes + 1U);
+    frame.original_length = frame.captured_length;
+    assert(writer.write(frame) == PcapWriteResult::InvalidFrame);
+    assert(sink.size() == header_size);
+    assert(sink.writeCount() == 1);
+    assert(!writer.failed());
+}
+
+void testFailedRecordWriteLeavesOnlyGlobalHeader()
+{
+    FixedSink sink{2};
+    PcapLoraTapWriter writer(sink);
+    assert(writer.begin() == PcapWriteResult::Ok);
+    const std::size_t header_size = sink.size();
+
+    RawFrame frame = makeFrame();
+    frame.captured_length = static_cast<std::uint16_t>(kMaxFrameBytes);
+    frame.original_length = frame.captured_length;
+    assert(writer.write(frame) == PcapWriteResult::SinkError);
+
+    assert(sink.writeCount() == 2);
+    assert(sink.lastWriteLength() == 16U + kPcapCaptureLength);
+    assert(sink.size() == header_size);
+    assert(writer.failed());
+    assert(writer.write(frame) == PcapWriteResult::SinkError);
+    assert(sink.writeCount() == 2);
+}
+
 } // namespace
 
 int main()
@@ -159,6 +214,8 @@ int main()
     testFrameRecordAndOriginalLength();
     testUnknownRssiNormalizedSyncAndSnrClamping();
     testMalformedBandwidthWritesNothing();
+    testMalformedFrameLengthsWriteNothing();
+    testFailedRecordWriteLeavesOnlyGlobalHeader();
     std::puts("pcap export tests passed");
     return 0;
 }

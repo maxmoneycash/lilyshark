@@ -88,8 +88,19 @@ build_and_run decoder_stress \
   test/decoder_stress/test_decoder_stress.cpp
 
 build_and_run profile_tuning \
+  src/core/builtin_profiles.cpp \
   src/core/profile_tuning.cpp \
   test/profile_tuning/test_profile_tuning.cpp
+
+build_and_run profile_settings \
+  src/core/builtin_profiles.cpp \
+  src/core/profile_tuning.cpp \
+  src/core/profile_settings.cpp \
+  test/profile_settings/test_profile_settings.cpp
+
+build_and_run survey_accumulator \
+  src/core/survey_accumulator.cpp \
+  test/survey_accumulator/test_survey_accumulator.cpp
 
 build_and_run packet_presentation \
   src/core/meshtastic_decoder.cpp \
@@ -114,6 +125,12 @@ build_and_run spectrum \
   src/core/spectrum.cpp \
   test/spectrum/test_spectrum.cpp
 
+build_and_run radio_recovery \
+  test/radio_recovery/test_radio_recovery.cpp
+
+build_and_run radio_metadata \
+  test/radio_metadata/test_radio_metadata.cpp
+
 build_and_run touch_mapping \
   src/device/touch.cpp \
   test/touch/test_touch_mapping.cpp
@@ -122,10 +139,29 @@ build_and_run screenshot \
   src/device/screenshot.cpp \
   test/screenshot/test_screenshot.cpp
 
+echo "Testing lscap_reader"
+python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
+
 if [[ "${host_only}" == true ]]; then
   echo "All host tests passed"
   exit 0
 fi
+
+# Keep compiler-provided date/time macros stable across clean firmware builds.
+# The release script uses the same commit-derived epoch. Host-only tests above
+# remain runnable from a source archive without Git metadata.
+if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
+  if ! SOURCE_DATE_EPOCH="$(git -C "${repo_dir}" log -1 --format=%ct 2>/dev/null)" || \
+     [[ -z "${SOURCE_DATE_EPOCH}" ]]; then
+    echo "SOURCE_DATE_EPOCH is required when building outside a Git checkout" >&2
+    exit 1
+  fi
+fi
+if [[ ! "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
+  echo "SOURCE_DATE_EPOCH must be an integer Unix timestamp" >&2
+  exit 1
+fi
+export SOURCE_DATE_EPOCH
 
 if ! command -v uvx >/dev/null 2>&1; then
   echo "uvx is required to run the pinned PlatformIO toolchain" >&2
@@ -216,6 +252,7 @@ python3 scripts/validate_factory.py \
   --factory .pio/build/t-deck/firmware.factory.bin \
   --app .pio/build/t-deck/firmware.bin \
   --bootloader .pio/build/t-deck/bootloader.bin \
-  --partitions .pio/build/t-deck/partitions.bin
+  --partitions .pio/build/t-deck/partitions.bin \
+  --boot-app .pio/build/t-deck/boot_app0.bin
 
 echo "All tests and builds passed"

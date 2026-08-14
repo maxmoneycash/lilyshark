@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 
 namespace {
 
@@ -215,6 +216,45 @@ void testNodeSummaryAdmissionPolicy()
     assert(contributesToNodeSummary(record));
 }
 
+void testExistingNodeCrcErrorPolicy()
+{
+    FrameRecord record{};
+    record.raw.rf.crc = CrcStatus::Invalid;
+    record.decoded.protocol = ProtocolId::Meshtastic;
+    record.decoded.state = DecodeState::HeaderOnly;
+    record.decoded.present_fields = FieldSource;
+    record.decoded.source = 0x12345678U;
+
+    // A bad frame before the first valid identity cannot create or update a
+    // node. The same frame can count only after that identity is established.
+    assert(!contributesToNodeSummary(record));
+    assert(!contributesToExistingNodeCrcErrors(record, false, ProtocolId::Meshtastic,
+                                               0x12345678U));
+    assert(contributesToExistingNodeCrcErrors(record, true, ProtocolId::Meshtastic,
+                                              0x12345678U));
+    assert(!contributesToExistingNodeCrcErrors(record, true, ProtocolId::MeshCore,
+                                               0x12345678U));
+    assert(!contributesToExistingNodeCrcErrors(record, true, ProtocolId::Meshtastic,
+                                               0x87654321U));
+
+    record.decoded.state = DecodeState::Malformed;
+    assert(!contributesToExistingNodeCrcErrors(record, true, ProtocolId::Meshtastic,
+                                               0x12345678U));
+    record.decoded.state = DecodeState::HeaderOnly;
+    record.decoded.present_fields = FieldNone;
+    assert(!contributesToExistingNodeCrcErrors(record, true, ProtocolId::Meshtastic,
+                                               0x12345678U));
+    record.decoded.present_fields = FieldSource;
+    record.raw.rf.crc = CrcStatus::Valid;
+    assert(!contributesToExistingNodeCrcErrors(record, true, ProtocolId::Meshtastic,
+                                               0x12345678U));
+
+    assert(incrementedNodeCrcErrorCount(0U) == 1U);
+    const std::uint16_t maximum = std::numeric_limits<std::uint16_t>::max();
+    assert(incrementedNodeCrcErrorCount(static_cast<std::uint16_t>(maximum - 1U)) == maximum);
+    assert(incrementedNodeCrcErrorCount(maximum) == maximum);
+}
+
 } // namespace
 
 int main()
@@ -225,6 +265,7 @@ int main()
     testGenericAndDecodeStateLabels();
     testMeshtasticOpaqueLabelDoesNotDependOnChannelHash();
     testNodeSummaryAdmissionPolicy();
+    testExistingNodeCrcErrorPolicy();
     std::puts("packet presentation tests passed");
     return 0;
 }

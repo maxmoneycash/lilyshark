@@ -1,4 +1,5 @@
 #include "lilyshark/device/battery_model.h"
+#include "lilyshark/tdeck.h"
 
 #include <cassert>
 #include <cstdio>
@@ -13,6 +14,10 @@ void testDividerScaling()
     assert(scaleBatteryAdcMillivolts(1986, 2.11F) == 4190);
     assert(scaleBatteryAdcMillivolts(1000, 0.0F) == 0);
     assert(scaleBatteryAdcMillivolts(1000, -1.0F) == 0);
+
+    // Keep the tested board model tied to the original T-Deck's equal divider.
+    assert(tdeck::battery_divider_multiplier == 2.0F);
+    assert(scaleBatteryAdcMillivolts(2050, tdeck::battery_divider_multiplier) == 4100);
 }
 
 void testApproximateCurve()

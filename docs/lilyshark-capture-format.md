@@ -9,6 +9,19 @@ The format is not PCAP and does not claim direct Wireshark compatibility.
 Lilyshark can also export standards-compatible PCAP/LoRaTap when the active PHY
 settings fit that format.
 
+## Timestamp semantics
+
+The `rf.timestamp_us` field in each `RawFrame` is a monotonic count of
+microseconds since the T-Deck booted. Version 1 `.lscap` records store that
+value unchanged. It supports frame ordering and interval measurements within
+one boot. It cannot identify an absolute date or time.
+
+Classic PCAP has fields named `ts_sec` and `ts_usec`. Lilyshark fills them by
+splitting the same boot-relative value into seconds and microseconds. The
+original T-Deck has no reliable real-time clock, so those fields are not Unix
+wall time. Absolute wall time will remain unavailable until a future capture
+format or export path records a trustworthy clock anchor.
+
 ## Encoding rules
 
 - File extension: `.lscap`
@@ -18,6 +31,12 @@ settings fit that format.
 - Unknown metadata: retain the stored value and use `present_fields` to decide
   whether it is meaningful
 - Readers must use the encoded header sizes to allow later compatible extension
+- A writer submits each record to storage in one call, but removable media can
+  still fail partway through that call. A validator must reject an incomplete
+  trailing record and report the offset where that record began. A recovery
+  reader may return the complete records that precede it, then must stop at the
+  error. Readers walk declared header and payload lengths in order. They never
+  scan for `LSFR`, since those bytes can occur inside a radio payload.
 
 ## File header (24 bytes)
 
@@ -112,3 +131,35 @@ later reorganized.
 
 A reader should reject an unknown major file version, but it may skip extra
 header bytes when a future header size is larger than the version 1 minimum.
+
+## Host reader
+
+The dependency-free host reader validates the complete file, including every
+declared record payload:
+
+```sh
+python3 scripts/lscap.py validate capture-0001.lscap
+```
+
+It returns status 0 for a valid capture. A malformed or incomplete file returns
+status 1 and reports the failing file or record offset on standard error.
+
+The default dump is newline-delimited JSON. Its first line describes the file
+header, and each later line contains one complete frame record:
+
+```sh
+python3 scripts/lscap.py dump capture-0001.lscap
+```
+
+This mode writes complete records as it reads them. If the tail is incomplete,
+those earlier lines remain available and the command reports the tail error.
+For one indented JSON document, use:
+
+```sh
+python3 scripts/lscap.py dump --pretty capture-0001.lscap
+```
+
+Each frame includes the raw numeric enum and flag values, names for known enum
+values and set flags, unknown flag bits, signed RF fields as signed numbers,
+reserved and extension bytes as hexadecimal, and `payload_hex` containing the
+captured RF bytes.

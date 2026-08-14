@@ -8,6 +8,7 @@
 #include <SD.h>
 
 #include <cstdio>
+#include <limits>
 
 namespace lilyshark {
 
@@ -32,6 +33,7 @@ bool TDeckSdByteSink::open(const char *path) noexcept
         return false;
     }
     file_ = SD.open(path, FILE_WRITE);
+    expected_size_ = file_ ? file_.position() : 0;
     return static_cast<bool>(file_);
 }
 
@@ -64,17 +66,27 @@ bool TDeckSdByteSink::openNextCapture(char *path, std::size_t path_capacity,
 
 bool TDeckSdByteSink::write(const std::uint8_t *data, std::size_t length) noexcept
 {
-    if (!file_ || (data == nullptr && length != 0)) {
+    if (!file_ || (data == nullptr && length != 0) ||
+        length > std::numeric_limits<std::size_t>::max() - expected_size_) {
         return false;
     }
-    return length == 0 || file_.write(data, length) == length;
+    if (length == 0) {
+        return true;
+    }
+    if (file_.write(data, length) != length) {
+        return false;
+    }
+    expected_size_ += length;
+    return true;
 }
 
-void TDeckSdByteSink::flush() noexcept
+bool TDeckSdByteSink::flush() noexcept
 {
-    if (file_) {
-        file_.flush();
+    if (!file_) {
+        return false;
     }
+    file_.flush();
+    return file_.position() == expected_size_ && file_.size() >= expected_size_;
 }
 
 void TDeckSdByteSink::close() noexcept
@@ -82,6 +94,7 @@ void TDeckSdByteSink::close() noexcept
     if (file_) {
         file_.close();
     }
+    expected_size_ = 0;
 }
 
 bool TDeckSdByteSink::isOpen() const noexcept

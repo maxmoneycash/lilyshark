@@ -22,7 +22,8 @@ enum class LilysharkCaptureWriteResult : std::uint8_t {
 
 // Writes the versioned, protocol-neutral Lilyshark capture format. The format
 // stores every RawFrame RF field in its native integer units and supports PHY
-// settings, such as 62.5 kHz bandwidth, that LoRaTap v0 cannot represent.
+// settings, such as 62.5 kHz bandwidth, that LoRaTap v0 cannot represent. Each
+// frame record is passed to the sink in one write call.
 class LilysharkCaptureWriter
 {
   public:
