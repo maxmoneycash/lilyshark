@@ -546,6 +546,25 @@ SpectrumSweepRequest spectrum_request_for_profile(const RadioProfile &profile) n
     }
     return request;
 }
+
+const char *spectrum_failure_label(SpectrumSweepFailure failure) noexcept
+{
+    switch(failure) {
+        case SpectrumSweepFailure::InvalidRequest: return "INVALID REQUEST";
+        case SpectrumSweepFailure::RadioUnavailable: return "RADIO UNAVAILABLE";
+        case SpectrumSweepFailure::StandbyFailed: return "STANDBY";
+        case SpectrumSweepFailure::FskInitializationFailed: return "FSK INIT";
+        case SpectrumSweepFailure::PatchUploadFailed: return "PATCH UPLOAD";
+        case SpectrumSweepFailure::ScanConfigurationFailed: return "SCAN CONFIG";
+        case SpectrumSweepFailure::FrequencySetFailed: return "FREQUENCY";
+        case SpectrumSweepFailure::ScanStartFailed: return "SCAN START";
+        case SpectrumSweepFailure::ScanReadFailed: return "SCAN READ";
+        case SpectrumSweepFailure::Timeout: return "TIMEOUT";
+        case SpectrumSweepFailure::Cancelled: return "CANCELLED";
+        case SpectrumSweepFailure::RestoreFailed: return "RX RESTORE";
+        case SpectrumSweepFailure::None: default: return "UNKNOWN";
+    }
+}
 #endif
 
 void build_traffic(lv_obj_t * parent)
@@ -803,11 +822,22 @@ void build_spectrum(lv_obj_t * parent)
         put_label(parent, line, 10, 182, theme::amber(), &font_mono_semibold_12);
         put_label(parent, "RX PAUSED - ENTER CANCEL", 82, 204, theme::text_muted(), &font_mono_10);
     } else if(status.state == SpectrumSweepState::Failed) {
-        std::snprintf(line, sizeof(line), "SCAN FAILED %u  RADIO %d  RESTORE %s",
-                      static_cast<unsigned>(status.failure), status.radio_error,
-                      status.restoration_succeeded ? "OK" : "FAILED");
+        const std::int16_t error = status.failure == SpectrumSweepFailure::RestoreFailed
+            ? status.restore_error : status.radio_error;
+        const bool receive_recovered = status.failure == SpectrumSweepFailure::RestoreFailed &&
+                                       radio_service.status().receiving;
+        std::snprintf(line, sizeof(line), "FAIL %s  RADIO %d  RX %s",
+                      spectrum_failure_label(status.failure), error,
+                      status.restoration_succeeded ? "OK" :
+                      (receive_recovered ? "RECOVERED" : "FAILED"));
         put_label(parent, line, 10, 182, theme::fault(), &font_mono_10);
         put_label(parent, "ENTER RETRY", 117, 204, theme::cyan(), &font_mono_semibold_12);
+    } else if(status.state == SpectrumSweepState::Cancelled) {
+        std::snprintf(line, sizeof(line), "SCAN CANCELLED  %u/%u BINS  RX OK",
+                      status.points_completed, status.points_total);
+        put_label(parent, line, 10, 182, theme::amber(), &font_mono_10);
+        put_label(parent, "PARTIAL RESULT  /  ENTER RESCAN", 49, 204,
+                  theme::cyan(), &font_mono_10);
     } else {
         std::uint32_t busiest_score = 0;
         std::uint32_t quietest_score = UINT32_MAX;
@@ -1033,10 +1063,17 @@ void build_packet_detail(lv_obj_t * parent)
     put_label(parent, line, 49, 50,
               record->decoded.state == DecodeState::Malformed ? theme::fault() : theme::amber(),
               &font_mono_10);
-    std::snprintf(line, sizeof(line), "SF%u  BW %.1fk  CR4/%u  0x%04X",
-                  record->raw.rf.spreading_factor,
-                  static_cast<double>(record->raw.rf.bandwidth_hz) / 1000.0,
-                  record->raw.rf.coding_rate_denominator, record->raw.rf.sync_word);
+    if(record->raw.rf.hasField(RfFieldCodingRate)) {
+        std::snprintf(line, sizeof(line), "SF%u  BW %.1fk  CR4/%u  0x%04X",
+                      record->raw.rf.spreading_factor,
+                      static_cast<double>(record->raw.rf.bandwidth_hz) / 1000.0,
+                      record->raw.rf.coding_rate_denominator, record->raw.rf.sync_word);
+    } else {
+        std::snprintf(line, sizeof(line), "SF%u  BW %.1fk  CR --  0x%04X",
+                      record->raw.rf.spreading_factor,
+                      static_cast<double>(record->raw.rf.bandwidth_hz) / 1000.0,
+                      record->raw.rf.sync_word);
+    }
     put_label(parent, line, 49, 67, theme::text(), &font_mono_10);
     std::snprintf(line, sizeof(line), "RSSI %.1f  SNR %+.1f dB  CRC %s",
                   static_cast<double>(record->raw.rf.rssi_dbm_x10) / 10.0,
@@ -1387,13 +1424,17 @@ void build_utilization(lv_obj_t * parent)
     const std::uint64_t window_start_us = now_us > 60000000ULL ? now_us - 60000000ULL : 0;
     std::uint64_t airtime_us = 0;
     std::uint32_t frame_count = 0;
+    std::uint32_t airtime_sample_count = 0;
     std::uint32_t crc_errors = 0;
     std::uint64_t first_timestamp = now_us;
     for(std::size_t index = 0; index < store.size(); ++index) {
         const FrameRecord *record = store.at(index);
         if(record == nullptr || record->raw.rf.timestamp_us < window_start_us) continue;
         if(record->raw.rf.timestamp_us < first_timestamp) first_timestamp = record->raw.rf.timestamp_us;
-        if(record->raw.rf.hasField(RfFieldAirtime)) airtime_us += record->raw.rf.airtime_us;
+        if(record->raw.rf.hasField(RfFieldAirtime)) {
+            airtime_us += record->raw.rf.airtime_us;
+            ++airtime_sample_count;
+        }
         if(record->raw.rf.crc == CrcStatus::Invalid) ++crc_errors;
         ++frame_count;
     }
@@ -1404,6 +1445,8 @@ void build_utilization(lv_obj_t * parent)
     const std::uint32_t packets_per_minute = static_cast<std::uint32_t>(
         (static_cast<std::uint64_t>(frame_count) * 60000000ULL) / observed_us);
     const std::uint32_t crc_percent = frame_count == 0 ? 0 : (crc_errors * 100U) / frame_count;
+    const bool airtime_complete = airtime_sample_count == frame_count;
+    const bool airtime_available = frame_count == 0 || airtime_sample_count != 0;
 
     lv_obj_t *gauge = lv_arc_create(parent);
     lv_obj_set_pos(gauge, 10, 31);
@@ -1416,14 +1459,28 @@ void build_utilization(lv_obj_t * parent)
     lv_obj_set_style_arc_width(gauge, 7, LV_PART_MAIN);
     lv_obj_set_style_arc_color(gauge, theme::rule(), LV_PART_MAIN);
     lv_obj_set_style_arc_width(gauge, 7, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(gauge, utilization > 60 ? theme::fault() :
-                                      (utilization > 25 ? theme::amber() : theme::lime()), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(gauge, !airtime_complete ? theme::amber() :
+                                      (utilization > 60 ? theme::fault() :
+                                       (utilization > 25 ? theme::amber() : theme::lime())),
+                               LV_PART_INDICATOR);
 
     char line[48]{};
-    std::snprintf(line, sizeof(line), "%lu%%", static_cast<unsigned long>(utilization));
+    if(airtime_available) {
+        std::snprintf(line, sizeof(line), "%lu%%", static_cast<unsigned long>(utilization));
+    } else {
+        std::snprintf(line, sizeof(line), "--");
+    }
     put_label(parent, line, 39, 64, theme::text(), &font_condensed_bold_28);
-    put_label(parent, "OBSERVED", 39, 96, theme::text_muted(), &font_mono_10);
-    put_label(parent, "AIRTIME", 45, 108, theme::text_muted(), &font_mono_10);
+    if(airtime_complete) {
+        put_label(parent, "OBSERVED", 39, 96, theme::text_muted(), &font_mono_10);
+        put_label(parent, "AIRTIME", 45, 108, theme::text_muted(), &font_mono_10);
+    } else {
+        put_label(parent, "PARTIAL", 45, 96, theme::amber(), &font_mono_10);
+        std::snprintf(line, sizeof(line), "%lu/%lu TIMED",
+                      static_cast<unsigned long>(airtime_sample_count),
+                      static_cast<unsigned long>(frame_count));
+        put_label(parent, line, 30, 108, theme::amber(), &font_mono_10);
+    }
     theme::rule_line(parent, 173, 31, 1, 121);
     put_label(parent, "PACKETS / MIN", 187, 45, theme::text_muted(), &font_condensed_12);
     std::snprintf(line, sizeof(line), "%lu", static_cast<unsigned long>(packets_per_minute));
@@ -1439,11 +1496,14 @@ void build_utilization(lv_obj_t * parent)
     const std::size_t visible = store.size() < 22 ? store.size() : 22;
     for(std::size_t index = 0; index < visible; ++index) {
         const FrameRecord *record = store.newest(index);
-        if(record != nullptr && record->raw.rf.airtime_us > maximum_airtime) maximum_airtime = record->raw.rf.airtime_us;
+        if(record != nullptr && record->raw.rf.hasField(RfFieldAirtime) &&
+           record->raw.rf.airtime_us > maximum_airtime) {
+            maximum_airtime = record->raw.rf.airtime_us;
+        }
     }
     for(std::size_t index = 0; index < visible; ++index) {
         const FrameRecord *record = store.newest(visible - 1 - index);
-        if(record == nullptr) continue;
+        if(record == nullptr || !record->raw.rf.hasField(RfFieldAirtime)) continue;
         const lv_coord_t bar_height = static_cast<lv_coord_t>(4U +
             (static_cast<std::uint64_t>(record->raw.rf.airtime_us) * 34ULL) / maximum_airtime);
         const lv_color_t color = record->raw.rf.crc == CrcStatus::Invalid ? theme::fault() : theme::lime();
@@ -2049,15 +2109,30 @@ uint32_t touch_started_ms = 0;
 struct TrackballKey {
     uint8_t pin;
     uint32_t key;
-    bool released;
+    uint32_t pending_bit;
     uint32_t last_event_ms;
 };
 
-std::array<TrackballKey, 5> trackball_keys = {{{tdeck::trackball_up_pin, LV_KEY_UP, true, 0},
-                                                {tdeck::trackball_down_pin, LV_KEY_DOWN, true, 0},
-                                                {tdeck::trackball_left_pin, LV_KEY_LEFT, true, 0},
-                                                {tdeck::trackball_right_pin, LV_KEY_RIGHT, true, 0},
-                                                {tdeck::trackball_press_pin, LV_KEY_ENTER, true, 0}}};
+std::array<TrackballKey, 5> trackball_keys = {{{tdeck::trackball_up_pin, LV_KEY_UP, 1U << 0U, 0},
+                                                {tdeck::trackball_down_pin, LV_KEY_DOWN, 1U << 1U, 0},
+                                                {tdeck::trackball_left_pin, LV_KEY_LEFT, 1U << 2U, 0},
+                                                {tdeck::trackball_right_pin, LV_KEY_RIGHT, 1U << 3U, 0},
+                                                {tdeck::trackball_press_pin, LV_KEY_ENTER, 1U << 4U, 0}}};
+portMUX_TYPE trackball_isr_mux = portMUX_INITIALIZER_UNLOCKED;
+volatile uint32_t trackball_pending_mask = 0;
+
+void IRAM_ATTR latch_trackball_edge(uint32_t bit)
+{
+    portENTER_CRITICAL_ISR(&trackball_isr_mux);
+    trackball_pending_mask |= bit;
+    portEXIT_CRITICAL_ISR(&trackball_isr_mux);
+}
+
+void IRAM_ATTR on_trackball_up() { latch_trackball_edge(1U << 0U); }
+void IRAM_ATTR on_trackball_down() { latch_trackball_edge(1U << 1U); }
+void IRAM_ATTR on_trackball_left() { latch_trackball_edge(1U << 2U); }
+void IRAM_ATTR on_trackball_right() { latch_trackball_edge(1U << 3U); }
+void IRAM_ATTR on_trackball_press() { latch_trackball_edge(1U << 4U); }
 
 void set_backlight(uint8_t value)
 {
@@ -2181,13 +2256,16 @@ void take_device_screenshot() noexcept
 void poll_trackball()
 {
     const uint32_t now = millis();
+    portENTER_CRITICAL(&trackball_isr_mux);
+    const uint32_t pending = trackball_pending_mask;
+    trackball_pending_mask = 0;
+    portEXIT_CRITICAL(&trackball_isr_mux);
+
     for(TrackballKey & input : trackball_keys) {
-        const bool released = digitalRead(input.pin) == HIGH;
-        if(input.released && !released && now - input.last_event_ms >= 60) {
+        if((pending & input.pending_bit) != 0U && now - input.last_event_ms >= 60U) {
             input.last_event_ms = now;
             handle_navigation_key(input.key);
         }
-        input.released = released;
     }
 }
 
@@ -2255,8 +2333,12 @@ void setup()
     update_live_hardware_labels();
     for(TrackballKey & input : trackball_keys) {
         pinMode(input.pin, INPUT_PULLUP);
-        input.released = digitalRead(input.pin) == HIGH;
     }
+    attachInterrupt(tdeck::trackball_up_pin, on_trackball_up, FALLING);
+    attachInterrupt(tdeck::trackball_down_pin, on_trackball_down, FALLING);
+    attachInterrupt(tdeck::trackball_left_pin, on_trackball_left, FALLING);
+    attachInterrupt(tdeck::trackball_right_pin, on_trackball_right, FALLING);
+    attachInterrupt(tdeck::trackball_press_pin, on_trackball_press, FALLING);
 
     spectrum_buffer = static_cast<uint8_t *>(ps_malloc(spectrum_buffer_size));
     if(spectrum_buffer == nullptr) {
@@ -2372,7 +2454,9 @@ void loop()
     const bool time_driven_screen = current_screen == Screen::survey ||
                                     current_screen == Screen::events ||
                                     current_screen == Screen::nodes ||
-                                    current_screen == Screen::node_detail;
+                                    current_screen == Screen::node_detail ||
+                                    current_screen == Screen::map ||
+                                    current_screen == Screen::utilization;
     const std::uint32_t dynamic_interval_ms = scan_active ? 150U : 1000U;
     if((scan_active || time_driven_screen) &&
        now - last_dynamic_ui_refresh_ms >= dynamic_interval_ms) {
