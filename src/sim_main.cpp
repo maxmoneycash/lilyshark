@@ -3,11 +3,20 @@
 #include <cstdlib>
 #include <cstdio>
 
+#if defined(LILYSHARK_DEVICE)
+#include <Arduino.h>
+#include <SPI.h>
+#include <TFT_eSPI.h>
+#include <Wire.h>
+#else
 #include <SDL.h>
+#endif
 #include <lvgl.h>
+#if !defined(LILYSHARK_DEVICE)
 #include <src/drivers/sdl/lv_sdl_keyboard.h>
 #include <src/drivers/sdl/lv_sdl_mouse.h>
 #include <src/drivers/sdl/lv_sdl_window.h>
+#endif
 
 #include "theme.h"
 
@@ -85,7 +94,11 @@ constexpr std::array<NodeRow, 8> nodes = {{
 
 Screen current_screen = Screen::traffic;
 lv_obj_t * root = nullptr;
+#if defined(LILYSHARK_DEVICE)
+static uint8_t * spectrum_buffer = nullptr;
+#else
 static uint8_t spectrum_buffer[LV_CANVAS_BUF_SIZE(306, 145, 16, LV_DRAW_BUF_STRIDE_ALIGN)];
+#endif
 static std::array<std::array<lv_point_precise_t, 160>, 16> trace_buffers;
 size_t trace_buffer_index = 0;
 
@@ -442,9 +455,8 @@ void build_current_screen()
     }
 }
 
-void handle_key(lv_event_t * event)
+void handle_navigation_key(uint32_t key)
 {
-    const uint32_t key = lv_event_get_key(event);
     int next = static_cast<int>(current_screen);
     if(key == LV_KEY_RIGHT || key == LV_KEY_DOWN || key == LV_KEY_NEXT) ++next;
     else if(key == LV_KEY_LEFT || key == LV_KEY_UP || key == LV_KEY_PREV) --next;
@@ -455,11 +467,21 @@ void handle_key(lv_event_t * event)
     next = (next % count + count) % count;
     current_screen = static_cast<Screen>(next);
     build_current_screen();
+#if defined(LILYSHARK_DEVICE)
+    Serial.printf("Lilyshark view: %s\n", screen_names[static_cast<size_t>(current_screen)]);
+#else
     std::fprintf(stderr, "Lilyshark view: %s\n", screen_names[static_cast<size_t>(current_screen)]);
+#endif
+}
+
+void handle_key(lv_event_t * event)
+{
+    handle_navigation_key(lv_event_get_key(event));
 }
 
 } // namespace
 
+#if !defined(LILYSHARK_DEVICE)
 int main(int argc, char ** argv)
 {
     if(argc > 1) {
@@ -494,3 +516,169 @@ int main(int argc, char ** argv)
         SDL_Delay(5);
     }
 }
+#else
+
+namespace {
+
+constexpr uint8_t power_pin = 10;
+constexpr uint8_t i2c_sda_pin = 18;
+constexpr uint8_t i2c_scl_pin = 8;
+constexpr uint8_t keyboard_address = 0x55;
+constexpr uint8_t keyboard_brightness_command = 0x01;
+constexpr uint8_t sd_cs_pin = 39;
+constexpr uint8_t radio_cs_pin = 9;
+constexpr uint8_t display_cs_pin = 12;
+constexpr uint8_t backlight_pin = 42;
+constexpr uint8_t spi_sck_pin = 40;
+constexpr uint8_t spi_miso_pin = 38;
+constexpr uint8_t spi_mosi_pin = 41;
+constexpr size_t spectrum_buffer_size = LV_CANVAS_BUF_SIZE(306, 145, 16, LV_DRAW_BUF_STRIDE_ALIGN);
+
+TFT_eSPI device_display;
+lv_color_t device_draw_buffer[theme::screen_width * 20];
+
+struct TrackballKey {
+    uint8_t pin;
+    uint32_t key;
+    bool released;
+    uint32_t last_event_ms;
+};
+
+std::array<TrackballKey, 4> trackball_keys = {{{3, LV_KEY_UP, true, 0},
+                                                {15, LV_KEY_DOWN, true, 0},
+                                                {1, LV_KEY_LEFT, true, 0},
+                                                {2, LV_KEY_RIGHT, true, 0}}};
+
+void set_backlight(uint8_t value)
+{
+    static uint8_t level = 0;
+    constexpr uint8_t steps = 16;
+    value = value > steps ? steps : value;
+    if(value == 0) {
+        digitalWrite(backlight_pin, LOW);
+        delay(3);
+        level = 0;
+        return;
+    }
+    if(level == 0) {
+        digitalWrite(backlight_pin, HIGH);
+        level = steps;
+        delayMicroseconds(30);
+    }
+    const int from = steps - level;
+    const int to = steps - value;
+    const int pulses = (steps + to - from) % steps;
+    for(int index = 0; index < pulses; ++index) {
+        digitalWrite(backlight_pin, LOW);
+        digitalWrite(backlight_pin, HIGH);
+    }
+    level = value;
+}
+
+uint32_t device_tick_ms()
+{
+    return millis();
+}
+
+void device_flush(lv_display_t * display, const lv_area_t * area, uint8_t * pixels)
+{
+    const uint32_t width = static_cast<uint32_t>(area->x2 - area->x1 + 1);
+    const uint32_t height = static_cast<uint32_t>(area->y2 - area->y1 + 1);
+    device_display.startWrite();
+    device_display.setAddrWindow(area->x1, area->y1, width, height);
+    device_display.pushColors(reinterpret_cast<uint16_t *>(pixels), width * height, true);
+    device_display.endWrite();
+    lv_display_flush_ready(display);
+}
+
+void poll_trackball()
+{
+    const uint32_t now = millis();
+    for(TrackballKey & input : trackball_keys) {
+        const bool released = digitalRead(input.pin) == HIGH;
+        if(input.released && !released && now - input.last_event_ms >= 60) {
+            input.last_event_ms = now;
+            handle_navigation_key(input.key);
+        }
+        input.released = released;
+    }
+}
+
+void poll_keyboard()
+{
+    static uint32_t next_read_ms = 0;
+    const uint32_t now = millis();
+    if(now < next_read_ms) return;
+    next_read_ms = now + 20;
+
+    const uint8_t received = Wire.requestFrom(keyboard_address, static_cast<uint8_t>(1));
+    if(received == 0 || !Wire.available()) return;
+    const uint8_t key = Wire.read();
+    if(key >= '1' && key <= '9') handle_navigation_key(key);
+}
+
+void set_keyboard_brightness(uint8_t value)
+{
+    Wire.beginTransmission(keyboard_address);
+    Wire.write(keyboard_brightness_command);
+    Wire.write(value);
+    Wire.endTransmission();
+}
+
+} // namespace
+
+void setup()
+{
+    Serial.begin(115200);
+    Serial.println("Lilyshark starting");
+
+    pinMode(power_pin, OUTPUT);
+    digitalWrite(power_pin, HIGH);
+    pinMode(sd_cs_pin, OUTPUT);
+    pinMode(radio_cs_pin, OUTPUT);
+    pinMode(display_cs_pin, OUTPUT);
+    digitalWrite(sd_cs_pin, HIGH);
+    digitalWrite(radio_cs_pin, HIGH);
+    digitalWrite(display_cs_pin, HIGH);
+    delay(120);
+
+    SPI.begin(spi_sck_pin, spi_miso_pin, spi_mosi_pin);
+    device_display.begin();
+    device_display.setRotation(1);
+    device_display.fillScreen(TFT_BLACK);
+    pinMode(backlight_pin, OUTPUT);
+    set_backlight(12);
+
+    Wire.begin(i2c_sda_pin, i2c_scl_pin);
+    set_keyboard_brightness(96);
+    for(TrackballKey & input : trackball_keys) {
+        pinMode(input.pin, INPUT_PULLUP);
+        input.released = digitalRead(input.pin) == HIGH;
+    }
+
+    spectrum_buffer = static_cast<uint8_t *>(ps_malloc(spectrum_buffer_size));
+    if(spectrum_buffer == nullptr) spectrum_buffer = static_cast<uint8_t *>(malloc(spectrum_buffer_size));
+    if(spectrum_buffer == nullptr) {
+        Serial.println("Spectrum buffer allocation failed");
+        return;
+    }
+
+    lv_init();
+    lv_tick_set_cb(device_tick_ms);
+    lv_display_t * display = lv_display_create(theme::screen_width, theme::screen_height);
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, device_draw_buffer, nullptr, sizeof(device_draw_buffer), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(display, device_flush);
+    build_current_screen();
+    Serial.println("Lilyshark UI ready");
+}
+
+void loop()
+{
+    poll_trackball();
+    poll_keyboard();
+    lv_timer_handler();
+    delay(5);
+}
+
+#endif
