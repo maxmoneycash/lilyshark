@@ -76,7 +76,7 @@ void assertKnownValues(const RawFrame &frame, DecodeResult result, const Decoded
     assert(static_cast<std::uint8_t>(result) <= static_cast<std::uint8_t>(DecodeResult::Malformed));
     assert(static_cast<std::uint8_t>(packet.protocol) <= static_cast<std::uint8_t>(ProtocolId::Custom));
     assert(static_cast<std::uint8_t>(packet.state) <= static_cast<std::uint8_t>(DecodeState::Malformed));
-    assert(static_cast<std::uint8_t>(packet.kind) <= static_cast<std::uint8_t>(PacketKind::Advertisement));
+    assert(static_cast<std::uint8_t>(packet.kind) <= static_cast<std::uint8_t>(PacketKind::OpaquePayload));
     assert((packet.present_fields & ~kKnownFields) == 0U);
     assert((packet.attributes & static_cast<std::uint16_t>(~kKnownAttributes)) == 0U);
     assertPayloadRange(frame, packet);
@@ -146,8 +146,8 @@ void stressMeshtastic(const MeshtasticDecoder &decoder, const RawFrame &frame)
         assert(frame.captured_length >= MeshtasticDecoder::kOuterHeaderLength);
         assert(packet.source != 0U);
         assert(packet.state == DecodeState::HeaderOnly);
-        assert(packet.kind == PacketKind::EncryptedPayload);
-        assert(packet.hasAttribute(AttributeEncrypted));
+        assert(packet.kind == PacketKind::OpaquePayload);
+        assert(!packet.hasAttribute(AttributeEncrypted));
         assert(packet.payload_offset == MeshtasticDecoder::kOuterHeaderLength);
         assert(packet.payload_length == frame.captured_length - MeshtasticDecoder::kOuterHeaderLength);
     }

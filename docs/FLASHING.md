@@ -19,10 +19,10 @@ If this is your only T-Deck, plan the return path before flashing. Export the cu
 Clone the exact release tag, then download only the merged factory image and checksum manifest:
 
 ```sh
-git clone --depth 1 --branch v0.1.0-alpha.1 https://github.com/maxmoneycash/lilyshark.git
+git clone --depth 1 --branch v0.1.0-alpha.2 https://github.com/maxmoneycash/lilyshark.git
 cd lilyshark
 mkdir -p dist
-release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.1'
+release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.2'
 curl --fail --location "${release_base}/lilyshark-tdeck.factory.bin" \
   --output dist/lilyshark-tdeck.factory.bin
 curl --fail --location "${release_base}/SHA256SUMS" \
@@ -150,7 +150,7 @@ This is the minimum evidence needed before calling a build hardware-validated:
 1. Power-cycle the T-Deck twice and confirm the UI reaches Traffic each time.
 2. Verify the status bar reports battery and the expected GPS state.
 3. Move through all nine views with the trackball, keyboard arrows, number keys, and touch swipes.
-4. Press `P` and confirm all four profiles reconfigure without an RF error.
+4. Press `P` and confirm all five profiles reconfigure without an RF error.
 5. Receive a known LoRa frame and inspect its packet detail and raw bytes.
 6. Confirm a CRC-mismatch test frame appears with the correct integrity state.
 7. Start, cancel, and complete a spectrum sweep. Confirm capture resumes afterward.

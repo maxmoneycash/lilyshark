@@ -87,6 +87,17 @@ build_and_run decoder_stress \
   src/core/reticulum_decoder.cpp \
   test/decoder_stress/test_decoder_stress.cpp
 
+build_and_run profile_tuning \
+  src/core/profile_tuning.cpp \
+  test/profile_tuning/test_profile_tuning.cpp
+
+build_and_run packet_presentation \
+  src/core/meshtastic_decoder.cpp \
+  src/core/meshcore_decoder.cpp \
+  src/core/reticulum_decoder.cpp \
+  src/ui/packet_presentation.cpp \
+  test/packet_presentation/test_packet_presentation.cpp
+
 build_and_run battery_model \
   src/device/battery_model.cpp \
   test/hardware_status/test_battery_model.cpp

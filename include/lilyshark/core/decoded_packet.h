@@ -20,6 +20,9 @@ enum class PacketKind : std::uint8_t {
     Data,
     Control,
     Advertisement,
+    // The payload bytes are present, but the active decoder cannot prove
+    // whether they are cleartext, encrypted, or otherwise encoded.
+    OpaquePayload,
 };
 
 enum DecodedField : std::uint32_t {
@@ -27,6 +30,8 @@ enum DecodedField : std::uint32_t {
     FieldSource = 1U << 0,
     FieldDestination = 1U << 1,
     FieldPacketId = 1U << 2,
+    // Protocol-specific channel value. For Meshtastic this is the one-byte
+    // channel hash/hint, not a radio-slot or channel-number index.
     FieldChannel = 1U << 3,
     FieldHopLimit = 1U << 4,
     FieldHopStart = 1U << 5,

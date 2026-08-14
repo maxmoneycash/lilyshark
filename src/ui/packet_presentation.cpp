@@ -1,0 +1,116 @@
+#include "lilyshark/ui/packet_presentation.h"
+
+#include "lilyshark/protocols/meshcore_decoder.h"
+#include "lilyshark/protocols/reticulum_decoder.h"
+
+#include <cstdint>
+
+namespace lilyshark {
+
+const char *packetKindLabel(const DecodedPacket &packet) noexcept
+{
+    if (packet.state == DecodeState::Malformed) {
+        return "BAD";
+    }
+
+    if (packet.protocol == ProtocolId::MeshCore) {
+        if (MeshCoreDecoder::payloadVersion(packet) != 0U) {
+            return "UNSUP";
+        }
+
+        const std::uint8_t payload_type =
+            static_cast<std::uint8_t>(MeshCoreDecoder::payloadType(packet));
+        if (payload_type >= 12U && payload_type <= 14U) {
+            return "RSVD";
+        }
+
+        switch (MeshCoreDecoder::payloadType(packet)) {
+        case MeshCorePayloadType::Request:
+            return "REQ";
+        case MeshCorePayloadType::Response:
+            return "RESP";
+        case MeshCorePayloadType::TextMessage:
+            return "TEXT";
+        case MeshCorePayloadType::Acknowledgement:
+            return "ACK";
+        case MeshCorePayloadType::Advertisement:
+            return "ADV";
+        case MeshCorePayloadType::GroupText:
+            return "GTXT";
+        case MeshCorePayloadType::GroupData:
+            return "GDATA";
+        case MeshCorePayloadType::AnonymousRequest:
+            return "ANON";
+        case MeshCorePayloadType::ReturnedPath:
+            return "PATH";
+        case MeshCorePayloadType::Trace:
+            return "TRACE";
+        case MeshCorePayloadType::Multipart:
+            return "MULTI";
+        case MeshCorePayloadType::Control:
+            return "CTRL";
+        case MeshCorePayloadType::RawCustom:
+            return "RAW";
+        }
+    }
+
+    if (packet.protocol == ProtocolId::Reticulum) {
+        if (ReticulumDecoder::isRNodeSplitFrame(packet)) {
+            return "SPLIT";
+        }
+        if (ReticulumDecoder::isIfacProtected(packet)) {
+            return "IFAC";
+        }
+
+        switch (ReticulumDecoder::packetType(packet)) {
+        case ReticulumPacketType::Announce:
+            return "ANN";
+        case ReticulumPacketType::LinkRequest:
+            return "LINK";
+        case ReticulumPacketType::Proof:
+            return "PROOF";
+        case ReticulumPacketType::Data:
+            return "DATA";
+        }
+    }
+
+    switch (packet.kind) {
+    case PacketKind::EncryptedPayload:
+        return "ENC";
+    case PacketKind::Data:
+        return "DATA";
+    case PacketKind::Control:
+        return "CTRL";
+    case PacketKind::Advertisement:
+        return "ADV";
+    case PacketKind::OpaquePayload:
+        return "OPAQUE";
+    case PacketKind::Unknown:
+    default:
+        return "RAW";
+    }
+}
+
+const char *decodeStateLabel(DecodeState state) noexcept
+{
+    switch (state) {
+    case DecodeState::HeaderOnly:
+        return "HEADER";
+    case DecodeState::PayloadDecoded:
+        return "DECODED";
+    case DecodeState::Malformed:
+        return "MALFORMED";
+    case DecodeState::Unknown:
+    default:
+        return "RAW";
+    }
+}
+
+bool contributesToNodeSummary(const FrameRecord &record) noexcept
+{
+    return record.raw.rf.crc != CrcStatus::Invalid &&
+           record.decoded.state != DecodeState::Malformed &&
+           record.decoded.hasField(FieldSource) && record.decoded.source != 0U;
+}
+
+} // namespace lilyshark
