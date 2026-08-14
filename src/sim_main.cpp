@@ -2,14 +2,40 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 
+#if defined(LILYSHARK_DEVICE)
+#include <Arduino.h>
+#include <SPI.h>
+#include <TFT_eSPI.h>
+#include <Wire.h>
+#include <esp_timer.h>
+#else
 #include <SDL.h>
+#endif
 #include <lvgl.h>
+#if !defined(LILYSHARK_DEVICE)
 #include <src/drivers/sdl/lv_sdl_keyboard.h>
 #include <src/drivers/sdl/lv_sdl_mouse.h>
 #include <src/drivers/sdl/lv_sdl_window.h>
+#endif
 
 #include "theme.h"
+#if defined(LILYSHARK_DEVICE)
+#include "lilyshark/core/builtin_profiles.h"
+#include "lilyshark/core/capture_runtime.h"
+#include "lilyshark/device/hardware_status.h"
+#include "lilyshark/device/radio_service.h"
+#include "lilyshark/device/screenshot.h"
+#include "lilyshark/device/touch.h"
+#include "lilyshark/device/tdeck_sd_sink.h"
+#include "lilyshark/export/lilyshark_capture.h"
+#include "lilyshark/export/pcap_loratap.h"
+#include "lilyshark/protocols/meshcore_decoder.h"
+#include "lilyshark/protocols/meshtastic_decoder.h"
+#include "lilyshark/protocols/reticulum_decoder.h"
+#include "lilyshark/tdeck.h"
+#endif
 
 namespace {
 
@@ -85,7 +111,56 @@ constexpr std::array<NodeRow, 8> nodes = {{
 
 Screen current_screen = Screen::traffic;
 lv_obj_t * root = nullptr;
+#if defined(LILYSHARK_DEVICE)
+static uint8_t * spectrum_buffer = nullptr;
+CaptureRuntime<64> capture_runtime{};
+MeshtasticDecoder meshtastic_decoder{};
+MeshCoreDecoder meshcore_decoder{};
+ReticulumDecoder reticulum_decoder{};
+TDeckRadioService radio_service{};
+TDeckHardwareStatus hardware_status{};
+TDeckTouch touch_service{};
+TDeckSdByteSink pcap_sink{};
+PcapLoraTapWriter pcap_writer{pcap_sink};
+TDeckSdByteSink native_capture_sink{};
+LilysharkCaptureWriter native_capture_writer{native_capture_sink};
+std::size_t active_profile_index = 0;
+bool live_data_dirty = false;
+bool sd_mounted = false;
+bool screenshot_attempted = false;
+bool pcap_recording = false;
+bool native_capture_recording = false;
+bool survey_running = false;
+bool survey_has_result = false;
+std::uint32_t last_ui_refresh_ms = 0;
+std::uint32_t last_hardware_ui_refresh_ms = 0;
+std::uint32_t last_dynamic_ui_refresh_ms = 0;
+std::uint32_t last_capture_flush_ms = 0;
+std::uint32_t last_screenshot_gap_ms = 0;
+std::uint32_t survey_started_ms = 0;
+std::uint64_t survey_baseline_sequence = 0;
+SpectrumSweepState observed_spectrum_state = SpectrumSweepState::Idle;
+std::uint16_t observed_spectrum_points = 0;
+std::uint64_t traffic_selected_sequence = 0;
+std::uint64_t packet_detail_sequence = 0;
+ProtocolId node_selected_protocol = ProtocolId::Unknown;
+std::uint32_t node_selected_id = 0;
+bool node_selection_valid = false;
+ProtocolId node_detail_protocol = ProtocolId::Unknown;
+std::uint32_t node_detail_id = 0;
+bool node_detail_selection_valid = false;
+PcapWriteResult last_pcap_result = PcapWriteResult::NotStarted;
+LilysharkCaptureWriteResult last_native_capture_result = LilysharkCaptureWriteResult::NotStarted;
+ScreenshotWriteResult last_screenshot_result = ScreenshotWriteResult::StorageError;
+char pcap_path[48]{};
+char native_capture_path[48]{};
+char screenshot_path[48]{};
+char live_battery_label[16] = "BAT --";
+char live_gps_label[16] = "GPS --";
+char live_radio_label[16] = "RX INIT";
+#else
 static uint8_t spectrum_buffer[LV_CANVAS_BUF_SIZE(306, 145, 16, LV_DRAW_BUF_STRIDE_ALIGN)];
+#endif
 static std::array<std::array<lv_point_precise_t, 160>, 16> trace_buffers;
 size_t trace_buffer_index = 0;
 
@@ -100,6 +175,11 @@ lv_obj_t * put_label(lv_obj_t * parent, const char * value, lv_coord_t x, lv_coo
 void add_status_bar(lv_obj_t * parent, const char * title, const char * left_value = "BAT 100%",
                     const char * middle_value = "GPS LOCK", const char * right_value = "18 pkt/min")
 {
+#if defined(LILYSHARK_DEVICE)
+    left_value = live_battery_label;
+    middle_value = live_gps_label;
+    right_value = live_radio_label;
+#endif
     lv_obj_t * bar = theme::rect(parent, 0, 0, theme::screen_width, theme::status_height, theme::surface());
     theme::rule_line(bar, 0, theme::status_height - 1, theme::screen_width);
 
@@ -159,8 +239,378 @@ void add_grid(lv_obj_t * parent, lv_coord_t x, lv_coord_t y, lv_coord_t width, l
     for(lv_coord_t py = y; py <= y + height; py += y_step) theme::rule_line(parent, x, py, width, 1, theme::grid());
 }
 
+#if defined(LILYSHARK_DEVICE)
+const char *packet_kind_label(const DecodedPacket &packet) noexcept
+{
+    if(packet.protocol == ProtocolId::MeshCore) {
+        switch(MeshCoreDecoder::payloadType(packet)) {
+            case MeshCorePayloadType::Request: return "REQ";
+            case MeshCorePayloadType::Response: return "RESP";
+            case MeshCorePayloadType::TextMessage: return "TEXT";
+            case MeshCorePayloadType::Acknowledgement: return "ACK";
+            case MeshCorePayloadType::Advertisement: return "ADV";
+            case MeshCorePayloadType::GroupText: return "GTXT";
+            case MeshCorePayloadType::GroupData: return "GDATA";
+            case MeshCorePayloadType::AnonymousRequest: return "ANON";
+            case MeshCorePayloadType::ReturnedPath: return "PATH";
+            case MeshCorePayloadType::Trace: return "TRACE";
+            case MeshCorePayloadType::Multipart: return "MULTI";
+            case MeshCorePayloadType::Control: return "CTRL";
+            case MeshCorePayloadType::RawCustom: return "RAW";
+        }
+    }
+    if(packet.protocol == ProtocolId::Reticulum) {
+        if(ReticulumDecoder::isRNodeSplitFrame(packet)) return "SPLIT";
+        if(ReticulumDecoder::isIfacProtected(packet)) return "IFAC";
+        switch(ReticulumDecoder::packetType(packet)) {
+            case ReticulumPacketType::Announce: return "ANN";
+            case ReticulumPacketType::LinkRequest: return "LINK";
+            case ReticulumPacketType::Proof: return "PROOF";
+            case ReticulumPacketType::Data: return "DATA";
+        }
+    }
+    switch(packet.kind) {
+        case PacketKind::EncryptedPayload: return "ENC";
+        case PacketKind::Data: return "DATA";
+        case PacketKind::Control: return "CTRL";
+        case PacketKind::Advertisement: return "ADV";
+        case PacketKind::Unknown: default: return "RAW";
+    }
+}
+
+void format_node(char *output, std::size_t capacity, const DecodedPacket &packet,
+                 DecodedField field) noexcept
+{
+    if(!packet.hasField(field)) {
+        std::snprintf(output, capacity, "--");
+        return;
+    }
+    const std::uint32_t value = field == FieldSource ? packet.source : packet.destination;
+    if(value == 0xffffffffU) std::snprintf(output, capacity, "ALL");
+    else std::snprintf(output, capacity, "%08lX", static_cast<unsigned long>(value));
+}
+
+void format_capture_time(char *output, std::size_t capacity, std::uint64_t timestamp_us) noexcept
+{
+    const std::uint64_t seconds = timestamp_us / 1000000ULL;
+    const std::uint64_t tenths = (timestamp_us / 100000ULL) % 10ULL;
+    std::snprintf(output, capacity, "%02llu:%02llu.%llu",
+                  static_cast<unsigned long long>((seconds / 60ULL) % 100ULL),
+                  static_cast<unsigned long long>(seconds % 60ULL),
+                  static_cast<unsigned long long>(tenths));
+}
+
+struct LiveNodeSummary {
+    ProtocolId protocol = ProtocolId::Unknown;
+    std::uint32_t id = 0;
+    std::uint64_t last_seen_us = 0;
+    std::int32_t snr_sum_x10 = 0;
+    std::int16_t latest_snr_x10 = 0;
+    std::int16_t latest_rssi_x10 = 0;
+    std::uint16_t frames = 0;
+    std::uint16_t crc_errors = 0;
+};
+
+std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexcept
+{
+    std::size_t count = 0;
+    const auto &store = capture_runtime.frames();
+    for(std::size_t offset = 0; offset < store.size(); ++offset) {
+        const FrameRecord *record = store.newest(offset);
+        if(record == nullptr || !record->decoded.hasField(FieldSource)) continue;
+
+        std::size_t index = 0;
+        for(; index < count; ++index) {
+            if(summaries[index].protocol == record->decoded.protocol &&
+               summaries[index].id == record->decoded.source) break;
+        }
+        if(index == count) {
+            if(count == summaries.size()) continue;
+            summaries[index].protocol = record->decoded.protocol;
+            summaries[index].id = record->decoded.source;
+            summaries[index].last_seen_us = record->raw.rf.timestamp_us;
+            summaries[index].latest_snr_x10 = record->raw.rf.snr_db_x10;
+            summaries[index].latest_rssi_x10 = record->raw.rf.rssi_dbm_x10;
+            ++count;
+        }
+        LiveNodeSummary &summary = summaries[index];
+        summary.snr_sum_x10 += record->raw.rf.snr_db_x10;
+        if(summary.frames != UINT16_MAX) ++summary.frames;
+        if(record->raw.rf.crc == CrcStatus::Invalid && summary.crc_errors != UINT16_MAX) {
+            ++summary.crc_errors;
+        }
+    }
+    return count;
+}
+
+const FrameRecord *find_live_frame(std::uint64_t sequence,
+                                   std::size_t *offset_from_newest = nullptr) noexcept
+{
+    const auto &store = capture_runtime.frames();
+    for(std::size_t offset = 0; offset < store.size(); ++offset) {
+        const FrameRecord *record = store.newest(offset);
+        if(record != nullptr && record->sequence == sequence) {
+            if(offset_from_newest != nullptr) *offset_from_newest = offset;
+            return record;
+        }
+    }
+    return nullptr;
+}
+
+std::size_t resolve_traffic_selection() noexcept
+{
+    const auto &store = capture_runtime.frames();
+    if(store.empty()) {
+        traffic_selected_sequence = 0;
+        return 0;
+    }
+
+    std::size_t selected_offset = 0;
+    if(traffic_selected_sequence != 0 &&
+       find_live_frame(traffic_selected_sequence, &selected_offset) != nullptr) {
+        return selected_offset;
+    }
+
+    const FrameRecord *oldest = store.at(0);
+    const bool selection_expired = traffic_selected_sequence != 0 && oldest != nullptr &&
+                                   traffic_selected_sequence < oldest->sequence;
+    selected_offset = selection_expired ? store.size() - 1 : 0;
+    const FrameRecord *fallback = store.newest(selected_offset);
+    traffic_selected_sequence = fallback == nullptr ? 0 : fallback->sequence;
+    return selected_offset;
+}
+
+bool move_traffic_selection(int direction) noexcept
+{
+    const auto &store = capture_runtime.frames();
+    if(store.empty()) return false;
+
+    std::size_t selected_offset = resolve_traffic_selection();
+    if(direction > 0) {
+        selected_offset = (selected_offset + 1) % store.size();
+    } else if(direction < 0) {
+        selected_offset = selected_offset == 0 ? store.size() - 1 : selected_offset - 1;
+    } else {
+        return false;
+    }
+    const FrameRecord *selected = store.newest(selected_offset);
+    if(selected == nullptr) return false;
+    traffic_selected_sequence = selected->sequence;
+    return true;
+}
+
+bool live_node_matches(const LiveNodeSummary &node, ProtocolId protocol,
+                       std::uint32_t id) noexcept
+{
+    return node.protocol == protocol && node.id == id;
+}
+
+std::size_t resolve_node_selection(const std::array<LiveNodeSummary, 8> &live_nodes,
+                                   std::size_t count) noexcept
+{
+    if(count == 0) {
+        node_selection_valid = false;
+        return 0;
+    }
+    if(node_selection_valid) {
+        for(std::size_t index = 0; index < count; ++index) {
+            if(live_node_matches(live_nodes[index], node_selected_protocol, node_selected_id)) {
+                return index;
+            }
+        }
+    }
+    node_selected_protocol = live_nodes[0].protocol;
+    node_selected_id = live_nodes[0].id;
+    node_selection_valid = true;
+    return 0;
+}
+
+bool move_node_selection(int direction) noexcept
+{
+    std::array<LiveNodeSummary, 8> live_nodes{};
+    const std::size_t count = collect_live_nodes(live_nodes);
+    if(count == 0) return false;
+
+    std::size_t selected_index = resolve_node_selection(live_nodes, count);
+    if(direction > 0) {
+        selected_index = (selected_index + 1) % count;
+    } else if(direction < 0) {
+        selected_index = selected_index == 0 ? count - 1 : selected_index - 1;
+    } else {
+        return false;
+    }
+    node_selected_protocol = live_nodes[selected_index].protocol;
+    node_selected_id = live_nodes[selected_index].id;
+    node_selection_valid = true;
+    return true;
+}
+
+bool select_current_frame_for_detail() noexcept
+{
+    const auto &store = capture_runtime.frames();
+    if(store.empty()) return false;
+    const FrameRecord *record = store.newest(resolve_traffic_selection());
+    if(record == nullptr) return false;
+    packet_detail_sequence = record->sequence;
+    return true;
+}
+
+bool select_current_node_for_detail() noexcept
+{
+    std::array<LiveNodeSummary, 8> live_nodes{};
+    const std::size_t count = collect_live_nodes(live_nodes);
+    if(count == 0) return false;
+    const LiveNodeSummary &node = live_nodes[resolve_node_selection(live_nodes, count)];
+    node_detail_protocol = node.protocol;
+    node_detail_id = node.id;
+    node_detail_selection_valid = true;
+    return true;
+}
+
+void format_age(char *output, std::size_t capacity, std::uint64_t timestamp_us) noexcept
+{
+    const std::uint64_t now_us = static_cast<std::uint64_t>(esp_timer_get_time());
+    const std::uint64_t age_seconds = now_us > timestamp_us ? (now_us - timestamp_us) / 1000000ULL : 0;
+    if(age_seconds < 60) {
+        std::snprintf(output, capacity, "%llus", static_cast<unsigned long long>(age_seconds));
+    } else if(age_seconds < 3600) {
+        std::snprintf(output, capacity, "%llum", static_cast<unsigned long long>(age_seconds / 60ULL));
+    } else {
+        std::snprintf(output, capacity, "%lluh", static_cast<unsigned long long>(age_seconds / 3600ULL));
+    }
+}
+
+void draw_live_node_history(lv_obj_t *parent, const LiveNodeSummary &node, lv_coord_t x,
+                            lv_coord_t y, lv_coord_t width, lv_coord_t height,
+                            bool use_rssi = false,
+                            lv_color_t color = theme::lime()) noexcept
+{
+    if(trace_buffer_index >= trace_buffers.size()) return;
+    auto &points = trace_buffers[trace_buffer_index++];
+    std::array<std::int16_t, 64> samples{};
+    std::size_t sample_count = 0;
+    const auto &store = capture_runtime.frames();
+    for(std::size_t index = 0; index < store.size() && sample_count < samples.size(); ++index) {
+        const FrameRecord *record = store.at(index);
+        if(record != nullptr && record->decoded.hasField(FieldSource) &&
+           record->decoded.protocol == node.protocol && record->decoded.source == node.id) {
+            samples[sample_count++] = use_rssi ? record->raw.rf.rssi_dbm_x10 : record->raw.rf.snr_db_x10;
+        }
+    }
+    if(sample_count == 0) return;
+
+    std::int16_t low = samples[0];
+    std::int16_t high = samples[0];
+    for(std::size_t index = 1; index < sample_count; ++index) {
+        if(samples[index] < low) low = samples[index];
+        if(samples[index] > high) high = samples[index];
+    }
+    if(high == low) ++high;
+    for(std::size_t index = 0; index < sample_count; ++index) {
+        points[index].x = sample_count == 1 ? 0 :
+            static_cast<lv_coord_t>((index * static_cast<std::size_t>(width - 1)) / (sample_count - 1));
+        points[index].y = static_cast<lv_coord_t>((static_cast<std::int32_t>(high - samples[index]) *
+                                                  (height - 2)) / (high - low) + 1);
+    }
+    lv_obj_t *line = lv_line_create(parent);
+    theme::reset(line);
+    lv_line_set_points(line, points.data(), static_cast<std::uint32_t>(sample_count));
+    lv_obj_set_pos(line, x, y);
+    lv_obj_set_size(line, width, height);
+    lv_obj_set_style_line_color(line, color, 0);
+    lv_obj_set_style_line_width(line, 1, 0);
+}
+
+SpectrumSweepRequest spectrum_request_for_profile(const RadioProfile &profile) noexcept
+{
+    SpectrumSweepRequest request{};
+    request.samples_per_frequency = 512;
+    if(profile.center_frequency_hz >= 902000000U && profile.center_frequency_hz <= 928000000U) {
+        request.start_frequency_hz = 902000000U;
+        request.end_frequency_hz = 928000000U;
+        request.step_hz = 200000U;
+    } else if(profile.center_frequency_hz >= 863000000U && profile.center_frequency_hz <= 870000000U) {
+        request.start_frequency_hz = 863000000U;
+        request.end_frequency_hz = 870000000U;
+        request.step_hz = 100000U;
+    } else {
+        constexpr std::uint32_t radius_hz = 3000000U;
+        request.start_frequency_hz = profile.center_frequency_hz > radius_hz
+            ? profile.center_frequency_hz - radius_hz : profile.center_frequency_hz;
+        request.end_frequency_hz = profile.center_frequency_hz < 957000000U
+            ? profile.center_frequency_hz + radius_hz : 960000000U;
+        request.step_hz = 100000U;
+    }
+    return request;
+}
+#endif
+
 void build_traffic(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    add_status_bar(parent, "TRAFFIC");
+    constexpr lv_coord_t first_y = 28;
+    constexpr lv_coord_t row_height = 14;
+    const auto &store = capture_runtime.frames();
+
+    if(store.empty()) {
+        put_label(parent, "LISTENING FOR FRAMES", 8, 48, theme::lime(), &font_condensed_bold_16);
+        const RadioProfile &profile = radio_service.activeProfile();
+        char line[64]{};
+        std::snprintf(line, sizeof(line), "%s", profile.name);
+        put_label(parent, line, 8, 78, theme::cyan(), &font_mono_semibold_12);
+        std::snprintf(line, sizeof(line), "%.3f MHz  BW %.1f kHz",
+                      static_cast<double>(profile.center_frequency_hz) / 1000000.0,
+                      static_cast<double>(profile.bandwidth_hz) / 1000.0);
+        put_label(parent, line, 8, 98, theme::text(), &font_mono_10);
+        std::snprintf(line, sizeof(line), "SF%u  CR 4/%u  SYNC 0x%04X",
+                      profile.spreading_factor, profile.coding_rate_denominator, profile.sync_word);
+        put_label(parent, line, 8, 114, theme::text(), &font_mono_10);
+        put_label(parent, "P  CHANGE ACTIVE PROFILE", 8, 204, theme::text_muted(), &font_mono_10);
+        return;
+    }
+
+    const std::size_t selected_offset = resolve_traffic_selection();
+    const std::size_t maximum_visible = store.size() < 15 ? store.size() : 15;
+    const std::size_t first_offset = selected_offset < maximum_visible
+        ? 0 : selected_offset - maximum_visible + 1;
+    const std::size_t visible = (store.size() - first_offset) < maximum_visible
+        ? store.size() - first_offset : maximum_visible;
+    for(std::size_t index = 0; index < visible; ++index) {
+        const std::size_t offset = first_offset + index;
+        const FrameRecord *record = store.newest(offset);
+        if(record == nullptr) continue;
+        const lv_coord_t y = first_y + static_cast<lv_coord_t>(index) * row_height;
+        const bool selected = offset == selected_offset;
+        if(selected) theme::rect(parent, 4, y - 1, 312, row_height, theme::focus());
+
+        const lv_color_t row_color = selected ? theme::text() :
+            (record->raw.rf.crc == CrcStatus::Invalid ? theme::fault() : theme::lime());
+        char time[12]{};
+        char source[12]{};
+        char destination[12]{};
+        char hops[5]{};
+        char snr[10]{};
+        format_capture_time(time, sizeof(time), record->raw.rf.timestamp_us);
+        format_node(source, sizeof(source), record->decoded, FieldSource);
+        format_node(destination, sizeof(destination), record->decoded, FieldDestination);
+        if(record->decoded.hasField(FieldHopStart) && record->decoded.hasField(FieldHopLimit) &&
+           record->decoded.hop_start >= record->decoded.hop_limit) {
+            std::snprintf(hops, sizeof(hops), "%u", record->decoded.hop_start - record->decoded.hop_limit);
+        } else {
+            std::snprintf(hops, sizeof(hops), "-");
+        }
+        std::snprintf(snr, sizeof(snr), "%+.1f", static_cast<double>(record->raw.rf.snr_db_x10) / 10.0);
+
+        put_label(parent, time, 5, y, row_color, &font_mono_10);
+        put_label(parent, source, 59, y, row_color, &font_mono_10);
+        put_label(parent, ">", 122, y, row_color, &font_mono_10);
+        put_label(parent, destination, 133, y, row_color, &font_mono_10);
+        put_label(parent, packet_kind_label(record->decoded), 198, y, row_color, &font_mono_10);
+        put_label(parent, hops, 250, y, row_color, &font_mono_10);
+        put_label(parent, snr, 274, y, row_color, &font_mono_10);
+    }
+#else
     add_status_bar(parent, "TRAFFIC", "BAT 100%", "GPS 3D", "18 pkt/min");
     constexpr lv_coord_t first_y = 28;
     constexpr lv_coord_t row_height = 14;
@@ -180,10 +630,55 @@ void build_traffic(lv_obj_t * parent)
         put_label(parent, packets[index].hops, 255, y, row_color, &font_mono_10);
         put_label(parent, packets[index].snr, 278, y, row_color, &font_mono_10);
     }
+#endif
 }
 
 void build_nodes(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    {
+    add_status_bar(parent, "NODES");
+    put_label(parent, "SOURCE", 8, 27, theme::text(), &font_mono_semibold_12);
+    put_label(parent, "PROTO", 88, 27, theme::text(), &font_mono_semibold_12);
+    put_label(parent, "LAST", 146, 27, theme::text(), &font_mono_semibold_12);
+    put_label(parent, "SNR", 192, 27, theme::text(), &font_mono_semibold_12);
+    theme::rule_line(parent, 6, 43, 308);
+
+    std::array<LiveNodeSummary, 8> live_nodes{};
+    const std::size_t count = collect_live_nodes(live_nodes);
+    if(count == 0) {
+        put_label(parent, "NO NODE IDENTITIES YET", 58, 84, theme::text_muted(), &font_condensed_bold_16);
+        put_label(parent, "Raw frames still appear in TRAFFIC", 62, 108, theme::text_muted(), &font_mono_10);
+        return;
+    }
+
+    const std::size_t selected_index = resolve_node_selection(live_nodes, count);
+    for(std::size_t index = 0; index < count; ++index) {
+        const lv_coord_t y = 48 + static_cast<lv_coord_t>(index) * 22;
+        const bool selected = index == selected_index;
+        if(selected) theme::rect(parent, 4, y - 2, 312, 20, theme::surface_selected());
+        const lv_color_t value_color = selected ? theme::background() : theme::text();
+        char id[12]{};
+        char age[10]{};
+        char snr[10]{};
+        std::snprintf(id, sizeof(id), "%08lX", static_cast<unsigned long>(live_nodes[index].id));
+        format_age(age, sizeof(age), live_nodes[index].last_seen_us);
+        std::snprintf(snr, sizeof(snr), "%+.1f",
+                      static_cast<double>(live_nodes[index].latest_snr_x10) / 10.0);
+        put_label(parent, id, 8, y, value_color, &font_mono_10);
+        put_label(parent, protocolName(live_nodes[index].protocol), 88, y,
+                  selected ? theme::background() : theme::cyan(), &font_mono_10);
+        put_label(parent, age, 146, y,
+                  selected ? theme::background() : theme::text_muted(), &font_mono_10);
+        put_label(parent, snr, 190, y,
+                  selected ? theme::background() : theme::lime(), &font_mono_10);
+        draw_live_node_history(parent, live_nodes[index], 240, y, 70, 14, false,
+                               selected ? theme::background() : theme::lime());
+        theme::rule_line(parent, 6, y + 18, 308, 1, theme::grid());
+    }
+    return;
+    }
+#endif
     add_status_bar(parent, "NODES", "BAT 100%", "GPS LOCK", "18 pkt/min");
     put_label(parent, "NODE", 8, 27, theme::text(), &font_mono_semibold_12);
     put_label(parent, "LAST", 112, 27, theme::text(), &font_mono_semibold_12);
@@ -207,6 +702,133 @@ void build_nodes(lv_obj_t * parent)
 
 void build_spectrum(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    {
+    add_status_bar(parent, "SPECTRUM");
+    const SpectrumSweepStatus &status = radio_service.spectrumStatus();
+    const SpectrumSweepResult &result = radio_service.spectrumResult();
+    const SpectrumSweepRequest planned_request = spectrum_request_for_profile(radio_service.activeProfile());
+    constexpr lv_coord_t x = 7;
+    constexpr lv_coord_t y = 30;
+    constexpr lv_coord_t width = 306;
+    constexpr lv_coord_t height = 145;
+
+    if(spectrum_buffer == nullptr) {
+        put_label(parent, "SPECTRUM BUFFER UNAVAILABLE", 39, 82,
+                  theme::fault(), &font_condensed_bold_16);
+        put_label(parent, "Packet capture remains available", 69, 108,
+                  theme::text_muted(), &font_mono_10);
+        return;
+    }
+
+    if(status.state == SpectrumSweepState::Idle && result.point_count == 0) {
+        put_label(parent, "FULL-BAND SPECTRAL SCAN", 42, 58, theme::text(), &font_condensed_bold_16);
+        char plan[72]{};
+        std::snprintf(plan, sizeof(plan), "%.1f - %.1f MHz  /  %lu kHz steps",
+                      static_cast<double>(planned_request.start_frequency_hz) / 1000000.0,
+                      static_cast<double>(planned_request.end_frequency_hz) / 1000000.0,
+                      static_cast<unsigned long>(planned_request.step_hz / 1000U));
+        put_label(parent, plan, 36, 88, theme::cyan(), &font_mono_10);
+        put_label(parent, "Packet receive pauses while the SX1262 scans", 28, 113,
+                  theme::amber(), &font_mono_10);
+        put_label(parent, "The radio profile is restored before RX resumes", 25, 130,
+                  theme::text_muted(), &font_mono_10);
+        theme::rule_line(parent, 0, 198, 320);
+        put_label(parent, "ENTER  START EXPERIMENTAL SCAN", 39, 207,
+                  theme::cyan(), &font_mono_semibold_12);
+        return;
+    }
+
+    lv_obj_t *canvas = lv_canvas_create(parent);
+    theme::reset(canvas);
+    lv_canvas_set_buffer(canvas, spectrum_buffer, width, height, LV_COLOR_FORMAT_RGB565);
+    lv_canvas_fill_bg(canvas, theme::heat_deep(), LV_OPA_COVER);
+    lv_obj_set_pos(canvas, x, y);
+
+    std::uint16_t maximum_count = 1;
+    for(std::size_t point = 0; point < result.point_count; ++point) {
+        for(std::size_t bin = 0; bin < kSpectrumPowerBinCount; ++bin) {
+            if(result.points[point].counts[bin] > maximum_count) {
+                maximum_count = result.points[point].counts[bin];
+            }
+        }
+    }
+    if(result.point_count > 0) {
+        for(lv_coord_t px = 0; px < width; ++px) {
+            std::size_t point = static_cast<std::size_t>(px) * result.point_count /
+                                static_cast<std::size_t>(width);
+            if(point >= result.point_count) point = result.point_count - 1;
+            for(lv_coord_t py = 0; py < height; ++py) {
+                std::size_t bin = static_cast<std::size_t>(py) * kSpectrumPowerBinCount /
+                                  static_cast<std::size_t>(height);
+                if(bin >= kSpectrumPowerBinCount) bin = kSpectrumPowerBinCount - 1;
+                const std::uint16_t count = result.points[point].counts[bin];
+                // Preserve the scan's full histogram instead of making rare
+                // power buckets disappear behind the dominant noise-floor
+                // bucket. Every observed bucket gets a cold pixel; repeated
+                // samples then increase intensity linearly.
+                const std::uint32_t scaled = count == 0 ? 0U :
+                    20U + (static_cast<std::uint32_t>(count) * 235U) / maximum_count;
+                lv_color_t color = theme::heat_deep();
+                if(scaled > 210U) color = theme::heat_peak();
+                else if(scaled > 160U) color = theme::heat_hot();
+                else if(scaled > 110U) color = theme::heat_bright();
+                else if(scaled > 62U) color = theme::heat_mid();
+                else if(scaled > 12U) color = theme::heat_cold();
+                lv_canvas_set_px(canvas, px, py, color, LV_OPA_COVER);
+            }
+        }
+    }
+    lv_obj_invalidate(canvas);
+    add_grid(parent, x, y, width, height, 47, 29);
+    theme::rule_line(parent, x, y, width);
+    theme::rule_line(parent, x, y + height, width);
+    put_label(parent, "-11", x + 3, y + 2, theme::text_muted(), &font_mono_10);
+    put_label(parent, "-139", x + 3, y + height - 13, theme::text_muted(), &font_mono_10);
+
+    char line[72]{};
+    if(status.active()) {
+        const std::uint32_t percent = status.points_total == 0 ? 0 :
+            (static_cast<std::uint32_t>(status.points_completed) * 100U) / status.points_total;
+        std::snprintf(line, sizeof(line), "SCANNING %u/%u  %lu%%  %.3f MHz",
+                      status.points_completed, status.points_total,
+                      static_cast<unsigned long>(percent),
+                      static_cast<double>(status.current_frequency_hz) / 1000000.0);
+        put_label(parent, line, 10, 182, theme::amber(), &font_mono_semibold_12);
+        put_label(parent, "RX PAUSED - ENTER CANCEL", 82, 204, theme::text_muted(), &font_mono_10);
+    } else if(status.state == SpectrumSweepState::Failed) {
+        std::snprintf(line, sizeof(line), "SCAN FAILED %u  RADIO %d  RESTORE %s",
+                      static_cast<unsigned>(status.failure), status.radio_error,
+                      status.restoration_succeeded ? "OK" : "FAILED");
+        put_label(parent, line, 10, 182, theme::fault(), &font_mono_10);
+        put_label(parent, "ENTER RETRY", 117, 204, theme::cyan(), &font_mono_semibold_12);
+    } else {
+        std::uint32_t busiest_score = 0;
+        std::uint32_t quietest_score = UINT32_MAX;
+        std::uint32_t busiest_hz = 0;
+        std::uint32_t quietest_hz = 0;
+        for(std::size_t point = 0; point < result.point_count; ++point) {
+            const SpectrumBinSummary summary = summarizeSpectrumBins(result.points[point].counts);
+            if(summary.above_floor_samples >= busiest_score) {
+                busiest_score = summary.above_floor_samples;
+                busiest_hz = result.points[point].frequency_hz;
+            }
+            if(summary.above_floor_samples < quietest_score) {
+                quietest_score = summary.above_floor_samples;
+                quietest_hz = result.points[point].frequency_hz;
+            }
+        }
+        std::snprintf(line, sizeof(line), "BUSY %.3f    QUIET %.3f    %u BINS",
+                      static_cast<double>(busiest_hz) / 1000000.0,
+                      static_cast<double>(quietest_hz) / 1000000.0,
+                      result.point_count);
+        put_label(parent, line, 10, 182, theme::text(), &font_mono_10);
+        put_label(parent, "RELATIVE POWER  /  ENTER RESCAN", 54, 204,
+                  theme::cyan(), &font_mono_10);
+    }
+    return;
+    }
+#endif
     add_status_bar(parent, "SPECTRUM", "BAT 100%", "GPS LOCK", "24 pkt/min");
     constexpr lv_coord_t x = 7;
     constexpr lv_coord_t y = 30;
@@ -265,6 +887,69 @@ void build_spectrum(lv_obj_t * parent)
 
 void build_node_detail(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    {
+    add_status_bar(parent, "NODE DETAIL");
+    std::array<LiveNodeSummary, 8> live_nodes{};
+    const std::size_t count = collect_live_nodes(live_nodes);
+    if(count == 0) {
+        put_label(parent, "NO NODE SELECTED", 77, 87, theme::text_muted(), &font_condensed_bold_16);
+        put_label(parent, "Capture a decoded source first", 75, 111, theme::text_muted(), &font_mono_10);
+        return;
+    }
+
+    if(!node_detail_selection_valid) {
+        const LiveNodeSummary &selected = live_nodes[resolve_node_selection(live_nodes, count)];
+        node_detail_protocol = selected.protocol;
+        node_detail_id = selected.id;
+        node_detail_selection_valid = true;
+    }
+    const LiveNodeSummary *selected_node = nullptr;
+    for(std::size_t index = 0; index < count; ++index) {
+        if(live_node_matches(live_nodes[index], node_detail_protocol, node_detail_id)) {
+            selected_node = &live_nodes[index];
+            break;
+        }
+    }
+    if(selected_node == nullptr) {
+        put_label(parent, "SELECTED NODE EXPIRED", 59, 84, theme::fault(), &font_condensed_bold_16);
+        put_label(parent, "Its frames left the capture buffer", 63, 108,
+                  theme::text_muted(), &font_mono_10);
+        put_label(parent, "BACK  RETURN TO NODES", 85, 204, theme::cyan(), &font_mono_10);
+        return;
+    }
+
+    const LiveNodeSummary &node = *selected_node;
+    char line[72]{};
+    char age[12]{};
+    format_age(age, sizeof(age), node.last_seen_us);
+    std::snprintf(line, sizeof(line), "%08lX", static_cast<unsigned long>(node.id));
+    put_label(parent, line, 8, 25, theme::text(), &font_condensed_bold_28);
+    std::snprintf(line, sizeof(line), "%s  LAST %s  %u FRAMES", protocolName(node.protocol), age,
+                  static_cast<unsigned>(node.frames));
+    put_label(parent, line, 9, 55, theme::text_muted(), &font_mono_10);
+    theme::rule_line(parent, 6, 70, 308);
+
+    put_label(parent, "SNR HISTORY", 8, 78, theme::text(), &font_mono_10);
+    add_grid(parent, 8, 92, 304, 40, 50, 20);
+    draw_live_node_history(parent, node, 8, 93, 304, 38);
+    std::snprintf(line, sizeof(line), "LATEST %+.1f dB  AVERAGE %+.1f dB",
+                  static_cast<double>(node.latest_snr_x10) / 10.0,
+                  node.frames == 0 ? 0.0 : static_cast<double>(node.snr_sum_x10) /
+                      (10.0 * static_cast<double>(node.frames)));
+    put_label(parent, line, 9, 135, theme::lime(), &font_mono_10);
+
+    put_label(parent, "RSSI HISTORY", 8, 155, theme::text(), &font_mono_10);
+    add_grid(parent, 8, 169, 304, 34, 50, 17);
+    draw_live_node_history(parent, node, 8, 170, 304, 32, true);
+    std::snprintf(line, sizeof(line), "LATEST %.1f dBm  CRC ERRORS %u",
+                  static_cast<double>(node.latest_rssi_x10) / 10.0,
+                  static_cast<unsigned>(node.crc_errors));
+    put_label(parent, line, 9, 207,
+              node.crc_errors == 0 ? theme::cyan() : theme::fault(), &font_mono_10);
+    return;
+    }
+#endif
     add_status_bar(parent, "NODE DETAIL", "BAT 100%", "GPS LOCK", "12 nodes");
     put_label(parent, "Hilltop7", 8, 25, theme::text(), &font_condensed_bold_28);
     put_label(parent, "LAST SEEN  00:01:30", 9, 54, theme::text_muted(), &font_mono_10);
@@ -285,6 +970,105 @@ void build_node_detail(lv_obj_t * parent)
 
 void build_packet_detail(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    {
+    add_status_bar(parent, "PACKET DETAIL");
+    if(packet_detail_sequence == 0) select_current_frame_for_detail();
+    const FrameRecord *record = find_live_frame(packet_detail_sequence);
+    if(record == nullptr) {
+        if(capture_runtime.frames().empty()) {
+            put_label(parent, "NO CAPTURED FRAME", 48, 86,
+                      theme::text_muted(), &font_condensed_bold_16);
+            put_label(parent, "Open TRAFFIC and wait for radio activity", 35, 112,
+                      theme::text_muted(), &font_mono_10);
+        } else {
+            put_label(parent, "SELECTED FRAME EXPIRED", 48, 86,
+                      theme::fault(), &font_condensed_bold_16);
+            put_label(parent, "It left the 64-frame capture buffer", 47, 112,
+                      theme::text_muted(), &font_mono_10);
+            put_label(parent, "BACK  RETURN TO TRAFFIC", 78, 204,
+                      theme::cyan(), &font_mono_10);
+        }
+        return;
+    }
+
+    theme::rect(parent, 0, 22, 38, 201, theme::surface());
+    theme::rule_line(parent, 37, 22, 1, 201);
+    constexpr std::array<const char *, 5> nav = {{"TRF", "SPC", "NOD", "MAP", "CFG"}};
+    for(std::size_t index = 0; index < nav.size(); ++index) {
+        const lv_coord_t y = 29 + static_cast<lv_coord_t>(index) * 37;
+        if(index == 0) theme::rect(parent, 0, y - 4, 37, 31, theme::rule());
+        put_label(parent, nav[index], 8, y + 4, index == 0 ? theme::lime() : theme::text(), &font_mono_10);
+    }
+
+    char source[12]{};
+    char destination[12]{};
+    char line[72]{};
+    format_node(source, sizeof(source), record->decoded, FieldSource);
+    format_node(destination, sizeof(destination), record->decoded, FieldDestination);
+    std::snprintf(line, sizeof(line), "%s  >  %s", source, destination);
+    put_label(parent, line, 49, 29, theme::text(), &font_mono_semibold_12);
+    std::snprintf(line, sizeof(line), "%s  %s  %u B", protocolName(record->decoded.protocol),
+                  packet_kind_label(record->decoded), record->raw.captured_length);
+    put_label(parent, line, 49, 50, theme::amber(), &font_mono_10);
+    std::snprintf(line, sizeof(line), "SF%u  BW %.1fk  CR4/%u  0x%04X",
+                  record->raw.rf.spreading_factor,
+                  static_cast<double>(record->raw.rf.bandwidth_hz) / 1000.0,
+                  record->raw.rf.coding_rate_denominator, record->raw.rf.sync_word);
+    put_label(parent, line, 49, 67, theme::text(), &font_mono_10);
+    std::snprintf(line, sizeof(line), "RSSI %.1f  SNR %+.1f dB  CRC %s",
+                  static_cast<double>(record->raw.rf.rssi_dbm_x10) / 10.0,
+                  static_cast<double>(record->raw.rf.snr_db_x10) / 10.0,
+                  record->raw.rf.crc == CrcStatus::Valid ? "OK" :
+                  (record->raw.rf.crc == CrcStatus::Invalid ? "BAD" : "--"));
+    put_label(parent, line, 49, 84,
+              record->raw.rf.crc == CrcStatus::Invalid ? theme::fault() : theme::lime(), &font_mono_10);
+    theme::rule_line(parent, 47, 103, 266);
+
+    if(record->decoded.protocol == ProtocolId::MeshCore) {
+        std::snprintf(line, sizeof(line), "ROUTE %u  TYPE %s  PATH %ux%u",
+                      static_cast<unsigned>(MeshCoreDecoder::routeType(record->decoded)),
+                      packet_kind_label(record->decoded),
+                      static_cast<unsigned>(MeshCoreDecoder::pathHashCount(record->decoded)),
+                      static_cast<unsigned>(MeshCoreDecoder::pathHashSize(record->decoded)));
+    } else if(record->decoded.protocol == ProtocolId::Reticulum) {
+        if(ReticulumDecoder::isIfacProtected(record->decoded)) {
+            std::snprintf(line, sizeof(line), "IFAC PROTECTED  HEADER OPAQUE");
+        } else if(ReticulumDecoder::isRNodeSplitFrame(record->decoded)) {
+            std::snprintf(line, sizeof(line), "RNODE SPLIT FRAME  REASSEMBLY PENDING");
+        } else {
+            std::snprintf(line, sizeof(line), "H%u  HOPS %u  DEST PREFIX %08lX",
+                          ReticulumDecoder::headerType(record->decoded) == ReticulumHeaderType::HeaderTwo ? 2U : 1U,
+                          static_cast<unsigned>(ReticulumDecoder::observedHops(record->decoded)),
+                          static_cast<unsigned long>(ReticulumDecoder::destinationHashPrefix(record->decoded)));
+        }
+    } else if(record->decoded.hasField(FieldPacketId)) {
+        std::snprintf(line, sizeof(line), "ID %08lX  CH %u  HOPS %u/%u",
+                      static_cast<unsigned long>(record->decoded.packet_id), record->decoded.channel,
+                      record->decoded.hop_limit, record->decoded.hop_start);
+    } else {
+        std::snprintf(line, sizeof(line), "FLAGS 0x%08lX  OFFSET %u",
+                      static_cast<unsigned long>(record->decoded.protocol_flags),
+                      record->decoded.payload_offset);
+    }
+    put_label(parent, line, 49, 111, theme::cyan(), &font_mono_10);
+    put_label(parent, "RAW FRAME", 49, 136, theme::text_muted(), &font_mono_10);
+
+    for(std::size_t row = 0; row < 4; ++row) {
+        char hex[48]{};
+        std::size_t cursor = 0;
+        for(std::size_t column = 0; column < 10; ++column) {
+            const std::size_t offset = row * 10 + column;
+            if(offset >= record->raw.captured_length || cursor + 4 >= sizeof(hex)) break;
+            cursor += static_cast<std::size_t>(std::snprintf(hex + cursor, sizeof(hex) - cursor,
+                                                              "%02X ", record->raw.bytes[offset]));
+        }
+        put_label(parent, hex, 49, 151 + static_cast<lv_coord_t>(row) * 14,
+                  row == 0 ? theme::text() : theme::text_muted(), &font_mono_10);
+    }
+    return;
+    }
+#endif
     add_status_bar(parent, "PACKET DETAIL", "BAT 100%", "GPS LOCK", "14:02:11");
     theme::rect(parent, 0, 22, 38, 201, theme::surface());
     theme::rule_line(parent, 37, 22, 1, 201);
@@ -311,6 +1095,36 @@ void build_packet_detail(lv_obj_t * parent)
 
 void build_map(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    {
+    add_status_bar(parent, "MAP");
+    add_grid(parent, 0, 22, 320, 201, 20, 20);
+    constexpr lv_coord_t cx = 160;
+    constexpr lv_coord_t cy = 122;
+    theme::rule_line(parent, cx - 28, cy, 56, 2, theme::lime());
+    theme::rule_line(parent, cx, cy - 28, 2, 56, theme::lime());
+
+    const GpsStatus &gps = hardware_status.snapshot().gps;
+    if(gps.state == GpsState::Fix && gps.position_valid) {
+        char line[72]{};
+        std::snprintf(line, sizeof(line), "LOCAL FIX  %.5f, %.5f", gps.latitude_degrees,
+                      gps.longitude_degrees);
+        put_label(parent, line, 52, 29, theme::lime(), &font_mono_semibold_12);
+        std::snprintf(line, sizeof(line), "ALT %.0f m  SAT %u  HDOP %.1f",
+                      static_cast<double>(gps.altitude_meters), static_cast<unsigned>(gps.satellites),
+                      static_cast<double>(gps.hdop));
+        put_label(parent, line, 82, 47, theme::cyan(), &font_mono_10);
+    } else if(gps.state == GpsState::Searching) {
+        put_label(parent, "GPS RECEIVER FOUND - WAITING FOR FIX", 38, 42,
+                  theme::amber(), &font_mono_10);
+    } else {
+        put_label(parent, "NO GPS RECEIVER", 98, 42, theme::text_muted(), &font_mono_semibold_12);
+    }
+    put_label(parent, "REMOTE POSITIONS REQUIRE A DECODED POSITION FRAME", 20, 204,
+              theme::text_muted(), &font_mono_10);
+    return;
+    }
+#endif
     add_status_bar(parent, "MAP", "BAT 100%", "GPS LOCK", "12 nodes");
     add_grid(parent, 0, 22, 320, 201, 20, 20);
     theme::rule_line(parent, 160, 23, 1, 199, theme::text_muted());
@@ -343,6 +1157,64 @@ void build_map(lv_obj_t * parent)
 
 void build_survey(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    {
+    add_status_bar(parent, "SURVEY");
+    const std::uint32_t elapsed_ms = survey_running
+        ? (millis() - survey_started_ms)
+        : (survey_has_result ? 60000U : 0U);
+    const std::uint32_t bounded_ms = elapsed_ms > 60000U ? 60000U : elapsed_ms;
+    const std::uint64_t captured = capture_runtime.frames().totalSeen() >= survey_baseline_sequence
+        ? capture_runtime.frames().totalSeen() - survey_baseline_sequence : 0;
+
+    std::array<std::uint32_t, 8> node_ids{};
+    std::size_t node_count = 0;
+    std::int16_t best_snr = INT16_MIN;
+    std::uint32_t crc_errors = 0;
+    const auto &store = capture_runtime.frames();
+    for(std::size_t index = 0; index < store.size(); ++index) {
+        const FrameRecord *record = store.at(index);
+        if(record == nullptr || record->sequence <= survey_baseline_sequence) continue;
+        if(record->raw.rf.snr_db_x10 > best_snr) best_snr = record->raw.rf.snr_db_x10;
+        if(record->raw.rf.crc == CrcStatus::Invalid) ++crc_errors;
+        if(record->decoded.hasField(FieldSource)) {
+            bool known = false;
+            for(std::size_t node = 0; node < node_count; ++node) {
+                if(node_ids[node] == record->decoded.source) known = true;
+            }
+            if(!known && node_count < node_ids.size()) node_ids[node_count++] = record->decoded.source;
+        }
+    }
+
+    put_label(parent, survey_running ? "CAPTURING" : (survey_has_result ? "SURVEY COMPLETE" : "READY"),
+              survey_running ? 44 : 23, 47,
+              survey_running ? theme::amber() : theme::lime(), &font_condensed_bold_28);
+    char line[64]{};
+    std::snprintf(line, sizeof(line), "%lus / 60s", static_cast<unsigned long>(bounded_ms / 1000U));
+    put_label(parent, line, 241, 88, theme::lime(), &font_mono_semibold_12);
+
+    lv_obj_t *progress = theme::rect(parent, 9, 84, 221, 23, theme::background());
+    lv_obj_set_style_border_width(progress, 1, 0);
+    lv_obj_set_style_border_color(progress, theme::text_muted(), 0);
+    const lv_coord_t fill = static_cast<lv_coord_t>((bounded_ms * 215ULL) / 60000ULL);
+    if(fill > 0) theme::rect(progress, 3, 3, fill, 17, theme::lime());
+
+    std::snprintf(line, sizeof(line), "FRAMES          %llu",
+                  static_cast<unsigned long long>(captured));
+    put_label(parent, line, 10, 121, theme::text(), &font_mono_semibold_12);
+    std::snprintf(line, sizeof(line), "SOURCES         %u", static_cast<unsigned>(node_count));
+    put_label(parent, line, 10, 143, theme::text(), &font_mono_semibold_12);
+    if(best_snr == INT16_MIN) std::snprintf(line, sizeof(line), "BEST SNR        --");
+    else std::snprintf(line, sizeof(line), "BEST SNR        %+.1f dB", static_cast<double>(best_snr) / 10.0);
+    put_label(parent, line, 10, 165, theme::text(), &font_mono_semibold_12);
+    std::snprintf(line, sizeof(line), "CRC ERRORS      %lu", static_cast<unsigned long>(crc_errors));
+    put_label(parent, line, 10, 187, crc_errors == 0 ? theme::cyan() : theme::fault(), &font_mono_10);
+    theme::rule_line(parent, 0, 211, 320);
+    put_label(parent, survey_running ? "SURVEY RUNNING" : "ENTER  START 60s SURVEY", 54, 216,
+              survey_running ? theme::text_muted() : theme::cyan(), &font_mono_semibold_12);
+    return;
+    }
+#endif
     add_status_bar(parent, "SURVEY", "BAT 100%", "GPS LOCK", "915.0 MHz");
     put_label(parent, "CAPTURING", 44, 47, theme::amber(), &font_condensed_bold_28);
     put_label(parent, "42s / 60s", 241, 88, theme::lime(), &font_mono_semibold_12);
@@ -364,6 +1236,87 @@ void build_survey(lv_obj_t * parent)
 
 void build_events(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    {
+    add_status_bar(parent, "EVENTS");
+    const RadioStatus &radio = radio_service.status();
+    char time[12]{};
+    const std::uint32_t uptime_seconds = millis() / 1000U;
+    std::snprintf(time, sizeof(time), "%02lu:%02lu", static_cast<unsigned long>((uptime_seconds / 60U) % 100U),
+                  static_cast<unsigned long>(uptime_seconds % 60U));
+
+    struct LiveEvent { const char *kind; char detail[96]; lv_color_t color; };
+    std::array<LiveEvent, 6> events{};
+    if(screenshot_attempted) {
+        if(last_screenshot_result == ScreenshotWriteResult::Ok) {
+            std::snprintf(events[0].detail, sizeof(events[0].detail), "%s  capture gap %lums",
+                          screenshot_path, static_cast<unsigned long>(last_screenshot_gap_ms));
+        } else {
+            std::snprintf(events[0].detail, sizeof(events[0].detail),
+                          "Screenshot failed  capture gap %lums",
+                          static_cast<unsigned long>(last_screenshot_gap_ms));
+        }
+        events[0].kind = last_screenshot_result == ScreenshotWriteResult::Ok
+                             ? "SCREENSHOT" : "SHOT ERR";
+        events[0].color = last_screenshot_result == ScreenshotWriteResult::Ok
+                              ? theme::lime() : theme::fault();
+    } else {
+        std::snprintf(events[0].detail, sizeof(events[0].detail), "Firmware running for %lus",
+                      static_cast<unsigned long>(uptime_seconds));
+        events[0].kind = "BOOT";
+        events[0].color = theme::lime();
+    }
+
+    std::snprintf(events[1].detail, sizeof(events[1].detail), "%s  error %d",
+                  radio.receiving ? "SX1262 listening" : "SX1262 not receiving", radio.last_error);
+    events[1].kind = radio.receiving ? "RADIO OK" : "RADIO ERR";
+    events[1].color = radio.receiving ? theme::lime() : theme::fault();
+
+    const RadioProfile &profile = radio_service.activeProfile();
+    if(radio.profile_switch_failures != 0) {
+        std::snprintf(events[2].detail, sizeof(events[2].detail),
+                      "%s  rollback kept RX  last error %d", profile.name,
+                      radio.last_profile_error);
+        events[2].kind = "PROFILE WARN";
+        events[2].color = theme::amber();
+    } else {
+        std::snprintf(events[2].detail, sizeof(events[2].detail), "%s  %.3f MHz",
+                      profile.name, static_cast<double>(profile.center_frequency_hz) / 1000000.0);
+        events[2].kind = "PROFILE";
+        events[2].color = theme::cyan();
+    }
+
+    std::snprintf(events[3].detail, sizeof(events[3].detail), "%s",
+                  native_capture_recording ? native_capture_path : "No writable SD capture");
+    events[3].kind = native_capture_recording ? "LSCAP REC" : "LSCAP OFF";
+    events[3].color = native_capture_recording ? theme::lime() : theme::amber();
+
+    const bool pcap_bw_unsupported = last_pcap_result == PcapWriteResult::InvalidBandwidth;
+    std::snprintf(events[4].detail, sizeof(events[4].detail), "%s",
+                  pcap_bw_unsupported ? "Active bandwidth cannot fit LoRaTap v0" :
+                  (pcap_recording ? pcap_path : "PCAP unavailable"));
+    events[4].kind = pcap_bw_unsupported ? "PCAP LIMIT" : (pcap_recording ? "PCAP REC" : "PCAP OFF");
+    events[4].color = pcap_bw_unsupported ? theme::amber() :
+                      (pcap_recording ? theme::lime() : theme::text_muted());
+
+    std::snprintf(events[5].detail, sizeof(events[5].detail), "%lu frames  %lu bad CRC  %lu RX errors",
+                  static_cast<unsigned long>(radio.received_frames),
+                  static_cast<unsigned long>(radio.crc_errors),
+                  static_cast<unsigned long>(radio.receive_errors));
+    events[5].kind = "COUNTERS";
+    events[5].color = radio.crc_errors == 0 && radio.receive_errors == 0 ? theme::cyan() : theme::amber();
+
+    for(std::size_t index = 0; index < events.size(); ++index) {
+        const lv_coord_t y = 29 + static_cast<lv_coord_t>(index) * 32;
+        put_label(parent, index == 0 ? time : "", 7, y, events[index].color, &font_mono_10);
+        put_label(parent, events[index].kind, index == 0 ? 57 : 7, y, events[index].color,
+                  &font_mono_semibold_12);
+        put_label(parent, events[index].detail, 7, y + 15, theme::text(), &font_mono_10);
+        theme::rule_line(parent, 6, y + 28, 308, 1, theme::grid());
+    }
+    return;
+    }
+#endif
     add_status_bar(parent, "EVENTS", "BAT 100%", "GPS LOCK", "5 recent");
     struct Event { const char * time; const char * kind; const char * detail; lv_color_t (*color)(); };
     constexpr std::array<Event, 5> events = {{{"14:11", "NEW NODE", "Mobile-4 appeared  SNR -12.1", theme::lime},
@@ -382,6 +1335,88 @@ void build_events(lv_obj_t * parent)
 
 void build_utilization(lv_obj_t * parent)
 {
+#if defined(LILYSHARK_DEVICE)
+    {
+    add_status_bar(parent, "AIRTIME");
+    const auto &store = capture_runtime.frames();
+    if(store.empty()) {
+        put_label(parent, "NO AIRTIME SAMPLES", 70, 82, theme::text_muted(), &font_condensed_bold_16);
+        put_label(parent, "Waiting for received LoRa frames", 69, 108, theme::text_muted(), &font_mono_10);
+        return;
+    }
+
+    const std::uint64_t now_us = static_cast<std::uint64_t>(esp_timer_get_time());
+    const std::uint64_t window_start_us = now_us > 60000000ULL ? now_us - 60000000ULL : 0;
+    std::uint64_t airtime_us = 0;
+    std::uint32_t frame_count = 0;
+    std::uint32_t crc_errors = 0;
+    std::uint64_t first_timestamp = now_us;
+    for(std::size_t index = 0; index < store.size(); ++index) {
+        const FrameRecord *record = store.at(index);
+        if(record == nullptr || record->raw.rf.timestamp_us < window_start_us) continue;
+        if(record->raw.rf.timestamp_us < first_timestamp) first_timestamp = record->raw.rf.timestamp_us;
+        if(record->raw.rf.hasField(RfFieldAirtime)) airtime_us += record->raw.rf.airtime_us;
+        if(record->raw.rf.crc == CrcStatus::Invalid) ++crc_errors;
+        ++frame_count;
+    }
+    std::uint64_t observed_us = now_us > first_timestamp ? now_us - first_timestamp : 1000000ULL;
+    if(observed_us < 1000000ULL) observed_us = 1000000ULL;
+    std::uint32_t utilization = static_cast<std::uint32_t>((airtime_us * 100ULL) / observed_us);
+    if(utilization > 100U) utilization = 100U;
+    const std::uint32_t packets_per_minute = static_cast<std::uint32_t>(
+        (static_cast<std::uint64_t>(frame_count) * 60000000ULL) / observed_us);
+    const std::uint32_t crc_percent = frame_count == 0 ? 0 : (crc_errors * 100U) / frame_count;
+
+    lv_obj_t *gauge = lv_arc_create(parent);
+    lv_obj_set_pos(gauge, 10, 31);
+    lv_obj_set_size(gauge, 140, 140);
+    lv_arc_set_rotation(gauge, 135);
+    lv_arc_set_bg_angles(gauge, 0, 270);
+    lv_arc_set_value(gauge, static_cast<std::int32_t>(utilization));
+    lv_obj_remove_style(gauge, nullptr, LV_PART_KNOB);
+    lv_obj_clear_flag(gauge, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_arc_width(gauge, 7, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(gauge, theme::rule(), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(gauge, 7, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(gauge, utilization > 60 ? theme::fault() :
+                                      (utilization > 25 ? theme::amber() : theme::lime()), LV_PART_INDICATOR);
+
+    char line[48]{};
+    std::snprintf(line, sizeof(line), "%lu%%", static_cast<unsigned long>(utilization));
+    put_label(parent, line, 39, 64, theme::text(), &font_condensed_bold_28);
+    put_label(parent, "OBSERVED", 39, 96, theme::text_muted(), &font_mono_10);
+    put_label(parent, "AIRTIME", 45, 108, theme::text_muted(), &font_mono_10);
+    theme::rule_line(parent, 173, 31, 1, 121);
+    put_label(parent, "PACKETS / MIN", 187, 45, theme::text_muted(), &font_condensed_12);
+    std::snprintf(line, sizeof(line), "%lu", static_cast<unsigned long>(packets_per_minute));
+    put_label(parent, line, 187, 61, theme::text(), &font_mono_semibold_12);
+    theme::rule_line(parent, 185, 83, 122);
+    put_label(parent, "CRC ERROR RATE", 187, 94, theme::text_muted(), &font_condensed_12);
+    std::snprintf(line, sizeof(line), "%lu%%", static_cast<unsigned long>(crc_percent));
+    put_label(parent, line, 187, 110, crc_percent == 0 ? theme::cyan() : theme::fault(),
+              &font_mono_semibold_12);
+
+    put_label(parent, "RECENT PACKET AIRTIME", 8, 166, theme::text_muted(), &font_mono_10);
+    std::uint32_t maximum_airtime = 1;
+    const std::size_t visible = store.size() < 22 ? store.size() : 22;
+    for(std::size_t index = 0; index < visible; ++index) {
+        const FrameRecord *record = store.newest(index);
+        if(record != nullptr && record->raw.rf.airtime_us > maximum_airtime) maximum_airtime = record->raw.rf.airtime_us;
+    }
+    for(std::size_t index = 0; index < visible; ++index) {
+        const FrameRecord *record = store.newest(visible - 1 - index);
+        if(record == nullptr) continue;
+        const lv_coord_t bar_height = static_cast<lv_coord_t>(4U +
+            (static_cast<std::uint64_t>(record->raw.rf.airtime_us) * 34ULL) / maximum_airtime);
+        const lv_color_t color = record->raw.rf.crc == CrcStatus::Invalid ? theme::fault() : theme::lime();
+        theme::rect(parent, 42 + static_cast<lv_coord_t>(index) * 12, 211 - bar_height, 8, bar_height, color);
+    }
+    theme::rule_line(parent, 39, 212, 270);
+    put_label(parent, "OLDEST", 39, 216, theme::text_muted(), &font_mono_10);
+    put_label(parent, "NEWEST", 268, 216, theme::text_muted(), &font_mono_10);
+    return;
+    }
+#endif
     add_status_bar(parent, "UTILIZATION", "BAT 100%", "GPS LOCK", "19 pkt/min");
     lv_obj_t * gauge = lv_arc_create(parent);
     lv_obj_set_pos(gauge, 10, 31);
@@ -442,9 +1477,189 @@ void build_current_screen()
     }
 }
 
-void handle_key(lv_event_t * event)
+#if defined(LILYSHARK_DEVICE)
+void take_device_screenshot() noexcept;
+
+const char *protocol_abbreviation(ProtocolId protocol) noexcept
 {
-    const uint32_t key = lv_event_get_key(event);
+    switch(protocol) {
+        case ProtocolId::Meshtastic: return "MT";
+        case ProtocolId::MeshCore: return "MC";
+        case ProtocolId::Reticulum: return "RN";
+        case ProtocolId::Custom: return "CU";
+        case ProtocolId::Unknown: default: return "RF";
+    }
+}
+
+bool update_live_radio_label() noexcept
+{
+    char next_label[sizeof(live_radio_label)]{};
+    const RadioStatus &status = radio_service.status();
+    if(!status.initialized) {
+        std::snprintf(next_label, sizeof(next_label), "RF ERR %d", status.last_error);
+    } else if(!status.receiving) {
+        std::snprintf(next_label, sizeof(next_label), "RX STOP %d", status.last_error);
+    } else {
+        std::snprintf(next_label, sizeof(next_label), "%s %lu",
+                      protocol_abbreviation(radio_service.activeProfile().protocol_hint),
+                      static_cast<unsigned long>(status.received_frames));
+    }
+    const bool changed = std::strcmp(live_radio_label, next_label) != 0;
+    std::snprintf(live_radio_label, sizeof(live_radio_label), "%s", next_label);
+    return changed;
+}
+
+void on_radio_frame(const RawFrame &frame, const RadioProfile &profile, void *) noexcept
+{
+    const FrameRecord *previous_newest = capture_runtime.frames().newest();
+    const bool follow_newest = traffic_selected_sequence == 0 ||
+                               (previous_newest != nullptr &&
+                                traffic_selected_sequence == previous_newest->sequence);
+    const IngestResult ingest = capture_runtime.ingest(frame, profile);
+    if(follow_newest) traffic_selected_sequence = ingest.sequence;
+    if(native_capture_recording) {
+        const FrameRecord *stored = capture_runtime.frames().newest();
+        last_native_capture_result = stored != nullptr
+            ? native_capture_writer.write(*stored)
+            : LilysharkCaptureWriteResult::InvalidFrame;
+        if(last_native_capture_result == LilysharkCaptureWriteResult::SinkError) {
+            native_capture_recording = false;
+        }
+    }
+    if(pcap_recording) {
+        last_pcap_result = pcap_writer.write(frame);
+        if(last_pcap_result == PcapWriteResult::SinkError) {
+            pcap_recording = false;
+        }
+    }
+    live_data_dirty = true;
+    update_live_radio_label();
+}
+
+bool update_live_hardware_labels() noexcept
+{
+    const HardwareStatusSnapshot &status = hardware_status.snapshot();
+    const bool changed = std::strcmp(live_battery_label, status.battery_label) != 0 ||
+                         std::strcmp(live_gps_label, status.gps_label) != 0;
+    std::snprintf(live_battery_label, sizeof(live_battery_label), "%s", status.battery_label);
+    std::snprintf(live_gps_label, sizeof(live_gps_label), "%s", status.gps_label);
+    return changed;
+}
+
+void cycle_active_profile() noexcept
+{
+    const std::size_t count = builtinProfileCount();
+    if(count == 0) return;
+    const std::size_t candidate_index = (active_profile_index + 1) % count;
+    const RadioProfile &next = builtinProfiles()[candidate_index];
+    const bool ready = radio_service.setProfile(next);
+    if(ready) active_profile_index = candidate_index;
+    update_live_radio_label();
+    Serial.printf("Lilyshark profile: %s (%s, error %d)\n", next.name,
+                  ready ? "listening" : "failed",
+                  ready ? radio_service.status().last_error
+                        : radio_service.status().last_profile_error);
+    build_current_screen();
+}
+
+constexpr std::array<Screen, 7> primary_screens = {{
+    Screen::traffic,
+    Screen::spectrum,
+    Screen::nodes,
+    Screen::map,
+    Screen::survey,
+    Screen::events,
+    Screen::utilization,
+}};
+
+Screen primary_context(Screen screen) noexcept
+{
+    if(screen == Screen::packet_detail) return Screen::traffic;
+    if(screen == Screen::node_detail) return Screen::nodes;
+    return screen;
+}
+
+void move_primary_screen(int direction) noexcept
+{
+    const Screen context = primary_context(current_screen);
+    std::size_t current_index = 0;
+    for(std::size_t index = 0; index < primary_screens.size(); ++index) {
+        if(primary_screens[index] == context) {
+            current_index = index;
+            break;
+        }
+    }
+    if(direction > 0) {
+        current_index = (current_index + 1) % primary_screens.size();
+    } else {
+        current_index = current_index == 0 ? primary_screens.size() - 1 : current_index - 1;
+    }
+    current_screen = primary_screens[current_index];
+    build_current_screen();
+    Serial.printf("Lilyshark view: %s\n", screen_names[static_cast<std::size_t>(current_screen)]);
+}
+#endif
+
+void handle_navigation_key(uint32_t key)
+{
+#if defined(LILYSHARK_DEVICE)
+    if(key == 'p' || key == 'P') {
+        cycle_active_profile();
+        return;
+    }
+    if(key == 's' || key == 'S') {
+        take_device_screenshot();
+        return;
+    }
+    if(key == LV_KEY_ENTER || key == '\r') {
+        if(current_screen == Screen::spectrum) {
+            if(spectrum_buffer == nullptr) return;
+            if(radio_service.spectrumStatus().active()) {
+                radio_service.cancelSpectrumSweep();
+            } else {
+                const SpectrumSweepRequest request = spectrum_request_for_profile(radio_service.activeProfile());
+                radio_service.startSpectrumSweep(request);
+            }
+            build_current_screen();
+        } else if(current_screen == Screen::traffic && select_current_frame_for_detail()) {
+            current_screen = Screen::packet_detail;
+            build_current_screen();
+        } else if(current_screen == Screen::nodes && select_current_node_for_detail()) {
+            current_screen = Screen::node_detail;
+            build_current_screen();
+        } else if(current_screen == Screen::survey && !survey_running) {
+            survey_running = true;
+            survey_has_result = false;
+            survey_started_ms = millis();
+            survey_baseline_sequence = capture_runtime.frames().totalSeen();
+            build_current_screen();
+        }
+        return;
+    }
+    if(key == LV_KEY_ESC || key == 0x08U) {
+        if(current_screen == Screen::packet_detail) current_screen = Screen::traffic;
+        else if(current_screen == Screen::node_detail) current_screen = Screen::nodes;
+        else return;
+        build_current_screen();
+        return;
+    }
+    if(key == LV_KEY_DOWN || key == LV_KEY_UP) {
+        const int direction = key == LV_KEY_DOWN ? 1 : -1;
+        bool moved = false;
+        if(current_screen == Screen::traffic) moved = move_traffic_selection(direction);
+        else if(current_screen == Screen::nodes) moved = move_node_selection(direction);
+        if(moved) build_current_screen();
+        return;
+    }
+    if(key == LV_KEY_RIGHT || key == LV_KEY_NEXT) {
+        move_primary_screen(1);
+        return;
+    }
+    if(key == LV_KEY_LEFT || key == LV_KEY_PREV) {
+        move_primary_screen(-1);
+        return;
+    }
+#endif
     int next = static_cast<int>(current_screen);
     if(key == LV_KEY_RIGHT || key == LV_KEY_DOWN || key == LV_KEY_NEXT) ++next;
     else if(key == LV_KEY_LEFT || key == LV_KEY_UP || key == LV_KEY_PREV) --next;
@@ -453,13 +1668,27 @@ void handle_key(lv_event_t * event)
 
     constexpr int count = static_cast<int>(Screen::count);
     next = (next % count + count) % count;
+#if defined(LILYSHARK_DEVICE)
+    if(static_cast<Screen>(next) == Screen::packet_detail) select_current_frame_for_detail();
+    else if(static_cast<Screen>(next) == Screen::node_detail) select_current_node_for_detail();
+#endif
     current_screen = static_cast<Screen>(next);
     build_current_screen();
+#if defined(LILYSHARK_DEVICE)
+    Serial.printf("Lilyshark view: %s\n", screen_names[static_cast<size_t>(current_screen)]);
+#else
     std::fprintf(stderr, "Lilyshark view: %s\n", screen_names[static_cast<size_t>(current_screen)]);
+#endif
+}
+
+void handle_key(lv_event_t * event)
+{
+    handle_navigation_key(lv_event_get_key(event));
 }
 
 } // namespace
 
+#if !defined(LILYSHARK_DEVICE)
 int main(int argc, char ** argv)
 {
     if(argc > 1) {
@@ -494,3 +1723,316 @@ int main(int argc, char ** argv)
         SDL_Delay(5);
     }
 }
+#else
+
+namespace {
+
+constexpr uint8_t keyboard_brightness_command = 0x01;
+constexpr size_t spectrum_buffer_size = LV_CANVAS_BUF_SIZE(306, 145, 16, LV_DRAW_BUF_STRIDE_ALIGN);
+
+TFT_eSPI device_display;
+alignas(4) std::uint8_t device_draw_buffer[theme::screen_width * 20 * sizeof(std::uint16_t)];
+TouchPoint touch_last_point{};
+TouchPoint touch_start_point{};
+bool touch_was_pressed = false;
+uint32_t touch_started_ms = 0;
+
+struct TrackballKey {
+    uint8_t pin;
+    uint32_t key;
+    bool released;
+    uint32_t last_event_ms;
+};
+
+std::array<TrackballKey, 5> trackball_keys = {{{tdeck::trackball_up_pin, LV_KEY_UP, true, 0},
+                                                {tdeck::trackball_down_pin, LV_KEY_DOWN, true, 0},
+                                                {tdeck::trackball_left_pin, LV_KEY_LEFT, true, 0},
+                                                {tdeck::trackball_right_pin, LV_KEY_RIGHT, true, 0},
+                                                {tdeck::trackball_press_pin, LV_KEY_ENTER, true, 0}}};
+
+void set_backlight(uint8_t value)
+{
+    static uint8_t level = 0;
+    constexpr uint8_t steps = 16;
+    value = value > steps ? steps : value;
+    if(value == 0) {
+        digitalWrite(tdeck::backlight_pin, LOW);
+        delay(3);
+        level = 0;
+        return;
+    }
+    if(level == 0) {
+        digitalWrite(tdeck::backlight_pin, HIGH);
+        level = steps;
+        delayMicroseconds(30);
+    }
+    const int from = steps - level;
+    const int to = steps - value;
+    const int pulses = (steps + to - from) % steps;
+    for(int index = 0; index < pulses; ++index) {
+        digitalWrite(tdeck::backlight_pin, LOW);
+        digitalWrite(tdeck::backlight_pin, HIGH);
+    }
+    level = value;
+}
+
+uint32_t device_tick_ms()
+{
+    return millis();
+}
+
+void device_flush(lv_display_t * display, const lv_area_t * area, uint8_t * pixels)
+{
+    const uint32_t width = static_cast<uint32_t>(area->x2 - area->x1 + 1);
+    const uint32_t height = static_cast<uint32_t>(area->y2 - area->y1 + 1);
+    device_display.startWrite();
+    device_display.setAddrWindow(area->x1, area->y1, width, height);
+    device_display.pushColors(reinterpret_cast<uint16_t *>(pixels), width * height, true);
+    device_display.endWrite();
+    lv_display_flush_ready(display);
+}
+
+void device_touch_read(lv_indev_t *, lv_indev_data_t *data)
+{
+    data->point.x = static_cast<lv_coord_t>(touch_last_point.x);
+    data->point.y = static_cast<lv_coord_t>(touch_last_point.y);
+    data->state = touch_was_pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+}
+
+void poll_touch()
+{
+    static uint32_t next_poll_ms = 0;
+    if(!touch_service.present()) return;
+
+    const uint32_t now = millis();
+    if(now < next_poll_ms) return;
+    next_poll_ms = now + 16U;
+
+    const bool was_pressed = touch_was_pressed;
+    if(!touch_service.poll()) return;
+    const TouchPoint point = touch_service.point();
+    touch_was_pressed = point.pressed;
+    if(point.pressed) touch_last_point = point;
+
+    if(!was_pressed && point.pressed) {
+        touch_start_point = point;
+        touch_started_ms = now;
+        return;
+    }
+    if(was_pressed && !point.pressed) {
+        const int delta_x = static_cast<int>(touch_last_point.x) -
+                            static_cast<int>(touch_start_point.x);
+        const int delta_y = static_cast<int>(touch_last_point.y) -
+                            static_cast<int>(touch_start_point.y);
+        const int abs_x = delta_x < 0 ? -delta_x : delta_x;
+        const int abs_y = delta_y < 0 ? -delta_y : delta_y;
+        if(abs_x >= 40 && abs_x > abs_y) {
+            handle_navigation_key(delta_x < 0 ? LV_KEY_RIGHT : LV_KEY_LEFT);
+        } else if(abs_y >= 36) {
+            handle_navigation_key(delta_y < 0 ? LV_KEY_DOWN : LV_KEY_UP);
+        } else if(now - touch_started_ms <= 800U) {
+            handle_navigation_key(LV_KEY_ENTER);
+        }
+    }
+}
+
+void take_device_screenshot() noexcept
+{
+    const std::uint32_t started_ms = millis();
+    screenshot_attempted = true;
+    if(!sd_mounted) {
+        screenshot_path[0] = '\0';
+        last_screenshot_result = ScreenshotWriteResult::StorageError;
+        Serial.println("Lilyshark screenshot: SD unavailable");
+        last_screenshot_gap_ms = millis() - started_ms;
+        return;
+    }
+
+    // Flush pending LVGL invalidations before reading pixels back from ST7789.
+    lv_refr_now(nullptr);
+    last_screenshot_result = saveTDeckScreenshot(device_display, screenshot_path,
+                                                  sizeof(screenshot_path));
+    last_screenshot_gap_ms = millis() - started_ms;
+    if(last_screenshot_result == ScreenshotWriteResult::Ok) {
+        Serial.printf("Lilyshark screenshot: %s (%lu ms capture gap)\n", screenshot_path,
+                      static_cast<unsigned long>(last_screenshot_gap_ms));
+    } else {
+        Serial.printf("Lilyshark screenshot failed: %u\n",
+                      static_cast<unsigned>(last_screenshot_result));
+    }
+    if(current_screen == Screen::events) build_current_screen();
+}
+
+void poll_trackball()
+{
+    const uint32_t now = millis();
+    for(TrackballKey & input : trackball_keys) {
+        const bool released = digitalRead(input.pin) == HIGH;
+        if(input.released && !released && now - input.last_event_ms >= 60) {
+            input.last_event_ms = now;
+            handle_navigation_key(input.key);
+        }
+        input.released = released;
+    }
+}
+
+void poll_keyboard()
+{
+    static uint32_t next_read_ms = 0;
+    const uint32_t now = millis();
+    if(now < next_read_ms) return;
+    next_read_ms = now + 20;
+
+    const uint8_t received = Wire.requestFrom(tdeck::keyboard_address, static_cast<uint8_t>(1));
+    if(received == 0 || !Wire.available()) return;
+    const uint8_t key = Wire.read();
+    if(key != 0) handle_navigation_key(key);
+}
+
+void set_keyboard_brightness(uint8_t value)
+{
+    Wire.beginTransmission(tdeck::keyboard_address);
+    Wire.write(keyboard_brightness_command);
+    Wire.write(value);
+    Wire.endTransmission();
+}
+
+} // namespace
+
+void setup()
+{
+    Serial.begin(115200);
+    Serial.println("Lilyshark starting");
+
+    pinMode(tdeck::power_enable_pin, OUTPUT);
+    digitalWrite(tdeck::power_enable_pin, HIGH);
+    pinMode(tdeck::sd_cs_pin, OUTPUT);
+    pinMode(tdeck::radio_cs_pin, OUTPUT);
+    pinMode(tdeck::display_cs_pin, OUTPUT);
+    digitalWrite(tdeck::sd_cs_pin, HIGH);
+    digitalWrite(tdeck::radio_cs_pin, HIGH);
+    digitalWrite(tdeck::display_cs_pin, HIGH);
+    delay(500);
+
+    pinMode(tdeck::spi_miso_pin, INPUT_PULLUP);
+    SPI.begin(tdeck::spi_sck_pin, tdeck::spi_miso_pin, tdeck::spi_mosi_pin);
+    device_display.begin();
+    device_display.setRotation(1);
+    device_display.fillScreen(TFT_BLACK);
+    pinMode(tdeck::backlight_pin, OUTPUT);
+    set_backlight(12);
+
+    Wire.begin(tdeck::i2c_sda_pin, tdeck::i2c_scl_pin, tdeck::i2c_frequency_hz);
+    set_keyboard_brightness(96);
+    const bool touch_ready = touch_service.begin(Wire);
+    Serial.printf("Lilyshark touch: %s (0x%02X)\n", touch_ready ? "ready" : "not found",
+                  touch_service.address());
+    hardware_status.begin(true);
+    update_live_hardware_labels();
+    for(TrackballKey & input : trackball_keys) {
+        pinMode(input.pin, INPUT_PULLUP);
+        input.released = digitalRead(input.pin) == HIGH;
+    }
+
+    spectrum_buffer = static_cast<uint8_t *>(ps_malloc(spectrum_buffer_size));
+    if(spectrum_buffer == nullptr) spectrum_buffer = static_cast<uint8_t *>(malloc(spectrum_buffer_size));
+    if(spectrum_buffer == nullptr) {
+        Serial.println("Spectrum buffer allocation failed");
+    }
+
+    lv_init();
+    lv_tick_set_cb(device_tick_ms);
+    lv_display_t * display = lv_display_create(theme::screen_width, theme::screen_height);
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, device_draw_buffer, nullptr, sizeof(device_draw_buffer), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(display, device_flush);
+    lv_indev_t *touch = lv_indev_create();
+    lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(touch, device_touch_read);
+
+    sd_mounted = mountTDeckSd(SPI);
+    if(sd_mounted && pcap_sink.openNextCapture(pcap_path, sizeof(pcap_path))) {
+        last_pcap_result = pcap_writer.begin();
+        pcap_recording = last_pcap_result == PcapWriteResult::Ok;
+    }
+    if(sd_mounted && native_capture_sink.openNextCapture(native_capture_path, sizeof(native_capture_path),
+                                                       kLilysharkCaptureExtension)) {
+        last_native_capture_result = native_capture_writer.begin();
+        native_capture_recording = last_native_capture_result == LilysharkCaptureWriteResult::Ok;
+    }
+    Serial.printf("Lilyshark SD capture: %s%s%s\n", pcap_recording ? "recording " : "unavailable",
+                  pcap_recording ? pcap_path : "", sd_mounted ? "" : " (no card)");
+    Serial.printf("Lilyshark native capture: %s%s\n",
+                  native_capture_recording ? "recording " : "unavailable",
+                  native_capture_recording ? native_capture_path : "");
+
+    capture_runtime.addDecoder(meshtastic_decoder);
+    capture_runtime.addDecoder(meshcore_decoder);
+    capture_runtime.addDecoder(reticulum_decoder);
+    const RadioProfile &initial_profile = builtinProfiles()[active_profile_index];
+    const bool radio_ready = radio_service.begin(initial_profile, on_radio_frame, nullptr);
+    update_live_radio_label();
+    Serial.printf("Lilyshark radio: %s (%s, error %d)\n", initial_profile.name,
+                  radio_ready ? "listening" : "failed", radio_service.status().last_error);
+
+    build_current_screen();
+    Serial.println("Lilyshark UI ready");
+}
+
+void loop()
+{
+    poll_trackball();
+    poll_keyboard();
+    poll_touch();
+    hardware_status.poll();
+    radio_service.poll();
+
+    const uint32_t now = millis();
+    bool redraw = false;
+    const SpectrumSweepStatus &spectrum_status = radio_service.spectrumStatus();
+    if(spectrum_status.state != observed_spectrum_state ||
+       spectrum_status.points_completed != observed_spectrum_points) {
+        observed_spectrum_state = spectrum_status.state;
+        observed_spectrum_points = spectrum_status.points_completed;
+        if(current_screen == Screen::spectrum) redraw = true;
+    }
+    if(survey_running && now - survey_started_ms >= 60000U) {
+        survey_running = false;
+        survey_has_result = true;
+        redraw = true;
+    }
+    if(now - last_hardware_ui_refresh_ms >= 1000U) {
+        last_hardware_ui_refresh_ms = now;
+        redraw = update_live_hardware_labels() || update_live_radio_label() || redraw;
+    }
+    if(now - last_capture_flush_ms >= 5000U) {
+        last_capture_flush_ms = now;
+        if(pcap_recording) pcap_sink.flush();
+        if(native_capture_recording) native_capture_sink.flush();
+    }
+    if(live_data_dirty && now - last_ui_refresh_ms >= 250U) {
+        live_data_dirty = false;
+        last_ui_refresh_ms = now;
+        if(current_screen != Screen::spectrum && current_screen != Screen::map) {
+            redraw = true;
+        }
+    }
+    const bool scan_active = current_screen == Screen::spectrum &&
+                             radio_service.spectrumStatus().active();
+    const bool time_driven_screen = current_screen == Screen::survey ||
+                                    current_screen == Screen::events ||
+                                    current_screen == Screen::nodes ||
+                                    current_screen == Screen::node_detail;
+    const std::uint32_t dynamic_interval_ms = scan_active ? 150U : 1000U;
+    if((scan_active || time_driven_screen) &&
+       now - last_dynamic_ui_refresh_ms >= dynamic_interval_ms) {
+        last_dynamic_ui_refresh_ms = now;
+        redraw = true;
+    }
+    if(redraw) build_current_screen();
+
+    lv_timer_handler();
+    delay(5);
+}
+
+#endif
