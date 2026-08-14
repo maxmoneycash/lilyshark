@@ -167,6 +167,20 @@ const char *protocol_abbreviation(ProtocolId protocol) noexcept;
 #else
 static uint8_t spectrum_buffer[LV_CANVAS_BUF_SIZE(306, 145, 16, LV_DRAW_BUF_STRIDE_ALIGN)];
 #endif
+
+// The static preview path is compiled for both targets even though device views
+// return after drawing live data. Keep its state available to both builds while
+// only the simulator mutates it.
+std::size_t simulator_traffic_selection = 5;
+std::size_t simulator_packet_detail_selection = 5;
+std::size_t simulator_node_selection = 2;
+bool simulator_spectrum_scanning = false;
+bool simulator_survey_running = false;
+
+const char *simulator_survey_footer() noexcept
+{
+    return simulator_survey_running ? "SURVEY RUNNING" : "ENTER  START 60s SURVEY";
+}
 static std::array<std::array<lv_point_precise_t, 160>, 16> trace_buffers;
 size_t trace_buffer_index = 0;
 
@@ -588,7 +602,7 @@ void build_traffic(lv_obj_t * parent)
 
     for(size_t index = 0; index < packets.size(); ++index) {
         const lv_coord_t y = first_y + static_cast<lv_coord_t>(index) * row_height;
-        const bool selected = index == 5;
+        const bool selected = index == simulator_traffic_selection;
         const bool healthy = index == 0 || index >= 9;
         if(selected) theme::rect(parent, 4, y - 1, 312, row_height, theme::focus());
 
@@ -659,7 +673,7 @@ void build_nodes(lv_obj_t * parent)
 
     for(size_t index = 0; index < nodes.size(); ++index) {
         const lv_coord_t y = 46 + static_cast<lv_coord_t>(index) * 22;
-        const bool selected = index == 2;
+        const bool selected = index == simulator_node_selection;
         if(selected) theme::rect(parent, 4, y - 2, 312, 21, theme::surface_selected());
         const lv_color_t value_color = selected ? theme::background() : theme::text();
         put_label(parent, nodes[index].name, 8, y, value_color, &font_condensed_bold_16);
@@ -845,6 +859,16 @@ void build_spectrum(lv_obj_t * parent)
     theme::rule_line(parent, 159, y, 1, height, theme::cyan());
     for(lv_coord_t tick = y + 7; tick < y + height; tick += 10) theme::rule_line(parent, 153, tick, 13, 1, theme::cyan());
 
+    if(simulator_spectrum_scanning) {
+        theme::rect(parent, 0, 181, 320, 42, theme::background());
+        theme::rule_line(parent, 7, 182, 306);
+        put_label(parent, "SCANNING 42/130  32%  915.000 MHz", 21, 188,
+                  theme::amber(), &font_mono_semibold_12);
+        put_label(parent, "RX PAUSED - ENTER CANCEL", 82, 207,
+                  theme::text_muted(), &font_mono_10);
+        return;
+    }
+
     theme::rule_line(parent, 7, 182, 306);
     put_label(parent, "NOISE FLOOR", 16, 186, theme::text_muted(), &font_condensed_12);
     put_label(parent, "-98 dBm", 23, 199, theme::text(), &font_mono_semibold_12);
@@ -922,9 +946,12 @@ void build_node_detail(lv_obj_t * parent)
     }
 #endif
     add_status_bar(parent, "NODE DETAIL", "BAT 100%", "GPS LOCK", "12 nodes");
-    put_label(parent, "Hilltop7", 8, 25, theme::text(), &font_condensed_bold_28);
-    put_label(parent, "LAST SEEN  00:01:30", 9, 54, theme::text_muted(), &font_mono_10);
-    put_label(parent, "100%", 275, 31, theme::lime(), &font_mono_semibold_12);
+    const NodeRow &selected_node = nodes[simulator_node_selection];
+    put_label(parent, selected_node.name, 8, 25, theme::text(), &font_condensed_bold_28);
+    char node_line[40]{};
+    std::snprintf(node_line, sizeof(node_line), "LAST SEEN  %s", selected_node.seen);
+    put_label(parent, node_line, 9, 54, theme::text_muted(), &font_mono_10);
+    put_label(parent, selected_node.battery, 275, 31, theme::lime(), &font_mono_semibold_12);
     theme::rule_line(parent, 6, 68, 308);
 
     struct Plot { const char * name; lv_coord_t y; uint8_t seed; bool bars; };
@@ -1044,7 +1071,8 @@ void build_packet_detail(lv_obj_t * parent)
     return;
     }
 #endif
-    add_status_bar(parent, "PACKET DETAIL", "BAT 100%", "GPS LOCK", "14:02:11");
+    const PacketRow &selected_packet = packets[simulator_packet_detail_selection];
+    add_status_bar(parent, "PACKET DETAIL", "BAT 100%", "GPS LOCK", selected_packet.time);
     theme::rect(parent, 0, 22, 38, 201, theme::surface());
     theme::rule_line(parent, 37, 22, 1, 201);
     constexpr std::array<const char *, 5> nav = {{"TRF", "SPC", "NOD", "MAP", "CFG"}};
@@ -1054,15 +1082,30 @@ void build_packet_detail(lv_obj_t * parent)
         put_label(parent, nav[index], 8, y + 4, index == 0 ? theme::lime() : theme::text(), &font_mono_10);
     }
 
-    put_label(parent, "Yosemite-Base  >  ^all", 49, 31, theme::text(), &font_mono_semibold_12);
-    put_label(parent, "PORT  POSITION", 49, 58, theme::amber(), &font_mono_10);
-    put_label(parent, "HOPS  3    SNR  -7.2 dB", 49, 75, theme::text(), &font_mono_10);
+    char detail_line[72]{};
+    std::snprintf(detail_line, sizeof(detail_line), "%s  >  %s",
+                  selected_packet.source, selected_packet.destination);
+    put_label(parent, detail_line, 49, 31, theme::text(), &font_mono_semibold_12);
+    std::snprintf(detail_line, sizeof(detail_line), "PORT  %s", selected_packet.port);
+    put_label(parent, detail_line, 49, 58, theme::amber(), &font_mono_10);
+    std::snprintf(detail_line, sizeof(detail_line), "HOPS  %s    SNR  %s dB",
+                  selected_packet.hops, selected_packet.snr);
+    put_label(parent, detail_line, 49, 75, theme::text(), &font_mono_10);
     put_label(parent, "RSSI  -89 dBm", 49, 91, theme::text(), &font_mono_10);
     theme::rule_line(parent, 47, 109, 266);
     put_label(parent, "ROUTE", 49, 116, theme::text_muted(), &font_mono_10);
-    put_label(parent, "Yosemite > Relay3 > Hilltop7 > You", 49, 131, theme::text(), &font_condensed_12);
+    std::snprintf(detail_line, sizeof(detail_line), "%s > Relay3 > Hilltop7 > You",
+                  selected_packet.source);
+    put_label(parent, detail_line, 49, 131, theme::text(), &font_condensed_12);
     put_label(parent, "PAYLOAD", 49, 153, theme::cyan(), &font_mono_10);
-    put_label(parent, "37.7749 N, 122.4194 W  ALT 15m", 49, 168, theme::cyan(), &font_mono_10);
+    const char *payload_preview = std::strcmp(selected_packet.port, "POS") == 0
+        ? "37.7749 N, 122.4194 W  ALT 15m"
+        : (std::strcmp(selected_packet.port, "TEXT") == 0
+               ? "TEXT PAYLOAD PREVIEW"
+               : (std::strcmp(selected_packet.port, "TELE") == 0
+                      ? "TELEMETRY PAYLOAD PREVIEW"
+                      : "ROUTING PAYLOAD PREVIEW"));
+    put_label(parent, payload_preview, 49, 168, theme::cyan(), &font_mono_10);
     theme::rule_line(parent, 47, 187, 266);
     put_label(parent, "52 45 4C 41 59 3A 20 7B 22 6C 61 74 22 3A", 49, 194, theme::text(), &font_mono_10);
     put_label(parent, "33 37 2E 37 37 34 39 2C 22 6C 6F 6E 22 3A", 49, 207, theme::text_muted(), &font_mono_10);
@@ -1191,22 +1234,32 @@ void build_survey(lv_obj_t * parent)
     }
 #endif
     add_status_bar(parent, "SURVEY", "BAT 100%", "GPS LOCK", "915.0 MHz");
-    put_label(parent, "CAPTURING", 44, 47, theme::amber(), &font_condensed_bold_28);
-    put_label(parent, "42s / 60s", 241, 88, theme::lime(), &font_mono_semibold_12);
+    put_label(parent, simulator_survey_running ? "CAPTURING" : "READY",
+              simulator_survey_running ? 44 : 118, 47,
+              simulator_survey_running ? theme::amber() : theme::lime(),
+              &font_condensed_bold_28);
+    put_label(parent, simulator_survey_running ? "42s / 60s" : "0s / 60s", 241, 88,
+              theme::lime(), &font_mono_semibold_12);
 
     lv_obj_t * progress = theme::rect(parent, 9, 84, 221, 23, theme::background());
     lv_obj_set_style_border_width(progress, 1, 0);
     lv_obj_set_style_border_color(progress, theme::text_muted(), 0);
-    theme::rect(progress, 3, 3, 152, 17, theme::lime());
+    if(simulator_survey_running) theme::rect(progress, 3, 3, 152, 17, theme::lime());
 
     put_label(parent, "NODES HEARD", 10, 121, theme::text_muted(), &font_condensed_12);
-    put_label(parent, "7", 120, 116, theme::text(), &font_condensed_bold_16);
+    put_label(parent, simulator_survey_running ? "7" : "0", 120, 116,
+              theme::text(), &font_condensed_bold_16);
     put_label(parent, "BEST SNR", 10, 143, theme::text_muted(), &font_condensed_12);
-    put_label(parent, "-6.2 dB", 120, 139, theme::text(), &font_mono_semibold_12);
+    put_label(parent, simulator_survey_running ? "-6.2 dB" : "--", 120, 139,
+              theme::text(), &font_mono_semibold_12);
     put_label(parent, "NOISE", 10, 165, theme::text_muted(), &font_condensed_12);
-    put_label(parent, "-97 dBm", 120, 161, theme::text(), &font_mono_semibold_12);
+    put_label(parent, simulator_survey_running ? "-97 dBm" : "--", 120, 161,
+              theme::text(), &font_mono_semibold_12);
     theme::rule_line(parent, 0, 190, 320);
-    put_label(parent, "ENTER  START 60s SURVEY", 51, 199, theme::cyan(), &font_mono_semibold_12);
+    put_label(parent, simulator_survey_footer(),
+              simulator_survey_running ? 104 : 51, 199,
+              simulator_survey_running ? theme::text_muted() : theme::cyan(),
+              &font_mono_semibold_12);
 }
 
 void build_events(lv_obj_t * parent)
@@ -1658,6 +1711,8 @@ void apply_tuned_profile(const RadioProfile &candidate, const char *action) noex
     build_current_screen();
 }
 
+#endif
+
 constexpr std::array<Screen, 7> primary_screens = {{
     Screen::traffic,
     Screen::spectrum,
@@ -1692,9 +1747,13 @@ void move_primary_screen(int direction) noexcept
     }
     current_screen = primary_screens[current_index];
     build_current_screen();
+#if defined(LILYSHARK_DEVICE)
     Serial.printf("Lilyshark view: %s\n", screen_names[static_cast<std::size_t>(current_screen)]);
-}
+#else
+    std::fprintf(stderr, "Lilyshark view: %s\n",
+                 screen_names[static_cast<std::size_t>(current_screen)]);
 #endif
+}
 
 void handle_navigation_key(uint32_t key)
 {
@@ -1726,7 +1785,10 @@ void handle_navigation_key(uint32_t key)
         apply_tuned_profile(cycleProfileCodingRate(radio_service.activeProfile()), "coding rate");
         return;
     }
+#endif
+
     if(key == LV_KEY_ENTER || key == '\r') {
+#if defined(LILYSHARK_DEVICE)
         if(current_screen == Screen::spectrum) {
             if(spectrum_buffer == nullptr) return;
             if(radio_service.spectrumStatus().active()) {
@@ -1749,6 +1811,22 @@ void handle_navigation_key(uint32_t key)
             survey_baseline_sequence = capture_runtime.frames().totalSeen();
             build_current_screen();
         }
+#else
+        if(current_screen == Screen::spectrum) {
+            simulator_spectrum_scanning = !simulator_spectrum_scanning;
+            build_current_screen();
+        } else if(current_screen == Screen::traffic) {
+            simulator_packet_detail_selection = simulator_traffic_selection;
+            current_screen = Screen::packet_detail;
+            build_current_screen();
+        } else if(current_screen == Screen::nodes) {
+            current_screen = Screen::node_detail;
+            build_current_screen();
+        } else if(current_screen == Screen::survey && !simulator_survey_running) {
+            simulator_survey_running = true;
+            build_current_screen();
+        }
+#endif
         return;
     }
     if(key == LV_KEY_ESC || key == 0x08U) {
@@ -1761,8 +1839,29 @@ void handle_navigation_key(uint32_t key)
     if(key == LV_KEY_DOWN || key == LV_KEY_UP) {
         const int direction = key == LV_KEY_DOWN ? 1 : -1;
         bool moved = false;
+#if defined(LILYSHARK_DEVICE)
         if(current_screen == Screen::traffic) moved = move_traffic_selection(direction);
         else if(current_screen == Screen::nodes) moved = move_node_selection(direction);
+#else
+        if(current_screen == Screen::traffic) {
+            if(direction > 0) {
+                simulator_traffic_selection =
+                    (simulator_traffic_selection + 1) % packets.size();
+            } else {
+                simulator_traffic_selection = simulator_traffic_selection == 0
+                    ? packets.size() - 1 : simulator_traffic_selection - 1;
+            }
+            moved = true;
+        } else if(current_screen == Screen::nodes) {
+            if(direction > 0) {
+                simulator_node_selection = (simulator_node_selection + 1) % nodes.size();
+            } else {
+                simulator_node_selection = simulator_node_selection == 0
+                    ? nodes.size() - 1 : simulator_node_selection - 1;
+            }
+            moved = true;
+        }
+#endif
         if(moved) build_current_screen();
         return;
     }
@@ -1774,18 +1873,17 @@ void handle_navigation_key(uint32_t key)
         move_primary_screen(-1);
         return;
     }
-#endif
-    int next = static_cast<int>(current_screen);
-    if(key == LV_KEY_RIGHT || key == LV_KEY_DOWN || key == LV_KEY_NEXT) ++next;
-    else if(key == LV_KEY_LEFT || key == LV_KEY_UP || key == LV_KEY_PREV) --next;
-    else if(key >= '1' && key <= '9') next = static_cast<int>(key - '1');
-    else return;
 
-    constexpr int count = static_cast<int>(Screen::count);
-    next = (next % count + count) % count;
+    if(key < '1' || key > '9') return;
+    const int next = static_cast<int>(key - '1');
+
 #if defined(LILYSHARK_DEVICE)
     if(static_cast<Screen>(next) == Screen::packet_detail) select_current_frame_for_detail();
     else if(static_cast<Screen>(next) == Screen::node_detail) select_current_node_for_detail();
+#else
+    if(static_cast<Screen>(next) == Screen::packet_detail) {
+        simulator_packet_detail_selection = simulator_traffic_selection;
+    }
 #endif
     current_screen = static_cast<Screen>(next);
     build_current_screen();
@@ -1795,6 +1893,96 @@ void handle_navigation_key(uint32_t key)
     std::fprintf(stderr, "Lilyshark view: %s\n", screen_names[static_cast<size_t>(current_screen)]);
 #endif
 }
+
+#if !defined(LILYSHARK_DEVICE)
+bool expect_simulator_state(bool condition, const char *step) noexcept
+{
+    if(condition) return true;
+    std::fprintf(stderr, "Simulator interaction failed: %s\n", step);
+    return false;
+}
+
+bool run_simulator_interaction_test() noexcept
+{
+    current_screen = Screen::traffic;
+    simulator_traffic_selection = 5;
+    simulator_packet_detail_selection = 5;
+    simulator_node_selection = 2;
+    simulator_spectrum_scanning = false;
+    simulator_survey_running = false;
+    build_current_screen();
+
+    handle_navigation_key(LV_KEY_DOWN);
+    if(!expect_simulator_state(current_screen == Screen::traffic &&
+                               simulator_traffic_selection == 6,
+                               "Down must move the Traffic focus")) return false;
+    handle_navigation_key(LV_KEY_UP);
+    if(!expect_simulator_state(simulator_traffic_selection == 5,
+                               "Up must move the Traffic focus")) return false;
+
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(current_screen == Screen::packet_detail &&
+                               simulator_packet_detail_selection == simulator_traffic_selection &&
+                               std::strcmp(packets[simulator_packet_detail_selection].source,
+                                           packets[simulator_traffic_selection].source) == 0 &&
+                               std::strcmp(packets[simulator_packet_detail_selection].port,
+                                           packets[simulator_traffic_selection].port) == 0,
+                               "Enter must open the focused Packet Detail")) return false;
+    handle_navigation_key(LV_KEY_RIGHT);
+    if(!expect_simulator_state(current_screen == Screen::spectrum,
+                               "Right from Packet Detail must use the Traffic context")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(simulator_spectrum_scanning,
+                               "Enter must start the simulated spectrum scan")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(!simulator_spectrum_scanning,
+                               "Enter must cancel the simulated spectrum scan")) return false;
+    handle_navigation_key(LV_KEY_LEFT);
+    handle_navigation_key(LV_KEY_ENTER);
+    handle_navigation_key(0x08U);
+    if(!expect_simulator_state(current_screen == Screen::traffic,
+                               "Back must return from Packet Detail")) return false;
+
+    handle_navigation_key(LV_KEY_DOWN);
+    handle_navigation_key('5');
+    if(!expect_simulator_state(current_screen == Screen::packet_detail &&
+                               simulator_packet_detail_selection == simulator_traffic_selection,
+                               "Numeric Packet Detail must bind the focused frame")) return false;
+    handle_navigation_key(0x08U);
+
+    handle_navigation_key(LV_KEY_RIGHT);
+    handle_navigation_key(LV_KEY_RIGHT);
+    if(!expect_simulator_state(current_screen == Screen::nodes,
+                               "Primary navigation must reach Nodes")) return false;
+    handle_navigation_key(LV_KEY_DOWN);
+    if(!expect_simulator_state(simulator_node_selection == 3,
+                               "Down must move the Nodes focus")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(current_screen == Screen::node_detail,
+                               "Enter must open Node Detail")) return false;
+    handle_navigation_key(0x08U);
+    if(!expect_simulator_state(current_screen == Screen::nodes,
+                               "Back must return from Node Detail")) return false;
+
+    handle_navigation_key(LV_KEY_RIGHT);
+    handle_navigation_key(LV_KEY_RIGHT);
+    if(!expect_simulator_state(current_screen == Screen::survey,
+                               "Primary navigation must skip detail views")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(simulator_survey_running &&
+                               std::strcmp(simulator_survey_footer(), "SURVEY RUNNING") == 0,
+                               "Enter must start a consistent Survey state")) return false;
+
+    handle_navigation_key(LV_KEY_RIGHT);
+    handle_navigation_key(LV_KEY_RIGHT);
+    handle_navigation_key(LV_KEY_RIGHT);
+    if(!expect_simulator_state(current_screen == Screen::traffic,
+                               "Primary navigation must wrap after Utilization")) return false;
+
+    std::fprintf(stderr, "Lilyshark simulator interaction test passed\n");
+    return true;
+}
+#endif
 
 void handle_key(lv_event_t * event)
 {
@@ -1807,7 +1995,9 @@ void handle_key(lv_event_t * event)
 int main(int argc, char ** argv)
 {
     const bool soak_mode = argc > 1 && std::strcmp(argv[1], "--soak") == 0;
-    if(argc > 1 && !soak_mode) {
+    const bool interaction_test_mode =
+        argc > 1 && std::strcmp(argv[1], "--interaction-test") == 0;
+    if(argc > 1 && !soak_mode && !interaction_test_mode) {
         const int requested = std::atoi(argv[1]);
         if(requested >= 1 && requested <= static_cast<int>(Screen::count)) {
             current_screen = static_cast<Screen>(requested - 1);
@@ -1833,6 +2023,9 @@ int main(int argc, char ** argv)
     lv_obj_add_event_cb(screen, handle_key, LV_EVENT_KEY, nullptr);
 
     build_current_screen();
+    if(interaction_test_mode) {
+        return run_simulator_interaction_test() ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
 
     constexpr std::uint64_t soak_screen_interval_ms = 1000;
     std::uint64_t next_soak_screen_ms = SDL_GetTicks64() + soak_screen_interval_ms;
