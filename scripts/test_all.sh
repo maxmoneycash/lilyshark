@@ -87,6 +87,17 @@ build_and_run decoder_stress \
   src/core/reticulum_decoder.cpp \
   test/decoder_stress/test_decoder_stress.cpp
 
+build_and_run profile_tuning \
+  src/core/profile_tuning.cpp \
+  test/profile_tuning/test_profile_tuning.cpp
+
+build_and_run packet_presentation \
+  src/core/meshtastic_decoder.cpp \
+  src/core/meshcore_decoder.cpp \
+  src/core/reticulum_decoder.cpp \
+  src/ui/packet_presentation.cpp \
+  test/packet_presentation/test_packet_presentation.cpp
+
 build_and_run battery_model \
   src/device/battery_model.cpp \
   test/hardware_status/test_battery_model.cpp
@@ -160,6 +171,29 @@ for screen in 1 2 3 4 5 6 7 8 9; do
     exit 1
   fi
 done
+
+echo "Smoke testing continuous simulator cycling"
+soak_log="${test_dir}/simulator-soak.log"
+set +e
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+  "${timeout_command}" 11 .pio/build/simulator/program --soak >"${soak_log}" 2>&1
+soak_result=$?
+set -e
+if [[ ${soak_result} -ne 124 ]]; then
+  echo "Continuous simulator soak exited unexpectedly (${soak_result})" >&2
+  cat "${soak_log}" >&2
+  exit 1
+fi
+if grep -Eiq 'assert|abort|sanitizer|segmentation|fatal error' "${soak_log}"; then
+  echo "Continuous simulator soak logged a fatal diagnostic" >&2
+  cat "${soak_log}" >&2
+  exit 1
+fi
+if ! grep -q '^Lilyshark soak cycle 1 passed:' "${soak_log}"; then
+  echo "Continuous simulator soak did not complete all nine views" >&2
+  cat "${soak_log}" >&2
+  exit 1
+fi
 
 echo "Building T-Deck firmware"
 "${pio[@]}" run -e t-deck

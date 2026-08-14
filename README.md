@@ -23,7 +23,7 @@ A single T-Deck is enough for field surveys, packet inspection, radio-profile ch
 
 ## Download
 
-The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/releases) contains the current T-Deck factory image, application-only image, debug symbols, and SHA-256 checksums. For a fresh install, download `lilyshark-tdeck.factory.bin`, verify it with `SHA256SUMS`, and follow the [flashing guide](docs/FLASHING.md). Do not flash the `.elf` file.
+The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/releases) contains the current T-Deck factory image, application-only image, debug symbols, and SHA-256 checksums. For a fresh install, use the [prebuilt-release steps](docs/FLASHING.md#install-the-prebuilt-developer-alpha); a local firmware build is not required. Do not flash the `.elf` file.
 
 ## What Lilyshark shows
 
@@ -91,13 +91,13 @@ The simulator fills these views with deterministic example data. The T-Deck targ
 
 ## Protocol coverage
 
-Decoding is profile-gated because these LoRa protocols do not all carry an unambiguous magic value. Press `P` on the T-Deck to cycle the active radio profile. Lilyshark reconfigures the SX1262 and uses the matching structural decoder.
+Decoding is profile-gated because these LoRa protocols do not all carry an unambiguous magic value. Press `P` on the T-Deck to cycle the active radio profile. Use `-`/`+`, `B`, `F`, and `C` to tune its frequency, bandwidth, spreading factor, and coding rate for the network in front of you. The active preset and tuned values are saved across restarts. Lilyshark reconfigures the SX1262 transactionally and uses the matching structural decoder.
 
 | Protocol | Included profiles | Fields decoded today | Current boundary |
 | --- | --- | --- | --- |
-| **Meshtastic** | US LongFast, 906.875 MHz, 250 kHz, SF11, CR 4/5 | Outer header, source, destination, packet ID, channel, hop limit/start, next hop, relay byte, broadcast/ACK/MQTT flags | Encrypted protobuf payload stays opaque. Channel keys and payload decryption are not implemented. |
+| **Meshtastic** | US LongFast, 906.875 MHz, 250 kHz, SF11, CR 4/5 | Outer header, source, destination, packet ID, channel hash/hint, hop limit/start, next hop, relay byte, broadcast/ACK/MQTT flags | Protobuf payload stays opaque. The outer header alone does not prove whether it is clear or encrypted; channel keys and payload decryption are not implemented. |
 | **MeshCore** | Current US recommendation at 910.525 MHz/62.5 kHz/SF7; legacy 915 MHz/250 kHz/SF10 | Version 1 route type, payload type, encoded path shape, transport codes, group channel, ACK checksum, structural length validation | Protected direct, group, and anonymous payloads stay opaque. Advertisement bodies are not expanded into contacts. |
-| **Reticulum / RNode** | Documented EU example at 867.2 MHz, 125 kHz, SF8 | RNode shim, split marker, Reticulum header type, packet and destination type, context, hops, hash prefixes, clear/protected state | RNode PHY settings are deployment-defined. IFAC-protected content stays opaque without an interface key. The included profile is an example, not a universal Reticulum channel. |
+| **Reticulum / RNode** | Documented EU example at 867.2 MHz plus a tunable 915 MHz US starting point, both 125 kHz/SF8 | RNode shim, split marker, Reticulum header type, packet and destination type, context, hops, hash prefixes, outer-header protection marker | RNode PHY settings are deployment-defined. IFAC-marked content stays opaque and unverified without an interface key. The included profiles are starting points, not universal Reticulum channels. |
 | **Unknown LoRa** | User code can add `RadioProfile` entries | Raw frame, integrity state, and all RF metadata supplied by the radio | No protocol labels are invented. The frame is still inspectable and exportable. |
 
 The decoder API preserves uncertainty. MeshCore transport codes are not presented as node IDs, and Reticulum's 32-bit hash prefixes are not presented as complete identities.
@@ -110,6 +110,7 @@ The decoder API preserves uncertainty. MeshCore transport codes are not presente
 | 2 | `MESHCORE US` | 910.525 MHz | 62.5 kHz | 7 | 4/5 | `0x1424` | 32 symbols |
 | 3 | `MESHCORE LEGACY` | 915.000 MHz | 250 kHz | 10 | 4/5 | `0x1424` | 16 symbols |
 | 4 | `RNODE EXAMPLE EU` | 867.200 MHz | 125 kHz | 8 | 4/5 | `0x1424` | 18 symbols |
+| 5 | `RNODE EXAMPLE US` | 915.000 MHz | 125 kHz | 8 | 4/5 | `0x1424` | 18 symbols |
 
 These are explicit starting profiles, not automatic protocol detection. Choose settings that match the network and comply with the rules for your location before capturing traffic.
 
@@ -144,7 +145,11 @@ Saving a BMP uses the display and microSD on the shared SPI bus. Reception stays
 | Trackball press or `Enter` | Open packet/node detail, start a survey, or start/cancel a spectrum sweep |
 | `Backspace` | Return from packet or node detail |
 | `1` through `9` | Open a primary view directly |
-| `P` | Cycle Meshtastic, MeshCore US, MeshCore legacy, and RNode example profiles |
+| `P` | Cycle Meshtastic, MeshCore US, MeshCore legacy, and RNode EU/US starting profiles |
+| `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
+| `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
+| `F` | Cycle spreading factors 7 through 12 |
+| `C` | Cycle coding rates 4/5 through 4/8 |
 | `S` | Save a BMP screenshot to microSD |
 | Touch tap | Perform the current Enter action |
 
@@ -177,7 +182,8 @@ The scan state machine gives the SX1262 exclusive ownership during a sweep. It h
 | SX1262 frame capture | RadioLib service, ISR handoff, CRC-mismatch path, bounded store, tests around core records | Reception and long-run recovery pending |
 | Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Live over-air sample pending |
 | MeshCore decoder | Version 1 structural and malformed-frame tests | Live over-air sample pending |
-| Reticulum/RNode decoder | Clear, IFAC, split, and malformed-frame tests | Live RNode sample pending |
+| Reticulum/RNode decoder | Header-one/header-two, IFAC-marker, split, and malformed-frame tests | Live RNode sample pending |
+| Radio profile tuning | Sanitizer tests cover regional frequency stepping, BW, SF, CR, and persisted-value validation | Keyboard tuning and restart persistence pending |
 | `.lscap` export | Byte-exact writer tests and documented v1 layout | microSD write test pending |
 | LoRaTap PCAP | Byte-exact writer tests for the DLT 270 record layout | microSD and desktop-open test pending |
 | BMP screenshots | RGB565-to-BMP tests and unique-path device writer | Display readback and microSD test pending |
@@ -240,6 +246,13 @@ Pass a view number to open that screen at launch:
 .pio/build/simulator/program 2
 ```
 
+Run the simulator as one long-lived process that rebuilds every view once per second. With no argument, the runner stops after 24 hours and fails on an early exit or fatal diagnostic:
+
+```sh
+./scripts/soak_simulator.sh       # 24 hours
+./scripts/soak_simulator.sh 60    # one-minute check
+```
+
 On Apple Silicon with Homebrew:
 
 ```sh
@@ -267,9 +280,11 @@ include/lilyshark/core/       Protocol-neutral records, profiles, store, and spe
 include/lilyshark/protocols/  Meshtastic, MeshCore, and Reticulum decoder interfaces
 include/lilyshark/device/     T-Deck radio, status, touch, screenshot, and SD services
 include/lilyshark/export/     LSCAP and LoRaTap writer interfaces
+include/lilyshark/ui/         Packet presentation and derived-node policy
 src/core/                     Decoder registry, profiles, decoders, and spectrum helpers
 src/device/                   ESP32-S3 and T-Deck hardware implementations
 src/export/                   Capture encoders
+src/ui/                       Shared packet labels and UI admission rules
 src/sim_main.cpp              Shared LVGL screens plus simulator and T-Deck shells
 src/fonts/                    Generated LVGL font sources
 test/                         Sanitizer-backed host tests
@@ -298,6 +313,7 @@ The T-Deck is the first hardware target. The capture record, decoder registry, a
 - [x] Add the ESP32-S3/T-Deck target and reproducible factory image.
 - [x] Capture SX1262 frames and CRC mismatches with complete available RF metadata.
 - [x] Add profile-gated structural decoders for Meshtastic, MeshCore, and Reticulum/RNode.
+- [x] Add persistent on-device frequency, bandwidth, spreading-factor, and coding-rate tuning.
 - [x] Add `.lscap`, LoRaTap PCAP, and BMP output on microSD.
 - [x] Add keyboard, trackball, GT911 touch, battery, and optional-GPS services.
 - [x] Add an interruptible SX1262 spectral-scan state machine with receive restoration.
@@ -307,7 +323,7 @@ The T-Deck is the first hardware target. The capture record, decoder registry, a
 - [ ] Calibrate touch orientation, battery voltage, and spectral power against known references.
 - [ ] Exercise scan cancellation, SD removal, CRC bursts, missing peripherals, and radio recovery.
 - [ ] Run an overnight capture and spectrum endurance test on hardware.
-- [ ] Add profile editing, key management, deeper payload decoders, and more regional presets.
+- [ ] Add sync-word/preamble editing, key management, deeper payload decoders, and more regional presets.
 - [ ] Publish a hardware-validated tagged release with checksums and a field-test report.
 
 ## License and project names

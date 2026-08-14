@@ -7,12 +7,40 @@ Lilyshark currently ships as developer-alpha firmware. The repository produces r
 - A LILYGO T-Deck with an SX1262 and a suitable antenna
 - A USB data cable
 - [`uv`](https://docs.astral.sh/uv/) and its `uvx` command
-- This repository checked out locally
+- `git` and `curl` for the prebuilt-release path
 - A writable microSD card if you want packet captures or screenshots
 
 Flashing replaces the firmware and partition metadata at the start of the device flash. Back up data you need from the current firmware first. A project change can also make data left in other partitions inaccessible.
 
-## Build and verify the images
+If this is your only T-Deck, plan the return path before flashing. Export the current firmware's settings and keep its installer or image. Returning to Meshtastic, MeshCore, or another stack requires reflashing that project.
+
+## Install the prebuilt developer alpha
+
+Clone the exact release tag, then download only the merged factory image and checksum manifest:
+
+```sh
+git clone --depth 1 --branch v0.1.0-alpha.2 https://github.com/maxmoneycash/lilyshark.git
+cd lilyshark
+mkdir -p dist
+release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.2'
+curl --fail --location "${release_base}/lilyshark-tdeck.factory.bin" \
+  --output dist/lilyshark-tdeck.factory.bin
+curl --fail --location "${release_base}/SHA256SUMS" \
+  --output dist/SHA256SUMS
+```
+
+Verify only the factory image. The manifest also lists the application image and ELF, which this install path does not need:
+
+```sh
+cd dist
+awk '$2 == "lilyshark-tdeck.factory.bin" { print }' SHA256SUMS | shasum -a 256 -c -   # macOS
+# awk '$2 == "lilyshark-tdeck.factory.bin" { print }' SHA256SUMS | sha256sum -c -     # Linux
+cd ..
+```
+
+Continue at [Find the serial port](#find-the-serial-port), then run the guarded flash script with that exact port.
+
+## Build from source and verify the images
 
 From the repository root:
 
@@ -122,7 +150,7 @@ This is the minimum evidence needed before calling a build hardware-validated:
 1. Power-cycle the T-Deck twice and confirm the UI reaches Traffic each time.
 2. Verify the status bar reports battery and the expected GPS state.
 3. Move through all nine views with the trackball, keyboard arrows, number keys, and touch swipes.
-4. Press `P` and confirm all four profiles reconfigure without an RF error.
+4. Press `P` and confirm all five profiles reconfigure without an RF error.
 5. Receive a known LoRa frame and inspect its packet detail and raw bytes.
 6. Confirm a CRC-mismatch test frame appears with the correct integrity state.
 7. Start, cancel, and complete a spectrum sweep. Confirm capture resumes afterward.

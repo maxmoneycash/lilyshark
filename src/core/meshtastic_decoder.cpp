@@ -39,7 +39,7 @@ DecodeResult MeshtasticDecoder::decode(const RawFrame &frame, const RadioProfile
     // Verified against meshtastic/firmware commit
     // 34680833b88b37bbcffca0b31dffe45f29e9d35c, RadioInterface.h and
     // RadioInterface.cpp: to[0..3], from[4..7], id[8..11], flags[12],
-    // channel[13], next_hop[14], relay_node[15]. The firmware transmits this
+    // channel_hash[13], next_hop[14], relay_node[15]. The firmware transmits this
     // native 16-byte structure from its little-endian targets.
     output.destination = readLittleEndian32(&frame.bytes[0]);
     output.source = readLittleEndian32(&frame.bytes[4]);
@@ -53,8 +53,11 @@ DecodeResult MeshtasticDecoder::decode(const RawFrame &frame, const RadioProfile
     output.payload_length = static_cast<std::uint16_t>(frame.captured_length - kOuterHeaderLength);
     output.present_fields = FieldSource | FieldDestination | FieldPacketId | FieldChannel | FieldHopLimit |
                             FieldHopStart | FieldPayload;
-    output.attributes = AttributeEncrypted;
-    output.kind = PacketKind::EncryptedPayload;
+    // The outer header does not prove whether the protobuf bytes are encrypted:
+    // Meshtastic channels with an empty/zero PSK can send them in cleartext.
+    // Keep the bytes inspectable without making an encryption claim.
+    output.attributes = AttributeNone;
+    output.kind = PacketKind::OpaquePayload;
     output.state = DecodeState::HeaderOnly;
 
     if (output.hop_start != 0) {

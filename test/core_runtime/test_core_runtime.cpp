@@ -138,7 +138,7 @@ void testMeshtasticOuterHeader()
     assert(result == DecodeResult::Matched);
     assert(decoded.protocol == ProtocolId::Meshtastic);
     assert(decoded.state == DecodeState::HeaderOnly);
-    assert(decoded.kind == PacketKind::EncryptedPayload);
+    assert(decoded.kind == PacketKind::OpaquePayload);
     assert(decoded.destination == 0xffffffffU);
     assert(decoded.source == 0x12345678U);
     assert(decoded.packet_id == 0x0badc0deU);
@@ -153,7 +153,7 @@ void testMeshtasticOuterHeader()
     assert(decoded.hasAttribute(AttributeBroadcast));
     assert(decoded.hasAttribute(AttributeAcknowledgementRequested));
     assert(decoded.hasAttribute(AttributeViaMqtt));
-    assert(decoded.hasAttribute(AttributeEncrypted));
+    assert(!decoded.hasAttribute(AttributeEncrypted));
 }
 
 void testMeshtasticMalformedFramesRemainInspectable()
@@ -263,6 +263,31 @@ void testMeshCoreProtectedAndMalformedFrames()
     assert(short_ack.assignPayload(short_ack_bytes, sizeof(short_ack_bytes)));
     assert(registry.decode(short_ack, profile, decoded) == DecodeResult::Malformed);
     assert(decoded.state == DecodeState::Malformed);
+
+    const std::uint8_t short_trace_bytes[] = {0x25, 0x00, 0xaa};
+    RawFrame short_trace{};
+    assert(short_trace.assignPayload(short_trace_bytes, sizeof(short_trace_bytes)));
+    assert(registry.decode(short_trace, profile, decoded) == DecodeResult::Malformed);
+    assert(decoded.state == DecodeState::Malformed);
+
+    const std::uint8_t trace_bytes[] = {
+        0x25, 0x00,
+        0x01, 0x02, 0x03, 0x04, // tag
+        0x05, 0x06, 0x07, 0x08, // auth
+        0x09,                   // flags
+    };
+    RawFrame trace{};
+    assert(trace.assignPayload(trace_bytes, sizeof(trace_bytes)));
+    assert(registry.decode(trace, profile, decoded) == DecodeResult::Matched);
+    assert(decoded.kind == PacketKind::Control);
+    assert(MeshCoreDecoder::payloadType(decoded) == MeshCorePayloadType::Trace);
+
+    const std::uint8_t reserved_bytes[] = {0x31, 0x00, 0xaa};
+    RawFrame reserved{};
+    assert(reserved.assignPayload(reserved_bytes, sizeof(reserved_bytes)));
+    assert(registry.decode(reserved, profile, decoded) == DecodeResult::Matched);
+    assert(decoded.kind == PacketKind::Unknown);
+    assert(static_cast<std::uint8_t>(MeshCoreDecoder::payloadType(decoded)) == 12U);
 
     const std::uint8_t invalid_path_bytes[] = {0x01, 0xc1, 0xaa};
     RawFrame invalid_path{};

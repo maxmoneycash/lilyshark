@@ -130,9 +130,18 @@ DecodeResult MeshCoreDecoder::decode(const RawFrame &frame, const RadioProfile &
             return malformed(output);
         }
         output.kind = PacketKind::Advertisement;
-    } else if (type == static_cast<std::uint8_t>(MeshCorePayloadType::Trace) ||
-               type == static_cast<std::uint8_t>(MeshCorePayloadType::Control)) {
+    } else if (type == static_cast<std::uint8_t>(MeshCorePayloadType::Trace)) {
+        // TRACE v1 begins with tag[4], auth[4], and flags[1]. Treat shorter
+        // frames as malformed instead of presenting them as valid control data.
+        if (payload_length < 9) {
+            return malformed(output);
+        }
         output.kind = PacketKind::Control;
+    } else if (type == static_cast<std::uint8_t>(MeshCorePayloadType::Control)) {
+        output.kind = PacketKind::Control;
+    } else if (type >= 12U && type <= 14U) {
+        // Values 12..14 are reserved in the published v1 wire format.
+        output.kind = PacketKind::Unknown;
     } else if (isDirectEncryptedType(type)) {
         if (payload_length < 20 || ((payload_length - 4) % 16) != 0) {
             return malformed(output);

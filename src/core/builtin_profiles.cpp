@@ -37,6 +37,9 @@ const RadioProfile profiles[] = {
     // Official RNode documentation example, intentionally labeled as an
     // example because Reticulum/RNode PHY settings are user-defined.
     makeProfile(4, "RNODE EXAMPLE EU", ProtocolId::Reticulum, 867200000U, 125000U, 8, 5, 0x1424, 18),
+    // A US-band starting point for deployment-defined RNode settings. This is
+    // not a universal Reticulum channel; tune it to the peer interface.
+    makeProfile(5, "RNODE EXAMPLE US", ProtocolId::Reticulum, 915000000U, 125000U, 8, 5, 0x1424, 18),
 };
 
 } // namespace

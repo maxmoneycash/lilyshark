@@ -6,6 +6,7 @@
 
 #if defined(LILYSHARK_DEVICE)
 #include <Arduino.h>
+#include <Preferences.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <Wire.h>
@@ -24,6 +25,7 @@
 #if defined(LILYSHARK_DEVICE)
 #include "lilyshark/core/builtin_profiles.h"
 #include "lilyshark/core/capture_runtime.h"
+#include "lilyshark/core/profile_tuning.h"
 #include "lilyshark/device/hardware_status.h"
 #include "lilyshark/device/radio_service.h"
 #include "lilyshark/device/screenshot.h"
@@ -35,6 +37,7 @@
 #include "lilyshark/protocols/meshtastic_decoder.h"
 #include "lilyshark/protocols/reticulum_decoder.h"
 #include "lilyshark/tdeck.h"
+#include "lilyshark/ui/packet_presentation.h"
 #endif
 
 namespace {
@@ -158,6 +161,9 @@ char screenshot_path[48]{};
 char live_battery_label[16] = "BAT --";
 char live_gps_label[16] = "GPS --";
 char live_radio_label[16] = "RX INIT";
+Preferences profile_preferences{};
+bool profile_preferences_ready = false;
+const char *protocol_abbreviation(ProtocolId protocol) noexcept;
 #else
 static uint8_t spectrum_buffer[LV_CANVAS_BUF_SIZE(306, 145, 16, LV_DRAW_BUF_STRIDE_ALIGN)];
 #endif
@@ -240,44 +246,6 @@ void add_grid(lv_obj_t * parent, lv_coord_t x, lv_coord_t y, lv_coord_t width, l
 }
 
 #if defined(LILYSHARK_DEVICE)
-const char *packet_kind_label(const DecodedPacket &packet) noexcept
-{
-    if(packet.protocol == ProtocolId::MeshCore) {
-        switch(MeshCoreDecoder::payloadType(packet)) {
-            case MeshCorePayloadType::Request: return "REQ";
-            case MeshCorePayloadType::Response: return "RESP";
-            case MeshCorePayloadType::TextMessage: return "TEXT";
-            case MeshCorePayloadType::Acknowledgement: return "ACK";
-            case MeshCorePayloadType::Advertisement: return "ADV";
-            case MeshCorePayloadType::GroupText: return "GTXT";
-            case MeshCorePayloadType::GroupData: return "GDATA";
-            case MeshCorePayloadType::AnonymousRequest: return "ANON";
-            case MeshCorePayloadType::ReturnedPath: return "PATH";
-            case MeshCorePayloadType::Trace: return "TRACE";
-            case MeshCorePayloadType::Multipart: return "MULTI";
-            case MeshCorePayloadType::Control: return "CTRL";
-            case MeshCorePayloadType::RawCustom: return "RAW";
-        }
-    }
-    if(packet.protocol == ProtocolId::Reticulum) {
-        if(ReticulumDecoder::isRNodeSplitFrame(packet)) return "SPLIT";
-        if(ReticulumDecoder::isIfacProtected(packet)) return "IFAC";
-        switch(ReticulumDecoder::packetType(packet)) {
-            case ReticulumPacketType::Announce: return "ANN";
-            case ReticulumPacketType::LinkRequest: return "LINK";
-            case ReticulumPacketType::Proof: return "PROOF";
-            case ReticulumPacketType::Data: return "DATA";
-        }
-    }
-    switch(packet.kind) {
-        case PacketKind::EncryptedPayload: return "ENC";
-        case PacketKind::Data: return "DATA";
-        case PacketKind::Control: return "CTRL";
-        case PacketKind::Advertisement: return "ADV";
-        case PacketKind::Unknown: default: return "RAW";
-    }
-}
-
 void format_node(char *output, std::size_t capacity, const DecodedPacket &packet,
                  DecodedField field) noexcept
 {
@@ -317,7 +285,7 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
     const auto &store = capture_runtime.frames();
     for(std::size_t offset = 0; offset < store.size(); ++offset) {
         const FrameRecord *record = store.newest(offset);
-        if(record == nullptr || !record->decoded.hasField(FieldSource)) continue;
+        if(record == nullptr || !contributesToNodeSummary(*record)) continue;
 
         std::size_t index = 0;
         for(; index < count; ++index) {
@@ -566,7 +534,8 @@ void build_traffic(lv_obj_t * parent)
         std::snprintf(line, sizeof(line), "SF%u  CR 4/%u  SYNC 0x%04X",
                       profile.spreading_factor, profile.coding_rate_denominator, profile.sync_word);
         put_label(parent, line, 8, 114, theme::text(), &font_mono_10);
-        put_label(parent, "P  CHANGE ACTIVE PROFILE", 8, 204, theme::text_muted(), &font_mono_10);
+        put_label(parent, "P PRESET   -/+ FREQUENCY", 8, 188, theme::text_muted(), &font_mono_10);
+        put_label(parent, "B BANDWIDTH   F SF   C CR", 8, 204, theme::text_muted(), &font_mono_10);
         return;
     }
 
@@ -584,8 +553,10 @@ void build_traffic(lv_obj_t * parent)
         const bool selected = offset == selected_offset;
         if(selected) theme::rect(parent, 4, y - 1, 312, row_height, theme::focus());
 
+        const bool malformed = record->decoded.state == DecodeState::Malformed;
         const lv_color_t row_color = selected ? theme::text() :
-            (record->raw.rf.crc == CrcStatus::Invalid ? theme::fault() : theme::lime());
+            ((record->raw.rf.crc == CrcStatus::Invalid || malformed)
+                 ? theme::fault() : theme::lime());
         char time[12]{};
         char source[12]{};
         char destination[12]{};
@@ -606,7 +577,7 @@ void build_traffic(lv_obj_t * parent)
         put_label(parent, source, 59, y, row_color, &font_mono_10);
         put_label(parent, ">", 122, y, row_color, &font_mono_10);
         put_label(parent, destination, 133, y, row_color, &font_mono_10);
-        put_label(parent, packet_kind_label(record->decoded), 198, y, row_color, &font_mono_10);
+        put_label(parent, packetKindLabel(record->decoded), 198, y, row_color, &font_mono_10);
         put_label(parent, hops, 250, y, row_color, &font_mono_10);
         put_label(parent, snr, 274, y, row_color, &font_mono_10);
     }
@@ -1008,9 +979,12 @@ void build_packet_detail(lv_obj_t * parent)
     format_node(destination, sizeof(destination), record->decoded, FieldDestination);
     std::snprintf(line, sizeof(line), "%s  >  %s", source, destination);
     put_label(parent, line, 49, 29, theme::text(), &font_mono_semibold_12);
-    std::snprintf(line, sizeof(line), "%s  %s  %u B", protocolName(record->decoded.protocol),
-                  packet_kind_label(record->decoded), record->raw.captured_length);
-    put_label(parent, line, 49, 50, theme::amber(), &font_mono_10);
+    std::snprintf(line, sizeof(line), "%s  %s  %s  %u B", protocolName(record->decoded.protocol),
+                  packetKindLabel(record->decoded), decodeStateLabel(record->decoded.state),
+                  record->raw.captured_length);
+    put_label(parent, line, 49, 50,
+              record->decoded.state == DecodeState::Malformed ? theme::fault() : theme::amber(),
+              &font_mono_10);
     std::snprintf(line, sizeof(line), "SF%u  BW %.1fk  CR4/%u  0x%04X",
                   record->raw.rf.spreading_factor,
                   static_cast<double>(record->raw.rf.bandwidth_hz) / 1000.0,
@@ -1028,12 +1002,12 @@ void build_packet_detail(lv_obj_t * parent)
     if(record->decoded.protocol == ProtocolId::MeshCore) {
         std::snprintf(line, sizeof(line), "ROUTE %u  TYPE %s  PATH %ux%u",
                       static_cast<unsigned>(MeshCoreDecoder::routeType(record->decoded)),
-                      packet_kind_label(record->decoded),
+                      packetKindLabel(record->decoded),
                       static_cast<unsigned>(MeshCoreDecoder::pathHashCount(record->decoded)),
                       static_cast<unsigned>(MeshCoreDecoder::pathHashSize(record->decoded)));
     } else if(record->decoded.protocol == ProtocolId::Reticulum) {
         if(ReticulumDecoder::isIfacProtected(record->decoded)) {
-            std::snprintf(line, sizeof(line), "IFAC PROTECTED  HEADER OPAQUE");
+            std::snprintf(line, sizeof(line), "IFAC MARKED / UNVERIFIED  HEADER OPAQUE");
         } else if(ReticulumDecoder::isRNodeSplitFrame(record->decoded)) {
             std::snprintf(line, sizeof(line), "RNODE SPLIT FRAME  REASSEMBLY PENDING");
         } else {
@@ -1043,8 +1017,9 @@ void build_packet_detail(lv_obj_t * parent)
                           static_cast<unsigned long>(ReticulumDecoder::destinationHashPrefix(record->decoded)));
         }
     } else if(record->decoded.hasField(FieldPacketId)) {
-        std::snprintf(line, sizeof(line), "ID %08lX  CH %u  HOPS %u/%u",
-                      static_cast<unsigned long>(record->decoded.packet_id), record->decoded.channel,
+        std::snprintf(line, sizeof(line), "ID %08lX  CH HASH %02X  HOPS %u/%u",
+                      static_cast<unsigned long>(record->decoded.packet_id),
+                      static_cast<unsigned>(record->decoded.channel),
                       record->decoded.hop_limit, record->decoded.hop_start);
     } else {
         std::snprintf(line, sizeof(line), "FLAGS 0x%08lX  OFFSET %u",
@@ -1273,15 +1248,19 @@ void build_events(lv_obj_t * parent)
     events[1].color = radio.receiving ? theme::lime() : theme::fault();
 
     const RadioProfile &profile = radio_service.activeProfile();
-    if(radio.profile_switch_failures != 0) {
+    if(radio.last_profile_error != 0) {
         std::snprintf(events[2].detail, sizeof(events[2].detail),
                       "%s  rollback kept RX  last error %d", profile.name,
                       radio.last_profile_error);
         events[2].kind = "PROFILE WARN";
         events[2].color = theme::amber();
     } else {
-        std::snprintf(events[2].detail, sizeof(events[2].detail), "%s  %.3f MHz",
-                      profile.name, static_cast<double>(profile.center_frequency_hz) / 1000000.0);
+        std::snprintf(events[2].detail, sizeof(events[2].detail),
+                      "%s %.3f  B%.1f S%u C%u",
+                      protocol_abbreviation(profile.protocol_hint),
+                      static_cast<double>(profile.center_frequency_hz) / 1000000.0,
+                      static_cast<double>(profile.bandwidth_hz) / 1000.0,
+                      profile.spreading_factor, profile.coding_rate_denominator);
         events[2].kind = "PROFILE";
         events[2].color = theme::cyan();
     }
@@ -1546,6 +1525,89 @@ bool update_live_hardware_labels() noexcept
     return changed;
 }
 
+constexpr std::size_t saved_profile_size = 16;
+
+void put_profile_u16(std::uint8_t *bytes, std::uint16_t value) noexcept
+{
+    bytes[0] = static_cast<std::uint8_t>(value);
+    bytes[1] = static_cast<std::uint8_t>(value >> 8U);
+}
+
+void put_profile_u32(std::uint8_t *bytes, std::uint32_t value) noexcept
+{
+    bytes[0] = static_cast<std::uint8_t>(value);
+    bytes[1] = static_cast<std::uint8_t>(value >> 8U);
+    bytes[2] = static_cast<std::uint8_t>(value >> 16U);
+    bytes[3] = static_cast<std::uint8_t>(value >> 24U);
+}
+
+std::uint16_t get_profile_u16(const std::uint8_t *bytes) noexcept
+{
+    return static_cast<std::uint16_t>(bytes[0]) |
+           static_cast<std::uint16_t>(static_cast<std::uint16_t>(bytes[1]) << 8U);
+}
+
+std::uint32_t get_profile_u32(const std::uint8_t *bytes) noexcept
+{
+    return static_cast<std::uint32_t>(bytes[0]) |
+           (static_cast<std::uint32_t>(bytes[1]) << 8U) |
+           (static_cast<std::uint32_t>(bytes[2]) << 16U) |
+           (static_cast<std::uint32_t>(bytes[3]) << 24U);
+}
+
+bool load_saved_profile(RadioProfile &profile) noexcept
+{
+    profile_preferences_ready = profile_preferences.begin("lilyshark", false);
+    if(!profile_preferences_ready ||
+       profile_preferences.getBytesLength("profile") != saved_profile_size) {
+        return false;
+    }
+
+    std::uint8_t bytes[saved_profile_size]{};
+    if(profile_preferences.getBytes("profile", bytes, sizeof(bytes)) != sizeof(bytes) ||
+       bytes[0] != 'L' || bytes[1] != 'P' || bytes[2] != 1U) {
+        return false;
+    }
+
+    const std::uint16_t profile_id = get_profile_u16(&bytes[4]);
+    const RadioProfile *base = findBuiltinProfile(profile_id);
+    if(base == nullptr) return false;
+
+    RadioProfile candidate = *base;
+    candidate.center_frequency_hz = get_profile_u32(&bytes[6]);
+    candidate.bandwidth_hz = get_profile_u32(&bytes[10]);
+    candidate.spreading_factor = bytes[14];
+    candidate.coding_rate_denominator = bytes[15];
+    if(!isSupportedTunedProfile(candidate)) return false;
+
+    for(std::size_t index = 0; index < builtinProfileCount(); ++index) {
+        if(builtinProfiles()[index].id == candidate.id) {
+            active_profile_index = index;
+            break;
+        }
+    }
+    profile = candidate;
+    return true;
+}
+
+bool save_active_profile() noexcept
+{
+    if(!profile_preferences_ready) return false;
+    const RadioProfile &profile = radio_service.activeProfile();
+    if(!isSupportedTunedProfile(profile)) return false;
+
+    std::uint8_t bytes[saved_profile_size]{};
+    bytes[0] = 'L';
+    bytes[1] = 'P';
+    bytes[2] = 1U;
+    put_profile_u16(&bytes[4], profile.id);
+    put_profile_u32(&bytes[6], profile.center_frequency_hz);
+    put_profile_u32(&bytes[10], profile.bandwidth_hz);
+    bytes[14] = profile.spreading_factor;
+    bytes[15] = profile.coding_rate_denominator;
+    return profile_preferences.putBytes("profile", bytes, sizeof(bytes)) == sizeof(bytes);
+}
+
 void cycle_active_profile() noexcept
 {
     const std::size_t count = builtinProfileCount();
@@ -1553,9 +1615,43 @@ void cycle_active_profile() noexcept
     const std::size_t candidate_index = (active_profile_index + 1) % count;
     const RadioProfile &next = builtinProfiles()[candidate_index];
     const bool ready = radio_service.setProfile(next);
-    if(ready) active_profile_index = candidate_index;
+    if(ready) {
+        active_profile_index = candidate_index;
+        if(!save_active_profile()) Serial.println("Lilyshark profile settings were not saved");
+    }
     update_live_radio_label();
     Serial.printf("Lilyshark profile: %s (%s, error %d)\n", next.name,
+                  ready ? "listening" : "failed",
+                  ready ? radio_service.status().last_error
+                        : radio_service.status().last_profile_error);
+    build_current_screen();
+}
+
+void apply_tuned_profile(const RadioProfile &candidate, const char *action) noexcept
+{
+    const RadioProfile &current = radio_service.activeProfile();
+    if(candidate.center_frequency_hz == current.center_frequency_hz &&
+       candidate.bandwidth_hz == current.bandwidth_hz &&
+       candidate.spreading_factor == current.spreading_factor &&
+       candidate.coding_rate_denominator == current.coding_rate_denominator) {
+        Serial.printf("Lilyshark profile tune ignored: %s\n", action);
+        return;
+    }
+    if(!isSupportedTunedProfile(candidate)) {
+        Serial.printf("Lilyshark profile tune rejected: %s would leave supported limits\n", action);
+        return;
+    }
+
+    const bool ready = radio_service.setProfile(candidate);
+    if(ready && !save_active_profile()) {
+        Serial.println("Lilyshark profile settings were not saved");
+    }
+    update_live_radio_label();
+    Serial.printf("Lilyshark profile %s: %.3f MHz, BW %.1f kHz, SF%u, CR 4/%u (%s, error %d)\n",
+                  action,
+                  static_cast<double>(candidate.center_frequency_hz) / 1000000.0,
+                  static_cast<double>(candidate.bandwidth_hz) / 1000.0,
+                  candidate.spreading_factor, candidate.coding_rate_denominator,
                   ready ? "listening" : "failed",
                   ready ? radio_service.status().last_error
                         : radio_service.status().last_profile_error);
@@ -1609,6 +1705,25 @@ void handle_navigation_key(uint32_t key)
     }
     if(key == 's' || key == 'S') {
         take_device_screenshot();
+        return;
+    }
+    if(key == '-' || key == '+') {
+        apply_tuned_profile(stepProfileFrequency(radio_service.activeProfile(),
+                                                 key == '+' ? 1 : -1),
+                            key == '+' ? "frequency up" : "frequency down");
+        return;
+    }
+    if(key == 'b' || key == 'B') {
+        apply_tuned_profile(cycleProfileBandwidth(radio_service.activeProfile()), "bandwidth");
+        return;
+    }
+    if(key == 'f' || key == 'F') {
+        apply_tuned_profile(cycleProfileSpreadingFactor(radio_service.activeProfile()),
+                            "spreading factor");
+        return;
+    }
+    if(key == 'c' || key == 'C') {
+        apply_tuned_profile(cycleProfileCodingRate(radio_service.activeProfile()), "coding rate");
         return;
     }
     if(key == LV_KEY_ENTER || key == '\r') {
@@ -1691,7 +1806,8 @@ void handle_key(lv_event_t * event)
 #if !defined(LILYSHARK_DEVICE)
 int main(int argc, char ** argv)
 {
-    if(argc > 1) {
+    const bool soak_mode = argc > 1 && std::strcmp(argv[1], "--soak") == 0;
+    if(argc > 1 && !soak_mode) {
         const int requested = std::atoi(argv[1]);
         if(requested >= 1 && requested <= static_cast<int>(Screen::count)) {
             current_screen = static_cast<Screen>(requested - 1);
@@ -1718,8 +1834,37 @@ int main(int argc, char ** argv)
 
     build_current_screen();
 
+    constexpr std::uint64_t soak_screen_interval_ms = 1000;
+    std::uint64_t next_soak_screen_ms = SDL_GetTicks64() + soak_screen_interval_ms;
+    std::uint64_t soak_transitions = 0;
     while(true) {
         lv_timer_handler();
+        if(soak_mode) {
+            const std::uint64_t now_ms = SDL_GetTicks64();
+            if(now_ms >= next_soak_screen_ms) {
+                const int next = (static_cast<int>(current_screen) + 1) %
+                                 static_cast<int>(Screen::count);
+                current_screen = static_cast<Screen>(next);
+                build_current_screen();
+                ++soak_transitions;
+                next_soak_screen_ms = now_ms + soak_screen_interval_ms;
+                if(current_screen == Screen::traffic) {
+                    if(lv_mem_test() != LV_RESULT_OK) {
+                        std::fprintf(stderr, "fatal error: LVGL heap integrity check failed\n");
+                        return EXIT_FAILURE;
+                    }
+                    lv_mem_monitor_t memory{};
+                    lv_mem_monitor(&memory);
+                    std::fprintf(stderr,
+                                 "Lilyshark soak cycle %llu passed: used=%u%% frag=%u%% free=%zu max=%zu\n",
+                                 static_cast<unsigned long long>(soak_transitions /
+                                                                  static_cast<std::uint64_t>(Screen::count)),
+                                 static_cast<unsigned>(memory.used_pct),
+                                 static_cast<unsigned>(memory.frag_pct), memory.free_size,
+                                 memory.max_used);
+                }
+            }
+        }
         SDL_Delay(5);
     }
 }
@@ -1969,10 +2114,21 @@ void setup()
     capture_runtime.addDecoder(meshtastic_decoder);
     capture_runtime.addDecoder(meshcore_decoder);
     capture_runtime.addDecoder(reticulum_decoder);
-    const RadioProfile &initial_profile = builtinProfiles()[active_profile_index];
-    const bool radio_ready = radio_service.begin(initial_profile, on_radio_frame, nullptr);
+    RadioProfile initial_profile = builtinProfiles()[active_profile_index];
+    bool restored_profile = load_saved_profile(initial_profile);
+    bool radio_ready = radio_service.begin(initial_profile, on_radio_frame, nullptr);
+    if(!radio_ready && restored_profile) {
+        Serial.println("Lilyshark saved profile failed; retrying its built-in preset");
+        restored_profile = false;
+        initial_profile = builtinProfiles()[active_profile_index];
+        radio_ready = radio_service.begin(initial_profile, on_radio_frame, nullptr);
+        if(radio_ready && !save_active_profile()) {
+            Serial.println("Lilyshark fallback profile settings were not saved");
+        }
+    }
     update_live_radio_label();
-    Serial.printf("Lilyshark radio: %s (%s, error %d)\n", initial_profile.name,
+    Serial.printf("Lilyshark radio: %s%s (%s, error %d)\n", initial_profile.name,
+                  restored_profile ? " [saved settings]" : "",
                   radio_ready ? "listening" : "failed", radio_service.status().last_error);
 
     build_current_screen();
