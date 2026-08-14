@@ -227,7 +227,7 @@ uvx --with intelhex==2.3.0 --from platformio==6.1.19 \
 
 ### Run the simulator
 
-The checked-in simulator environment currently targets x86_64 macOS and expects `sdl2-config` at `/usr/local/bin/sdl2-config`.
+The checked-in simulator environment currently targets x86_64 macOS and resolves `sdl2-config` from `PATH`.
 
 ```sh
 uvx --from platformio==6.1.19 platformio run -e simulator
@@ -240,12 +240,10 @@ Pass a view number to open that screen at launch:
 .pio/build/simulator/program 2
 ```
 
-On Apple Silicon with Homebrew, create the path expected by the pinned build if needed:
+On Apple Silicon with Homebrew:
 
 ```sh
 brew install sdl2 uv
-sudo mkdir -p /usr/local/bin
-sudo ln -sf "$(brew --prefix sdl2)/bin/sdl2-config" /usr/local/bin/sdl2-config
 ```
 
 ## Flash a T-Deck

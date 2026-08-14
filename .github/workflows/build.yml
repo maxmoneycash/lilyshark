@@ -26,8 +26,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes libsdl2-dev
-          sudo install -d /usr/local/bin
-          sudo ln -sf /usr/bin/sdl2-config /usr/local/bin/sdl2-config
+          sdl2-config --version
 
       - name: Adapt the simulator target for Linux
         run: sed -i '/^[[:space:]]*-arch x86_64$/d' platformio.ini
