@@ -125,6 +125,13 @@ build_and_run spectrum \
   src/core/spectrum.cpp \
   test/spectrum/test_spectrum.cpp
 
+build_and_run radio_service_integration \
+  -DLILYSHARK_DEVICE=1 \
+  -I"${repo_dir}/test/radio_service_integration/fakes" \
+  src/core/spectrum.cpp \
+  src/device/radio_service.cpp \
+  test/radio_service_integration/test_radio_service_integration.cpp
+
 build_and_run radio_recovery \
   test/radio_recovery/test_radio_recovery.cpp
 
@@ -141,6 +148,9 @@ build_and_run screenshot \
 
 echo "Testing lscap_reader"
 python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
+
+echo "Testing serial_smoke"
+python3 -m unittest discover -s test/serial_smoke -p 'test_*.py'
 
 if [[ "${host_only}" == true ]]; then
   echo "All host tests passed"
@@ -185,6 +195,15 @@ elif command -v gtimeout >/dev/null 2>&1; then
   timeout_command="$(command -v gtimeout)"
 else
   echo "timeout or gtimeout is required for simulator smoke tests" >&2
+  exit 1
+fi
+
+echo "Testing deterministic pixels for all nine simulator screens"
+render_log="${test_dir}/simulator-render.log"
+if ! "${timeout_command}" 10 .pio/build/simulator/program --render-test >"${render_log}" 2>&1 || \
+   ! grep -q '^Lilyshark simulator render test passed$' "${render_log}"; then
+  echo "Simulator pixel-output test did not complete" >&2
+  cat "${render_log}" >&2
   exit 1
 fi
 

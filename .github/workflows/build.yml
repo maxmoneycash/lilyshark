@@ -82,7 +82,7 @@ jobs:
 
           This build has passed the sanitizer-backed host suite, all nine simulator smoke tests, the pinned ESP32-S3 build, and byte-level factory-image validation. It has not yet completed the physical T-Deck smoke test, so treat it as test firmware and report the first-boot serial log.
 
-          This alpha adds streaming 60-second surveys, slot-correct Meshtastic tuning with saved-profile migration, received-header CR/CRC and airtime metadata, automatic radio recovery, hardened SD capture writes, a dependency-free `.lscap` validator, and a two-clean-build reproducibility gate.
+          This alpha adds a bounded read-only first-boot serial checker, direct host execution of the real radio-service state machine, and exact 320x240 pixel checks for every simulator view. These checks strengthen the software evidence while the physical T-Deck smoke test remains pending.
 
           - Flash `lilyshark-tdeck.factory.bin` at `0x0` for a fresh install.
           - Use `lilyshark-tdeck.bin` at `0x10000` only with the matching Lilyshark bootloader and partition table.

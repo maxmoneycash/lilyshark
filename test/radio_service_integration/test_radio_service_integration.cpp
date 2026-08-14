@@ -1,0 +1,288 @@
+#include "lilyshark/device/radio_service.h"
+
+#include <RadioLib.h>
+
+#include <cassert>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+
+namespace {
+
+using namespace lilyshark;
+using radiolib_fake::Operation;
+
+RadioProfile testProfile()
+{
+    RadioProfile profile{};
+    profile.id = 17;
+    profile.setName("TEST PROFILE");
+    profile.protocol_hint = ProtocolId::Meshtastic;
+    profile.modulation = Modulation::LoRa;
+    profile.center_frequency_hz = 906875000;
+    profile.bandwidth_hz = 250000;
+    profile.preamble_symbols = 16;
+    profile.sync_word = 0x2b;
+    profile.spreading_factor = 11;
+    profile.coding_rate_denominator = 5;
+    profile.tx_power_dbm = 10;
+    profile.crc_enabled = true;
+    return profile;
+}
+
+std::size_t operationIndex(Operation operation, std::size_t start = 0)
+{
+    const auto &operations = radiolib_fake::state().operations;
+    for (std::size_t index = start; index < operations.size(); ++index) {
+        if (operations[index] == operation) {
+            return index;
+        }
+    }
+    return operations.size();
+}
+
+std::size_t operationCount(Operation operation)
+{
+    std::size_t count = 0;
+    for (const Operation recorded : radiolib_fake::state().operations) {
+        if (recorded == operation) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+struct CapturedFrame {
+    RawFrame frame{};
+    RadioProfile profile{};
+    std::size_t calls = 0;
+    bool receiver_rearmed_before_callback = false;
+};
+
+void captureFrame(const RawFrame &frame, const RadioProfile &profile, void *context)
+{
+    auto &capture = *static_cast<CapturedFrame *>(context);
+    capture.frame = frame;
+    capture.profile = profile;
+    ++capture.calls;
+    capture.receiver_rearmed_before_callback = radiolib_fake::state().start_receive_calls == 2U;
+}
+
+void testConfigureInterruptReadAndRearm()
+{
+    auto &fake = radiolib_fake::state();
+    fake.reset();
+    fake.now_ms = 100;
+    fake.now_us = 123456;
+
+    CapturedFrame capture{};
+    TDeckRadioService service{};
+    const RadioProfile profile = testProfile();
+    assert(service.begin(profile, captureFrame, &capture));
+    assert(service.status().initialized);
+    assert(service.status().receiving);
+    assert(fake.begin_calls == 1U);
+    assert(fake.start_receive_calls == 1U);
+    assert(std::fabs(fake.last_lora_frequency_mhz - 906.875F) < 0.001F);
+    assert(std::fabs(fake.last_lora_bandwidth_khz - 250.0F) < 0.001F);
+    assert(fake.last_lora_spreading_factor == 11U);
+    assert(fake.last_lora_coding_rate == 5U);
+    assert(fake.last_lora_sync_word == 0x2bU);
+    assert(fake.last_lora_preamble == 16U);
+
+    fake.packet = {0x11, 0x22, 0x33, 0x44};
+    fake.packet_length = fake.packet.size();
+    fake.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+    fake.header_coding_rate = 4;
+    fake.header_has_crc = true;
+    fake.read_data_result = RADIOLIB_ERR_CRC_MISMATCH;
+    const std::size_t receive_operation_start = fake.operations.size();
+
+    fake.triggerDio1();
+    service.poll();
+
+    assert(capture.calls == 1U);
+    assert(capture.receiver_rearmed_before_callback);
+    assert(capture.profile.id == profile.id);
+    assert(capture.frame.captured_length == fake.packet.size());
+    assert(capture.frame.bytes[0] == 0x11U);
+    assert(capture.frame.bytes[3] == 0x44U);
+    assert(capture.frame.rf.timestamp_us == 123456U);
+    assert(capture.frame.rf.coding_rate_denominator == 8U);
+    assert(capture.frame.rf.crc == CrcStatus::Invalid);
+    assert(capture.frame.rf.radio_status == RADIOLIB_ERR_CRC_MISMATCH);
+    assert(capture.frame.rf.airtime_us == fake.airtime_us);
+    assert(capture.frame.rf.hasField(RfFieldCodingRate));
+    assert(capture.frame.rf.hasField(RfFieldAirtime));
+    assert(service.status().received_frames == 1U);
+    assert(service.status().crc_errors == 1U);
+    assert(service.status().receiving);
+    assert(fake.start_receive_calls == 2U);
+
+    const std::size_t irq_index = operationIndex(Operation::GetIrqFlags,
+                                                  receive_operation_start);
+    const std::size_t read_index = operationIndex(Operation::ReadData,
+                                                   receive_operation_start);
+    const std::size_t rearm_index = operationIndex(Operation::StartReceive,
+                                                    receive_operation_start);
+    assert(irq_index < read_index);
+    assert(read_index < rearm_index);
+    service.stop();
+}
+
+void testReceiveArmRetryAndInvalidLengthRearm()
+{
+    auto &fake = radiolib_fake::state();
+    fake.reset();
+    fake.now_ms = 200;
+    fake.start_receive_results = {-601, RADIOLIB_ERR_NONE, RADIOLIB_ERR_NONE};
+
+    CapturedFrame capture{};
+    TDeckRadioService service{};
+    assert(!service.begin(testProfile(), captureFrame, &capture));
+    assert(service.status().initialized);
+    assert(!service.status().receiving);
+    assert(service.status().receive_errors == 1U);
+
+    fake.now_ms = 699;
+    service.poll();
+    assert(fake.start_receive_calls == 1U);
+    fake.now_ms = 700;
+    service.poll();
+    assert(fake.start_receive_calls == 2U);
+    assert(service.status().receiving);
+
+    fake.packet_length = kMaxFrameBytes + 1U;
+    fake.triggerDio1();
+    service.poll();
+    assert(capture.calls == 0U);
+    assert(service.status().receive_errors == 2U);
+    assert(service.status().receiving);
+    assert(fake.start_receive_calls == 3U);
+    service.stop();
+}
+
+SpectrumSweepRequest twoPointSweep()
+{
+    SpectrumSweepRequest request{};
+    request.start_frequency_hz = 902000000;
+    request.end_frequency_hz = 902200000;
+    request.step_hz = 200000;
+    request.samples_per_frequency = 64;
+    request.per_frequency_timeout_ms = 50;
+    request.overall_timeout_ms = 1000;
+    return request;
+}
+
+void testSpectrumSweepRestoresReceiver()
+{
+    auto &fake = radiolib_fake::state();
+    fake.reset();
+    fake.now_ms = 1000;
+
+    TDeckRadioService service{};
+    assert(service.begin(testProfile(), nullptr, nullptr));
+    assert(service.startSpectrumSweep(twoPointSweep()));
+    assert(service.spectrumStatus().state == SpectrumSweepState::Preparing);
+    assert(!service.status().receiving);
+    assert(fake.dio1_action == nullptr);
+
+    service.poll();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Scanning);
+    assert(std::fabs(fake.last_scan_frequency_mhz - 902.0F) < 0.001F);
+    assert(fake.last_scan_samples == 64U);
+    assert(operationCount(Operation::ScanStart) == 1U);
+
+    fake.scan_counts.fill(0);
+    fake.scan_counts[2] = 7;
+    fake.scan_status_result = RADIOLIB_ERR_NONE;
+    service.poll();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Advancing);
+    assert(service.spectrumStatus().points_completed == 1U);
+
+    fake.now_ms += 4;
+    service.poll();
+    assert(operationCount(Operation::ScanStart) == 1U);
+    fake.now_ms += 1;
+    service.poll();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Scanning);
+    assert(operationCount(Operation::ScanStart) == 2U);
+    assert(std::fabs(fake.last_scan_frequency_mhz - 902.2F) < 0.001F);
+
+    fake.scan_counts.fill(0);
+    fake.scan_counts[6] = 11;
+    fake.scan_status_result = RADIOLIB_ERR_NONE;
+    service.poll();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Restoring);
+    assert(fake.scan_abort_calls == 1U);
+
+    service.poll();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Complete);
+    assert(service.spectrumStatus().restoration_succeeded);
+    assert(service.spectrumStatus().restore_error == RADIOLIB_ERR_NONE);
+    assert(service.spectrumResult().generation == 1U);
+    assert(service.spectrumResult().point_count == 2U);
+    assert(service.spectrumResult().points[0].frequency_hz == 902000000U);
+    assert(service.spectrumResult().points[0].counts[2] == 7U);
+    assert(service.spectrumResult().points[1].frequency_hz == 902200000U);
+    assert(service.spectrumResult().points[1].counts[6] == 11U);
+    assert(fake.begin_calls == 2U);
+    assert(service.status().initialized);
+    assert(service.status().receiving);
+    assert(fake.dio1_action != nullptr);
+    service.stop();
+}
+
+void testRestoreFailureSchedulesFullConfigureRecovery()
+{
+    constexpr std::int16_t restore_failure = -812;
+    auto &fake = radiolib_fake::state();
+    fake.reset();
+    fake.now_ms = 4000;
+    fake.begin_results = {RADIOLIB_ERR_NONE, restore_failure, RADIOLIB_ERR_NONE};
+
+    TDeckRadioService service{};
+    assert(service.begin(testProfile(), nullptr, nullptr));
+    SpectrumSweepRequest request = twoPointSweep();
+    request.end_frequency_hz = request.start_frequency_hz;
+    assert(service.startSpectrumSweep(request));
+    service.poll();
+    fake.scan_counts[1] = 3;
+    fake.scan_status_result = RADIOLIB_ERR_NONE;
+    service.poll();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Restoring);
+
+    service.poll();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Failed);
+    assert(service.spectrumStatus().failure == SpectrumSweepFailure::RestoreFailed);
+    assert(!service.spectrumStatus().restoration_succeeded);
+    assert(service.spectrumStatus().restore_error == restore_failure);
+    assert(!service.status().initialized);
+    assert(!service.status().receiving);
+    assert(fake.begin_calls == 2U);
+
+    fake.now_ms += 999;
+    service.poll();
+    assert(fake.begin_calls == 2U);
+    fake.now_ms += 1;
+    service.poll();
+    assert(fake.begin_calls == 3U);
+    assert(service.status().initialized);
+    assert(service.status().receiving);
+    assert(service.spectrumStatus().state == SpectrumSweepState::Failed);
+    assert(service.spectrumStatus().failure == SpectrumSweepFailure::RestoreFailed);
+    service.stop();
+}
+
+} // namespace
+
+int main()
+{
+    testConfigureInterruptReadAndRearm();
+    testReceiveArmRetryAndInvalidLengthRearm();
+    testSpectrumSweepRestoresReceiver();
+    testRestoreFailureSchedulesFullConfigureRecovery();
+    std::puts("radio service state-transition tests passed");
+    return 0;
+}
