@@ -1,0 +1,95 @@
+name: Build firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*-alpha*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pinned build runner
+        run: python3 -m pip install uv==0.11.22
+
+      - name: Install simulator build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libsdl2-dev
+          sudo install -d /usr/local/bin
+          sudo ln -sf /usr/bin/sdl2-config /usr/local/bin/sdl2-config
+
+      - name: Adapt the simulator target for Linux
+        run: sed -i '/^[[:space:]]*-arch x86_64$/d' platformio.ini
+
+      - name: Test and build every release surface
+        run: ./scripts/test_all.sh
+
+      - name: Stage firmware artifacts
+        run: |
+          python3 scripts/validate_factory.py \
+            --factory .pio/build/t-deck/firmware.factory.bin \
+            --app .pio/build/t-deck/firmware.bin \
+            --bootloader .pio/build/t-deck/bootloader.bin \
+            --partitions .pio/build/t-deck/partitions.bin
+          mkdir -p dist
+          cp .pio/build/t-deck/firmware.bin dist/lilyshark-tdeck.bin
+          cp .pio/build/t-deck/firmware.factory.bin dist/lilyshark-tdeck.factory.bin
+          cp .pio/build/t-deck/firmware.elf dist/lilyshark-tdeck.elf
+          cd dist
+          sha256sum lilyshark-tdeck.bin lilyshark-tdeck.factory.bin lilyshark-tdeck.elf > SHA256SUMS
+
+      - name: Upload T-Deck firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: lilyshark-tdeck-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-alpha:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: test-and-build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download verified firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: lilyshark-tdeck-${{ github.sha }}
+          path: dist
+
+      - name: Publish durable developer-alpha download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          Lilyshark developer-alpha firmware for the original LILYGO T-Deck.
+
+          This build has passed the sanitizer-backed host suite, all nine simulator smoke tests, the pinned ESP32-S3 build, and byte-level factory-image validation. It has not yet completed the physical T-Deck smoke test, so treat it as test firmware and report the first-boot serial log.
+
+          - Flash `lilyshark-tdeck.factory.bin` at `0x0` for a fresh install.
+          - Use `lilyshark-tdeck.bin` at `0x10000` only with the matching Lilyshark bootloader and partition table.
+          - Verify downloads with `SHA256SUMS`.
+          - Keep `lilyshark-tdeck.elf` for crash-symbol decoding; do not flash it.
+
+          Read `docs/FLASHING.md` in the repository before installing.
+          EOF
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Lilyshark ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
+            --prerelease \
+            --verify-tag

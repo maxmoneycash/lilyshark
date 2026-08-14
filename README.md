@@ -1,68 +1,64 @@
 <p align="center">
-  <img src="assets/brand/lilyshark-wordmark-pink.svg" alt="" width="520">
+  <img src="assets/brand/lilyshark-wordmark-pink.svg" alt="Lilyshark" width="520">
 </p>
 
 <h1 align="center">Lilyshark</h1>
 <p align="center"><strong>Wireshark for mesh radio, built for the LILYGO T-Deck.</strong></p>
 
 <p align="center">
-  <a href="#project-status"><img alt="Status: UI prototype" src="https://img.shields.io/badge/status-UI%20prototype-F2CE58"></a>
+  <a href="#project-status"><img alt="Status: developer alpha" src="https://img.shields.io/badge/status-developer%20alpha-F05AA6"></a>
   <a href="#target-hardware"><img alt="Target: LILYGO T-Deck" src="https://img.shields.io/badge/target-LILYGO%20T--Deck-66F05A"></a>
   <a href="https://lvgl.io/"><img alt="LVGL 9.3" src="https://img.shields.io/badge/LVGL-9.3-71D8DF"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-F0F4EF"></a>
 </p>
 
-Lilyshark turns a T-Deck into a handheld protocol and RF analyzer. It is being built to capture LoRa traffic, inspect raw frames and radio conditions, decode supported mesh protocols, trace routes and node health, find interference, and export captures for deeper analysis in Wireshark.
+Lilyshark turns a T-Deck into a handheld LoRa traffic and RF analyzer. It captures frames from the SX1262, keeps the raw bytes and radio measurements together, interprets supported mesh headers, tracks what the receiver has heard, surveys the band, and saves evidence to a microSD card.
 
-Meshtastic, MeshCore, and Reticulum are the first protocol targets. A shared capture core will preserve raw frames and radio metadata, while decoder modules add protocol-specific meaning. The same traffic, spectrum, history, and export tools can then work across multiple mesh stacks.
+Meshtastic, MeshCore, and Reticulum-compatible RNode traffic share one capture engine and one interface. Each protocol decoder adds the meaning it can prove from the frame. Unknown or protected data remains available as raw bytes with frequency, bandwidth, spreading factor, coding rate, RSSI, SNR, CRC state, frequency error, and airtime.
 
-The product is designed to be useful on one T-Deck for field surveys, radio checks, packet inspection, troubleshooting, and capture. Extra radios are useful for controlled tests and longer observation sessions. They are optional.
+A single T-Deck is enough for field surveys, packet inspection, radio-profile checks, interference hunting, and capture. Lilyshark listens to traffic already on the air and gives that traffic a diagnostic interface you can carry.
 
-> **Current state:** this repository contains the working UI simulator. Hardware capture, protocol decoders, and flashable T-Deck firmware are still in development.
+> [!WARNING]
+> The current firmware is a developer alpha. The simulator, sanitizer-backed host tests, T-Deck build, and merged factory image run successfully in the development environment. No physical T-Deck was connected for the current build pass, so display orientation, touch calibration, radio reception, microSD behavior, optional GPS, battery readings, and spectrum-scan recovery still need a hardware smoke test. Treat the generated image as test firmware until those checks pass.
 
-## Why Lilyshark
+## Download
 
-Mesh failures can start with RF noise, mismatched modem settings, weak links, route changes, congestion, corrupt frames, or protocol behavior. Client apps rarely put all of that evidence in one place.
+The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/releases) contains the current T-Deck factory image, application-only image, debug symbols, and SHA-256 checksums. For a fresh install, download `lilyshark-tdeck.factory.bin`, verify it with `SHA256SUMS`, and follow the [flashing guide](docs/FLASHING.md). Do not flash the `.elf` file.
 
-Lilyshark will bring the useful evidence together on the device: live frames, decoded fields, raw bytes, signal history, node activity, route data, spectrum activity, events, surveys, and capture export. The interface dedicates the screen to understanding what the radio and mesh are doing.
+## What Lilyshark shows
 
-## Protocol roadmap
+- A live frame feed with capture time, protocol, source and destination when the protocol exposes them, packet type, route or hop data, and SNR
+- Packet detail with decoded header fields, integrity state, complete RF metadata, and a raw hex view
+- Protocol-aware node activity and short signal histories when a stable node identity is available
+- A color spectrum view built from the SX1262 spectral-scan histogram
+- Channel activity, observed airtime, packet rate, CRC failures, and recent utilization
+- A timed 60-second field survey with frames captured, unique sources, best SNR, and CRC errors
+- Local GPS state and position when a compatible receiver is attached
+- Operational events for radio state, active profile, capture files, PCAP limits, and screenshots
+- Native `.lscap`, LoRaTap PCAP, and 24-bit BMP output on microSD
 
-Radio capture and protocol decoding are separate layers. The capture layer records raw frames and RF context such as frequency, bandwidth, spreading factor, coding rate, RSSI, SNR, and integrity state. Decoder modules add protocol names, node identities, packet types, routes, and readable fields. Frames without a matching decoder remain available as raw bytes and radio metadata.
+## Interface
 
-| Protocol | Direction |
-| --- | --- |
-| **Meshtastic** | Planned radio profile and packet decoder |
-| **MeshCore** | Planned radio profile and packet decoder |
-| **Reticulum** | Planned integration for deployments using compatible LoRa interfaces |
-| **Other LoRa mesh protocols** | Future decoder modules using the same capture record and decoder API |
+The 320x240 interface gives the display to telemetry. It uses condensed labels, monospaced values, one-pixel rules, compact plots, and high-contrast selection. Lime marks live or healthy data, cyan marks navigation and information, amber marks warnings, and coral marks faults.
 
-These are product targets. The current simulator uses generated, Meshtastic-style sample telemetry. Live protocol integration remains on the roadmap.
-
-## What works today
-
-The simulator implements all nine primary views in LVGL 9.3.0. It includes keyboard navigation, embedded fonts, semantic states, dense tables, line plots, a canvas-based waterfall, and deterministic sample telemetry.
+These two images come from the working LVGL simulator:
 
 <table>
   <tr>
-    <td width="50%"><img src="design/previews/traffic-simulator.png" alt="Current Lilyshark traffic screen running in the LVGL simulator"></td>
-    <td width="50%"><img src="design/previews/spectrum-simulator.png" alt="Current Lilyshark spectrum screen running in the LVGL simulator"></td>
+    <td width="50%"><img src="design/previews/traffic-simulator.png" alt="Lilyshark traffic screen running in the LVGL simulator"></td>
+    <td width="50%"><img src="design/previews/spectrum-simulator.png" alt="Lilyshark spectrum screen running in the LVGL simulator"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Working simulator: live-traffic view</sub></td>
-    <td align="center"><sub>Working simulator: spectrum view</sub></td>
+    <td align="center"><sub>Live traffic</sub></td>
+    <td align="center"><sub>Spectrum</sub></td>
   </tr>
 </table>
 
-## What it will look like
-
-The interface is designed for the T-Deck's 320x240 display. It uses dense telemetry, high-contrast selection, compact plots, and a fixed status strip instead of a card-based phone UI.
+The hardware mockups below define the visual target for the T-Deck build:
 
 <p align="center">
-  <img src="design/references/07-spectrum-waterfall.png" width="760" alt="Target Lilyshark spectrum waterfall shown on a LILYGO T-Deck">
+  <img src="design/references/07-spectrum-waterfall.png" width="760" alt="Target Lilyshark spectrum view shown on a LILYGO T-Deck">
 </p>
-
-<p align="center"><sub>Target product direction: a full-width spectrum waterfall with noise-floor, busiest-frequency, and quietest-frequency summaries.</sub></p>
 
 <table>
   <tr>
@@ -70,176 +66,254 @@ The interface is designed for the T-Deck's 320x240 display. It uses dense teleme
     <td width="50%"><img src="design/references/01-node-detail.png" alt="Target Lilyshark node detail screen"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Live packet feed with an obvious focused row</sub></td>
-    <td align="center"><sub>Per-node SNR, RSSI, hop count, and last known position</sub></td>
+    <td align="center"><sub>Dense frame feed with a clear focused row</sub></td>
+    <td align="center"><sub>Per-node signal, hop, activity, and position detail</sub></td>
   </tr>
 </table>
 
-These are target hardware mockups. All ten references are documented in [design/references](design/references/README.md). Two references explore alternate node-roster density, which is why the design folder contains ten images while the simulator has nine primary screens.
+All ten reference images and their screen mapping live in [design/references](design/references/README.md).
 
-## What Lilyshark is being built to answer
+### Nine views
 
-- What protocol and packet type is this frame?
-- Which radio profile is active, and does it match nearby traffic?
-- Is the channel crowded, noisy, or experiencing a burst of interference?
-- Which nodes or links are becoming harder to hear?
-- Did a node disappear, or has it simply gone quiet?
-- What route or hop information does this protocol expose?
-- Are integrity failures, retries, or weak links increasing?
-- Which frequency is busiest, and where is the quietest part of the band?
-- What happened just before traffic stopped getting through?
-- Can the raw capture be saved for deeper inspection in Wireshark?
+| Key | View | Current device behavior |
+| ---: | --- | --- |
+| `1` | **Traffic** | Shows captured frames from the bounded in-memory store. Up/Down selects a row; Enter opens it. |
+| `2` | **Spectrum** | Runs and renders an SX1262 power-histogram sweep for the active profile's band. |
+| `3` | **Nodes** | Lists observed protocol identities and signal history. Up/Down selects a row; Enter opens it. |
+| `4` | **Node detail** | Summarizes recent frames, SNR, RSSI, and activity for an observed source. |
+| `5` | **Packet detail** | Shows protocol fields, RF measurements, integrity state, and raw bytes. |
+| `6` | **Map** | Shows the local optional-GPS fix and states clearly when remote positions are unavailable. |
+| `7` | **Survey** | Captures a 60-second diagnostic sample and reports observed results. |
+| `8` | **Events** | Reports radio, profile, capture, PCAP, and screenshot state. |
+| `9` | **Utilization** | Summarizes observed airtime, frame rate, CRC failures, and recent activity. |
 
-## Planned diagnostic views
+The simulator fills these views with deterministic example data. The T-Deck target uses captured data or an explicit unavailable state.
 
-| View | Purpose |
+## Protocol coverage
+
+Decoding is profile-gated because these LoRa protocols do not all carry an unambiguous magic value. Press `P` on the T-Deck to cycle the active radio profile. Lilyshark reconfigures the SX1262 and uses the matching structural decoder.
+
+| Protocol | Included profiles | Fields decoded today | Current boundary |
+| --- | --- | --- | --- |
+| **Meshtastic** | US LongFast, 906.875 MHz, 250 kHz, SF11, CR 4/5 | Outer header, source, destination, packet ID, channel, hop limit/start, next hop, relay byte, broadcast/ACK/MQTT flags | Encrypted protobuf payload stays opaque. Channel keys and payload decryption are not implemented. |
+| **MeshCore** | Current US recommendation at 910.525 MHz/62.5 kHz/SF7; legacy 915 MHz/250 kHz/SF10 | Version 1 route type, payload type, encoded path shape, transport codes, group channel, ACK checksum, structural length validation | Protected direct, group, and anonymous payloads stay opaque. Advertisement bodies are not expanded into contacts. |
+| **Reticulum / RNode** | Documented EU example at 867.2 MHz, 125 kHz, SF8 | RNode shim, split marker, Reticulum header type, packet and destination type, context, hops, hash prefixes, clear/protected state | RNode PHY settings are deployment-defined. IFAC-protected content stays opaque without an interface key. The included profile is an example, not a universal Reticulum channel. |
+| **Unknown LoRa** | User code can add `RadioProfile` entries | Raw frame, integrity state, and all RF metadata supplied by the radio | No protocol labels are invented. The frame is still inspectable and exportable. |
+
+The decoder API preserves uncertainty. MeshCore transport codes are not presented as node IDs, and Reticulum's 32-bit hash prefixes are not presented as complete identities.
+
+### Built-in PHY profiles
+
+| ID | Name in firmware | Center frequency | Bandwidth | SF | CR | Sync word | Preamble |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | `MESHTASTIC US LF` | 906.875 MHz | 250 kHz | 11 | 4/5 | `0x2B` | 16 symbols |
+| 2 | `MESHCORE US` | 910.525 MHz | 62.5 kHz | 7 | 4/5 | `0x1424` | 32 symbols |
+| 3 | `MESHCORE LEGACY` | 915.000 MHz | 250 kHz | 10 | 4/5 | `0x1424` | 16 symbols |
+| 4 | `RNODE EXAMPLE EU` | 867.200 MHz | 125 kHz | 8 | 4/5 | `0x1424` | 18 symbols |
+
+These are explicit starting profiles, not automatic protocol detection. Choose settings that match the network and comply with the rules for your location before capturing traffic.
+
+## Radio capture and spectrum scanning
+
+The T-Deck target configures the onboard SX1262 for one active profile at a time. Its receive path records valid frames and CRC mismatches, then immediately returns the radio to receive mode. The in-memory UI store holds the newest 64 records while microSD capture keeps writing beyond that window.
+
+Spectrum mode uses the SX1262 spectral-scan patch and reads a 33-bin power histogram at each frequency step. A full US-band request covers 902 through 928 MHz in 200 kHz steps. EU and profile-centered requests use their own range. The scan owns the radio while it runs, then fully reapplies the active receive profile before capture resumes.
+
+This scan facility is marked **experimental** in the firmware. Semtech and RadioLib describe it as experimental, and Lilyshark's restore path has not yet been exercised on a physical T-Deck. The interface reports partial progress, cancellation, timeouts, scan failures, and receive-restoration failures instead of hiding them.
+
+## Capture files and screenshots
+
+Insert a writable microSD card before boot. Lilyshark mounts it, creates `/lilyshark`, and opens unique capture files automatically.
+
+| Output | Path | Use |
+| --- | --- | --- |
+| Lilyshark capture | `/lilyshark/capture-####.lscap` | Protocol-neutral format that preserves every recorded RF field and supports settings such as 62.5 kHz bandwidth. The version 1 layout is documented in [docs/lilyshark-capture-format.md](docs/lilyshark-capture-format.md). |
+| LoRaTap PCAP | `/lilyshark/capture-####.pcap` | Standard PCAP with DLT 270 LoRaTap records for Wireshark and compatible tools. |
+| Screenshot | `/lilyshark/screenshot-####.bmp` | Pixel-exact 320x240, uncompressed 24-bit BMP captured from the device display when `S` is pressed. |
+
+LoRaTap v0 cannot represent every bandwidth exactly. The included MeshCore 62.5 kHz profile therefore continues recording `.lscap` while the Events view reports the PCAP bandwidth limit. Profiles at 125 kHz or exact multiples can produce LoRaTap records. Capture sinks flush every five seconds during normal operation.
+
+Saving a BMP uses the display and microSD on the shared SPI bus. Reception stays armed, but polling pauses while the image is written, so a busy channel can lose frames. The Events view reports the measured screenshot capture gap.
+
+## Device controls
+
+| Control | Action |
 | --- | --- |
-| **Live traffic** | A dense, scrolling feed of frames with protocol, decoded source and destination when available, frame type, routing data, RSSI, and SNR. |
-| **Packet detail** | Protocol-specific fields, routing metadata when present, payload summary, raw bytes, integrity state, and radio conditions for one frame. |
-| **Spectrum** | A color waterfall built from SX1262 spectral-scan data, with fast narrow scans and full-band scans. |
-| **Channel utilization** | Noise floor, recent peak usage, and a frequency-by-frequency activity histogram. |
-| **Node roster** | Last-seen time, signal history, and protocol-specific node data such as battery state when available. |
-| **Node detail** | Longer SNR and RSSI histories plus route, hop, and position data when the active protocol exposes them. |
-| **Events** | New nodes, lost nodes, high utilization, interference spikes, and other changes worth investigating. |
-| **Survey** | A timed field capture that summarizes nodes heard, best link quality, and local noise. |
-| **Map** | A simple field-oriented spatial view of known node positions and distances. |
+| Left/Right or horizontal touch swipe | Move through the seven primary views |
+| Up/Down or vertical touch swipe | Move the focused row in Traffic and Nodes |
+| Trackball press or `Enter` | Open packet/node detail, start a survey, or start/cancel a spectrum sweep |
+| `Backspace` | Return from packet or node detail |
+| `1` through `9` | Open a primary view directly |
+| `P` | Cycle Meshtastic, MeshCore US, MeshCore legacy, and RNode example profiles |
+| `S` | Save a BMP screenshot to microSD |
+| Touch tap | Perform the current Enter action |
 
-## Design principles
+The touchscreen probes the GT911 at both T-Deck addresses and reports absence instead of blocking startup. The trackball and keyboard remain available when touch is missing.
 
-### Protocol-aware and extensible
+## Architecture
 
-Raw frames and radio metadata belong to the analyzer core. Protocol adapters interpret that data without owning the capture engine or interface. Meshtastic, MeshCore, Reticulum, and future formats share the same traffic, spectrum, event, history, and export tools. Unknown traffic remains visible as raw radio data.
-
-### Useful on one T-Deck
-
-A single T-Deck can run a complete field session: survey the band, inspect traffic, compare radio settings, review node and link history, identify interference, and save a capture. Additional radios can generate controlled traffic or serve as test peers.
-
-### Show the active radio context
-
-The interface must expose the selected region or band, frequency, bandwidth, spreading factor, coding rate, sync word, and protocol profile. Decoding may require protocol settings, channel configuration, or keys. Encrypted payloads can remain opaque while frame and radio metadata stay visible. The setup flow must make the active decoder and decode state clear.
-
-### Data gets the screen
-
-Plots, packet rows, and state changes take priority over branding and decorative chrome. The visual system uses a near-black field, condensed labels, monospaced telemetry, one-pixel rules, and semantic color:
-
-- Lime: healthy, live, or selected data
-- Cyan: information and navigation
-- Amber: congestion or warning
-- Coral: loss or fault
-
-### On-device first, desktop when needed
-
-The common answers should be visible in the field without opening a laptop. Capture export to SD will support deeper inspection with desktop tools such as Wireshark. Each protocol still needs a validated PCAP metadata mapping and dissector strategy.
-
-## Target architecture
-
-Lilyshark is designed around a protocol-neutral capture record. The radio layer owns the SX1262 and records raw frames with their RF metadata. A decoder registry turns recognized frames into protocol-aware packet models while preserving every frame for raw inspection and export.
+The firmware separates raw capture from protocol interpretation. A radio profile defines the LoRa PHY and suggests a decoder. Each received frame enters one protocol-neutral record, passes through the decoder registry, updates the bounded snapshot store, reaches the UI, and is written to the enabled capture sinks.
 
 ```mermaid
 flowchart LR
-    A[Radio and protocol profile] --> B[SX1262 capture and scan scheduler]
-    B --> C[Raw frame and RF metadata queue]
+    A[Active radio profile] --> B[SX1262 receive and scan service]
+    B --> C[Raw frame plus RF metadata]
     C --> D[Decoder registry]
-    D --> E[Protocol-aware packet model]
-    C --> F[Raw frame view and capture export]
-    E --> G[Snapshot store and event engine]
-    G --> H[LVGL 320x240 interface]
-    F --> H
+    D --> E[Protocol-aware packet]
+    C --> F[LSCAP and LoRaTap writers]
+    E --> G[64-record capture store]
+    G --> H[Nine-screen LVGL interface]
+    F --> I[microSD]
 ```
 
-Meshtastic, MeshCore, Reticulum, and future protocols belong in profiles and decoder modules that share one analyzer interface. The proposed spectrum scanner still needs exclusive ownership of the SX1262, reliable configuration restore, and hardware validation.
+The scan state machine gives the SX1262 exclusive ownership during a sweep. It has bounded point counts, per-frequency and overall timeouts, cancellation, partial results, and a receive-profile restore step on every exit path.
 
 ## Project status
 
-This repository currently contains the UI and interaction prototype. Flashable T-Deck firmware, live radio capture, and production protocol decoders remain on the roadmap.
+| Area | Evidence in this repository | Physical T-Deck status |
+| --- | --- | --- |
+| Nine-screen LVGL interface | Simulator builds and runs with checked-in preview images | Pending display smoke test |
+| T-Deck hardware target | Pinned PlatformIO environment produces app, factory, and ELF artifacts | Boot not yet observed on hardware |
+| SX1262 frame capture | RadioLib service, ISR handoff, CRC-mismatch path, bounded store, tests around core records | Reception and long-run recovery pending |
+| Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Live over-air sample pending |
+| MeshCore decoder | Version 1 structural and malformed-frame tests | Live over-air sample pending |
+| Reticulum/RNode decoder | Clear, IFAC, split, and malformed-frame tests | Live RNode sample pending |
+| `.lscap` export | Byte-exact writer tests and documented v1 layout | microSD write test pending |
+| LoRaTap PCAP | Byte-exact writer tests for the DLT 270 record layout | microSD and desktop-open test pending |
+| BMP screenshots | RGB565-to-BMP tests and unique-path device writer | Display readback and microSD test pending |
+| Touch, keyboard, and trackball | Input services compile; touch transform has host tests | Calibration and interaction test pending |
+| Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | ADC calibration and serial receiver test pending |
+| Spectrum scan | Request/result tests plus radio restore state machine | Experimental; complete hardware validation pending |
 
-| Area | Status |
-| --- | --- |
-| Nine-screen 320x240 LVGL simulator | Working |
-| Reference-driven theme and embedded fonts | Working |
-| Keyboard navigation and direct screen launch | Working |
-| T-Deck hardware shell and SX1262 capture scheduler | Next |
-| Raw receive capture and diagnostic snapshot store | Planned |
-| Protocol-neutral capture record and decoder API | Planned |
-| Meshtastic protocol profile and decoder | Planned |
-| MeshCore protocol profile and decoder | Planned |
-| Reticulum-compatible LoRa integration | Planned |
-| Exclusive spectrum-scan scheduler | Planned |
-| Protocol-aware PCAP export to SD | Planned |
-| On-device screenshot capture | Planned |
-| Hardware tests and long-running stability work | Planned |
+The host suite compiles with warnings as errors and runs under AddressSanitizer and UndefinedBehaviorSanitizer. The checked-in GitHub Actions workflow is configured to run the same suite, build both targets, and upload firmware artifacts after a successful workflow run.
 
-## Roadmap
+## Build and test
 
-- [x] Establish the visual contract and build all primary simulator screens.
-- [ ] Build the T-Deck firmware shell and SX1262 radio scheduler.
-- [ ] Bring up the T-Deck display, keyboard, trackball, SD card, GPS, and power status.
-- [ ] Define the protocol-neutral capture record and decoder API.
-- [ ] Connect raw frames to a bounded capture queue, including integrity failures.
-- [ ] Add Meshtastic, MeshCore, and Reticulum profiles and decoders.
-- [ ] Add node snapshots, time-series history, and event detection.
-- [ ] Add fast narrow-band and full-band SX1262 spectrum scans.
-- [ ] Implement and validate protocol-aware PCAP export for Wireshark.
-- [ ] Add screenshot-to-SD and capture-session export.
-- [ ] Test memory use, radio recovery, task stacks, and overnight stability on hardware.
+The tool versions are pinned in the repository. Install [`uv`](https://docs.astral.sh/uv/) so `uvx` can create isolated PlatformIO and esptool environments.
 
-## Run the current simulator
+### Run every host test and build both targets
 
-The checked-in PlatformIO environment currently targets x86_64 macOS and uses SDL2 from `/usr/local`. It is pinned to LVGL 9.3.0 to match the planned T-Deck firmware interface.
+```sh
+./scripts/test_all.sh
+```
 
-Prerequisites:
+Run the sanitizer-backed C++ tests without PlatformIO builds:
 
-- macOS with Rosetta available for the x86_64 build
-- [`uv`](https://docs.astral.sh/uv/) for the pinned PlatformIO invocation
-- SDL2 with `/usr/local/bin/sdl2-config` available
+```sh
+./scripts/test_all.sh --host-only
+```
+
+### Build release artifacts
+
+```sh
+./scripts/build_release.sh
+```
+
+The script runs the pinned T-Deck build and writes:
+
+```text
+dist/lilyshark-tdeck.factory.bin  Complete image for address 0x0
+dist/lilyshark-tdeck.bin          Application image for address 0x10000
+dist/lilyshark-tdeck.elf          Symbols for debugging
+dist/SHA256SUMS                   SHA-256 checksums
+```
+
+The equivalent direct firmware build is:
+
+```sh
+uvx --with intelhex==2.3.0 --from platformio==6.1.19 \
+  platformio run -e t-deck
+```
+
+### Run the simulator
+
+The checked-in simulator environment currently targets x86_64 macOS and expects `sdl2-config` at `/usr/local/bin/sdl2-config`.
 
 ```sh
 uvx --from platformio==6.1.19 platformio run -e simulator
 .pio/build/simulator/program
 ```
 
-Use the arrow keys to move between views. Number keys `1` through `9` open a view directly:
-
-1. Live traffic
-2. Spectrum waterfall
-3. Node roster
-4. Node detail
-5. Packet detail
-6. Node map
-7. Survey capture
-8. Events
-9. Channel utilization
-
-Pass a number on launch to open a specific screen:
+Pass a view number to open that screen at launch:
 
 ```sh
 .pio/build/simulator/program 2
 ```
 
+On Apple Silicon with Homebrew, create the path expected by the pinned build if needed:
+
+```sh
+brew install sdl2 uv
+sudo mkdir -p /usr/local/bin
+sudo ln -sf "$(brew --prefix sdl2)/bin/sdl2-config" /usr/local/bin/sdl2-config
+```
+
+## Flash a T-Deck
+
+The guarded flash script accepts an explicit serial device, verifies the factory image against `SHA256SUMS`, pins esptool 4.11.0, and writes the merged image at `0x0`.
+
+```sh
+./scripts/build_release.sh
+./scripts/flash_tdeck.sh /dev/cu.usbmodem1101   # macOS example
+# ./scripts/flash_tdeck.sh /dev/ttyACM0         # Linux example
+```
+
+`./scripts/flash_tdeck.sh --auto` proceeds only when it finds exactly one eligible USB modem or ACM serial device. The script stops when the port, artifact, or checksum is ambiguous.
+
+Use the factory image for a fresh install. The application-only image at `0x10000` is for updates on a T-Deck that already has the matching Lilyshark bootloader and partition table. Full instructions, serial monitoring, expected files, and recovery boundaries are in [docs/FLASHING.md](docs/FLASHING.md).
+
 ## Repository layout
 
 ```text
-include/theme.h             Shared colors, spacing, typography, and LVGL helpers
-src/sim_main.cpp            Simulator shell and all nine diagnostic screens
-src/fonts/                  Generated LVGL font sources
-assets/brand/               Transparent SVG wordmark and color variants
-assets/fonts/               Original OFL font files and licenses
-design/references/          Ten target hardware mockups and their screen map
-platformio.ini              Reproducible native simulator environment
+include/lilyshark/core/       Protocol-neutral records, profiles, store, and spectrum model
+include/lilyshark/protocols/  Meshtastic, MeshCore, and Reticulum decoder interfaces
+include/lilyshark/device/     T-Deck radio, status, touch, screenshot, and SD services
+include/lilyshark/export/     LSCAP and LoRaTap writer interfaces
+src/core/                     Decoder registry, profiles, decoders, and spectrum helpers
+src/device/                   ESP32-S3 and T-Deck hardware implementations
+src/export/                   Capture encoders
+src/sim_main.cpp              Shared LVGL screens plus simulator and T-Deck shells
+src/fonts/                    Generated LVGL font sources
+test/                         Sanitizer-backed host tests
+scripts/                      Test, release-build, factory-image, and safe-flash tooling
+assets/brand/                 Pink transparent SVG wordmark and monochrome variants
+design/previews/              Captures from the working simulator
+design/references/            Ten target hardware mockups and their screen map
+docs/                         Capture format and flashing documentation
+.github/workflows/            Reproducible test and firmware artifact build
 ```
 
 ## Target hardware
 
-- LILYGO T-Deck
-- ESP32-S3
-- SX1262 LoRa radio
-- 320x240 color display
-- Keyboard, trackball, GPS, microSD, and PSRAM
+- LILYGO T-Deck with ESP32-S3 and SX1262
+- 320x240 ST7789 color display
+- Built-in keyboard, trackball, GT911 touch controller, and PSRAM
+- Writable microSD card for capture and screenshots
+- Optional GPS receiver on the T-Deck serial pins
+- An antenna suited to the frequencies you configure
 
-The T-Deck is Lilyshark's first hardware target. Board support, radio capture, protocol decoding, and the UI remain separate layers so the analyzer can grow across mesh stacks and future compatible hardware.
+The T-Deck is the first hardware target. The capture record, decoder registry, and export formats stay independent of its display and input services so future compatible LoRa hardware can reuse the analyzer core.
 
-## License
+## Roadmap to a stable release
+
+- [x] Build all nine reference-driven simulator screens.
+- [x] Add the ESP32-S3/T-Deck target and reproducible factory image.
+- [x] Capture SX1262 frames and CRC mismatches with complete available RF metadata.
+- [x] Add profile-gated structural decoders for Meshtastic, MeshCore, and Reticulum/RNode.
+- [x] Add `.lscap`, LoRaTap PCAP, and BMP output on microSD.
+- [x] Add keyboard, trackball, GT911 touch, battery, and optional-GPS services.
+- [x] Add an interruptible SX1262 spectral-scan state machine with receive restoration.
+- [x] Add sanitizer-backed host tests and a two-target GitHub Actions build.
+- [ ] Boot the factory image on a physical T-Deck and verify every hardware service.
+- [ ] Capture known Meshtastic, MeshCore, and RNode fixtures over the air and compare bytes with desktop captures.
+- [ ] Calibrate touch orientation, battery voltage, and spectral power against known references.
+- [ ] Exercise scan cancellation, SD removal, CRC bursts, missing peripherals, and radio recovery.
+- [ ] Run an overnight capture and spectrum endurance test on hardware.
+- [ ] Add profile editing, key management, deeper payload decoders, and more regional presets.
+- [ ] Publish a hardware-validated tagged release with checksums and a field-test report.
+
+## License and project names
 
 Lilyshark is licensed under [GPL-3.0](LICENSE). Barlow Condensed and IBM Plex Mono are distributed under the SIL Open Font License; their license texts are included in [assets/fonts](assets/fonts).
 
-Meshtastic, MeshCore, Reticulum, Wireshark, and LILYGO are referenced to describe protocol goals, interoperability, and target hardware. Lilyshark is independent and is not an official release from any of those projects.
+Meshtastic, MeshCore, Reticulum, RNode, Wireshark, and LILYGO are referenced to describe compatibility, protocol coverage, and target hardware. Lilyshark is an independent project and is not an official release from those projects.

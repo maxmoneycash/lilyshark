@@ -1,3 +1,5 @@
 .pio/
 .DS_Store
+/dist/
+__pycache__/
 .hallmark/
