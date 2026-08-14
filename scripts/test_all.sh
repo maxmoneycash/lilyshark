@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/.." && pwd)"
 platformio_version="6.1.19"
 intelhex_version="2.3.0"
+pip_version="25.2"
 cxx="${CXX:-c++}"
 
 usage() {
@@ -122,6 +123,7 @@ fi
 
 pio=(
   uvx
+  --with "pip==${pip_version}"
   --with "intelhex==${intelhex_version}"
   --from "platformio==${platformio_version}"
   platformio

@@ -8,8 +8,9 @@ dist_dir="${repo_dir}/dist"
 
 cd "${repo_dir}"
 
-# Espressif32 6.13 currently needs intelhex alongside PlatformIO's Python.
-pio=(uvx --with intelhex==2.3.0 --from platformio==6.1.19 platformio)
+# Espressif32 6.13 installs Python-backed tools during its first run, so the
+# isolated PlatformIO environment needs pip as well as the factory-image helper.
+pio=(uvx --with pip==25.2 --with intelhex==2.3.0 --from platformio==6.1.19 platformio)
 
 # The factory merge is a PlatformIO post-build action. Force a clean device
 # build so an up-to-date app target can never leave a stale merged image behind.

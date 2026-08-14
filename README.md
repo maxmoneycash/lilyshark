@@ -221,7 +221,7 @@ dist/SHA256SUMS                   SHA-256 checksums
 The equivalent direct firmware build is:
 
 ```sh
-uvx --with intelhex==2.3.0 --from platformio==6.1.19 \
+uvx --with pip==25.2 --with intelhex==2.3.0 --from platformio==6.1.19 \
   platformio run -e t-deck
 ```
 
