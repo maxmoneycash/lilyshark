@@ -343,7 +343,7 @@ void build_map(lv_obj_t * parent)
 
 void build_survey(lv_obj_t * parent)
 {
-    add_status_bar(parent, "SURVEY", "BAT 100%", "GPS LOCK", "RX ONLY");
+    add_status_bar(parent, "SURVEY", "BAT 100%", "GPS LOCK", "915.0 MHz");
     put_label(parent, "CAPTURING", 44, 47, theme::amber(), &font_condensed_bold_28);
     put_label(parent, "42s / 60s", 241, 88, theme::lime(), &font_mono_semibold_12);
 
