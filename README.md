@@ -23,7 +23,7 @@ A single T-Deck is enough for field surveys, packet inspection, radio-profile ch
 
 ## Download
 
-The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/releases) contains the current T-Deck factory image, application-only image, debug symbols, and SHA-256 checksums. For a fresh install, download `lilyshark-tdeck.factory.bin`, verify it with `SHA256SUMS`, and follow the [flashing guide](docs/FLASHING.md). Do not flash the `.elf` file.
+The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/releases) contains the current T-Deck factory image, application-only image, debug symbols, and SHA-256 checksums. For a fresh install, use the [prebuilt-release steps](docs/FLASHING.md#install-the-prebuilt-developer-alpha); a local firmware build is not required. Do not flash the `.elf` file.
 
 ## What Lilyshark shows
 
@@ -238,6 +238,13 @@ Pass a view number to open that screen at launch:
 
 ```sh
 .pio/build/simulator/program 2
+```
+
+Run the simulator as one long-lived process that rebuilds every view once per second. With no argument, the runner stops after 24 hours and fails on an early exit or fatal diagnostic:
+
+```sh
+./scripts/soak_simulator.sh       # 24 hours
+./scripts/soak_simulator.sh 60    # one-minute check
 ```
 
 On Apple Silicon with Homebrew:

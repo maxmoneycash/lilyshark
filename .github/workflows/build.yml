@@ -84,7 +84,7 @@ jobs:
           - Verify downloads with `SHA256SUMS`.
           - Keep `lilyshark-tdeck.elf` for crash-symbol decoding; do not flash it.
 
-          Read `docs/FLASHING.md` in the repository before installing.
+          Read the [flashing guide](https://github.com/maxmoneycash/lilyshark/blob/main/docs/FLASHING.md) before installing.
           EOF
           gh release create "${GITHUB_REF_NAME}" dist/* \
             --repo "${GITHUB_REPOSITORY}" \

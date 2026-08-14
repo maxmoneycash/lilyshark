@@ -1691,7 +1691,8 @@ void handle_key(lv_event_t * event)
 #if !defined(LILYSHARK_DEVICE)
 int main(int argc, char ** argv)
 {
-    if(argc > 1) {
+    const bool soak_mode = argc > 1 && std::strcmp(argv[1], "--soak") == 0;
+    if(argc > 1 && !soak_mode) {
         const int requested = std::atoi(argv[1]);
         if(requested >= 1 && requested <= static_cast<int>(Screen::count)) {
             current_screen = static_cast<Screen>(requested - 1);
@@ -1718,8 +1719,37 @@ int main(int argc, char ** argv)
 
     build_current_screen();
 
+    constexpr std::uint64_t soak_screen_interval_ms = 1000;
+    std::uint64_t next_soak_screen_ms = SDL_GetTicks64() + soak_screen_interval_ms;
+    std::uint64_t soak_transitions = 0;
     while(true) {
         lv_timer_handler();
+        if(soak_mode) {
+            const std::uint64_t now_ms = SDL_GetTicks64();
+            if(now_ms >= next_soak_screen_ms) {
+                const int next = (static_cast<int>(current_screen) + 1) %
+                                 static_cast<int>(Screen::count);
+                current_screen = static_cast<Screen>(next);
+                build_current_screen();
+                ++soak_transitions;
+                next_soak_screen_ms = now_ms + soak_screen_interval_ms;
+                if(current_screen == Screen::traffic) {
+                    if(lv_mem_test() != LV_RESULT_OK) {
+                        std::fprintf(stderr, "fatal error: LVGL heap integrity check failed\n");
+                        return EXIT_FAILURE;
+                    }
+                    lv_mem_monitor_t memory{};
+                    lv_mem_monitor(&memory);
+                    std::fprintf(stderr,
+                                 "Lilyshark soak cycle %llu passed: used=%u%% frag=%u%% free=%zu max=%zu\n",
+                                 static_cast<unsigned long long>(soak_transitions /
+                                                                  static_cast<std::uint64_t>(Screen::count)),
+                                 static_cast<unsigned>(memory.used_pct),
+                                 static_cast<unsigned>(memory.frag_pct), memory.free_size,
+                                 memory.max_used);
+                }
+            }
+        }
         SDL_Delay(5);
     }
 }

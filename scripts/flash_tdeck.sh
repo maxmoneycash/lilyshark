@@ -58,13 +58,13 @@ fi
 
 if [[ ! -s "${image}" ]]; then
   echo "Factory image not found: ${image}" >&2
-  echo "Run scripts/build_release.sh first." >&2
+  echo "Build it with scripts/build_release.sh or download the release image into dist/." >&2
   exit 1
 fi
 
 if [[ ! -f "${checksums}" ]]; then
   echo "Checksum file not found: ${checksums}" >&2
-  echo "Run scripts/build_release.sh first." >&2
+  echo "Build it with scripts/build_release.sh or download the release manifest into dist/." >&2
   exit 1
 fi
 
