@@ -155,6 +155,25 @@ function buildNodes(now: number): NodeEntry[] {
   });
 }
 
+/**
+ * The demo topology as neighbor links, for the MESH graph. The screen reads
+ * links from IndexedDB (they come from NeighborInfo packets on a real radio),
+ * so the demo supplies its own set at render time instead of writing invented
+ * rows into the database: direct nodes link to us, relayed nodes link to their
+ * repeater, and each SNR is the one the node table already shows.
+ */
+export function demoNeighbors(): { node: number; neighbor: number; snr: number }[] {
+  if (!seeded) return [];
+  const out: { node: number; neighbor: number; snr: number }[] = [];
+  SPECS.forEach((s, i) => {
+    const num = DEMO_NODE_FLOOR + i + 1;
+    const other = s.via === undefined ? DEMO_ME : DEMO_NODE_FLOOR + s.via + 1;
+    const snr = Math.round((jitter(i + 7, 2.5) + 6) * 10) / 10;
+    out.push({ node: other, neighbor: num, snr });
+  });
+  return out;
+}
+
 /** Us: at the center of the map, mains-fed, heard this second. */
 function meNode(now: number): NodeEntry {
   return {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { loadActividad, loadAllTraceroutes, loadNeighbors } from "../db";
+import { demoNeighbors } from "../demo";
 import { ago, fechaHora } from "../fmt";
 import { t } from "../i18n";
 import { buildEdges, type Edge, edgeKey as key, summarize } from "../mesh";
@@ -150,7 +151,9 @@ export default function Mesh() {
 	}, [reload]);
 
 	const edges = useMemo(
-		() => buildEdges(neighbors, traces, s.myNodeNum),
+		// The demo mesh has no NeighborInfo rows in the database, so its links
+		// come straight from the seeded topology; real rows always ride along.
+		() => buildEdges([...neighbors, ...demoNeighbors()], traces, s.myNodeNum),
 		[neighbors, traces, s.myNodeNum],
 	);
 

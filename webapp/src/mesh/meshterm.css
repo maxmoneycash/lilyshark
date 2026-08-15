@@ -1245,6 +1245,28 @@ body {
 	.meshterm header > .spacer {
 		display: none;
 	}
+
+	/* Two deliberate rows: identity and the menu button up top, the transport
+	   controls beneath. Left to the wrap algorithm, the select landed exactly
+	   under the z-raised hamburger and was unreachable. */
+	.meshterm header::after {
+		content: "";
+		width: 100%;
+		order: 1;
+	}
+	.meshterm .menu-btn {
+		order: 0;
+	}
+	.meshterm header > select {
+		order: 2;
+	}
+	.meshterm header > button.primary {
+		order: 3;
+	}
+	.meshterm header > .conn-pill {
+		order: 4;
+		margin-left: auto;
+	}
 	.meshterm .logo > span:not(.wordmark),
 	.meshterm .logo small {
 		display: none;

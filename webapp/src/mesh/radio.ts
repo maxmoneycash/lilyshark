@@ -4,6 +4,7 @@ import type Connection from "@liamcottle/meshcore.js/src/connection/connection.j
 import Constants from "@liamcottle/meshcore.js/src/constants.js";
 import CayenneLpp from "@liamcottle/meshcore.js/src/cayenne_lpp.js";
 import { COOLDOWN_MS, getAlertCfg } from "./alerts";
+import { DEMO_NODE_FLOOR, isDemo } from "./demo";
 import { t } from "./i18n";
 import {
   addLog,
@@ -101,11 +102,22 @@ export async function loadHistory(): Promise<void> {
     if (n.publicKey) registerKey(bytesOfHex(n.publicKey));
   }
   mutate((s) => {
-    s.messages = msgs;
     s.waypoints = new Map(wps.map((w) => [w.id, w]));
     // DB first; the radio's dump overwrites field by field what it brings
     // (upsertNode keeps the previous value when the patch says undefined).
-    s.nodes = new Map(nodes.map((n) => [n.num, n]));
+    // While the demo mesh is up it was seeded before this ran, and a plain
+    // replace would silently wipe it — the seeded entries ride on top of the
+    // DB load and are removed by clearDemo like everywhere else.
+    if (isDemo()) {
+      const merged = new Map(nodes.map((n) => [n.num, n]));
+      for (const [num, n] of s.nodes) if (num >= DEMO_NODE_FLOOR) merged.set(num, n);
+      s.nodes = merged;
+      const demoMsgs = s.messages.filter((m) => m.from >= DEMO_NODE_FLOOR);
+      s.messages = [...msgs, ...demoMsgs].sort((a, b) => a.ts - b.ts);
+    } else {
+      s.messages = msgs;
+      s.nodes = new Map(nodes.map((n) => [n.num, n]));
+    }
   });
 }
 
