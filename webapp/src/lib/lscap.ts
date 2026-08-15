@@ -228,3 +228,87 @@ export function summarize(frames: LscapFrame[]) {
     framesPerMinute: durationSec > 0 ? (frames.length / durationSec) * 60 : 0,
   };
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Shelby off-grid pointer
+ *
+ * Mirrors include/lilyshark/shelby/shelby_pointer.h exactly — 82 bytes,
+ * little-endian, magic "SHLB". A LoRa node has no IP path, so the mesh carries
+ * this pointer and a connected node moves the bytes to or from Shelby.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export const SHELBY_POINTER_MAGIC = 'SHLB';
+export const SHELBY_POINTER_SIZE = 82;
+export const SHELBY_POINTER_VERSION = 1;
+
+export const SHELBY_FLAG = {
+  encrypted: 1 << 0,
+  chunked: 1 << 1,
+  capture: 1 << 2,
+} as const;
+
+export interface ShelbyPointer {
+  version: number;
+  flags: number;
+  /** 32-byte blob commitment, 0x-prefixed hex. */
+  commitment: string;
+  /** 32-byte owner account address, 0x-prefixed hex. */
+  owner: string;
+  sizeBytes: number;
+  expiresAtUnix: number;
+  chunkIndex: number;
+  chunkCount: number;
+  encrypted: boolean;
+  chunked: boolean;
+  capture: boolean;
+}
+
+function hexFrom(view: DataView, offset: number, length: number): string {
+  let out = '0x';
+  for (let i = 0; i < length; i++) out += view.getUint8(offset + i).toString(16).padStart(2, '0');
+  return out;
+}
+
+/**
+ * Decode a Shelby pointer at `offset`. Returns null unless the magic, version,
+ * and chunk fields are all self-consistent — the same checks the firmware makes,
+ * so the two implementations accept exactly the same bytes.
+ */
+export function decodeShelbyPointer(bytes: Uint8Array, offset = 0): ShelbyPointer | null {
+  if (offset + SHELBY_POINTER_SIZE > bytes.length) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset + offset, SHELBY_POINTER_SIZE);
+
+  if (String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3))
+      !== SHELBY_POINTER_MAGIC) return null;
+  if (view.getUint8(4) !== SHELBY_POINTER_VERSION) return null;
+
+  const flags = view.getUint8(5);
+  const chunkIndex = view.getUint16(78, true);
+  const chunkCount = view.getUint16(80, true);
+  if (chunkCount === 0 || chunkIndex >= chunkCount) return null;
+  if (((flags & SHELBY_FLAG.chunked) !== 0) !== (chunkCount > 1)) return null;
+
+  return {
+    version: SHELBY_POINTER_VERSION,
+    flags,
+    commitment: hexFrom(view, 6, 32),
+    owner: hexFrom(view, 38, 32),
+    sizeBytes: view.getUint32(70, true),
+    expiresAtUnix: view.getUint32(74, true),
+    chunkIndex,
+    chunkCount,
+    encrypted: (flags & SHELBY_FLAG.encrypted) !== 0,
+    chunked: (flags & SHELBY_FLAG.chunked) !== 0,
+    capture: (flags & SHELBY_FLAG.capture) !== 0,
+  };
+}
+
+/** Scan a captured frame for an embedded Shelby pointer, at any offset. */
+export function findShelbyPointer(bytes: Uint8Array): { offset: number; pointer: ShelbyPointer } | null {
+  for (let i = 0; i + SHELBY_POINTER_SIZE <= bytes.length; i++) {
+    if (bytes[i] !== 0x53 || bytes[i + 1] !== 0x48 || bytes[i + 2] !== 0x4c || bytes[i + 3] !== 0x42) continue;
+    const pointer = decodeShelbyPointer(bytes, i);
+    if (pointer) return { offset: i, pointer };
+  }
+  return null;
+}

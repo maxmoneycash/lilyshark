@@ -98,6 +98,18 @@ build_and_run profile_settings \
   src/core/profile_settings.cpp \
   test/profile_settings/test_profile_settings.cpp
 
+build_and_run app_settings \
+  src/core/app_settings.cpp \
+  test/app_settings/test_app_settings.cpp
+
+build_and_run app_shell \
+  src/ui/app_shell.cpp \
+  test/app_shell/test_app_shell.cpp
+
+build_and_run runtime_event_history \
+  src/core/runtime_event_history.cpp \
+  test/runtime_event_history/test_runtime_event_history.cpp
+
 build_and_run survey_accumulator \
   src/core/survey_accumulator.cpp \
   test/survey_accumulator/test_survey_accumulator.cpp
@@ -113,6 +125,13 @@ build_and_run battery_model \
   src/device/battery_model.cpp \
   test/hardware_status/test_battery_model.cpp
 
+build_and_run gps_session \
+  -DLILYSHARK_DEVICE=1 \
+  -I"${repo_dir}/test/hardware_status/fakes" \
+  src/device/battery_model.cpp \
+  src/device/hardware_status.cpp \
+  test/hardware_status/test_gps_session.cpp
+
 build_and_run lilyshark_capture \
   src/export/lilyshark_capture.cpp \
   test/lilyshark_capture/test_lilyshark_capture.cpp
@@ -120,6 +139,11 @@ build_and_run lilyshark_capture \
 build_and_run pcap_export \
   src/export/pcap_loratap.cpp \
   test/pcap_export/test_pcap_export.cpp
+
+build_and_run shelby_pointer \
+  src/shelby/shelby_pointer.cpp \
+  src/shelby/shelby_pointer_decoder.cpp \
+  test/shelby_pointer/test_shelby_pointer.cpp
 
 build_and_run spectrum \
   src/core/spectrum.cpp \
@@ -157,6 +181,9 @@ python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
 
 echo "Testing serial_smoke"
 python3 -m unittest discover -s test/serial_smoke -p 'test_*.py'
+
+echo "Testing logo_asset"
+python3 -m unittest discover -s test/logo_asset -p 'test_*.py'
 
 if [[ "${host_only}" == true ]]; then
   echo "All host tests passed"
@@ -207,7 +234,7 @@ else
   exit 1
 fi
 
-echo "Testing deterministic pixels for all nine simulator screens"
+echo "Testing deterministic pixels for all analyzer and shell screens"
 render_log="${test_dir}/simulator-render.log"
 if ! "${timeout_command}" 10 .pio/build/simulator/program --render-test >"${render_log}" 2>&1 || \
    ! grep -q '^Lilyshark simulator render test passed$' "${render_log}"; then
@@ -268,7 +295,7 @@ if grep -Eiq 'assert|abort|sanitizer|segmentation|fatal error' "${soak_log}"; th
   exit 1
 fi
 if ! grep -q '^Lilyshark soak cycle 1 passed:' "${soak_log}"; then
-  echo "Continuous simulator soak did not complete all nine views" >&2
+  echo "Continuous simulator soak did not complete all analyzer and shell views" >&2
   cat "${soak_log}" >&2
   exit 1
 fi
