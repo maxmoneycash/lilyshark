@@ -23,55 +23,82 @@ const DEVICE = '/intro/tdeck.webp';
 const SCREEN = { left: 0.0619, top: 0.3656, width: 0.8704, height: 0.2921 };
 
 interface Section {
-  screen: string;
+  /** Firmware renders this beat cycles through on the device's display. */
+  screens: string[];
   head: string;
   body: string;
 }
 
+const fw = (name: string) => `/intro/fw/${name}.png`;
+
 /**
  * The argument, in eight beats. Every number here is from the whitepaper the
  * PAPER tab ships — measured or sourced there, not invented for a landing
- * page. The screens are the firmware's own: LVGL simulator frames and the
- * ten reference screens, composited into the device photo's display.
+ * page. The screens are the firmware's own render-test output: all 38 of the
+ * simulator's pixel-locked frames, distributed across the beats they belong
+ * to and cycled on the device's display while a section is up.
  */
 const SECTIONS: Section[] = [
   {
-    screen: '/intro/screen-splash.png',
+    screens: ['splash', 'home'].map(fw),
     head: 'A packet sniffer for the mesh age.',
     body: 'Lilyshark is C++ firmware that turns the LILYGO T-Deck Plus — a $60 handheld with a LoRa radio, QWERTY keyboard and GPS — into a packet sniffer and RF analyzer for off-grid mesh networks.',
   },
   {
-    screen: '/intro/screen-live-traffic.png',
+    screens: ['traffic', 'protocols', 'protocol-detail', 'nodes'].map(fw),
     head: 'Off-grid went mainstream.',
     body: 'Meshtastic passed 40,000 GitHub stars and an 80,000-member subreddit, with 100+ supported boards, sub-$50 entry devices, and active meshes in most major US cities. When India ordered a mesh app off GitHub during the Delhi protests, it was carrying 430,000 daily users — and stayed up.',
   },
   {
-    screen: '/intro/screen-node-map.png',
-    head: 'Kilometres, not metres.',
+    screens: ['map', 'node-detail', 'survey'].map(fw),
+    head: 'Kilometers, not meters.',
     body: "Bluetooth mesh dies at 30–300 m — it works at a protest because a protest is a crowd. LoRa carries 2–15 km per hop, across a city, a county, a disaster zone; MeshCore's source routing now spans 64 hops with deterministic delivery receipts.",
   },
   {
-    screen: '/intro/screen-channel-utilization.png',
+    screens: ['utilization', 'timeline', 'traffic-filter'].map(fw),
     head: 'The air is the bottleneck.',
     body: 'A LongFast channel moves about 987 bit/s and flood routing repeats everything: we measured 7.36 transmissions per delivered message, reach collapsing from 68.6% to 25.8% as the mesh grows, saturation near 6,721 nodes. Growth is exactly what breaks it.',
   },
   {
-    screen: '/intro/screen-spectrum-waterfall.png',
+    screens: ['spectrum', 'spectrum-warning', 'events', 'event-detail'].map(fw),
     head: "You can't fix what you can't see.",
     body: 'So we built the instrument: a live spectrum waterfall with noise floor and channel occupancy, node rosters with SNR, RSSI and hop-count history, survey mode for coverage runs, and every frame kept with its radio physics.',
   },
   {
-    screen: '/intro/screen-packet-detail.png',
+    screens: [
+      'packet-detail',
+      'packet-pkt',
+      'packet-rf',
+      'packet-dec',
+      'packet-hex',
+      'packet-hex-2',
+      'packet-hex-3',
+      'packet-raw',
+    ].map(fw),
     head: 'Down to the byte.',
     body: 'Meshtastic, MeshCore and Reticulum share one capture engine. Each decoder claims only what it can prove from the frame; the rest stays as raw hex with frequency, bandwidth, SF, CR, CRC state and airtime. Captures write to microSD as .lscap and export as LoRaTap PCAP — desktop Wireshark opens them.',
   },
   {
-    screen: '/intro/screen-node-detail.png',
+    screens: [
+      'setup-welcome',
+      'setup-capabilities',
+      'setup-network',
+      'setup-profile',
+      'setup-controls',
+      'setup-ready',
+      'settings',
+      'radio-profile',
+      'display-input',
+      'device-status',
+      'help',
+      'about',
+      'reset-setup',
+    ].map(fw),
     head: 'The first T-Deck firmware built to be seen.',
     body: 'A complete LVGL device shell — guided first run, Home, live diagnostics, Help — instead of a debug menu. T-Deck Plus first, and portable to Meshtastic-class radios with a screen.',
   },
   {
-    screen: '/intro/screen-onboarding.png',
+    screens: ['storage'].map(fw),
     head: 'The first Shelby × LoRa application.',
     body: "Captures are evidence, so they live in Shelby's content-addressed storage on Aptos. A radio has no uplink — it broadcasts an 82-byte pointer instead, and any connected node resolves the bytes. Radio-frequency capture meets verifiable storage for the first time.",
   },
@@ -137,6 +164,17 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
   const s = SECTIONS[idx];
   const last = idx === SECTIONS.length - 1;
 
+  // While a section is up, the device pages through that beat's screens —
+  // this is how all 38 firmware renders get shown without 38 sections.
+  const [sub, setSub] = useState(0);
+  useEffect(() => {
+    setSub(0);
+    if (SECTIONS[idx].screens.length < 2) return;
+    const id = setInterval(() => setSub((v) => v + 1), 2100);
+    return () => clearInterval(id);
+  }, [idx]);
+  const screenSrc = s.screens[sub % s.screens.length];
+
   return (
     <main className="fill">
       <div className="intro-scroll" ref={scrollRef}>
@@ -159,7 +197,7 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
           {SECTIONS.map((sec, i) => (
             <div
               className="intro-snap"
-              key={sec.screen}
+              key={sec.head}
               style={{ top: `${(i * 100) / SECTIONS.length}%` }}
             />
           ))}
@@ -228,8 +266,8 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
               >
                 <AnimatePresence mode="popLayout">
                   <motion.img
-                    key={s.screen}
-                    src={s.screen}
+                    key={screenSrc}
+                    src={screenSrc}
                     alt=""
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1, transition: { duration: 0.32 } }}
@@ -242,7 +280,7 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
             <div className="intro-rail" aria-hidden="true">
               {SECTIONS.map((sec, i) => (
                 <button
-                  key={sec.screen}
+                  key={sec.head}
                   className={i === idx ? 'on' : ''}
                   tabIndex={-1}
                   onClick={() => {

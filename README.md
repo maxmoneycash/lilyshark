@@ -6,7 +6,7 @@
 <p align="center"><strong>Wireshark for mesh radio, built for the LILYGO T-Deck.</strong></p>
 
 <p align="center">
-  <a href="#project-status"><img alt="Status: developer alpha" src="https://img.shields.io/badge/status-developer%20alpha-F05AA6"></a>
+  <a href="#project-status"><img alt="Status: developer alpha" src="https://img.shields.io/badge/status-developer%20alpha-FF4F9D"></a>
   <a href="#target-hardware"><img alt="Target: LILYGO T-Deck" src="https://img.shields.io/badge/target-LILYGO%20T--Deck-66F05A"></a>
   <a href="https://lvgl.io/"><img alt="LVGL 9.3" src="https://img.shields.io/badge/LVGL-9.3-71D8DF"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-F0F4EF"></a>
@@ -18,7 +18,7 @@ Meshtastic, MeshCore, and Reticulum-compatible RNode traffic share one capture e
 
 A single T-Deck is enough for field surveys, packet inspection, radio-profile checks, interference hunting, and capture. Lilyshark listens to traffic already on the air and gives that traffic a diagnostic interface you can carry.
 
-The firmware is also a complete device shell, not a loose collection of graphs. It boots into the pink Lilyshark wordmark, guides a first-time user through network and radio-profile selection, checks the available hardware, then opens a Home screen with clear routes to live diagnostics and settings. Capture, storage, radio, display, keyboard, optional GPS, Help, About, and setup reset are all controllable on the T-Deck.
+The firmware is also a complete device shell, not a loose collection of graphs. It boots into the Lily Pink (`#FF4F9D`) wordmark, explains its packet/RF/network/capture tools, guides a first-time user through network and radio-profile selection, teaches the controls, checks the available hardware, then opens a Home screen with clear routes to diagnostics and settings. Capture, storage, radio, display, keyboard, optional GPS, Help, About, and setup reset are all controllable on the T-Deck.
 
 The diagnostic views change as the radio environment changes. Frames enter the Traffic feed, protocol totals roll forward, the spectrum history advances, node signals develop over time, surveys accumulate observations, and the synchronized Timeline shows packet rate, SNR, CRC failures, and events on one clock.
 
@@ -55,6 +55,148 @@ Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAM
   </tr>
 </table>
 
+## Every screen, rendered by the firmware
+
+These are not mockups: all 38 frames below are the simulator's own
+pixel-locked `--render-test` output at the device's exact 320x240
+layout, the same images the test suite hashes on every build. The
+intro at [lilyshark.com](https://lilyshark.com) cycles through every
+one of them on the device.
+
+### Analyzer views
+
+<table>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/traffic.png" alt="Live Traffic — frame feed with protocol, route, SNR"></td>
+    <td width="25%"><img src="design/previews/firmware/traffic-filter.png" alt="Traffic filter — protocol and field filtering"></td>
+    <td width="25%"><img src="design/previews/firmware/protocols.png" alt="Protocols — per-protocol totals"></td>
+    <td width="25%"><img src="design/previews/firmware/protocol-detail.png" alt="Protocol detail"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Live Traffic — frame feed with protocol, route, SNR</sub></td>
+    <td align="center"><sub>Traffic filter — protocol and field filtering</sub></td>
+    <td align="center"><sub>Protocols — per-protocol totals</sub></td>
+    <td align="center"><sub>Protocol detail</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/spectrum.png" alt="Spectrum — band scan"></td>
+    <td width="25%"><img src="design/previews/firmware/nodes.png" alt="Nodes — roster with signal history"></td>
+    <td width="25%"><img src="design/previews/firmware/node-detail.png" alt="Node detail — SNR/RSSI/hop plots"></td>
+    <td width="25%"><img src="design/previews/firmware/packet-detail.png" alt="Packet detail"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Spectrum — band scan</sub></td>
+    <td align="center"><sub>Nodes — roster with signal history</sub></td>
+    <td align="center"><sub>Node detail — SNR/RSSI/hop plots</sub></td>
+    <td align="center"><sub>Packet detail</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/map.png" alt="Map — spatial view"></td>
+    <td width="25%"><img src="design/previews/firmware/survey.png" alt="Survey — coverage capture"></td>
+    <td width="25%"><img src="design/previews/firmware/utilization.png" alt="Channel utilization"></td>
+    <td width="25%"><img src="design/previews/firmware/timeline.png" alt="Timeline — rate, SNR, CRC on one clock"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Map — spatial view</sub></td>
+    <td align="center"><sub>Survey — coverage capture</sub></td>
+    <td align="center"><sub>Channel utilization</sub></td>
+    <td align="center"><sub>Timeline — rate, SNR, CRC on one clock</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/events.png" alt="Events — device history"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Events — device history</sub></td>
+  </tr>
+</table>
+
+### Device shell and onboarding
+
+<table>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/splash.png" alt="Splash"></td>
+    <td width="25%"><img src="design/previews/firmware/setup-welcome.png" alt="First run — welcome"></td>
+    <td width="25%"><img src="design/previews/firmware/setup-capabilities.png" alt="First run — what it does"></td>
+    <td width="25%"><img src="design/previews/firmware/setup-network.png" alt="First run — network"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Splash</sub></td>
+    <td align="center"><sub>First run — welcome</sub></td>
+    <td align="center"><sub>First run — what it does</sub></td>
+    <td align="center"><sub>First run — network</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/setup-profile.png" alt="First run — radio profile"></td>
+    <td width="25%"><img src="design/previews/firmware/setup-controls.png" alt="First run — controls"></td>
+    <td width="25%"><img src="design/previews/firmware/setup-ready.png" alt="First run — ready"></td>
+    <td width="25%"><img src="design/previews/firmware/home.png" alt="Home"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>First run — radio profile</sub></td>
+    <td align="center"><sub>First run — controls</sub></td>
+    <td align="center"><sub>First run — ready</sub></td>
+    <td align="center"><sub>Home</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/radio-profile.png" alt="Radio profile"></td>
+    <td width="25%"><img src="design/previews/firmware/settings.png" alt="Settings"></td>
+    <td width="25%"><img src="design/previews/firmware/storage.png" alt="Capture & storage"></td>
+    <td width="25%"><img src="design/previews/firmware/device-status.png" alt="Device status"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Radio profile</sub></td>
+    <td align="center"><sub>Settings</sub></td>
+    <td align="center"><sub>Capture & storage</sub></td>
+    <td align="center"><sub>Device status</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/display-input.png" alt="Display & input"></td>
+    <td width="25%"><img src="design/previews/firmware/help.png" alt="Help"></td>
+    <td width="25%"><img src="design/previews/firmware/about.png" alt="About"></td>
+    <td width="25%"><img src="design/previews/firmware/spectrum-warning.png" alt="Spectrum scan warning"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Display & input</sub></td>
+    <td align="center"><sub>Help</sub></td>
+    <td align="center"><sub>About</sub></td>
+    <td align="center"><sub>Spectrum scan warning</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/reset-setup.png" alt="Reset setup"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Reset setup</sub></td>
+  </tr>
+</table>
+
+### Packet inspector
+
+<table>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/packet-pkt.png" alt="PKT tab"></td>
+    <td width="25%"><img src="design/previews/firmware/packet-rf.png" alt="RF tab"></td>
+    <td width="25%"><img src="design/previews/firmware/packet-dec.png" alt="DEC tab"></td>
+    <td width="25%"><img src="design/previews/firmware/packet-hex.png" alt="HEX page 1"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>PKT tab</sub></td>
+    <td align="center"><sub>RF tab</sub></td>
+    <td align="center"><sub>DEC tab</sub></td>
+    <td align="center"><sub>HEX page 1</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="design/previews/firmware/packet-hex-2.png" alt="HEX page 2"></td>
+    <td width="25%"><img src="design/previews/firmware/packet-hex-3.png" alt="HEX page 3"></td>
+    <td width="25%"><img src="design/previews/firmware/packet-raw.png" alt="RAW tab"></td>
+    <td width="25%"><img src="design/previews/firmware/event-detail.png" alt="Event detail"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>HEX page 2</sub></td>
+    <td align="center"><sub>HEX page 3</sub></td>
+    <td align="center"><sub>RAW tab</sub></td>
+    <td align="center"><sub>Event detail</sub></td>
+  </tr>
+</table>
 ## Shelby: storage for captures, and a pointer that fits one LoRa frame
 
 A capture is only worth something if you can prove it is the same bytes the radio
@@ -101,12 +243,14 @@ The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/rele
 ## What Lilyshark shows
 
 - A live frame feed with capture time, protocol, source and destination when the protocol exposes them, packet type, route or hop data, and SNR
-- Packet detail with decoded header fields, integrity state, available RF metadata, and a raw hex view
+- A five-tab packet inspector for route/header facts, RF measurements, decoder state, paged HEX, and capture provenance
+- A composable Traffic Filter for protocol, decoded/opaque/malformed state, and CRC condition; capture files remain complete while the view is filtered
 - Rolling 60-second protocol volume and decode health for Meshtastic, MeshCore, Reticulum/RNode, and unknown LoRa frames
+- Per-protocol detail with activity history, traffic share, CRC validity, mean SNR when attributable, and one-action handoff into filtered Traffic
 - Protocol-aware node activity and short signal histories when a stable node identity is available
 - A color spectrum view built from the SX1262 spectral-scan histogram
 - Channel activity, observed airtime, packet rate, CRC failures, and recent utilization
-- A synchronized 60-second Timeline for packet rate, median SNR, CRC failures, interference, node changes, high utilization, and survey completion
+- A synchronized 60-second Timeline for packet rate, SNR trend, CRC failures, interference, node changes, high utilization, and survey completion
 - A timed 60-second field survey with frames captured, unique sources, best SNR, and CRC errors
 - Local GPS state and position when a compatible receiver is attached
 - Operational events for radio state, active profile, capture files, PCAP limits, and screenshots
@@ -118,14 +262,22 @@ The 320x240 interface gives the display to telemetry. It uses condensed labels, 
 
 These images come from the working LVGL simulator and use the exact 320x240 device layout. Each screenshot freezes one moment from an interface that continues updating while the simulator runs:
 
+<p align="center">
+  <img src="design/previews/live-diagnostics.gif" width="640" alt="Deterministic synthetic Lilyshark telemetry moving through Traffic, Protocols, Protocol Detail, Spectrum, Nodes, Survey, Airtime, Timeline, and Events">
+</p>
+
+<p align="center"><sub>Deterministic synthetic RF telemetry: packet arrivals, protocol health, a deep-band spectrum sweep, node histories, survey progress, airtime, Timeline, and Events. Packet-derived views pause during the sweep because the T-Deck has one SX1262.</sub></p>
+
+The animation is generated from 118 verified 320x240 simulator frames with [`scripts/generate_readme_media.sh`](scripts/generate_readme_media.sh). The complete [87-step recording tour](docs/RECORDING_UI.md) also visits every setup, menu, tool, detail, confirmation, and analyzer route through the real input handlers.
+
 <table>
   <tr>
     <td width="50%"><img src="design/previews/splash-simulator.png" alt="Pink Lilyshark wordmark on the firmware splash screen"></td>
-    <td width="50%"><img src="design/previews/onboarding-simulator.png" alt="Lilyshark first-run network selection"></td>
+    <td width="50%"><img src="design/previews/onboarding-simulator.png" alt="Lilyshark onboarding screen explaining packet, radio, network, and capture diagnostics"></td>
   </tr>
   <tr>
     <td align="center"><sub>First visible frame</sub></td>
-    <td align="center"><sub>Guided first-run setup</sub></td>
+    <td align="center"><sub>What the firmware can diagnose</sub></td>
   </tr>
   <tr>
     <td><img src="design/previews/home-simulator.png" alt="Lilyshark Home screen with analyzer and Settings routes"></td>
@@ -134,6 +286,25 @@ These images come from the working LVGL simulator and use the exact 320x240 devi
   <tr>
     <td align="center"><sub>Home</sub></td>
     <td align="center"><sub>Settings</sub></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td width="50%"><img src="design/previews/traffic-filter-simulator.png" alt="Traffic Filter with protocol, decode-state, and CRC predicates"></td>
+    <td width="50%"><img src="design/previews/protocols-simulator.png" alt="Rolling protocol health for Meshtastic, MeshCore, Reticulum, custom, unknown, and malformed frames"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Traffic Filter</sub></td>
+    <td align="center"><sub>Protocols</sub></td>
+  </tr>
+  <tr>
+    <td><img src="design/previews/packet-detail-simulator.png" alt="Five-tab packet inspector showing decoded packet facts"></td>
+    <td><img src="design/previews/timeline-simulator.png" alt="Synchronized RF Timeline for packet rate, signal, CRC failures, and events"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Packet inspector</sub></td>
+    <td align="center"><sub>RF Timeline</sub></td>
   </tr>
 </table>
 
@@ -148,35 +319,37 @@ These images come from the working LVGL simulator and use the exact 320x240 devi
   </tr>
 </table>
 
-The hardware mockups below define the visual target for the T-Deck build:
+The early hardware mockups below established the compact visual language. They are historical composition studies, not a promise that every sketched field is available from received frames; the exact simulator frames above are the current implementation contract.
 
 <p align="center">
-  <img src="design/references/07-spectrum-waterfall.png" width="760" alt="Target Lilyshark spectrum view shown on a LILYGO T-Deck">
+  <img src="design/references/07-spectrum-waterfall.png" width="760" alt="Early Lilyshark spectrum composition study shown on a LILYGO T-Deck">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="design/references/09-live-traffic.png" alt="Target Lilyshark live packet traffic screen"></td>
-    <td width="50%"><img src="design/references/01-node-detail.png" alt="Target Lilyshark node detail screen"></td>
+    <td width="50%"><img src="design/references/09-live-traffic.png" alt="Early Lilyshark live packet traffic composition study"></td>
+    <td width="50%"><img src="design/references/01-node-detail.png" alt="Early Lilyshark node detail composition study"></td>
   </tr>
   <tr>
     <td align="center"><sub>Dense frame feed with a clear focused row</sub></td>
-    <td align="center"><sub>Per-node signal, hop, activity, and position detail</sub></td>
+    <td align="center"><sub>Signal-history density study; current firmware shows only attributable SNR/RSSI activity</sub></td>
   </tr>
 </table>
 
-All ten reference images and their screen mapping live in [design/references](design/references/README.md).
+All ten historical references and their relationship to the implemented routes live in [design/references](design/references/README.md).
 
 ### Product shell
 
 On a fresh install, Lilyshark follows this path:
 
 1. Show the antialiased pink wordmark before the backlight reveals the application UI.
-2. Ask which mesh family the operator intends to inspect.
-3. Choose and apply a matching radio preset.
-4. Report input, microSD, optional GPS, radio, and capture readiness honestly.
-5. Save first-run completion only after the settings write succeeds.
-6. Open Home, where every live view and Settings is reachable without memorizing keys.
+2. Explain the packet, RF, network-health, and capture tools before asking for configuration.
+3. Ask which mesh family the operator intends to inspect.
+4. Choose and apply a matching radio preset.
+5. Teach trackball, keyboard, Back, Home, profile, and screenshot controls.
+6. Report input, microSD, optional GPS, radio, and capture readiness honestly.
+7. Save first-run completion only after the settings write succeeds.
+8. Open Home, where every live view and Settings is reachable without memorizing keys.
 
 Returning users can start at Home or resume the last live view. Settings exposes the active radio profile, capture and storage state, device status, display brightness, keyboard light, optional GPS polling, startup behavior, Help, About, and a guarded setup reset. Failed persistence rolls the visible value back instead of pretending it was saved.
 
@@ -184,21 +357,23 @@ Returning users can start at Home or resume the last live view. Settings exposes
 
 | Route | View | Current device behavior |
 | ---: | --- | --- |
-| `1` | **Traffic** | Shows captured frames from the bounded in-memory store. Up/Down selects a row; Enter opens it. |
-| `9` | **Protocols** | Rolls the last 60 seconds of captured frames into per-protocol volume, CRC validity, decode health, and signal summaries. |
-| `2` | **Spectrum** | Runs and renders an SX1262 power-histogram sweep for the active profile's band. |
+| `1` | **Traffic** | Shows captured frames from the bounded in-memory store. Up/Down selects a row, Enter opens it, and `X` opens Traffic Filter. |
+| Traffic → `X` | **Traffic Filter** | Filters the visible frame list by protocol, decoder outcome, and CRC state without filtering either capture file. |
+| `9` | **Protocols** | Rolls the last 60 seconds into stable per-class counts, traffic share, decoded share, and CRC failures. Enter opens the focused class. |
+| Protocols → Enter | **Protocol detail** | Shows attributable activity, CRC, and SNR health. Enter applies that class to Traffic Filter. |
+| `2` | **Spectrum** | Offers a fast active-channel scan or a deeper regional sweep, grows the measured histogram as bins complete, and reports partial/cancel/restore state. |
 | `3` | **Nodes** | Lists observed protocol identities and signal history. Up/Down selects a row; Enter opens it. |
-| Traffic → Enter | **Packet detail** | Shows protocol fields, RF measurements, integrity state, and every captured raw byte in bounded 40-byte pages. |
+| Traffic → Enter | **Packet detail** | Uses PKT, RF, DEC, HEX, and RAW tabs; HEX exposes every captured byte in bounded 40-byte pages. |
 | Nodes → Enter | **Node detail** | Summarizes recent frames, SNR, RSSI, and activity for an observed source. |
 | `4` | **Map** | Shows the local optional-GPS fix and distinguishes GPS Off, missing hardware, search, and fix states. |
 | `5` | **Survey** | Captures a 60-second diagnostic sample and reports observed results. |
 | `6` | **Airtime** | Summarizes observed airtime, frame rate, CRC failures, and recent activity. |
-| `T` | **Timeline** | Places packet rate, median SNR, CRC failures, and diagnostic event markers on one synchronized 60-second axis. |
+| `T` | **Timeline** | Places packet rate, SNR trend, CRC failures, and diagnostic event markers on one synchronized 60-second axis. |
 | `7` | **Events** | Reports radio, profile, capture, PCAP, screenshot, settings, and hardware state in a scrollable history. |
 
 `8` opens Settings. `M` or `0` opens Home. Left and Right move through the primary diagnostic views; reaching either end returns to Home instead of wrapping invisibly.
 
-The simulator drives these views with deterministic synthetic RF telemetry. A fixed seed and simulation clock reproduce the same packet arrivals, scrolling spectrum, signal drift, survey totals, protocol mix, utilization changes, and Timeline markers for demos and tests. Simulator values are synthetic. On a T-Deck, the same interface uses live SX1262 captures and hardware state, or shows an explicit unavailable state when a measurement cannot be collected.
+The simulator drives these views with deterministic synthetic RF telemetry. A fixed seed and simulation clock reproduce the same packet arrivals, progressive spectrum sweeps, signal drift, survey totals, protocol mix, utilization changes, and Timeline markers for demos and tests. Simulator values are synthetic. On a T-Deck, the same interface uses live SX1262 captures and hardware state, or shows an explicit unavailable state when a measurement cannot be collected.
 
 ## Protocol coverage
 
@@ -229,7 +404,7 @@ These are explicit starting profiles, not automatic protocol detection. Choose s
 
 The T-Deck target configures the onboard SX1262 for one active profile at a time. Its receive path records valid frames and CRC mismatches, then immediately returns the radio to receive mode. The in-memory UI store holds the newest 64 records while microSD capture keeps writing beyond that window.
 
-Spectrum mode uses the SX1262 spectral-scan patch and reads a 33-bin power histogram at each frequency step. A full US-band request covers 902 through 928 MHz in 200 kHz steps. EU and profile-centered requests use their own range. The scan owns the radio while it runs, then fully reapplies the active receive profile before capture resumes.
+Spectrum mode uses the SX1262 spectral-scan patch and reads a 33-bin power histogram at each frequency step. **Fast Narrow** inspects 11 steps around the active channel with 64 samples per step. **Deep Band** uses 512 samples per step across the configured region; the built-in US request covers 902 through 928 MHz in 200 kHz steps, while EU and custom profiles use their own ranges. The plot grows only as measurements complete. The scan owns the single radio while it runs, so packet reception, Traffic, and capture pause visibly; Lilyshark then fully reapplies the active receive profile before capture resumes.
 
 This scan facility is marked **experimental** in the firmware. Semtech and RadioLib describe it as experimental, and Lilyshark's restore path has not yet been exercised on a physical T-Deck. The interface reports partial progress, cancellation, timeouts, scan failures, and receive-restoration failures instead of hiding them.
 
@@ -279,8 +454,8 @@ Saving a BMP uses the display and microSD on the shared SPI bus. Reception stays
 
 | Control | Action |
 | --- | --- |
-| Left/Right or horizontal touch swipe | Move through the primary analyzer views; adjust a selected setting where the screen says so |
-| Up/Down or vertical touch swipe | Move menu and table focus; page Packet Detail raw bytes and the Events history |
+| Left/Right or horizontal touch swipe | Move through primary analyzer views, Packet Detail tabs, or a selected setting where the screen says so |
+| Up/Down or vertical touch swipe | Move menu and table focus; page Packet Detail HEX bytes and the Events history |
 | Trackball press or `Enter` | Open the focused route or record, apply a choice, start a survey, or start/cancel a spectrum sweep |
 | `Backspace` | Go back through the product shell or return from a detail view |
 | `M` or `0` | Open Home; press again to return to the analyzer |
@@ -288,6 +463,7 @@ Saving a BMP uses the display and microSD on the shared SPI bus. Reception stays
 | `8` | Open Settings |
 | `9` | Open Protocols |
 | `T` | Open Timeline |
+| `X` from Traffic | Open Traffic Filter; use Up/Down to choose a predicate, Left/Right to change it, `R` to reset, and Enter to apply |
 | `P` | Open the five-preset radio-profile picker with the active preset focused |
 | `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
 | `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
@@ -321,7 +497,7 @@ The scan state machine gives the SX1262 exclusive ownership during a sweep. It h
 
 | Area | Evidence in this repository | Physical T-Deck status |
 | --- | --- | --- |
-| Product shell and analyzer UI | Exact 320x240 framebuffer comparisons cover the pink splash, four-step onboarding, Home, menus, confirmations, and every analyzer view. Interaction tests cover keyboard, trackball-equivalent navigation, touch hit targets, back-stack behavior, first-run persistence, and failure rollback. | Pending display and input smoke test |
+| Product shell and analyzer UI | Exact 320x240 framebuffer comparisons cover 13 analyzer routes, six onboarding stages, Home, menus, confirmations, all five packet tabs, extra HEX pages, and Event Detail. Interaction tests cover keyboard, trackball-equivalent navigation, mouse/touch hit targets, back-stack behavior, first-run persistence, filtering, and failure rollback. | Pending display and input smoke test |
 | Embedded wordmark | A generated 264x128 A8 mask keeps the SVG's antialiased edge detail, lives in flash, and is recolored Lily Pink at draw time. A source/payload hash test and device-shell framebuffer check protect the asset. | Pending physical panel confirmation |
 | T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts. A host test checks every command, data byte, and delay in the panel initialization sequence against LilyGO T-Deck commit `274ddaa`. TFT_eSPI 2.5.43 is pinned with the upstream one-line SPI2 register fix at [`880ec0e`](https://github.com/maxmoneycash/TFT_eSPI/commit/880ec0e4657c0de56d28cc250bdbbe863386021e), and a compile-time guard rejects an invalid ESP32-S3 register base. The device shell also runs against host peripheral fakes. | Boot and panel output not yet observed on hardware |
 | SX1262 frame capture | The real radio service runs against host fakes covering configure, IRQ/read/rearm order, CRC mismatch, retry, scan, restore, and recovery | Reception and long-run recovery pending |
@@ -336,7 +512,7 @@ The scan state machine gives the SX1262 exclusive ownership during a sweep. It h
 | Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | ADC calibration and serial receiver test pending |
 | Spectrum scan | Request/result tests plus radio restore state machine | Experimental; complete hardware validation pending |
 
-The standalone C++ tests compile with warnings as errors and run under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator test renders every analyzer and product-shell route into a full 320x240 RGB565 buffer and checks exact pixels, content thresholds, and uniqueness. The telemetry model has sanitizer-backed tests for deterministic replay, bounded state, rolling windows, and changing measurements. The serial checker is fixture-tested and reads without writing to the port. Alpha.7 also executes the real device setup and loop under the sanitizers through host peripheral fakes, including first-frame/backlight ordering, onboarding persistence, missing-hardware recovery, menu navigation, settings rollback, a radio frame flowing into both capture formats and the UI, raw-byte paging, and event-history scrolling. These checks do not replace the pending physical display and input smoke tests. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
+The standalone C++ tests compile with warnings as errors and run under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator renders every analyzer and product-shell route into a full 320x240 RGB565 buffer and checks exact pixels, content thresholds, and uniqueness. A separate region-based motion test proves that eleven live diagnostic views change through the production update path; packet selection remains a deliberate snapshot. The telemetry model has sanitizer-backed tests for deterministic replay, bounded state, rolling windows, scan-time capture pause, and changing measurements. The serial checker is fixture-tested and reads without writing to the port. Alpha.7 also executes the real device setup and loop under the sanitizers through host peripheral fakes, including first-frame/backlight ordering, six-stage onboarding persistence, missing-hardware recovery, menu navigation, settings rollback, a radio frame flowing into both capture formats and the UI, five packet tabs, HEX paging, Traffic Filter, Protocol Detail, and event-history detail. These checks do not replace the pending physical display and input smoke tests. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
 
 ## Build and test
 
@@ -398,10 +574,10 @@ uvx --from platformio==6.1.19 platformio run -e simulator
 .pio/build/simulator/program
 ```
 
-Pass a view number to open that screen at launch:
+Open a named view at launch:
 
 ```sh
-.pio/build/simulator/program 2
+.pio/build/simulator/program --screen spectrum
 ```
 
 Render all analyzer and product-shell routes without opening an SDL window and compare their exact
@@ -422,6 +598,12 @@ and holds on the pink splash until you confirm that recording has begun. It then
 drives one complete pass through the real UI navigation while the deterministic
 synthetic telemetry continues to move. See the
 [recording guide](docs/RECORDING_UI.md) for the full shot list and output options.
+
+Regenerate the exact README screenshots and the deterministic live GIF after an intentional UI change:
+
+```sh
+./scripts/generate_readme_media.sh
+```
 
 Run the simulator as one long-lived process that rebuilds every view once per second. With no argument, the runner stops after 24 hours and fails on an early exit or fatal diagnostic:
 
@@ -495,8 +677,8 @@ The T-Deck is the first hardware target. The capture record, decoder registry, a
 
 ## Roadmap to a stable release
 
-- [x] Build the reference-driven analyzer screen set, including Protocols and Timeline.
-- [x] Add the pink device splash, four-step onboarding, Home, Settings, Help, About, and guarded confirmations.
+- [x] Build the analyzer screen set, including Traffic Filter, Protocol Detail, five packet tabs, Protocols, and Timeline.
+- [x] Add the pink device splash, six-stage onboarding, Home, Settings, Help, About, and guarded confirmations.
 - [x] Persist first-run, brightness, capture, GPS, and startup preferences with CRC validation and failure rollback.
 - [x] Add the ESP32-S3/T-Deck target and reproducible factory image.
 - [x] Capture SX1262 frames and CRC mismatches with configured channel settings, measured signal metrics, and explicit-header coding-rate/CRC metadata.
