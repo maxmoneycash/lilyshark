@@ -1599,3 +1599,21 @@ body:has(.meshterm .app.menu-open) {
 		padding-bottom: max(34px, env(safe-area-inset-bottom) + 20px);
 	}
 }
+
+/* A frame visibly lands: the newest row settles from the selection pink to
+   its resting state. Static tables never re-render their last row, so this
+   only ever animates genuinely new arrivals. */
+@keyframes meshterm-rowland {
+	from {
+		background: var(--fg);
+		color: var(--bg);
+	}
+}
+.meshterm table.grid tbody tr:last-child {
+	animation: meshterm-rowland 0.5s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+	.meshterm table.grid tbody tr:last-child {
+		animation: none;
+	}
+}

@@ -55,6 +55,9 @@ export function TrafficTab() {
       // pointer, so the decoded pointer detail is on screen from the start.
       const ptrIdx = c.frames.findIndex((fr) => findShelbyPointer(fr.bytes));
       setSelected(ptrIdx >= 0 ? ptrIdx : 0);
+      // Live frames continue the capture's own numbering; a jump from 23 to
+      // 1000 read as a glitch, not a stream.
+      liveSeq.current = Number(c.frames[c.frames.length - 1]?.sequence ?? -1n) + 1;
       setError(
         c.trailingBytes > 0
           ? `${c.trailingBytes} trailing byte(s) were not a complete record`
@@ -119,6 +122,23 @@ export function TrafficTab() {
   // Live air: a frame lands every few seconds, timed like a LongFast channel.
   // The table follows the newest frame unless the user has scrolled back up
   // to study something — the same follow rule every log viewer uses.
+  // Follow from the start — but only once the capture exists; scrolling the
+  // still-empty table was a no-op and the live screen opened looking frozen,
+  // with every arrival landing below the fold.
+  const followInit = useRef(false);
+  useEffect(() => {
+    if (!live) {
+      followInit.current = false;
+      return;
+    }
+    if (!capture || followInit.current) return;
+    followInit.current = true;
+    requestAnimationFrame(() => {
+      const el = tableRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, [live, capture]);
+
   useEffect(() => {
     if (!live) return;
     const id = setInterval(() => {
