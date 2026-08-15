@@ -1,0 +1,29 @@
+{
+  "name": "@shelby-cash/producer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "lint": "biome check .",
+    "fmt": "biome format . --write",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shelby-cash/candle-primitives": "workspace:*",
+    "@aptos-labs/ts-sdk": "^5.1.1",
+    "@shelby-protocol/sdk": "^0.0.4",
+    "dotenv": "^16.6.1",
+    "p-limit": "^4.0.0",
+    "pino": "^9.5.0",
+    "pino-pretty": "^11.3.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.4"
+  }
+}

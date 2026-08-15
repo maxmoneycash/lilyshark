@@ -1,0 +1,12 @@
+services/
+apps/
+examples/
+webtui-repo/
+ironclad-reference/
+q5.js/
+packages/
+.turbo/
+.pnpm-store/
+node_modules/
+docs/
+artifacts/

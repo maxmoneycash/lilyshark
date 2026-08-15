@@ -1,0 +1,120 @@
+/* Shelby Protocol Custom Theme - Lipgloss Inspired */
+
+@layer base {
+  [data-webtui-theme='shelby'] {
+    /* Browns & Neutrals */
+    --brown: #322312;
+    --black: #0D0D0D;
+    --black-80: #383838;
+    --white-20: #EEEEEE;
+    --white: #FCFAF8;
+
+    /* Reds & Pinks - Lipgloss Accent */
+    --maroon: #4F192A;
+    --pink: #F25D94;
+    --pink-bright: #FF5F87;
+    --pink-20: #FFC2E1;
+    --pink-10: #FFDFEF;
+
+    /* Oranges */
+    --orange: #FDB565;
+    --orange-20: #FFC2AD;
+    --orange-10: #FFCDD9;
+
+    /* Purples & Lilacs - Lipgloss Primary */
+    --purple: #7D56F4;
+    --purple-light: #874BFD;
+    --purple-deep: #6124DF;
+    --lilac: #DEBAFF;
+    --lilac-20: #E2C9F8;
+    --lilac-10: #EEE2FF;
+
+    /* Greens - Lipgloss Success */
+    --forest: #21351A;
+    --lime: #73F59F;
+    --lime-bright: #43BF6D;
+    --lime-20: #C8FAAE;
+    --lime-10: #DFFFCC;
+
+    /* Subtle Backgrounds - Lipgloss */
+    --subtle-dark: #383838;
+    --subtle-light: #D9DCCF;
+
+    /* WebTUI Color Mappings */
+    --crust: var(--black);
+    --mantle: var(--brown);
+
+    --background0: var(--black);
+    --background1: var(--subtle-dark);
+    --background2: var(--brown);
+
+    --foreground0: var(--white-20);
+    --foreground1: #C1C6B2;
+    --foreground2: #696969;
+
+    /* Semantic Colors */
+    --green: var(--lime);
+    --blue: var(--purple);
+    --yellow: var(--orange);
+    --red: var(--pink);
+
+    /* Status Colors */
+    --success: var(--lime);
+    --warning: var(--orange);
+    --error: var(--pink);
+    --info: var(--purple);
+
+    /* Box borders - Lipgloss style */
+    --box-border-color: var(--purple);
+    --box-border-color-subtle: var(--subtle-dark);
+  }
+
+  /* Set Shelby as default theme */
+  html:not([data-webtui-theme]) {
+    --brown: #322312;
+    --black: #0D0D0D;
+    --black-80: #383838;
+    --white-20: #EEEEEE;
+    --white: #FCFAF8;
+    --maroon: #4F192A;
+    --pink: #F25D94;
+    --pink-bright: #FF5F87;
+    --pink-20: #FFC2E1;
+    --pink-10: #FFDFEF;
+    --orange: #FDB565;
+    --orange-20: #FFC2AD;
+    --orange-10: #FFCDD9;
+    --purple: #7D56F4;
+    --purple-light: #874BFD;
+    --purple-deep: #6124DF;
+    --lilac: #DEBAFF;
+    --lilac-20: #E2C9F8;
+    --lilac-10: #EEE2FF;
+    --forest: #21351A;
+    --lime: #73F59F;
+    --lime-bright: #43BF6D;
+    --lime-20: #C8FAAE;
+    --lime-10: #DFFFCC;
+    --subtle-dark: #383838;
+    --subtle-light: #D9DCCF;
+
+    --crust: var(--black);
+    --mantle: var(--brown);
+    --background0: var(--black);
+    --background1: var(--subtle-dark);
+    --background2: var(--brown);
+    --foreground0: var(--white-20);
+    --foreground1: #C1C6B2;
+    --foreground2: #696969;
+    --green: var(--lime);
+    --blue: var(--purple);
+    --yellow: var(--orange);
+    --red: var(--pink);
+    --success: var(--lime);
+    --warning: var(--orange);
+    --error: var(--pink);
+    --info: var(--purple);
+    --box-border-color: var(--purple);
+    --box-border-color-subtle: var(--subtle-dark);
+  }
+}
