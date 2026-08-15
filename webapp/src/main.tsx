@@ -5,6 +5,7 @@ import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
 import { ToastProvider } from './components/Toast'
 import App from './App'
 import './styles/global.css'
+import './styles/lilyshark.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {

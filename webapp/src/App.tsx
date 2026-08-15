@@ -3,13 +3,23 @@ import { backendApi } from './api/backend'
 import { MetricsTab } from './components/MetricsTab'
 import { ProvidersTab } from './components/ProvidersTab'
 import { ActivityTab } from './components/ActivityTab'
-import { EconomyTab } from './components/EconomyTab'
 import { ShareTab } from './components/ShareTab'
+import { MeshTab } from './components/MeshTab'
 import { TrafficTab } from './components/TrafficTab'
 import { WhitepaperTab } from './components/WhitepaperTab'
 import { WalletButton } from './components/WalletButton'
 
-type Tab = 'traffic' | 'whitepaper' | 'activity' | 'metrics' | 'providers' | 'economy' | 'share'
+type Tab = 'mesh' | 'traffic' | 'network' | 'providers' | 'activity' | 'whitepaper' | 'share'
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'mesh', label: 'Mesh' },
+  { id: 'traffic', label: 'Traffic' },
+  { id: 'network', label: 'Network' },
+  { id: 'providers', label: 'Providers' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'whitepaper', label: 'Whitepaper' },
+  { id: 'share', label: 'Share' },
+]
 
 interface NetworkStats {
   totalBlobs: number
@@ -22,226 +32,77 @@ interface NetworkStats {
 function App() {
   const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [activeTab, setActiveTab] = useState<Tab>('activity')
+  // Traffic is the product; it is what the tool is for, so it opens there.
+  const [activeTab, setActiveTab] = useState<Tab>('traffic')
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
 
   useEffect(() => {
-    // Initial fetch
     fetchNetworkStats()
-
-    // Poll for updates every 15 seconds (reduced from 5s for better mobile performance)
-    const statsInterval = setInterval(() => {
-      fetchNetworkStats()
-    }, 15000)
-
-    // Update time every 30 seconds instead of every second (huge performance gain!)
-    const timeInterval = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 30000)
-
-    // Window resize listener for responsive design
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-
-    return () => {
-      clearInterval(statsInterval)
-      clearInterval(timeInterval)
-      window.removeEventListener('resize', handleResize)
-    }
+    const stats = setInterval(fetchNetworkStats, 15000)
+    const clock = setInterval(() => setCurrentTime(new Date()), 30000)
+    return () => { clearInterval(stats); clearInterval(clock) }
   }, [])
 
   async function fetchNetworkStats() {
     try {
-      const stats = await backendApi.getNetworkStats()
-      setNetworkStats(stats)
-      setLastUpdate(new Date())
+      setNetworkStats(await backendApi.getNetworkStats())
       setError(null)
-      setIsLoading(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch data')
-      setIsLoading(false)
+      setError(err instanceof Error ? err.message : 'Failed to reach the indexer')
     }
   }
 
-  function getTimeSinceUpdate() {
-    if (!lastUpdate) return 'never'
-    const seconds = Math.floor((Date.now() - lastUpdate.getTime()) / 1000)
-    if (seconds < 10) return 'just now'
-    if (seconds < 60) return `${seconds}s ago`
-    const minutes = Math.floor(seconds / 60)
-    return `${minutes}m ago`
-  }
-
-  if (isLoading) {
-    return (
-      <column className="terminal-emulator">
-        <column className="terminal" box-="square" pad-="2" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
-          <row gap-="1" style={{ alignItems: 'center' }}>
-            <span is-="spinner" style={{ color: 'var(--accent)' }}></span>
-            <h2 style={{ margin: 0 }}>Loading Network Data...</h2>
-          </row>
-          <small style={{ color: 'var(--foreground2)', marginTop: '0.5rem' }}>
-            Fetching real data from Shelby Protocol via Aptos blockchain
-          </small>
-        </column>
-      </column>
-    )
-  }
-
-  if (error) {
-    return (
-      <column className="terminal-emulator">
-        <column className="terminal" box-="square" pad-="2">
-          <h2 style={{ color: 'var(--error)' }}>Failed to Connect to Shelby Protocol</h2>
-          <small style={{ color: 'var(--foreground2)' }}>{error}</small>
-          <small style={{ color: 'var(--foreground2)', marginTop: '1rem' }}>
-            Make sure the pulse-api service is running:
-          </small>
-          <pre is-="pre" size-="half" style={{ marginTop: '0.5rem' }}>
-            cd services/pulse-api{'\n'}
-            pnpm dev
-          </pre>
-          <button
-            is-="button"
-            variant-="accent"
-            size-="half"
-            onClick={fetchNetworkStats}
-            style={{ marginTop: '1rem' }}
-          >
-            Retry Connection
-          </button>
-        </column>
-      </column>
-    )
-  }
-
-  if (!networkStats) {
-    return null
-  }
-
   return (
-    <column className="terminal-emulator">
-      <column className="terminal">
-        {/* Terminal Header */}
-        <row className="terminal-header">
-          <row gap-="1" style={{ padding: '0 1rem' }}>
-            <span className="dot-red">●</span>
-            <span className="dot-yellow">●</span>
-            <span className="dot-green">●</span>
-          </row>
-          <row style={{ gap: '0.75rem', alignItems: 'center' }}>
-            {/* Wordmark is the brand mark; alt text carries the name for screen
-                readers. Black reads against the light header — the pink variant
-                sits too close to the header's own tint to stay legible. */}
-            <img
-              src="/lilyshark-wordmark-black.svg"
-              alt="Lilyshark"
-              style={{ height: '1.9rem', width: 'auto', display: 'block' }}
-            />
-            {/* Wallet Button - Desktop only (in header) */}
-            {windowWidth >= 768 && <WalletButton variant="header" />}
-          </row>
-          <row className="tab-nav">
-            <button
-              onClick={() => setActiveTab('traffic')}
-              className={activeTab === 'traffic' ? 'active' : ''}
-            >
-              Traffic
-            </button>
-            <button
-              onClick={() => setActiveTab('activity')}
-              className={activeTab === 'activity' ? 'active' : ''}
-            >
-              Activity
-            </button>
-            <button
-              onClick={() => setActiveTab('whitepaper')}
-              className={activeTab === 'whitepaper' ? 'active' : ''}
-            >
-              Whitepaper
-            </button>
-            <button
-              onClick={() => setActiveTab('economy')}
-              className={activeTab === 'economy' ? 'active' : ''}
-            >
-              ShelbyUSD
-            </button>
-            <button
-              onClick={() => setActiveTab('metrics')}
-              className={activeTab === 'metrics' ? 'active' : ''}
-            >
-              Metrics
-            </button>
-            <button
-              onClick={() => setActiveTab('providers')}
-              className={activeTab === 'providers' ? 'active' : ''}
-            >
-              Providers
-            </button>
-            <button
-              onClick={() => setActiveTab('share')}
-              className={activeTab === 'share' ? 'active' : ''}
-            >
-              Share
-            </button>
-            {/* Wallet Button - Mobile only (as tab) */}
-            {windowWidth < 768 && <WalletButton variant="tab" />}
-          </row>
-        </row>
+    <div className="ls-app">
+      <header className="ls-header">
+        <img className="ls-mark" src="/lilyshark-wordmark-pink.svg" alt="Lilyshark" />
 
-        {/* Status Bar */}
-        <row
-          style={{
-            padding: '0.5rem 1rem',
-            background: 'var(--background0)',
-            borderBottom: '1px solid var(--background2)',
-            gap: '1rem',
-            fontSize: '0.85rem',
-            flexWrap: 'wrap'
-          }}
-        >
-          <span is-="badge" variant-="success">● LIVE</span>
-          <span style={{ color: 'var(--foreground2)' }}>
-            Storage: {networkStats.totalStorageFormatted}
-          </span>
-          <span style={{ color: 'var(--foreground2)' }}>|</span>
-          <span style={{ color: 'var(--foreground2)' }}>
-            Upload: {networkStats.uploadRate.toFixed(1)} KB/s
-          </span>
-          <span style={{ color: 'var(--foreground2)' }}>|</span>
-          <span style={{ color: 'var(--foreground2)' }}>
-            {networkStats.totalBlobs} blobs
-          </span>
-          <span style={{ color: 'var(--foreground2)' }}>|</span>
-          <span style={{ color: 'var(--foreground2)' }}>
-            {getTimeSinceUpdate()}
-          </span>
-        </row>
+        {/* One line of network truth, always on screen. Values only — the
+            labels are short enough to read without a legend. */}
+        <div className="ls-live">
+          {error ? (
+            <span className="bad">indexer unreachable</span>
+          ) : networkStats ? (
+            <>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <i className="ls-dot" aria-hidden />live
+              </span>
+              <span><b>{networkStats.totalBlobs.toLocaleString()}</b> blobs</span>
+              <span><b>{networkStats.totalStorageFormatted}</b> stored</span>
+            </>
+          ) : (
+            <span className="dim">connecting…</span>
+          )}
+          <WalletButton variant="header" />
+        </div>
+      </header>
 
-        {/* Content - GPU accelerated */}
-        <column
-          className="terminal-content"
-          pad-="1"
-          style={{
-            transform: 'translateZ(0)',
-            willChange: 'transform',
-            backfaceVisibility: 'hidden',
-            position: 'relative'
-          }}
-        >
+      <nav className="ls-nav ls-scroll" role="tablist" aria-label="Sections">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={activeTab === t.id}
+            className="ls-tab"
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      <main className="ls-main">
+        <div className="ls-wrap">
+          {activeTab === 'mesh' && <MeshTab />}
           {activeTab === 'traffic' && <TrafficTab />}
-          {activeTab === 'whitepaper' && <WhitepaperTab />}
-          {activeTab === 'activity' && <ActivityTab currentTime={currentTime} />}
-          {activeTab === 'economy' && <EconomyTab />}
-          {activeTab === 'metrics' && <MetricsTab />}
+          {activeTab === 'network' && <MetricsTab />}
           {activeTab === 'providers' && <ProvidersTab />}
+          {activeTab === 'activity' && <ActivityTab currentTime={currentTime} />}
+          {activeTab === 'whitepaper' && <WhitepaperTab />}
           {activeTab === 'share' && <ShareTab />}
-        </column>
-      </column>
-    </column>
+        </div>
+      </main>
+    </div>
   )
 }
 

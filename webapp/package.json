@@ -18,6 +18,7 @@
     "@aptos-labs/ts-sdk": "^5.1.6",
     "@aptos-labs/wallet-adapter-ant-design": "^5.3.3",
     "@aptos-labs/wallet-adapter-react": "^7.2.3",
+    "@liamcottle/meshcore.js": "^1.14.0",
     "@shelby-protocol/sdk": "^0.0.9",
     "@tanstack/react-query": "^5.62.3",
     "framer-motion": "^12.23.24",

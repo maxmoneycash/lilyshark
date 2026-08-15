@@ -23,35 +23,39 @@
 
 @layer base {
   :root {
-    /* Pink & White Theme */
-    --root: #FCFAF8;
-    --background0: #F7F1E9;
-    --background1: #FFDFEF;
-    --background2: #FFC2E1;
-    --background3: #FF77C9;
+    /* Lilyshark instrument theme — the same dark vocabulary as
+       styles/lilyshark.css, expressed in the WebTUI variable names the
+       older tabs consume. Pink is the brand marker, never a background. */
+    --root: oklch(0.165 0.012 320);
+    --background0: oklch(0.165 0.012 320);
+    --background1: oklch(0.205 0.014 320);
+    --background2: oklch(0.245 0.016 320);
+    --background3: oklch(0.305 0.018 320);
 
-    /* Text colors - mostly dark with pink accents */
-    --foreground0: #1a1a1a;
-    --foreground1: #404040;
-    --foreground2: #737373;
+    /* Ink — muted step still clears 4.5:1 on --root. */
+    --foreground0: oklch(0.965 0.004 320);
+    --foreground1: oklch(0.800 0.010 320);
+    --foreground2: oklch(0.660 0.012 320);
 
-    /* Accent Colors - pink for highlights only */
-    --accent: #FF1493;
-    --accent-light: #FF69B4;
-    --accent-soft: #FFB6D9;
-    --pink-bright: #FF1493;
-    --pink-pastel: #FF69B4;
-    --pink-soft: #FFB6D9;
-    --link: #FF1493;
-    --link-hover: #D91A7A;
-    --yellow: #FFA500;
-    --red: #FF6B6B;
-    --blue: #4A90E2;
-    --green: #00C896;
-    --success: #00C896;
+    /* Accents — firmware semantics: lime is live, cyan navigates, amber
+       warns, coral faults, pink is the brand. */
+    --accent: oklch(0.702 0.212 356);
+    --accent-light: oklch(0.760 0.180 356);
+    --accent-soft: oklch(0.702 0.212 356 / 0.35);
+    --pink-bright: oklch(0.702 0.212 356);
+    --pink-pastel: oklch(0.760 0.180 356);
+    --pink-soft: oklch(0.702 0.212 356 / 0.35);
+    --link: oklch(0.820 0.108 205);
+    --link-hover: oklch(0.880 0.090 205);
+    --yellow: oklch(0.840 0.155 85);
+    --red: oklch(0.720 0.170 25);
+    --blue: oklch(0.820 0.108 205);
+    --green: oklch(0.855 0.202 145);
+    --success: oklch(0.855 0.202 145);
+    --muted-fg: oklch(0.660 0.012 320);
 
-    --font-size: 16px;
-    --line-height: 1.5;
+    --font-size: 15px;
+    --line-height: 1.55;
   }
 
   * {
@@ -82,9 +86,9 @@
 
   a:not([is-~='button']) {
     color: var(--link);
-    background-color: rgba(2, 132, 199, 0.1);
+    background-color: oklch(0.820 0.108 205 / 0.08);
     display: inline-flex;
-    text-decoration-color: rgba(2, 132, 199, 0.4);
+    text-decoration-color: oklch(0.820 0.108 205 / 0.4);
     text-decoration-skip-ink: none;
 
     &::before {
@@ -282,20 +286,10 @@
   }
 }
 
-body, html {
-  font-family: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', Monaco, monospace;
-  background-color: var(--root);
-  color: var(--foreground0);
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  height: 100vh;
-  max-height: 100vh;
-  position: fixed;
-  width: 100%;
-  font-variant-ligatures: normal;
-  font-feature-settings: "calt" 1, "liga" 1;
-}
+/* The old fixed-viewport terminal shell (body/html position: fixed, mono
+   everything, white ground) is gone: App.tsx renders the lilyshark.css app
+   frame, and styles/lilyshark.css owns body and html. The .terminal-* rules
+   below remain for components that still opt into them. */
 
 /* Terminal Emulator Layout */
 .terminal-emulator {
@@ -358,17 +352,7 @@ body, html {
 /* Mobile responsive */
 @media (max-width: 768px) {
   :root {
-    --font-size: 16px; /* Larger for better mobile readability */
-  }
-
-  body, html {
-    overflow: hidden;
-    height: 100vh;
-    height: 100dvh; /* Use dynamic viewport height on mobile */
-    max-height: 100vh;
-    max-height: 100dvh;
-    position: fixed;
-    width: 100%;
+    --font-size: 15px;
   }
 
   .terminal-emulator {
