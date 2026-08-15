@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { layoutWithLines, prepareWithSegments } from '@chenglou/pretext';
 
 /**
@@ -28,39 +29,51 @@ interface Section {
 }
 
 /**
- * The argument, in six beats. Every number here is from the whitepaper the
- * PAPER tab ships — measured or sourced there, not invented for the landing.
+ * The argument, in eight beats. Every number here is from the whitepaper the
+ * PAPER tab ships — measured or sourced there, not invented for a landing
+ * page. The screens are the firmware's own: LVGL simulator frames and the
+ * ten reference screens, composited into the device photo's display.
  */
 const SECTIONS: Section[] = [
   {
     screen: '/intro/screen-splash.png',
-    head: 'Wireshark for mesh radio.',
-    body: 'Lilyshark turns a LILYGO T-Deck into a handheld analyzer for LoRa mesh traffic — and the first firmware on this hardware built to look as good as it works.',
+    head: 'A packet sniffer for the mesh age.',
+    body: 'Lilyshark is C++ firmware that turns the LILYGO T-Deck Plus — a $60 handheld with a LoRa radio, QWERTY keyboard and GPS — into a packet sniffer and RF analyzer for off-grid mesh networks.',
   },
   {
-    screen: '/intro/screen-home.png',
-    head: 'Off-grid is having a moment.',
-    body: 'No carrier, no account, no server. During the 2025–26 blackouts one Bluetooth-mesh app was downloaded 48,800 times in a single day in Nepal and hit 430,000 daily users in India — and LoRa meshes like Meshtastic and MeshCore carry the same idea kilometres per hop.',
+    screen: '/intro/screen-live-traffic.png',
+    head: 'Off-grid went mainstream.',
+    body: 'Meshtastic passed 40,000 GitHub stars and an 80,000-member subreddit, with 100+ supported boards, sub-$50 entry devices, and active meshes in most major US cities. When India ordered a mesh app off GitHub during the Delhi protests, it was carrying 430,000 daily users — and stayed up.',
   },
   {
-    screen: '/intro/screen-traffic.png',
+    screen: '/intro/screen-node-map.png',
+    head: 'Kilometres, not metres.',
+    body: "Bluetooth mesh dies at 30–300 m — it works at a protest because a protest is a crowd. LoRa carries 2–15 km per hop, across a city, a county, a disaster zone; MeshCore's source routing now spans 64 hops with deterministic delivery receipts.",
+  },
+  {
+    screen: '/intro/screen-channel-utilization.png',
     head: 'The air is the bottleneck.',
-    body: 'A LongFast channel moves about 987 bit/s, and flood routing makes every node repeat everything. We measured a rebroadcast factor of 7.36 — delivery reach collapses from 68.6% to 25.8% as a mesh grows, saturating near 6,721 nodes.',
+    body: 'A LongFast channel moves about 987 bit/s and flood routing repeats everything: we measured 7.36 transmissions per delivered message, reach collapsing from 68.6% to 25.8% as the mesh grows, saturation near 6,721 nodes. Growth is exactly what breaks it.',
   },
   {
-    screen: '/intro/screen-spectrum.png',
+    screen: '/intro/screen-spectrum-waterfall.png',
     head: "You can't fix what you can't see.",
-    body: 'So we built the instrument: every frame captured with its RSSI, SNR, airtime and CRC, a live survey of the band, node and route maps, and LoRaTap PCAP export that Wireshark itself opens.',
+    body: 'So we built the instrument: a live spectrum waterfall with noise floor and channel occupancy, node rosters with SNR, RSSI and hop-count history, survey mode for coverage runs, and every frame kept with its radio physics.',
   },
   {
-    screen: '/intro/screen-settings.png',
-    head: "Firmware you'd show someone.",
-    body: 'A complete device shell — guided first run, live diagnostics, capture to microSD — on the T-Deck first, and built to travel to any Meshtastic-class radio with a screen.',
+    screen: '/intro/screen-packet-detail.png',
+    head: 'Down to the byte.',
+    body: 'Meshtastic, MeshCore and Reticulum share one capture engine. Each decoder claims only what it can prove from the frame; the rest stays as raw hex with frequency, bandwidth, SF, CR, CRC state and airtime. Captures write to microSD as .lscap and export as LoRaTap PCAP — desktop Wireshark opens them.',
+  },
+  {
+    screen: '/intro/screen-node-detail.png',
+    head: 'The first T-Deck firmware built to be seen.',
+    body: 'A complete LVGL device shell — guided first run, Home, live diagnostics, Help — instead of a debug menu. T-Deck Plus first, and portable to Meshtastic-class radios with a screen.',
   },
   {
     screen: '/intro/screen-onboarding.png',
-    head: 'Storage meets radio.',
-    body: "The first application pairing Shelby's content-addressed storage with LoRa mesh: a capture is too big for the air, so the radio broadcasts an 82-byte pointer and any connected node resolves the bytes — evidence nobody can quietly edit.",
+    head: 'The first Shelby × LoRa application.',
+    body: "Captures are evidence, so they live in Shelby's content-addressed storage on Aptos. A radio has no uplink — it broadcasts an 82-byte pointer instead, and any connected node resolves the bytes. Radio-frequency capture meets verifiable storage for the first time.",
   },
 ];
 
@@ -127,7 +140,18 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
   return (
     <main className="fill">
       <div className="intro-scroll" ref={scrollRef}>
-        <div className="intro-track" style={{ height: `${SECTIONS.length * 100}%` }}>
+        <div
+          className="intro-track"
+          style={
+            {
+              height: `${SECTIONS.length * 100}%`,
+              // The stage divides the track back into one viewport; hardcoding
+              // the count in CSS once left the stage 20% too tall when a
+              // section was added, pushing the device half off screen.
+              '--intro-n': SECTIONS.length,
+            } as CSSProperties
+          }
+        >
           <div className="intro-stage">
             <div className="intro-copy" ref={textRef}>
               <AnimatePresence mode="wait">

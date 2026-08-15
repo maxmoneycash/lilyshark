@@ -1159,8 +1159,9 @@ body {
 }
 
 /* Between the single desktop row and the phone hamburger, the tabs take
-   their own row and wrap — a sliding strip hides half the destinations. */
-@media (min-width: 861px) and (max-width: 1200px) {
+   their own row and wrap — a sliding strip hides half the destinations.
+   Eleven tabs collide with CONNECT up to ~1540px, hence the ceiling. */
+@media (min-width: 861px) and (max-width: 1540px) {
 	.meshterm header {
 		flex-wrap: wrap;
 		row-gap: 6px;
