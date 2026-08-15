@@ -826,3 +826,75 @@
 	font-size: 12px;
 	flex-shrink: 0;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Small screens.
+
+   The terminal layout is built for a wide window: a fixed-width sidebar beside
+   a main pane, a header that runs nav, transport, connect and clock on one
+   line, and label columns sized in pixels. None of that survives a phone, and
+   the base stylesheet carries no breakpoints at all — so everything below is
+   additive and changes nothing above 860px.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+	/* Header stacks: identity on its own line, then a nav strip that scrolls
+	   sideways rather than wrapping into a ragged block. */
+	.meshterm header {
+		flex-wrap: wrap;
+		gap: 6px 10px;
+		padding: 6px 8px;
+	}
+	.meshterm header nav {
+		order: 3;
+		width: 100%;
+		overflow-x: auto;
+		overflow-y: hidden;
+		scrollbar-width: none;
+		scroll-snap-type: x proximity;
+		padding-bottom: 2px;
+	}
+	.meshterm header nav::-webkit-scrollbar { display: none; }
+	.meshterm header nav > * { flex: 0 0 auto; scroll-snap-align: start; }
+
+	/* The clock is the first thing worth losing on a narrow screen. */
+	.meshterm .clock .uptime { display: none; }
+	.meshterm .titlebar-ver { display: none; }
+
+	/* Sidebar over main instead of beside it. */
+	.meshterm .app { flex-direction: column; }
+	.meshterm .app > aside,
+	.meshterm .app > .sidebar {
+		width: 100% !important;
+		max-width: none !important;
+		max-height: 34vh;
+		overflow-y: auto;
+	}
+
+	/* Label columns in px force a horizontal scroll; let them size to content. */
+	.meshterm .kv { grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 6px 10px; padding: 10px; }
+	.meshterm .form-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; }
+
+	/* Wide tables scroll inside their panel rather than widening the page. */
+	.meshterm .panel { overflow-x: auto; }
+	.meshterm table { min-width: max-content; }
+
+	/* Touch targets. The desktop build sizes controls for a mouse. */
+	.meshterm :where(button, .tb-btn, select, input) { min-height: 40px; }
+	.meshterm .chat-input input { min-height: 44px; }
+
+	/* Respect the notch and the home indicator. */
+	.meshterm .titlebar { padding-top: max(4px, env(safe-area-inset-top)); }
+	.meshterm .app { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+@media (max-width: 480px) {
+	.meshterm { font-size: 12px; }
+	.meshterm .logo span { display: none; }   /* keep the wordmark, drop the tagline */
+	.meshterm .panel-actions { flex-wrap: wrap; gap: 4px; }
+	.meshterm .app > aside,
+	.meshterm .app > .sidebar { max-height: 28vh; }
+}
+
+/* The page itself never scrolls sideways, whatever a panel does inside it. */
+.meshterm { overflow-x: hidden; }
