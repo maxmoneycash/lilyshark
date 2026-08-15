@@ -2040,3 +2040,37 @@ body:has(.meshterm .app.menu-open) {
 		animation: none;
 	}
 }
+	}
+}
+
+/* ── Desktop nav: one line, always ────────────────────────────────────────
+   Zooming in shrinks the CSS viewport, which used to wrap the eleven tabs
+   onto a second and third line and shove the screen down. Above the phone
+   breakpoint the row never wraps; instead the tabs scale with the viewport
+   so all eleven keep fitting. Below 861px the hamburger takes over and none
+   of this applies. */
+@media (min-width: 861px) {
+	.meshterm header nav {
+		flex-wrap: nowrap;
+		min-width: 0;
+		gap: clamp(2px, 0.35vw, 6px);
+	}
+	.meshterm header nav > .tab {
+		flex: 0 1 auto;
+		min-width: 0;
+		white-space: nowrap;
+		font-size: clamp(8px, 0.76vw, 11px);
+		letter-spacing: clamp(0px, 0.06vw, 1px);
+		padding: 0 clamp(3px, 0.55vw, 12px);
+	}
+	/* The identity and the controls give up their slack before the tabs do. */
+	.meshterm header {
+		gap: clamp(6px, 1vw, 16px);
+	}
+	.meshterm .logo .wordmark {
+		font-size: clamp(15px, 1.35vw, 20px);
+	}
+	.meshterm .logo .logo-mark {
+		height: clamp(19px, 1.8vw, 26px);
+	}
+}
