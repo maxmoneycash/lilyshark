@@ -1,5 +1,5 @@
 {
-  "name": "shelby-pulse",
+  "name": "lilyshark-webapp",
   "private": true,
   "version": "0.0.3",
   "type": "module",
@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --import tsx --test src/lib/lscap.test.ts",
     "lint": "biome lint --write .",
     "fmt": "biome format --write .",
     "shelby:upload": "tsx scripts/shelby-upload.ts",
