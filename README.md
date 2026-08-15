@@ -38,20 +38,50 @@ Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAM
 
 <table>
   <tr>
-    <td width="50%"><img src="design/previews/webapp-intro.png" alt="INTRO: the T-Deck with real firmware screens, scroll-driven"></td>
-    <td width="50%"><img src="design/previews/webapp-traffic.png" alt="TRAFFIC: live frame list with RF metadata and a decoded Shelby pointer"></td>
+    <td width="50%"><img src="design/previews/webapp-intro.png" alt="INTRO — the device, cycling all 38 real firmware screens"></td>
+    <td width="50%"><img src="design/previews/webapp-paper.png" alt="PAPER — the 63-page whitepaper, pre-rendered and scrollable"></td>
   </tr>
   <tr>
     <td align="center"><sub>INTRO — the device, cycling all 38 real firmware screens</sub></td>
+    <td align="center"><sub>PAPER — the 63-page whitepaper, pre-rendered and scrollable</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="design/previews/webapp-traffic.png" alt="TRAFFIC — live frames streaming, frame 9 carrying a Shelby pointer"></td>
+    <td width="50%"><img src="design/previews/webapp-shelby.png" alt="SHELBY — why an 82-byte pointer, with airtime measured from the capture"></td>
+  </tr>
+  <tr>
     <td align="center"><sub>TRAFFIC — live frames streaming, frame 9 carrying a Shelby pointer</sub></td>
-  </tr>
-  <tr>
-    <td><img src="design/previews/webapp-shelby.png" alt="SHELBY: the off-grid pointer design with measured airtime math"></td>
-    <td><img src="design/previews/webapp-map.png" alt="MAP: mesh nodes across Palo Alto"></td>
-  </tr>
-  <tr>
     <td align="center"><sub>SHELBY — why an 82-byte pointer, with airtime measured from the capture</sub></td>
-    <td align="center"><sub>MAP — the demo mesh across Palo Alto</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="design/previews/webapp-chat.png" alt="CHAT — channel traffic with per-message SNR and hop count"></td>
+    <td width="50%"><img src="design/previews/webapp-nodes.png" alt="NODES — roster with signal, battery, position and last-seen"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>CHAT — channel traffic with per-message SNR and hop count</sub></td>
+    <td align="center"><sub>NODES — roster with signal, battery, position and last-seen</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="design/previews/webapp-map.png" alt="MAP — the demo mesh across the Bay Area"></td>
+    <td width="50%"><img src="design/previews/webapp-mesh.png" alt="MESH — topology summary, hop histogram and link graph"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>MAP — the demo mesh across the Bay Area</sub></td>
+    <td align="center"><sub>MESH — topology summary, hop histogram and link graph</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="design/previews/webapp-telemetry.png" alt="TELEMETRY — per-node metrics charted over 6h to 30d"></td>
+    <td width="50%"><img src="design/previews/webapp-config.png" alt="CONFIG — device, radio, alerts and backup settings"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>TELEMETRY — per-node metrics charted over 6h to 30d</sub></td>
+    <td align="center"><sub>CONFIG — device, radio, alerts and backup settings</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="design/previews/webapp-debug.png" alt="DEBUG — the serial console"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>DEBUG — the serial console</sub></td>
   </tr>
 </table>
 
