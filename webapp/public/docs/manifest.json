@@ -1,0 +1,80 @@
+[
+  {
+    "id": "quickstart",
+    "title": "Quickstart \u2014 evaluate Lilyshark in ten minutes",
+    "path": "/docs/quickstart.md",
+    "source": "docs/quickstart.md"
+  },
+  {
+    "id": "architecture",
+    "title": "Architecture",
+    "path": "/docs/architecture.md",
+    "source": "docs/architecture.md"
+  },
+  {
+    "id": "why-shelby",
+    "title": "Why Shelby \u2014 and why not the obvious alternatives",
+    "path": "/docs/why-shelby.md",
+    "source": "docs/why-shelby.md"
+  },
+  {
+    "id": "shelby-off-grid",
+    "title": "Shelby off-grid: blobs over a 200-byte pipe",
+    "path": "/docs/shelby-off-grid.md",
+    "source": "docs/shelby-off-grid.md"
+  },
+  {
+    "id": "shelby-pointer-format",
+    "title": "Shelby off-grid pointer format (`SHLB`)",
+    "path": "/docs/shelby-pointer-format.md",
+    "source": "docs/shelby-pointer-format.md"
+  },
+  {
+    "id": "lilyshark-capture-format",
+    "title": "Lilyshark capture format (`.lscap`)",
+    "path": "/docs/lilyshark-capture-format.md",
+    "source": "docs/lilyshark-capture-format.md"
+  },
+  {
+    "id": "flashing",
+    "title": "Flashing Lilyshark on a LILYGO T-Deck",
+    "path": "/docs/FLASHING.md",
+    "source": "docs/FLASHING.md"
+  },
+  {
+    "id": "recording-ui",
+    "title": "Record the complete T-Deck interface",
+    "path": "/docs/RECORDING_UI.md",
+    "source": "docs/RECORDING_UI.md"
+  },
+  {
+    "id": "results-evidence",
+    "title": "Evidence from the live Shelby network",
+    "path": "/docs/analysis/results_evidence.md",
+    "source": "analysis/results_evidence.md"
+  },
+  {
+    "id": "results-scaling",
+    "title": "Shelby \u00d7 LoRa: scaling relationships, 2025\u20132033",
+    "path": "/docs/analysis/results.md",
+    "source": "analysis/results.md"
+  },
+  {
+    "id": "results-counterfactuals",
+    "title": "Counterfactuals: without content-addressed network storage",
+    "path": "/docs/analysis/results_counterfactuals.md",
+    "source": "analysis/results_counterfactuals.md"
+  },
+  {
+    "id": "analysis-readme",
+    "title": "Analysis: Shelby \u00d7 LoRa, modeled and measured",
+    "path": "/docs/analysis/README.md",
+    "source": "analysis/README.md"
+  },
+  {
+    "id": "samples",
+    "title": "Sample captures",
+    "path": "/docs/samples/README.md",
+    "source": "samples/README.md"
+  }
+]

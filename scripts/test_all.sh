@@ -115,7 +115,11 @@ build_and_run rolling_diagnostics \
   test/rolling_diagnostics/test_rolling_diagnostics.cpp
 
 build_and_run live_telemetry \
+  -DLILYSHARK_LIVE_TELEMETRY_DECODER_CROSSCHECK=1 \
   src/simulator/live_telemetry.cpp \
+  src/core/meshtastic_decoder.cpp \
+  src/core/meshcore_decoder.cpp \
+  src/core/reticulum_decoder.cpp \
   test/live_telemetry/test_live_telemetry.cpp
 
 build_and_run diagnostic_tools \
@@ -205,6 +209,9 @@ python3 -m unittest discover -s test/shelby_pointer_py -p 'test_*.py'
 
 echo "Testing analysis_sim"
 python3 -m unittest discover -s test/analysis_sim -p 'test_*.py'
+
+echo "Testing docs_sync"
+python3 -m unittest discover -s test/docs_sync -p 'test_*.py'
 
 echo "Testing serial_smoke"
 python3 -m unittest discover -s test/serial_smoke -p 'test_*.py'

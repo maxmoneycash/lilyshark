@@ -602,6 +602,12 @@ const en: Record<string, string> = {
   "DESCARGAR PDF": "DOWNLOAD PDF",
   "Wireshark para la malla de radio: captura LoRa en el T-Deck, análisis en la web, capturas y punteros off-grid sobre Shelby.":
     "Wireshark for mesh radio: LoRa capture on the T-Deck, analysis on the web, captures and off-grid pointers on Shelby.",
+
+  // Docs (visor de documentación)
+  "DOCS": "DOCS",
+  "DOCUMENTACIÓN": "DOCUMENTATION",
+  "CARGANDO…": "LOADING…",
+  "NO SE PUDO CARGAR: {0}": "COULD NOT LOAD: {0}",
 };
 
 export default en;

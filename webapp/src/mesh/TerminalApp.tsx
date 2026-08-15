@@ -30,6 +30,7 @@ import { ShelbyScreen } from "./screens/Shelby";
 // pre-rendered images its code is a few kilobytes.
 const MapView = lazy(() => import("./screens/MapView"));
 const Telemetry = lazy(() => import("./screens/Telemetry"));
+const Docs = lazy(() => import("./screens/Docs"));
 import { fmtFreq, useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
@@ -40,6 +41,7 @@ const VERSION = "0.1.0";
 const TABS = [
   "INTRO",
   "PAPER",
+  "DOCS",
   "TRAFFIC",
   "SHELBY",
   "CHAT",
@@ -663,6 +665,7 @@ function App() {
       {tab === "SHELBY" && <ShelbyScreen />}
       {tab === "INTRO" && <IntroTab onOpen={(next) => setTab(next as Tab)} />}
       {tab === "PAPER" && <WhitepaperTab />}
+      {tab === "DOCS" && <Docs />}
       {tab === "CHAT" && (
         <Chat
           convo={chatConvo}

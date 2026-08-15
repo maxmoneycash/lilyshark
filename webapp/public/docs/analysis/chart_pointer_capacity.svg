@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="380" viewBox="0 0 720 380" font-family="ui-monospace, monospace" font-size="12">
+<rect width="720" height="380" fill="#120e11"/>
+<text x="90" y="26" fill="#ff4f9d" font-size="15">Shelby pointers per day, one collision domain</text>
+<line x1="90" y1="243.5" x2="696" y2="243.5" stroke="#3a2f36" stroke-width="1"/><text x="82" y="247.5" fill="#8b7c85" text-anchor="end">79,006</text>
+<line x1="90" y1="177.0" x2="696" y2="177.0" stroke="#3a2f36" stroke-width="1"/><text x="82" y="181.0" fill="#8b7c85" text-anchor="end">158,012</text>
+<line x1="90" y1="110.5" x2="696" y2="110.5" stroke="#3a2f36" stroke-width="1"/><text x="82" y="114.5" fill="#8b7c85" text-anchor="end">237,017</text>
+<line x1="90" y1="44.0" x2="696" y2="44.0" stroke="#3a2f36" stroke-width="1"/><text x="82" y="48.0" fill="#8b7c85" text-anchor="end">316,023</text>
+<rect x="113.0" y="307.7" width="75.1" height="2.3" fill="#ff4f9d" opacity="0.9"/><text x="150.6" y="301.7" fill="#e8dde3" text-anchor="middle">2,776</text><text x="150.6" y="328.0" fill="#8b7c85" text-anchor="middle">2025</text>
+<rect x="234.2" y="305.7" width="75.1" height="4.3" fill="#ff4f9d" opacity="0.9"/><text x="271.8" y="299.7" fill="#e8dde3" text-anchor="middle">5,107</text><text x="271.8" y="328.0" fill="#8b7c85" text-anchor="middle">2026</text>
+<rect x="355.4" y="292.4" width="75.1" height="17.6" fill="#ff4f9d" opacity="0.9"/><text x="393.0" y="286.4" fill="#e8dde3" text-anchor="middle">20,894</text><text x="393.0" y="328.0" fill="#8b7c85" text-anchor="middle">2028</text>
+<rect x="476.6" y="232.6" width="75.1" height="77.4" fill="#ff4f9d" opacity="0.9"/><text x="514.2" y="226.6" fill="#e8dde3" text-anchor="middle">91,934</text><text x="514.2" y="328.0" fill="#8b7c85" text-anchor="middle">2030</text>
+<rect x="597.8" y="44.0" width="75.1" height="266.0" fill="#ff4f9d" opacity="0.9"/><text x="635.4" y="38.0" fill="#e8dde3" text-anchor="middle">316,023</text><text x="635.4" y="328.0" fill="#8b7c85" text-anchor="middle">2032</text>
+<text x="90" y="372" fill="#8b7c85">architecture ladder, LongFast SF11/BW250, 82-byte SHLB pointer</text></svg>
