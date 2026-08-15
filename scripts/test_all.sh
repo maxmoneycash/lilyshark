@@ -179,6 +179,9 @@ build_and_run tdeck_display_init \
 echo "Testing lscap_reader"
 python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
 
+echo "Testing shelby_pointer_py"
+python3 -m unittest discover -s test/shelby_pointer_py -p 'test_*.py'
+
 echo "Testing serial_smoke"
 python3 -m unittest discover -s test/serial_smoke -p 'test_*.py'
 
@@ -274,6 +277,18 @@ if [[ ${interaction_result} -ne 0 ]] || \
    ! grep -q '^Lilyshark simulator interaction test passed$' "${interaction_log}"; then
   echo "Simulator interaction test did not complete" >&2
   cat "${interaction_log}" >&2
+  exit 1
+fi
+
+echo "Testing the complete screen-recording tour"
+demo_log="${test_dir}/simulator-demo.log"
+if ! SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+     LILYSHARK_DEMO_LEAD_MS=0 LILYSHARK_DEMO_STEP_MS=5 LILYSHARK_DEMO_ONCE=1 \
+     "${timeout_command}" 10 .pio/build/simulator/program --demo >"${demo_log}" 2>&1 || \
+   ! grep -q '^Lilyshark UI tour test passed$' "${demo_log}" || \
+   [[ "$(grep -c '^UI tour [0-9][0-9]/[0-9][0-9]:' "${demo_log}")" -ne 63 ]]; then
+  echo "Simulator screen-recording tour did not complete every step" >&2
+  cat "${demo_log}" >&2
   exit 1
 fi
 
