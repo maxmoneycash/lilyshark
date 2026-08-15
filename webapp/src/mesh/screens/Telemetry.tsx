@@ -2,10 +2,30 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { listMetrics, listTelemetryNodes, loadTelemetry } from "../db";
+import { demoTelemetry, demoTelemetryMetrics, demoTelemetryNodes } from "../demo";
 import { saveText, stamp } from "../export";
 import { t, useLangTick } from "../i18n";
 import { getSnapshot, subscribe } from "../store";
 import { accent, fg, isLight, useThemeTick } from "../theme";
+
+// The database is the source of truth; the demo mesh rides on top of it the
+// same way it does on the node list, so this screen is never empty on a first
+// visit. Real rows always win — the demo only fills where the DB has nothing.
+const teleNodes = async (): Promise<number[]> => [
+	...new Set([...(await listTelemetryNodes()), ...demoTelemetryNodes()]),
+];
+const teleMetrics = async (node: number): Promise<string[]> => {
+	const real = await listMetrics(node);
+	return real.length ? real : demoTelemetryMetrics(node);
+};
+const teleLoad = async (
+	node: number,
+	metric: string,
+	since: number,
+): Promise<{ ts: number; value: number }[]> => {
+	const real = await loadTelemetry(node, metric, since);
+	return real.length ? real : demoTelemetry(node, metric, since);
+};
 
 // pseudo-metric: ChUtil + AirUtilTx on the same chart
 const CHANNEL = "__canal";
@@ -83,7 +103,7 @@ export default function Telemetry() {
 
 	useEffect(() => {
 		let alive = true;
-		listTelemetryNodes().then((ns) => {
+		teleNodes().then((ns) => {
 			if (alive) setWithData(new Set(ns));
 		});
 		return () => {
@@ -104,7 +124,7 @@ export default function Telemetry() {
 
 	useEffect(() => {
 		if (effectiveNode === undefined) return;
-		listMetrics(effectiveNode).then((raw) => {
+		teleMetrics(effectiveNode).then((raw) => {
 			const m =
 				raw.includes("channelUtilization") && raw.includes("airUtilTx")
 					? [CHANNEL, ...raw]
@@ -129,12 +149,12 @@ export default function Telemetry() {
 		const realMetric = metric === CHANNEL ? "channelUtilization" : metric;
 		const load = dual
 			? Promise.all([
-					loadTelemetry(effectiveNode, "channelUtilization", since),
-					loadTelemetry(effectiveNode, "airUtilTx", since),
+					teleLoad(effectiveNode, "channelUtilization", since),
+					teleLoad(effectiveNode, "airUtilTx", since),
 				])
 			: Promise.all([
-					loadTelemetry(effectiveNode, realMetric, since),
-					...compare.map((n) => loadTelemetry(n, realMetric, since)),
+					teleLoad(effectiveNode, realMetric, since),
+					...compare.map((n) => teleLoad(n, realMetric, since)),
 				]);
 		load.then(([rows, ...extra]) => {
 			const rows2 = dual ? extra[0] : undefined;
@@ -272,7 +292,7 @@ export default function Telemetry() {
 			const realMetric = metric === CHANNEL ? "channelUtilization" : metric;
 			const targets = [effectiveNode, ...compare];
 			const series = await Promise.all(
-				targets.map((n) => loadTelemetry(n, realMetric, since)),
+				targets.map((n) => teleLoad(n, realMetric, since)),
 			);
 			const rows = ["iso_date,epoch_ms,node,node_id,metric,value"];
 			targets.forEach((num, i) => {

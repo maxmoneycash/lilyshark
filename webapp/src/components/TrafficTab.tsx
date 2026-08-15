@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   findShelbyPointer,
   hasField,
@@ -162,27 +163,39 @@ export function TrafficTab() {
 
         {capture && (
           <>
-            <div className="kv">
-              <span className="k">FRAMES</span>
-              <span className="v">{stats.frames}</span>
-              <span className="k">PAYLOAD</span>
-              <span className="v">{stats.bytes.toLocaleString()} B</span>
-              <span className="k">CRC</span>
-              <span className="v">
-                <span className="ok">{stats.crcValid} OK</span>
-                {' · '}
-                <span className={stats.crcInvalid ? 'err' : 'dim'}>{stats.crcInvalid} BAD</span>
-              </span>
-              <span className="k">BEST SNR</span>
-              <span className="v">{stats.bestSnrDb?.toFixed(1) ?? '—'} dB</span>
-              <span className="k">MEDIAN RSSI</span>
-              <span className="v">{stats.medianRssiDbm?.toFixed(1) ?? '—'} dBm</span>
-              <span className="k">AIRTIME</span>
-              <span className="v">{stats.airtimeMs.toFixed(0)} ms</span>
-              <span className="k">SHELBY PTRS</span>
-              <span className={pointers.some(Boolean) ? 'v ok' : 'v dim'}>
-                {pointers.filter(Boolean).length}
-              </span>
+            {/* One horizontal strip: as a two-column kv this stretched seven
+                short readouts down half the panel with the right side empty. */}
+            <div className="stat-strip">
+              {(
+                [
+                  ['FRAMES', <>{stats.frames}</>],
+                  ['PAYLOAD', <>{stats.bytes.toLocaleString()} B</>],
+                  [
+                    'CRC',
+                    <>
+                      <span className="ok">{stats.crcValid} OK</span>
+                      {' · '}
+                      <span className={stats.crcInvalid ? 'err' : 'dim'}>
+                        {stats.crcInvalid} BAD
+                      </span>
+                    </>,
+                  ],
+                  ['BEST SNR', <>{stats.bestSnrDb?.toFixed(1) ?? '—'} dB</>],
+                  ['MEDIAN RSSI', <>{stats.medianRssiDbm?.toFixed(1) ?? '—'} dBm</>],
+                  ['AIRTIME', <>{stats.airtimeMs.toFixed(0)} ms</>],
+                  [
+                    'SHELBY PTRS',
+                    <span className={pointers.some(Boolean) ? 'ok' : 'dim'}>
+                      {pointers.filter(Boolean).length}
+                    </span>,
+                  ],
+                ] as [string, ReactNode][]
+              ).map(([k, v]) => (
+                <span className="stat" key={k}>
+                  <span className="k">{k}</span>
+                  <span className="v">{v}</span>
+                </span>
+              ))}
             </div>
 
             <div className="scroll-y">
@@ -242,6 +255,9 @@ export function TrafficTab() {
 
             <div className="panel-foot">
               {frames.length} FRAMES · {pointers.filter(Boolean).length} SHELBY POINTER(S)
+              {frames.some((fr) => fr.truncated) && (
+                <span className="dim">* = FRAME TRUNCATED AT CAPTURE</span>
+              )}
             </div>
           </>
         )}

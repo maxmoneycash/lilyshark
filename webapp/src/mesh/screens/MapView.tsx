@@ -6,7 +6,7 @@ import { ago, asciiBattery, fechaHora, useHourTick } from "../fmt";
 import { t, useLangTick } from "../i18n";
 import { deleteWaypoint, sendWaypoint } from "../radio";
 import { getSnapshot, subscribe } from "../store";
-import { accent, fg, useThemeTick } from "../theme";
+import { accent, fg, isLight, useThemeTick } from "../theme";
 
 interface Draft {
 	id?: number; // defined = editing
@@ -310,7 +310,11 @@ export default function MapView({
 								{label}
 							</button>
 						))}
-						<span style={{ marginLeft: 4 }}>{t("CAPA: OSCURA")}</span>
+						{/* The tiles are recolored to whatever the theme is; the label was
+						    hardcoded to the dark terminal's and lied on the light one. */}
+						<span style={{ marginLeft: 4 }}>
+							{isLight() ? t("CAPA: CLARA") : t("CAPA: OSCURA")}
+						</span>
 					</span>
 				</div>
 				<div className="map-wrap">

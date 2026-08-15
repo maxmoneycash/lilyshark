@@ -261,7 +261,7 @@ export default function Chat({
         </div>
         <div
           ref={listRef}
-          className="scroll-y"
+          className="scroll-y chat-msgs"
           style={{
             padding: "12px 14px",
             display: "flex",

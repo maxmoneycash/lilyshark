@@ -1515,3 +1515,49 @@ body:has(.meshterm .app.menu-open) {
 		display: none;
 	}
 }
+
+/* ── Refinement pass ──────────────────────────────────────────────────────
+   The medium-severity items from the live audit: layout rhythm rather than
+   breakage. */
+
+/* Capture stats read as one instrument strip across the panel instead of a
+   two-column list stretched down half of it. Each pair is one flex item, so
+   a wrap can only ever happen between readouts, never inside one. */
+.meshterm .stat-strip {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px 30px;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--border);
+	font-size: 12.5px;
+}
+.meshterm .stat-strip .stat {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 9px;
+	white-space: nowrap;
+}
+.meshterm .stat-strip .k {
+	color: var(--fg-dim);
+	font-size: 10.5px;
+	letter-spacing: 1px;
+}
+:root.light .meshterm .stat-strip .v {
+	color: var(--ink);
+}
+
+/* Chat sticks to the composer: with few messages the conversation used to
+   float at the top with half a panel of nothing between it and the input.
+   margin-top on the first child bottom-anchors without breaking scrolling
+   once the history outgrows the pane. */
+.meshterm .chat-msgs > :first-child {
+	margin-top: auto;
+}
+
+/* The MESH stat tiles share the row's width instead of each sizing to its
+   own label, which left the row ragged and the right third of the panel
+   empty. The cap keeps a lone wrapped tile from spanning the whole row. */
+.meshterm .stat-tile {
+	flex: 1 1 110px;
+	max-width: 200px;
+}

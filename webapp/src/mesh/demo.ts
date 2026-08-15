@@ -174,6 +174,88 @@ export function demoNeighbors(): { node: number; neighbor: number; snr: number }
   return out;
 }
 
+/* ── Telemetry ─────────────────────────────────────────────────────────────
+   The TELEMETRY screen reads series from IndexedDB, where a real radio's
+   packets accumulate. The demo computes its series on demand instead of
+   writing invented rows into the database: deterministic diurnal curves, so
+   the chart is stable between loads and nothing pollutes real storage. */
+
+const TELE_STEP_MS = 15 * 60_000;
+
+export function demoTelemetryNodes(): number[] {
+  if (!seeded) return [];
+  return [DEMO_ME, ...SPECS.map((_, i) => DEMO_NODE_FLOOR + i + 1)];
+}
+
+/** Sensors report weather on top of the device metrics every node has. */
+export function demoTelemetryMetrics(node: number): string[] {
+  if (!seeded) return [];
+  const base = ["batteryLevel", "voltage", "channelUtilization", "airUtilTx"];
+  const spec = SPECS[node - DEMO_NODE_FLOOR - 1];
+  return spec?.type === ContactType.Sensor
+    ? [...base, "temperature", "relativeHumidity", "barometricPressure"]
+    : base;
+}
+
+/**
+ * A metric's series since `sinceTs`, one sample per 15 minutes, capped at 30
+ * days. Everything is a daily sinusoid with node-seeded jitter: solar charge
+ * peaks mid-afternoon, channel use follows people being awake, temperature
+ * and humidity move against each other, pressure wanders over days.
+ */
+export function demoTelemetry(
+  node: number,
+  metric: string,
+  sinceTs: number,
+): { ts: number; value: number }[] {
+  if (!seeded) return [];
+  const i = node - DEMO_NODE_FLOOR - 1;
+  if (node !== DEMO_ME && !SPECS[i]) return [];
+  const mains = node === DEMO_ME ? true : (SPECS[i].mains ?? false);
+
+  const now = Date.now();
+  const start = Math.max(sinceTs, now - 30 * 86_400_000);
+  const first = now - Math.floor((now - start) / TELE_STEP_MS) * TELE_STEP_MS;
+  const out: { ts: number; value: number }[] = [];
+
+  for (let ts = first; ts <= now; ts += TELE_STEP_MS) {
+    // Peaks at 14:00: solar noon-ish for charge, mid-afternoon for the rest.
+    const day = Math.sin((2 * Math.PI * ((ts / 3_600_000) % 24 - 8)) / 24);
+    const j = (k: number, spread: number) =>
+      jitter(Math.floor(ts / TELE_STEP_MS) * 13 + (node % 997) * 7 + k, spread);
+    const battery = mains
+      ? 100
+      : Math.min(100, Math.max(18, 72 + 16 * day + j(1, 3)));
+
+    let v: number | undefined;
+    switch (metric) {
+      case "batteryLevel":
+        v = battery;
+        break;
+      case "voltage":
+        v = 3.4 + (battery / 100) * 0.75;
+        break;
+      case "channelUtilization":
+        v = Math.max(0.5, 8 + 6 * day + j(2, 2));
+        break;
+      case "airUtilTx":
+        v = Math.max(0.1, 1.4 + 0.9 * day + j(3, 0.4));
+        break;
+      case "temperature":
+        v = 16 + 7 * day + j(4, 0.8);
+        break;
+      case "relativeHumidity":
+        v = Math.min(97, Math.max(30, 62 - 18 * day + j(5, 3)));
+        break;
+      case "barometricPressure":
+        v = 1013 + 4 * Math.sin(ts / (86_400_000 * 3)) + j(6, 0.5);
+        break;
+    }
+    if (v !== undefined) out.push({ ts, value: Math.round(v * 100) / 100 });
+  }
+  return out;
+}
+
 /** Us: at the center of the map, mains-fed, heard this second. */
 function meNode(now: number): NodeEntry {
   return {
