@@ -114,6 +114,24 @@ The decoder API preserves uncertainty. MeshCore transport codes are not presente
 
 These are explicit starting profiles, not automatic protocol detection. Choose settings that match the network and comply with the rules for your location before capturing traffic.
 
+## Architecture: off-grid data over Shelby
+
+A flooded LoRa mesh pays for every payload byte many times over. Measured against Meshtastic's discrete-event simulator, delivery costs R = 7.36 transmissions per delivered message at realistic density — against the 3 to 5 usually assumed — and reach falls from 68.6% to 25.8% as nodes are added, because every relay consumes shared channel time. Airtime is the scarce resource, and it shrinks as the network grows.
+
+Lilyshark therefore never asks the mesh to carry content. It carries an 82-byte `ShelbyPointer`: a fixed-layout reference to a blob stored on the Shelby storage protocol. The pointer rides inside a normal Meshtastic, MeshCore, or Reticulum payload — it is a payload convention, not a new link layer — so the same encoding works on all three protocols and unmodified nodes forward it untouched. Any node with an IP path, such as a phone or a base station, acts as a gateway: it resolves the pointer and moves the actual bytes over IP, where bandwidth is not shared with the mesh.
+
+![Off-grid data flow: the 82-byte Shelby pointer crosses the LoRa mesh, a gateway resolves it, and the full blob moves over IP between the gateway and Shelby storage](design/diagrams/architecture.svg)
+
+The 82 bytes hold a magic, version, flags, a 32-byte blob commitment, a 32-byte owner account address, blob size, expiry, and chunk index/count, which leaves headroom inside one LoRa frame (~200 practical payload bytes in Meshtastic) for the enclosing protocol's own header. The exact layout, encoder, decoder, and payload detector are in [include/lilyshark/shelby/shelby_pointer.h](include/lilyshark/shelby/shelby_pointer.h).
+
+![ShelbyPointer 82-byte wire format: magic SHLB, version, flags, 32-byte blob commitment, 32-byte owner account address, blob size, expiry, chunk index, and chunk count, all little-endian](design/diagrams/shelby-pointer-format.svg)
+
+Shelby, built on Aptos, provides the storage side: persistent, paid, verifiable blob reads and writes that a mesh with no IP path can still reference. The commitment identifies the content and the owner address identifies the paying account, so a gateway can fetch or post the blob without trusting the mesh. The Lilyshark webapp resolves pointers seen in captures and displays both the capture data and the state of the Shelby network.
+
+![Open stack from LILYGO T-Deck hardware through open radio protocols, Lilyshark firmware, the Shelby pointer convention, and Shelby storage on Aptos to the Lilyshark webapp](design/diagrams/stack.svg)
+
+An interactive 3D walkthrough of this flow — the T-Deck, the mesh, the pointer in flight, and the Shelby resolution — is deployed at [maxmoneycash.github.io/lilyshark](https://maxmoneycash.github.io/lilyshark/) from [site/](site/). It includes a scripted record mode; [docs/DEMO.md](docs/DEMO.md) is the matching video production guide.
+
 ## Radio capture and spectrum scanning
 
 The T-Deck target configures the onboard SX1262 for one active profile at a time. Its receive path records valid frames and CRC mismatches, then immediately returns the radio to receive mode. The in-memory UI store holds the newest 64 records while microSD capture keeps writing beyond that window.

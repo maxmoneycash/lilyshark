@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" role="img" aria-labelledby="fmtTitle">
+  <title id="fmtTitle">ShelbyPointer 82-byte wire format: magic SHLB, version, flags, 32-byte blob commitment, 32-byte owner account address, blob size, expiry, chunk index, chunk count. Little-endian.</title>
+  <style>
+    .sans { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+
+  <!-- panel -->
+  <rect x="0.5" y="0.5" width="1199" height="659" rx="8" fill="#0B0D10" stroke="#252B33"/>
+
+  <!-- header -->
+  <text class="sans" x="36" y="42" font-size="17" font-weight="600" letter-spacing="3" fill="#F0F4EF">SHELBYPOINTER WIRE FORMAT</text>
+  <text class="mono" x="36" y="62" font-size="11" fill="#8A93A0">82 bytes &#183; little-endian &#183; magic "SHLB" &#183; version 1 &#183; rides inside a Meshtastic / MeshCore / Reticulum payload</text>
+  <text class="mono" x="1164" y="42" font-size="10" letter-spacing="2" fill="#F05AA6" text-anchor="end">LILYSHARK &#183; SHELBY POINTER</text>
+  <line x1="36" y1="76" x2="1164" y2="76" stroke="#232830" stroke-width="1"/>
+
+  <!-- column ruler: +0 .. +15 -->
+  <text class="mono" x="137" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+0</text>
+  <text class="mono" x="203" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+1</text>
+  <text class="mono" x="269" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+2</text>
+  <text class="mono" x="335" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+3</text>
+  <text class="mono" x="401" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+4</text>
+  <text class="mono" x="467" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+5</text>
+  <text class="mono" x="533" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+6</text>
+  <text class="mono" x="599" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+7</text>
+  <text class="mono" x="665" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+8</text>
+  <text class="mono" x="731" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+9</text>
+  <text class="mono" x="797" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+10</text>
+  <text class="mono" x="863" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+11</text>
+  <text class="mono" x="929" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+12</text>
+  <text class="mono" x="995" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+13</text>
+  <text class="mono" x="1061" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+14</text>
+  <text class="mono" x="1127" y="112" font-size="9" fill="#5A6270" text-anchor="middle">+15</text>
+
+  <!-- row offsets, left = row start, right = row end -->
+  <text class="mono" x="92" y="151" font-size="9.5" fill="#8A93A0" text-anchor="end">0</text>
+  <text class="mono" x="92" y="201" font-size="9.5" fill="#8A93A0" text-anchor="end">16</text>
+  <text class="mono" x="92" y="251" font-size="9.5" fill="#8A93A0" text-anchor="end">32</text>
+  <text class="mono" x="92" y="301" font-size="9.5" fill="#8A93A0" text-anchor="end">48</text>
+  <text class="mono" x="92" y="351" font-size="9.5" fill="#8A93A0" text-anchor="end">64</text>
+  <text class="mono" x="92" y="401" font-size="9.5" fill="#8A93A0" text-anchor="end">80</text>
+  <text class="mono" x="1168" y="151" font-size="9" fill="#5A6270">15</text>
+  <text class="mono" x="1168" y="201" font-size="9" fill="#5A6270">31</text>
+  <text class="mono" x="1168" y="251" font-size="9" fill="#5A6270">47</text>
+  <text class="mono" x="1168" y="301" font-size="9" fill="#5A6270">63</text>
+  <text class="mono" x="1168" y="351" font-size="9" fill="#5A6270">79</text>
+
+  <!-- row 0 : bytes 0..15 -->
+  <rect x="104" y="122" width="264" height="50" fill="#F05AA6" fill-opacity="0.10" stroke="#F05AA6" stroke-width="1"/>
+  <text class="sans" x="112" y="138" font-size="8.5" letter-spacing="1.2" fill="#F05AA6">MAGIC</text>
+  <text class="mono" x="112" y="156" font-size="10.5" fill="#F0F4EF">"SHLB"  53 48 4C 42</text>
+  <rect x="368" y="122" width="66" height="50" fill="#F0F4EF" fill-opacity="0.04" stroke="#8A93A0" stroke-width="1"/>
+  <text class="sans" x="401" y="138" font-size="8.5" letter-spacing="1.2" fill="#8A93A0" text-anchor="middle">VER</text>
+  <text class="mono" x="401" y="156" font-size="10.5" fill="#F0F4EF" text-anchor="middle">1</text>
+  <rect x="434" y="122" width="66" height="50" fill="#F0B429" fill-opacity="0.10" stroke="#F0B429" stroke-width="1"/>
+  <text class="sans" x="467" y="138" font-size="8.5" letter-spacing="1.2" fill="#F0B429" text-anchor="middle">FLAGS</text>
+  <text class="mono" x="467" y="156" font-size="10.5" fill="#F0F4EF" text-anchor="middle">b0..2</text>
+  <rect x="500" y="122" width="660" height="50" fill="#66F05A" fill-opacity="0.08" stroke="#66F05A" stroke-width="1"/>
+  <text class="sans" x="508" y="138" font-size="8.5" letter-spacing="1.2" fill="#66F05A">BLOB COMMITMENT &#8594;</text>
+  <text class="mono" x="508" y="156" font-size="9.5" fill="#A8B2BD">starts @ 6</text>
+
+  <!-- row 1 : bytes 16..31 -->
+  <rect x="104" y="172" width="1056" height="50" fill="#66F05A" fill-opacity="0.08" stroke="#66F05A" stroke-width="1"/>
+  <text class="sans" x="632" y="194" font-size="9" letter-spacing="1.5" fill="#66F05A" text-anchor="middle">BLOB COMMITMENT</text>
+  <text class="mono" x="632" y="211" font-size="9.5" fill="#A8B2BD" text-anchor="middle">32 bytes &#183; bytes 6..37 &#183; content commitment of the stored blob</text>
+
+  <!-- row 2 : bytes 32..47 -->
+  <rect x="104" y="222" width="396" height="50" fill="#66F05A" fill-opacity="0.08" stroke="#66F05A" stroke-width="1"/>
+  <text class="sans" x="112" y="238" font-size="8.5" letter-spacing="1.2" fill="#66F05A">&#8594; BLOB COMMITMENT</text>
+  <text class="mono" x="112" y="256" font-size="9.5" fill="#A8B2BD">ends @ 37</text>
+  <rect x="500" y="222" width="660" height="50" fill="#71D8DF" fill-opacity="0.08" stroke="#71D8DF" stroke-width="1"/>
+  <text class="sans" x="508" y="238" font-size="8.5" letter-spacing="1.2" fill="#71D8DF">OWNER ACCOUNT ADDRESS &#8594;</text>
+  <text class="mono" x="508" y="256" font-size="9.5" fill="#A8B2BD">starts @ 38</text>
+
+  <!-- row 3 : bytes 48..63 -->
+  <rect x="104" y="272" width="1056" height="50" fill="#71D8DF" fill-opacity="0.08" stroke="#71D8DF" stroke-width="1"/>
+  <text class="sans" x="632" y="294" font-size="9" letter-spacing="1.5" fill="#71D8DF" text-anchor="middle">OWNER ACCOUNT ADDRESS</text>
+  <text class="mono" x="632" y="311" font-size="9.5" fill="#A8B2BD" text-anchor="middle">32 bytes &#183; bytes 38..69 &#183; account that owns and pays for the blob</text>
+
+  <!-- row 4 : bytes 64..79 -->
+  <rect x="104" y="322" width="396" height="50" fill="#71D8DF" fill-opacity="0.08" stroke="#71D8DF" stroke-width="1"/>
+  <text class="sans" x="112" y="338" font-size="8.5" letter-spacing="1.2" fill="#71D8DF">&#8594; OWNER ACCOUNT ADDRESS</text>
+  <text class="mono" x="112" y="356" font-size="9.5" fill="#A8B2BD">ends @ 69</text>
+  <rect x="500" y="322" width="264" height="50" fill="#F0F4EF" fill-opacity="0.04" stroke="#8A93A0" stroke-width="1"/>
+  <text class="sans" x="508" y="338" font-size="8.5" letter-spacing="1.2" fill="#8A93A0">BLOB SIZE</text>
+  <text class="mono" x="508" y="356" font-size="9.5" fill="#F0F4EF">u32 LE &#183; bytes 70..73</text>
+  <rect x="764" y="322" width="264" height="50" fill="#F0F4EF" fill-opacity="0.04" stroke="#8A93A0" stroke-width="1"/>
+  <text class="sans" x="772" y="338" font-size="8.5" letter-spacing="1.2" fill="#8A93A0">EXPIRY</text>
+  <text class="mono" x="772" y="356" font-size="9.5" fill="#F0F4EF">u32 LE &#183; unix s &#183; 74..77</text>
+  <rect x="1028" y="322" width="132" height="50" fill="#F0F4EF" fill-opacity="0.04" stroke="#8A93A0" stroke-width="1"/>
+  <text class="sans" x="1094" y="338" font-size="8.5" letter-spacing="1.2" fill="#8A93A0" text-anchor="middle">CHUNK IDX</text>
+  <text class="mono" x="1094" y="356" font-size="9.5" fill="#F0F4EF" text-anchor="middle">u16 LE &#183; 78..79</text>
+
+  <!-- row 5 : bytes 80..81 -->
+  <rect x="104" y="372" width="132" height="50" fill="#F0F4EF" fill-opacity="0.04" stroke="#8A93A0" stroke-width="1"/>
+  <text class="sans" x="170" y="388" font-size="8.5" letter-spacing="1.2" fill="#8A93A0" text-anchor="middle">CHUNK CNT</text>
+  <text class="mono" x="170" y="406" font-size="9.5" fill="#F0F4EF" text-anchor="middle">u16 LE &#183; 80..81</text>
+  <rect x="236" y="372" width="924" height="50" fill="none" stroke="#3A4048" stroke-width="1" stroke-dasharray="4 4"/>
+  <text class="mono" x="698" y="401" font-size="9.5" fill="#5A6270" text-anchor="middle">end of pointer &#183; 82 bytes total &#183; remaining frame bytes belong to the host protocol</text>
+
+  <!-- flags breakout -->
+  <text class="sans" x="104" y="470" font-size="10" font-weight="600" letter-spacing="2" fill="#F0B429">FLAGS &#8212; BYTE 5</text>
+  <!-- bit cells b7..b0 left to right -->
+  <rect x="104" y="482" width="44" height="36" fill="none" stroke="#3A4048" stroke-width="1"/>
+  <text class="mono" x="126" y="504" font-size="9" fill="#5A6270" text-anchor="middle">0</text>
+  <rect x="148" y="482" width="44" height="36" fill="none" stroke="#3A4048" stroke-width="1"/>
+  <text class="mono" x="170" y="504" font-size="9" fill="#5A6270" text-anchor="middle">0</text>
+  <rect x="192" y="482" width="44" height="36" fill="none" stroke="#3A4048" stroke-width="1"/>
+  <text class="mono" x="214" y="504" font-size="9" fill="#5A6270" text-anchor="middle">0</text>
+  <rect x="236" y="482" width="44" height="36" fill="none" stroke="#3A4048" stroke-width="1"/>
+  <text class="mono" x="258" y="504" font-size="9" fill="#5A6270" text-anchor="middle">0</text>
+  <rect x="280" y="482" width="44" height="36" fill="none" stroke="#3A4048" stroke-width="1"/>
+  <text class="mono" x="302" y="504" font-size="9" fill="#5A6270" text-anchor="middle">0</text>
+  <rect x="324" y="482" width="44" height="36" fill="#F0B429" fill-opacity="0.10" stroke="#F0B429" stroke-width="1"/>
+  <text class="mono" x="346" y="504" font-size="8.5" fill="#F0B429" text-anchor="middle">CAP</text>
+  <rect x="368" y="482" width="44" height="36" fill="#F0B429" fill-opacity="0.10" stroke="#F0B429" stroke-width="1"/>
+  <text class="mono" x="390" y="504" font-size="8.5" fill="#F0B429" text-anchor="middle">CHK</text>
+  <rect x="412" y="482" width="44" height="36" fill="#F0B429" fill-opacity="0.10" stroke="#F0B429" stroke-width="1"/>
+  <text class="mono" x="434" y="504" font-size="8.5" fill="#F0B429" text-anchor="middle">ENC</text>
+  <!-- bit indices -->
+  <text class="mono" x="126" y="532" font-size="8.5" fill="#5A6270" text-anchor="middle">b7</text>
+  <text class="mono" x="170" y="532" font-size="8.5" fill="#5A6270" text-anchor="middle">b6</text>
+  <text class="mono" x="214" y="532" font-size="8.5" fill="#5A6270" text-anchor="middle">b5</text>
+  <text class="mono" x="258" y="532" font-size="8.5" fill="#5A6270" text-anchor="middle">b4</text>
+  <text class="mono" x="302" y="532" font-size="8.5" fill="#5A6270" text-anchor="middle">b3</text>
+  <text class="mono" x="346" y="532" font-size="8.5" fill="#F0B429" text-anchor="middle">b2</text>
+  <text class="mono" x="390" y="532" font-size="8.5" fill="#F0B429" text-anchor="middle">b1</text>
+  <text class="mono" x="434" y="532" font-size="8.5" fill="#F0B429" text-anchor="middle">b0</text>
+  <!-- flag legend -->
+  <text class="mono" x="560" y="494" font-size="10" fill="#A8B2BD">b0  ENCRYPTED &#8212; blob encrypted with the channel key (firmware never holds it)</text>
+  <text class="mono" x="560" y="512" font-size="10" fill="#A8B2BD">b1  CHUNKED   &#8212; this pointer is one part of a multi-frame set</text>
+  <text class="mono" x="560" y="530" font-size="10" fill="#A8B2BD">b2  CAPTURE   &#8212; blob is a Lilyshark .lscap capture, not user content</text>
+  <text class="mono" x="560" y="548" font-size="10" fill="#5A6270">b3..b7 reserved &#8212; must be 0</text>
+
+  <!-- footer -->
+  <line x1="36" y1="576" x2="1164" y2="576" stroke="#232830" stroke-width="1"/>
+  <text class="mono" x="36" y="600" font-size="10" fill="#8A93A0">82 bytes fits one LoRa frame (~200 practical payload bytes in Meshtastic) with headroom for the</text>
+  <text class="mono" x="36" y="618" font-size="10" fill="#8A93A0">enclosing protocol header. All multi-byte integers are little-endian.</text>
+</svg>
