@@ -6,9 +6,10 @@ import { ActivityTab } from './components/ActivityTab'
 import { EconomyTab } from './components/EconomyTab'
 import { ShareTab } from './components/ShareTab'
 import { TrafficTab } from './components/TrafficTab'
+import { WhitepaperTab } from './components/WhitepaperTab'
 import { WalletButton } from './components/WalletButton'
 
-type Tab = 'traffic' | 'activity' | 'metrics' | 'providers' | 'economy' | 'share'
+type Tab = 'traffic' | 'whitepaper' | 'activity' | 'metrics' | 'providers' | 'economy' | 'share'
 
 interface NetworkStats {
   totalBlobs: number
@@ -131,8 +132,15 @@ function App() {
             <span className="dot-yellow">●</span>
             <span className="dot-green">●</span>
           </row>
-          <row style={{ gap: '0.5rem', alignItems: 'center' }}>
-            {windowWidth >= 768 && <span is-="badge" variant-="root">Lilyshark</span>}
+          <row style={{ gap: '0.75rem', alignItems: 'center' }}>
+            {/* Wordmark is the brand mark; alt text carries the name for screen
+                readers. Black reads against the light header — the pink variant
+                sits too close to the header's own tint to stay legible. */}
+            <img
+              src="/lilyshark-wordmark-black.svg"
+              alt="Lilyshark"
+              style={{ height: '1.9rem', width: 'auto', display: 'block' }}
+            />
             {/* Wallet Button - Desktop only (in header) */}
             {windowWidth >= 768 && <WalletButton variant="header" />}
           </row>
@@ -148,6 +156,12 @@ function App() {
               className={activeTab === 'activity' ? 'active' : ''}
             >
               Activity
+            </button>
+            <button
+              onClick={() => setActiveTab('whitepaper')}
+              className={activeTab === 'whitepaper' ? 'active' : ''}
+            >
+              Whitepaper
             </button>
             <button
               onClick={() => setActiveTab('economy')}
@@ -219,6 +233,7 @@ function App() {
           }}
         >
           {activeTab === 'traffic' && <TrafficTab />}
+          {activeTab === 'whitepaper' && <WhitepaperTab />}
           {activeTab === 'activity' && <ActivityTab currentTime={currentTime} />}
           {activeTab === 'economy' && <EconomyTab />}
           {activeTab === 'metrics' && <MetricsTab />}

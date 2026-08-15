@@ -296,8 +296,11 @@ export class DataService {
     return this.coalesce(cacheKey, async () => {
       try {
         const providers = await this.aptosClient.fetchStorageProviders();
-        // Cache for 5 minutes (300s) - providers rarely change
-        this.cache.set(cacheKey, providers, 300);
+        // Providers rarely change, and the indexer quota is shared with the blob
+        // backfill. Cache a successful result for an hour; keep an empty result
+        // short-lived so a rate-limited miss retries soon instead of pinning the
+        // tab empty for an hour.
+        this.cache.set(cacheKey, providers, providers.length > 0 ? 3600 : 60);
         return providers;
       } catch (error) {
         logger.error({ error }, "Failed to fetch storage providers");

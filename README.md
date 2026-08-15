@@ -18,8 +18,58 @@ Meshtastic, MeshCore, and Reticulum-compatible RNode traffic share one capture e
 
 A single T-Deck is enough for field surveys, packet inspection, radio-profile checks, interference hunting, and capture. Lilyshark listens to traffic already on the air and gives that traffic a diagnostic interface you can carry.
 
+The firmware is also a complete device shell, not a loose collection of graphs. It boots into the pink Lilyshark wordmark, guides a first-time user through network and radio-profile selection, checks the available hardware, then opens a Home screen with clear routes to live diagnostics and settings. Capture, storage, radio, display, keyboard, optional GPS, Help, About, and setup reset are all controllable on the T-Deck.
+
 > [!WARNING]
 > The current firmware is a developer alpha. The simulator, sanitizer-backed host tests, T-Deck build, and merged factory image run successfully in the development environment. No physical T-Deck was connected for the current build pass, so display orientation, touch calibration, radio reception, microSD behavior, optional GPS, battery readings, and spectrum-scan recovery still need a hardware smoke test. Treat the generated image as test firmware until those checks pass.
+
+## Two halves: the device and the analyzer
+
+Lilyshark is firmware plus a web analyzer that reads what the firmware records.
+
+| | Where | What it does |
+| --- | --- | --- |
+| **Firmware** | `src/`, `include/` | Captures LoRa frames off the SX1262 with their radio measurements. Writes `.lscap` and LoRaTap PCAP to microSD. |
+| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.vercel.app](https://lilyshark.vercel.app)** | Opens those captures Wireshark-style: frame list, decoded RF metadata, hex dump, capture statistics. Also indexes the Shelby network. |
+
+## Shelby: storage for captures, and a pointer that fits one LoRa frame
+
+A capture is only worth something if you can prove it is the same bytes the radio
+heard, so captures belong in content-addressed storage rather than on a card that
+can be edited. Lilyshark uses [Shelby](https://shelby.xyz) for that, and the
+analyzer can fetch a capture by Shelby blob name and parse it in the browser.
+
+Reaching Shelby from off-grid needed a design rather than a wire. **A LoRa node has
+no IP path, so it cannot call Shelby.** It does not need to: the mesh moves ~200
+usable bytes per frame, far too small for a payload and far larger than a blob
+reference. So the radio carries an 82-byte **Shelby pointer** and a node with
+connectivity moves the bytes.
+
+```
+include/lilyshark/shelby/shelby_pointer.h    82-byte wire format, magic "SHLB"
+src/shelby/shelby_pointer.cpp                encode / decode / locate
+src/shelby/shelby_pointer_decoder.cpp        finds pointers inside captured frames
+webapp/src/lib/lscap.ts                      the same format, read in TypeScript
+```
+
+The pointer carries a blob commitment, owner account, size, expiry, and chunk
+position. It is deliberately **not a new link layer** — it is an application payload
+convention, which is why one encoding works inside Meshtastic, MeshCore, and
+Reticulum alike, and why a node running stock firmware relays it without knowing
+what it is. Decoding rejects inconsistent chunk state, so a receiver can never
+mistake one part of a split blob for a complete one. The C++ encoder and the
+TypeScript decoder are cross-checked byte for byte.
+
+Keeping the over-the-air object small is a measured decision, not a stylistic one:
+against Meshtastic's own discrete-event simulator a flooded mesh spends **R = 7.36**
+transmissions per delivered message at realistic density, and reach falls from 68.6%
+to 25.8% as nodes are added. Airtime is the scarce resource, so send a reference and
+let a connected node carry the payload.
+
+> **Status:** the pointer codec, the cross-protocol decoder, the capture format, and
+> the analyzer are built and tested under AddressSanitizer and UndefinedBehaviorSanitizer.
+> The gateway that resolves a pointer to and from Shelby over IP is the next piece,
+> not a shipped one.
 
 ## Download
 
@@ -41,7 +91,26 @@ The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/rele
 
 The 320x240 interface gives the display to telemetry. It uses condensed labels, monospaced values, one-pixel rules, compact plots, and high-contrast selection. Lime marks live or healthy data, cyan marks navigation and information, amber marks warnings, and coral marks faults.
 
-These two images come from the working LVGL simulator:
+These images come from the working LVGL simulator and use the exact 320x240 device layout:
+
+<table>
+  <tr>
+    <td width="50%"><img src="design/previews/splash-simulator.png" alt="Pink Lilyshark wordmark on the firmware splash screen"></td>
+    <td width="50%"><img src="design/previews/onboarding-simulator.png" alt="Lilyshark first-run network selection"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>First visible frame</sub></td>
+    <td align="center"><sub>Guided first-run setup</sub></td>
+  </tr>
+  <tr>
+    <td><img src="design/previews/home-simulator.png" alt="Lilyshark Home screen with analyzer and Settings routes"></td>
+    <td><img src="design/previews/settings-simulator.png" alt="Lilyshark Settings menu"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Home</sub></td>
+    <td align="center"><sub>Settings</sub></td>
+  </tr>
+</table>
 
 <table>
   <tr>
@@ -73,25 +142,40 @@ The hardware mockups below define the visual target for the T-Deck build:
 
 All ten reference images and their screen mapping live in [design/references](design/references/README.md).
 
-### Nine views
+### Product shell
 
-| Key | View | Current device behavior |
+On a fresh install, Lilyshark follows this path:
+
+1. Show the antialiased pink wordmark before the backlight reveals the application UI.
+2. Ask which mesh family the operator intends to inspect.
+3. Choose and apply a matching radio preset.
+4. Report input, microSD, optional GPS, radio, and capture readiness honestly.
+5. Save first-run completion only after the settings write succeeds.
+6. Open Home, where every live view and Settings is reachable without memorizing keys.
+
+Returning users can start at Home or resume the last live view. Settings exposes the active radio profile, capture and storage state, device status, display brightness, keyboard light, optional GPS polling, startup behavior, Help, About, and a guarded setup reset. Failed persistence rolls the visible value back instead of pretending it was saved.
+
+### Analyzer views
+
+| Route | View | Current device behavior |
 | ---: | --- | --- |
 | `1` | **Traffic** | Shows captured frames from the bounded in-memory store. Up/Down selects a row; Enter opens it. |
 | `2` | **Spectrum** | Runs and renders an SX1262 power-histogram sweep for the active profile's band. |
 | `3` | **Nodes** | Lists observed protocol identities and signal history. Up/Down selects a row; Enter opens it. |
-| `4` | **Node detail** | Summarizes recent frames, SNR, RSSI, and activity for an observed source. |
-| `5` | **Packet detail** | Shows protocol fields, RF measurements, integrity state, and raw bytes. |
-| `6` | **Map** | Shows the local optional-GPS fix and states clearly when remote positions are unavailable. |
-| `7` | **Survey** | Captures a 60-second diagnostic sample and reports observed results. |
-| `8` | **Events** | Reports radio, profile, capture, PCAP, and screenshot state. |
-| `9` | **Utilization** | Summarizes observed airtime, frame rate, CRC failures, and recent activity. |
+| Traffic → Enter | **Packet detail** | Shows protocol fields, RF measurements, integrity state, and every captured raw byte in bounded 40-byte pages. |
+| Nodes → Enter | **Node detail** | Summarizes recent frames, SNR, RSSI, and activity for an observed source. |
+| `4` | **Map** | Shows the local optional-GPS fix and distinguishes GPS Off, missing hardware, search, and fix states. |
+| `5` | **Survey** | Captures a 60-second diagnostic sample and reports observed results. |
+| `6` | **Airtime** | Summarizes observed airtime, frame rate, CRC failures, and recent activity. |
+| `7` | **Events** | Reports radio, profile, capture, PCAP, screenshot, settings, and hardware state in a scrollable history. |
+
+`8` opens Settings. `M` or `0` opens Home. Left and Right move through the seven primary live views; reaching either end returns to Home instead of wrapping invisibly.
 
 The simulator fills these views with deterministic example data. The T-Deck target uses captured data or an explicit unavailable state.
 
 ## Protocol coverage
 
-Decoding is profile-gated because these LoRa protocols do not all carry an unambiguous magic value. Press `P` on the T-Deck to cycle the active radio profile. Use `-`/`+`, `B`, `F`, and `C` to tune its frequency, bandwidth, spreading factor, and coding rate for the network in front of you. The active preset and tuned values are saved across restarts. Lilyshark reconfigures the SX1262 transactionally and uses the matching structural decoder.
+Decoding is profile-gated because these LoRa protocols do not all carry an unambiguous magic value. Press `P` on the T-Deck to open the radio-profile picker. Use `-`/`+`, `B`, `F`, and `C` to tune its frequency, bandwidth, spreading factor, and coding rate for the network in front of you. The active preset and tuned values are saved across restarts. Lilyshark reconfigures the SX1262 transactionally and uses the matching structural decoder.
 
 | Protocol | Included profiles | Fields decoded today | Current boundary |
 | --- | --- | --- | --- |
@@ -132,7 +216,7 @@ Insert a writable microSD card before boot. Lilyshark mounts it, creates `/lilys
 | LoRaTap PCAP | `/lilyshark/capture-####.pcap` | Standard PCAP with DLT 270 LoRaTap records for Wireshark and compatible tools. |
 | Screenshot | `/lilyshark/screenshot-####.bmp` | Pixel-exact 320x240, uncompressed 24-bit BMP captured from the device display when `S` is pressed. |
 
-LoRaTap v0 cannot represent every bandwidth exactly. The included MeshCore 62.5 kHz profile therefore continues recording `.lscap` while the Events view reports the PCAP bandwidth limit. Profiles at 125 kHz or exact multiples can produce LoRaTap records. Capture sinks flush every five seconds during normal operation. A short write or a post-flush size mismatch closes that file and latches a storage error; after reinserting a card, reboot Lilyshark to open new capture files.
+LoRaTap v0 cannot represent every bandwidth exactly. The included MeshCore 62.5 kHz profile therefore continues recording `.lscap` while the Events view reports the PCAP bandwidth limit. Profiles at 125 kHz or exact multiples can produce LoRaTap records. Capture sinks flush every five seconds during normal operation. A short write or a post-flush size mismatch closes that file and latches a storage error. After restoring writable storage, open **Settings → Capture & Storage** and retry capture to create new unique files; reboot if the card itself was reinserted after the SPI stack reported a mount failure.
 
 Capture timestamps are monotonic microseconds since boot. That preserves order
 and intervals, but the original T-Deck has no dependable real-time clock, so
@@ -168,18 +252,21 @@ Saving a BMP uses the display and microSD on the shared SPI bus. Reception stays
 
 | Control | Action |
 | --- | --- |
-| Left/Right or horizontal touch swipe | Move through the seven primary views |
-| Up/Down or vertical touch swipe | Move the focused row in Traffic and Nodes |
-| Trackball press or `Enter` | Open packet/node detail, start a survey, or start/cancel a spectrum sweep |
-| `Backspace` | Return from packet or node detail |
-| `1` through `9` | Open a primary view directly |
-| `P` | Cycle Meshtastic, MeshCore US, MeshCore legacy, and RNode EU/US starting profiles |
+| Left/Right or horizontal touch swipe | Move through the seven primary analyzer views; adjust a selected setting where the screen says so |
+| Up/Down or vertical touch swipe | Move menu and table focus; page Packet Detail raw bytes and the Events history |
+| Trackball press or `Enter` | Open the focused route or record, apply a choice, start a survey, or start/cancel a spectrum sweep |
+| `Backspace` | Go back through the product shell or return from a detail view |
+| `M` or `0` | Open Home; press again to return to the analyzer |
+| `1` through `7` | Open Traffic, Spectrum, Nodes, Map, Survey, Airtime, or Events directly |
+| `8` | Open Settings |
+| `P` | Open the five-preset radio-profile picker with the active preset focused |
 | `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
 | `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
 | `F` | Cycle spreading factors 7 through 12 |
 | `C` | Cycle coding rates 4/5 through 4/8 |
 | `S` | Save a BMP screenshot to microSD |
-| Touch tap | Perform the current Enter action |
+| `?` | Open Help without bypassing unfinished onboarding or destructive confirmations |
+| Touch tap | Select the tapped menu/table row or invoke the exact left/right action shown in the footer |
 
 The touchscreen probes the GT911 at both T-Deck addresses and reports absence instead of blocking startup. The trackball and keyboard remain available when touch is missing.
 
@@ -195,7 +282,7 @@ flowchart LR
     D --> E[Protocol-aware packet]
     C --> F[LSCAP and LoRaTap writers]
     E --> G[64-record capture store]
-    G --> H[Nine-screen LVGL interface]
+    G --> H[Product shell and nine analyzer views]
     F --> I[microSD]
 ```
 
@@ -205,7 +292,8 @@ The scan state machine gives the SX1262 exclusive ownership during a sweep. It h
 
 | Area | Evidence in this repository | Physical T-Deck status |
 | --- | --- | --- |
-| Nine-screen LVGL interface | Exact 320x240 framebuffer comparisons, interaction tests, and checked-in previews cover every view | Pending display smoke test |
+| Product shell and analyzer UI | Exact 320x240 framebuffer comparisons cover the pink splash, four-step onboarding, Home, menus, confirmations, and nine analyzer views. Interaction tests cover keyboard, trackball-equivalent navigation, touch hit targets, back-stack behavior, first-run persistence, and failure rollback. | Pending display and input smoke test |
+| Embedded wordmark | A generated 264x128 A8 mask keeps the SVG's antialiased edge detail, lives in flash, and is recolored Lily Pink at draw time. A source/payload hash test and device-shell framebuffer check protect the asset. | Pending physical panel confirmation |
 | T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts. A host test checks every command, data byte, and delay in the panel initialization sequence against LilyGO T-Deck commit `274ddaa`. TFT_eSPI 2.5.43 is pinned with the upstream one-line SPI2 register fix at [`880ec0e`](https://github.com/maxmoneycash/TFT_eSPI/commit/880ec0e4657c0de56d28cc250bdbbe863386021e), and a compile-time guard rejects an invalid ESP32-S3 register base. The device shell also runs against host peripheral fakes. | Boot and panel output not yet observed on hardware |
 | SX1262 frame capture | The real radio service runs against host fakes covering configure, IRQ/read/rearm order, CRC mismatch, retry, scan, restore, and recovery | Reception and long-run recovery pending |
 | Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Live over-air sample pending |
@@ -219,7 +307,7 @@ The scan state machine gives the SX1262 exclusive ownership during a sweep. It h
 | Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | ADC calibration and serial receiver test pending |
 | Spectrum scan | Request/result tests plus radio restore state machine | Experimental; complete hardware validation pending |
 
-The standalone C++ tests compile with warnings as errors and run under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator test renders every view into a full 320x240 RGB565 buffer and checks its exact pixels, content threshold, and uniqueness. The serial checker is fixture-tested and reads without writing to the port. Alpha.6 also executes the device setup and loop under AddressSanitizer and UndefinedBehaviorSanitizer through host peripheral fakes, including startup ordering and missing-hardware behavior. These checks do not replace the pending physical display and input smoke tests. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
+The standalone C++ tests compile with warnings as errors and run under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator test renders all 24 analyzer and product-shell routes into a full 320x240 RGB565 buffer and checks exact pixels, content thresholds, and uniqueness. The serial checker is fixture-tested and reads without writing to the port. Alpha.7 also executes the real device setup and loop under the sanitizers through host peripheral fakes, including first-frame/backlight ordering, onboarding persistence, missing-hardware recovery, menu navigation, settings rollback, a radio frame flowing into both capture formats and the UI, raw-byte paging, and event-history scrolling. These checks do not replace the pending physical display and input smoke tests. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
 
 ## Build and test
 
@@ -287,12 +375,23 @@ Pass a view number to open that screen at launch:
 .pio/build/simulator/program 2
 ```
 
-Render all nine views without opening an SDL window and compare their exact
+Render all analyzer and product-shell routes without opening an SDL window and compare their exact
 framebuffers with the checked-in expectations:
 
 ```sh
 .pio/build/simulator/program --render-test
 ```
+
+Run the automatic presentation tour for a screen recording:
+
+```sh
+./scripts/run_ui_demo.sh
+```
+
+On macOS, `./scripts/run_ui_demo.sh --record` opens the system screen recorder,
+waits 15 seconds, then drives one complete 115-second pass through the real UI
+navigation. See the [recording guide](docs/RECORDING_UI.md) for the full shot list
+and output options.
 
 Run the simulator as one long-lived process that rebuilds every view once per second. With no argument, the runner stops after 24 hours and fails on an early exit or fatal diagnostic:
 
@@ -328,16 +427,21 @@ include/lilyshark/core/       Protocol-neutral records, profiles, store, and spe
 include/lilyshark/protocols/  Meshtastic, MeshCore, and Reticulum decoder interfaces
 include/lilyshark/device/     T-Deck radio, status, touch, screenshot, and SD services
 include/lilyshark/export/     LSCAP and LoRaTap writer interfaces
+include/lilyshark/shelby/     Shelby off-grid pointer format and its frame decoder
 include/lilyshark/ui/         Packet presentation and derived-node policy
 src/core/                     Decoder registry, profiles, decoders, and spectrum helpers
 src/device/                   ESP32-S3 and T-Deck hardware implementations
 src/export/                   Capture encoders
+src/shelby/                   Shelby pointer encode, decode, and in-frame detection
+webapp/                       Web analyzer and Shelby network dashboard (Vite + React)
+webapp/src/lib/lscap.ts       .lscap and Shelby-pointer readers, matching the firmware
 src/ui/                       Shared packet labels and UI admission rules
 src/sim_main.cpp              Shared LVGL screens plus simulator and T-Deck shells
 src/fonts/                    Generated LVGL font sources
 test/                         Sanitizer-backed host tests
 scripts/                      Test, release-build, factory-image, and safe-flash tooling
 assets/brand/                 Pink transparent SVG wordmark and monochrome variants
+assets/device/                Embedded-wordmark generation notes and placement contract
 design/previews/              Captures from the working simulator
 design/references/            Ten target hardware mockups and their screen map
 docs/                         Capture format and flashing documentation
@@ -357,7 +461,9 @@ The T-Deck is the first hardware target. The capture record, decoder registry, a
 
 ## Roadmap to a stable release
 
-- [x] Build all nine reference-driven simulator screens.
+- [x] Build all nine reference-driven analyzer screens.
+- [x] Add the pink device splash, four-step onboarding, Home, Settings, Help, About, and guarded confirmations.
+- [x] Persist first-run, brightness, capture, GPS, and startup preferences with CRC validation and failure rollback.
 - [x] Add the ESP32-S3/T-Deck target and reproducible factory image.
 - [x] Capture SX1262 frames and CRC mismatches with configured channel settings, measured signal metrics, and explicit-header coding-rate/CRC metadata.
 - [x] Add profile-gated structural decoders for Meshtastic, MeshCore, and Reticulum/RNode.

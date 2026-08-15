@@ -1,13 +1,14 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-  parseLscap,
-  hexDump,
-  summarize,
+  findShelbyPointer,
   hasField,
-  RF_FIELD,
-  LscapParseError,
+  hexDump,
   type LscapCapture,
   type LscapFrame,
+  LscapParseError,
+  parseLscap,
+  RF_FIELD,
+  summarize,
 } from '../lib/lscap';
 
 /**
@@ -87,6 +88,11 @@ export function TrafficTab() {
   const frames = capture?.frames ?? [];
   const first = frames.length > 0 ? frames[0].timestampUs : 0n;
   const active = frames[selected];
+  // Scan every payload once per capture: a pointer rides behind whatever
+  // protocol header enclosed it, so any frame may carry one.
+  const shelbyHits = useMemo(() => frames.map((f) => findShelbyPointer(f.bytes)), [frames]);
+  const shelbyCount = shelbyHits.reduce((n, hit) => n + (hit ? 1 : 0), 0);
+  const activePointer = active ? shelbyHits[selected] : null;
 
   return (
     <column gap-="1" pad-="1">
@@ -160,6 +166,7 @@ export function TrafficTab() {
               ['Median RSSI', stats.medianRssiDbm === null ? '—' : `${stats.medianRssiDbm.toFixed(1)} dBm`],
               ['Airtime', `${stats.airtimeMs.toFixed(0)} ms`],
               ['Rate', `${stats.framesPerMinute.toFixed(1)}/min`],
+              ['SHLB', `${shelbyCount}`],
             ].map(([label, value]) => (
               <box key={label} style={{ minWidth: '9rem', flex: '1 1 auto' }}>
                 <column>
@@ -177,7 +184,7 @@ export function TrafficTab() {
                 <thead>
                   <tr style={{ textAlign: 'left', position: 'sticky', top: 0, background: 'var(--background1, #111)' }}>
                     <th>#</th><th>Time (s)</th><th>Dir</th><th>Len</th>
-                    <th>Freq</th><th>SF/CR</th><th>RSSI</th><th>SNR</th><th>CRC</th>
+                    <th>Freq</th><th>SF/CR</th><th>RSSI</th><th>SNR</th><th>CRC</th><th>SHLB</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -199,6 +206,7 @@ export function TrafficTab() {
                       <td>{hasField(f, RF_FIELD.rssi) ? f.rssiDbm.toFixed(1) : '—'}</td>
                       <td>{hasField(f, RF_FIELD.snr) ? f.snrDb.toFixed(1) : '—'}</td>
                       <td style={{ color: crcColor(f.crc) }}>{f.crc}</td>
+                      <td style={{ color: 'var(--success, #66F05A)' }}>{shelbyHits[i] ? 'SHLB' : ''}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -235,6 +243,41 @@ export function TrafficTab() {
                       <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v}</span>
                     </row>
                   ))}
+                  {activePointer && (
+                    <column gap-="0" style={{ marginTop: '0.75rem' }}>
+                      <span is-="badge" variant-="foreground1">
+                        SHELBY POINTER @ payload offset {activePointer.offset}
+                      </span>
+                      <span style={{ opacity: 0.7, fontSize: '0.8rem', margin: '0.25rem 0' }}>
+                        This frame references a Shelby blob — a connected node resolves the
+                        pointer and moves the bytes.
+                      </span>
+                      {([
+                        ['Size', `${activePointer.pointer.sizeBytes.toLocaleString()} B`],
+                        ['Expiry', new Date(activePointer.pointer.expiresAtUnix * 1000).toISOString()],
+                        ['Chunk', activePointer.pointer.chunked
+                          ? `${activePointer.pointer.chunkIndex + 1} of ${activePointer.pointer.chunkCount}`
+                          : 'whole blob'],
+                        ['Flags', [
+                          activePointer.pointer.encrypted && 'encrypted',
+                          activePointer.pointer.capture && 'lilyshark capture',
+                        ].filter(Boolean).join(', ') || 'none'],
+                        ['Commitment', activePointer.pointer.commitment],
+                        ['Owner', activePointer.pointer.owner],
+                      ] as [string, string][]).map(([k, v]) => (
+                        <row key={k} style={{ justifyContent: 'space-between', gap: '1rem' }}>
+                          <span style={{ opacity: 0.6 }}>{k}</span>
+                          <span style={{
+                            fontVariantNumeric: 'tabular-nums',
+                            fontSize: k === 'Commitment' || k === 'Owner' ? '0.7rem' : undefined,
+                            wordBreak: 'break-all',
+                            textAlign: 'right',
+                            maxWidth: '75%',
+                          }}>{v}</span>
+                        </row>
+                      ))}
+                    </column>
+                  )}
                 </column>
               </box>
               <box style={{ flex: '2 1 26rem' }}>

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
   decodeShelbyPointer,
   findShelbyPointer,
+  parseLscap,
   SHELBY_FLAG,
   SHELBY_POINTER_SIZE,
 } from './lscap';
@@ -88,4 +90,22 @@ test('finds the pointer behind an enclosing protocol header', () => {
   assert.equal(found.pointer.sizeBytes, 1 << 20);
 
   assert.equal(findShelbyPointer(new Uint8Array(96)), null);
+});
+
+// The same path the Traffic tab walks: parse the committed demo capture and
+// scan every payload. The pointer must surface on frame 9, behind the 16-byte
+// protocol header the generator puts there.
+test('finds the pointer in samples/sample-mesh-traffic.lscap', async () => {
+  const sampleUrl = new URL('../../samples/sample-mesh-traffic.lscap', import.meta.url);
+  const buffer = await readFile(sampleUrl);
+  const capture = parseLscap(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+
+  const hits = capture.frames
+    .map((frame, index) => ({ index, found: findShelbyPointer(frame.bytes) }))
+    .filter((hit) => hit.found !== null);
+
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].index, 9);
+  assert.equal(hits[0].found?.offset, 16);
+  assert.equal(hits[0].found?.pointer.capture, true);
 });

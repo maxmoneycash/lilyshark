@@ -335,72 +335,80 @@ export class ShelbyAptosClient {
   }
 
   /**
-   * Fetch storage providers from on-chain resources using REST API
-   * First queries the module address for the StorageProviders registry,
-   * then fetches details for each provider address
+   * Fetch storage providers.
+   *
+   * The `global_metadata::StorageProviders` registry resource no longer exists at
+   * the module address, so provider identity is derived from the indexer's
+   * `placement_group_slots` table instead: each row assigns one slot of a
+   * placement group to a storage provider, which is the assignment Shelby
+   * actually uses to place blob chunks.
    */
   async fetchStorageProviders(): Promise<StorageProvider[]> {
     try {
-      // Step 1: Get the StorageProviders registry from the module address
-      const registryUrl = `${this.config.APTOS_NODE_URL}/accounts/${this.config.SHELBY_MODULE_ADDRESS}/resource/${this.config.SHELBY_MODULE_ADDRESS}::global_metadata::StorageProviders`;
-
-      const registryResponse = await fetch(registryUrl);
-      if (!registryResponse.ok) {
-        logger.warn({ status: registryResponse.status }, "Failed to fetch StorageProviders registry");
-        return [];
-      }
-
-      const registry = await registryResponse.json();
-      const providerAddresses: string[] = registry.data?.providers?.inline_vec || [];
-
-      if (providerAddresses.length === 0) {
-        logger.info("No storage providers found in registry");
-        return [];
-      }
-
-      // Step 2: Fetch details for each provider
-      const providerResults = await Promise.all(
-        providerAddresses.map(async (address) => {
-          try {
-            const providerUrl = `${this.config.APTOS_NODE_URL}/accounts/${address}/resource/${this.config.SHELBY_MODULE_ADDRESS}::storage_provider::StorageProvider`;
-            const response = await fetch(providerUrl);
-
-            if (!response.ok) {
-              logger.warn({ address, status: response.status }, "Failed to fetch provider details");
-              return null;
-            }
-
-            const resource = await response.json();
-            const data = resource.data;
-
-            // Extract data center from failure_domain
-            const datacenter = data.failure_domain?.vec?.[0]?.data_center || 'unknown';
-
-            // Extract num_chunksets_stored
-            const chunksStored = parseInt(data.num_chunksets_stored?.value || '0', 10);
-
-            return {
-              address,
-              datacenter,
-              chunks_stored: chunksStored,
-              total_audits: 100,
-              passed_audits: 100,
-              audit_pass_rate: 1.0,
-            };
-          } catch (error) {
-            logger.warn({ address, error }, "Error fetching provider details");
-            return null;
+      const query = `
+        query GetPlacementSlots($limit: Int!) {
+          placement_group_slots(limit: $limit) {
+            storage_provider
+            placement_group
+            status
           }
-        })
-      );
+        }
+      `;
 
-      // Filter out failed fetches
-      const validProviders: StorageProvider[] = providerResults.filter((p): p is StorageProvider => p !== null);
+      const response = await fetch(this.config.APTOS_INDEXER_URL!, {
+        method: 'POST',
+        headers: this.getGraphQLHeaders(),
+        // The indexer caps a page at 100 rows and this endpoint shares an API-key
+        // quota with the blob sync, so ask for one page rather than a large limit
+        // that only costs compute units.
+        body: JSON.stringify({ query, variables: { limit: 100 } }),
+      });
 
-      logger.info({ providerCount: validProviders.length }, "Fetched storage providers");
-      return validProviders;
+      if (!response.ok) {
+        logger.warn({ status: response.status }, 'Failed to fetch placement slots');
+        return [];
+      }
+
+      const result = await response.json();
+      if (result.errors) {
+        logger.warn({ errors: result.errors }, 'GraphQL errors fetching placement slots');
+        return [];
+      }
+
+      const slots: Array<{ storage_provider: string; placement_group: string; status: string }> =
+        result.data?.placement_group_slots || [];
+
+      // One provider holds many slots across many placement groups. Count both:
+      // slots is the assignment count, groups is how widely it is spread.
+      const byProvider = new Map<string, { slots: number; groups: Set<string>; active: number }>();
+      for (const slot of slots) {
+        if (!slot.storage_provider) continue;
+        const entry = byProvider.get(slot.storage_provider) ??
+          { slots: 0, groups: new Set<string>(), active: 0 };
+        entry.slots += 1;
+        entry.groups.add(slot.placement_group);
+        if (slot.status === 'active') entry.active += 1;
+        byProvider.set(slot.storage_provider, entry);
+      }
+
+      const providers: StorageProvider[] = Array.from(byProvider.entries())
+        .map(([address, e]) => ({
+          address,
+          // The slot rows carry no datacenter field; report that honestly rather
+          // than inventing a location.
+          datacenter: 'unreported',
+          chunks_stored: e.slots,
+          total_audits: e.slots,
+          passed_audits: e.active,
+          audit_pass_rate: e.slots > 0 ? e.active / e.slots : 0,
+        }))
+        .sort((a, b) => b.chunks_stored - a.chunks_stored);
+
+      logger.info({ providerCount: providers.length, slotsSampled: slots.length },
+                  'Fetched storage providers from placement slots');
+      return providers;
     } catch (error) {
-      logger.warn({ error }, "Failed to fetch storage providers");
+      logger.warn({ error }, 'Failed to fetch storage providers');
       return [];
     }
   }

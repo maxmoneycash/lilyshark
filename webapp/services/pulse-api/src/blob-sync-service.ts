@@ -91,9 +91,11 @@ async function fetchBlobEventsSinceVersion(
   let offset = 0;
   let hasMore = true;
 
-  // Limit per sync cycle to avoid rate limits (fetch ~1000 events per cycle)
-  // With 30s interval, this catches up ~2000/min = 120k/hour
-  const maxEventsPerCycle = 1000;
+  // Limit per sync cycle to avoid rate limits. The indexer API key allows 40k
+  // compute units per 300s and is shared with every user-facing endpoint, so the
+  // backfill deliberately leaves headroom rather than starving /providers and
+  // /analytics into HTTP 429.
+  const maxEventsPerCycle = 200;
 
   // Get GraphQL config from client (includes API key in headers)
   const graphqlConfig = aptosClient.getGraphQLConfig();
