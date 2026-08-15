@@ -118,3 +118,12 @@ b0b1b2b3b4b5b6b7b8b9babbbcbdbebf0104070a0d10
 | `src/shelby/shelby_pointer_decoder.cpp` | C++17 | Capture-engine decoder that surfaces pointers inside any protocol's frames |
 | `webapp/src/lib/lscap.ts` | TypeScript | Browser reader; decodes pointers found in `.lscap` captures |
 | `scripts/shelby_pointer.py` | Python 3 | Reference tooling: emit, parse, scan captures, and verify blobs against pointers |
+
+## Sample data
+
+`samples/sample-mesh-traffic.lscap` (generated deterministically by
+`scripts/generate_sample_capture.py`) carries a pointer at sequence 9,
+behind a 16-byte protocol header. The web analyzer's Traffic tab marks the
+frame `SHLB` and decodes the pointer inline, and
+`python3 scripts/shelby_pointer.py scan samples/sample-mesh-traffic.lscap`
+finds it from the command line.
