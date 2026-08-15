@@ -9,38 +9,42 @@
 <style>
   :root {
     --pink:  #F05AA6;
-    --lime:  #66F05A;
-    --cyan:  #71D8DF;
-    --amber: #F0B429;
-    --paper: #F0F4EF;
-    --bg:    #07090C;
-    --panel: rgba(10, 13, 17, 0.82);
-    --rule:  rgba(240, 244, 239, 0.14);
+    --pink-deep: #D6357F;
+    --green: #37A466;
+    --cyan:  #1F8C99;
+    --coral: #E8604C;
+    --ink:   #43303C;
+    --ink-soft: rgba(67, 48, 60, 0.55);
+    --bg:    #FBF3F6;
+    --panel: rgba(255, 255, 255, 0.88);
+    --rule:  rgba(67, 48, 60, 0.12);
     --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Varela Round", system-ui, sans-serif;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; overflow: hidden; background: var(--bg); }
-  body { font-family: var(--mono); color: var(--paper); }
+  html { background: var(--bg); }
+  body { font-family: var(--sans); color: var(--ink); background: var(--bg); overflow-x: hidden; }
   #scene { position: fixed; inset: 0; display: block; }
+  #scrollspace { position: relative; width: 1px; pointer-events: none; }
 
   .hud { position: fixed; z-index: 10; user-select: none; }
   #brand { top: 18px; left: 20px; display: flex; align-items: center; gap: 14px; }
-  #brand img { height: 26px; display: block; }
+  #brand img { height: 28px; display: block; }
   #brand .sub {
-    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--cyan); border-left: 1px solid var(--rule); padding-left: 14px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--pink-deep); border-left: 1px solid var(--rule); padding-left: 14px;
   }
   #links { top: 18px; right: 20px; display: flex; gap: 10px; }
   #links a, #recbtn, #skipbtn {
     font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--paper); text-decoration: none; background: var(--panel);
-    border: 1px solid var(--rule); padding: 8px 14px; cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
+    color: var(--ink); text-decoration: none; background: var(--panel);
+    border: 1px solid rgba(240, 90, 166, 0.35); border-radius: 999px; padding: 9px 18px; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(214, 53, 127, 0.10);
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
-  #links a:hover, #skipbtn:hover { border-color: var(--cyan); color: var(--cyan); }
-  #recbtn { color: var(--pink); }
-  #recbtn:hover, #recbtn.on { border-color: var(--pink); }
-  #recbtn.on { background: rgba(240, 90, 166, 0.12); }
+  #links a:hover, #skipbtn:hover { border-color: var(--pink); color: var(--pink-deep); background: #fff; }
+  #recbtn { color: var(--pink-deep); }
+  #recbtn:hover, #recbtn.on { border-color: var(--pink); background: rgba(240, 90, 166, 0.10); }
   #recbtn .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--pink); margin-right: 8px; vertical-align: 1px; }
   #recbtn.on .dot { animation: blink 1.1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0.15; } }
@@ -51,53 +55,64 @@
     text-align: center; pointer-events: none;
   }
   #caption .phase {
-    display: inline-block; font-size: 10px; letter-spacing: 0.22em; color: var(--pink);
-    text-transform: uppercase; margin-bottom: 10px;
+    display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.22em;
+    color: var(--pink-deep); text-transform: uppercase; margin-bottom: 10px;
+    background: var(--panel); border-radius: 999px; padding: 6px 14px;
+    box-shadow: 0 4px 14px rgba(214, 53, 127, 0.10);
   }
   #caption .text {
-    font-size: 15.5px; line-height: 1.65; color: var(--paper);
-    background: var(--panel); border: 1px solid var(--rule);
-    padding: 15px 24px; opacity: 0; transition: opacity 0.5s;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    font-size: 16px; line-height: 1.6; color: var(--ink); font-weight: 500;
+    background: var(--panel); border: 1px solid rgba(240, 90, 166, 0.18); border-radius: 20px;
+    padding: 16px 26px; opacity: 0; transform: translateY(14px);
+    transition: opacity 0.5s, transform 0.65s cubic-bezier(0.2, 0.7, 0.2, 1);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 14px 44px rgba(120, 60, 95, 0.16);
   }
-  #caption .text b { color: var(--lime); font-weight: 600; }
-  #caption .text i { color: var(--cyan); font-style: normal; }
-  #caption .text em { color: var(--pink); font-style: normal; }
-  #caption.show .text { opacity: 1; }
+  #caption .text b { color: var(--green); font-weight: 700; }
+  #caption .text i { color: var(--cyan); font-style: normal; font-weight: 600; }
+  #caption .text em { color: var(--pink-deep); font-style: normal; font-weight: 700; }
+  #caption.show .text { opacity: 1; transform: translateY(0); }
   .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 12px; text-align: left; border-top: 1px solid var(--rule); }
   .vs .col { padding: 10px 14px 4px; }
   .vs .col + .col { border-left: 1px solid var(--rule); }
-  .vs h4 { font-size: 10px; letter-spacing: 0.18em; margin-bottom: 8px; font-weight: 600; }
-  .vs .bad h4 { color: #F0715A; }
-  .vs .good h4 { color: var(--lime); }
+  .vs h4 { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; margin-bottom: 8px; font-weight: 600; }
+  .vs .bad h4 { color: var(--coral); }
+  .vs .good h4 { color: var(--green); }
   .vs ul { list-style: none; }
-  .vs li { font-size: 12.5px; line-height: 1.8; color: var(--paper); }
-  .vs li span { color: rgba(240,244,239,0.55); }
-  .vs .bad li strong { color: #F0715A; font-weight: 600; }
-  .vs .good li strong { color: var(--lime); font-weight: 600; }
+  .vs li { font-size: 13px; line-height: 1.75; color: var(--ink); }
+  .vs li span { color: var(--ink-soft); }
+  .vs .bad li strong { color: var(--coral); font-weight: 700; }
+  .vs .good li strong { color: var(--green); font-weight: 700; }
 
   #timeline {
-    left: 0; right: 0; bottom: 0; height: 3px; background: rgba(240,244,239,0.08); pointer-events: none;
+    left: 0; right: 0; bottom: 0; height: 4px; background: rgba(67, 48, 60, 0.10); pointer-events: none;
   }
-  #timeline .fill { height: 100%; width: 0%; background: var(--pink); transition: width 0.25s linear; }
-  #timeline .tick { position: absolute; top: -2px; width: 1px; height: 7px; background: rgba(240,244,239,0.35); }
+  #timeline .fill { height: 100%; width: 0%; background: var(--pink); transition: width 0.25s linear; border-radius: 0 99px 99px 0; }
+  #timeline .tick { position: absolute; top: -2px; width: 1px; height: 8px; background: rgba(67, 48, 60, 0.25); }
 
   #vignette {
     position: fixed; inset: 0; pointer-events: none; z-index: 4;
-    background: radial-gradient(ellipse at center, transparent 52%, rgba(2,3,5,0.55) 100%);
+    background: radial-gradient(ellipse at center, transparent 58%, rgba(214, 53, 127, 0.07) 100%);
   }
+  #scrollcue {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    z-index: 11; font-family: var(--mono); font-size: 11px; letter-spacing: 0.3em; color: var(--pink-deep);
+    text-transform: uppercase; pointer-events: none; transition: opacity 0.6s;
+    animation: cue 2.2s ease-in-out infinite;
+  }
+  @keyframes cue { 50% { transform: translateX(-50%) translateY(6px); } }
   @media (prefers-reduced-motion: reduce) {
     #caption .text { transition: none; }
+    #scrollcue { animation: none; }
   }
 
   #controls { bottom: 18px; right: 20px; display: flex; gap: 10px; }
   #hint {
-    bottom: 18px; left: 20px; font-size: 10px; letter-spacing: 0.1em;
-    color: rgba(240,244,239,0.45); text-transform: uppercase; pointer-events: none;
+    bottom: 18px; left: 20px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+    color: var(--ink-soft); text-transform: uppercase; pointer-events: none;
   }
 
-  .bar { position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 5; transition: height 0.6s ease; pointer-events: none; }
+  .bar { position: fixed; left: 0; right: 0; height: 0; background: #332433; z-index: 5; transition: height 0.6s ease; pointer-events: none; }
   #bartop { top: 0; } #barbot { bottom: 0; }
   body.rec .bar { height: 7vh; }
   body.rec #brand .sub, body.rec #links, body.rec #hint, body.rec #timeline { opacity: 0; transition: opacity 0.4s; }
@@ -108,6 +123,22 @@
     background: var(--bg); text-align: center; padding: 24px; line-height: 1.7; font-size: 14px;
   }
   #fallback a { color: var(--cyan); }
+
+  @media (max-width: 720px) {
+    #brand img { height: 22px; }
+    #brand .sub, #hint { display: none; }
+    #links a, #recbtn, #skipbtn { padding: 7px 12px; font-size: 10px; }
+    #caption { bottom: 74px; max-width: calc(100vw - 20px); }
+    #caption .text { font-size: 13.5px; line-height: 1.55; padding: 12px 16px; border-radius: 16px; }
+    #caption .phase { font-size: 9px; margin-bottom: 7px; }
+    .vs { grid-template-columns: 1fr; }
+    .vs .col + .col { border-left: none; border-top: 1px solid var(--rule); }
+    .vs li { font-size: 12px; line-height: 1.6; }
+    #controls { bottom: 14px; right: 12px; }
+    #scrollcue { bottom: 48px; }
+    body.rec .bar { height: 5vh; }
+    body.rec #caption { bottom: calc(5vh + 62px); }
+  }
 </style>
 </head>
 <body>
@@ -138,8 +169,10 @@
   </button>
 </div>
 
-<div class="hud" id="hint">Drag to orbit · scroll to zoom · scripted camera resumes when idle</div>
+<div class="hud" id="hint">Scroll to walk through the story · Record mode auto-plays it for screen capture</div>
 <div class="hud" id="timeline"><div class="fill" id="tfill"></div></div>
+<div id="scrollcue">Scroll ▾</div>
+<div id="scrollspace"></div>
 
 <div id="fallback">
   <div>

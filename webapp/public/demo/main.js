@@ -1,9 +1,10 @@
-// Lilyshark Field Demo — a scripted 3D scene showing the Shelby off-grid
+// Lilyshark Field Demo — a scroll-driven 3D story of the Shelby off-grid
 // pointer flow: T-Deck capture node → LoRa mesh → gateway → Shelby on Aptos.
+// Scroll scrubs the whole sequence; every animation is a deterministic
+// function of the timeline so the story plays forward and backward.
 // Self-contained: three.js is vendored, no network requests.
 
 import * as THREE from 'three';
-import { OrbitControls } from './vendor/OrbitControls.js';
 import { EffectComposer } from './vendor/postprocessing/EffectComposer.js';
 import { RenderPass } from './vendor/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from './vendor/postprocessing/UnrealBloomPass.js';
@@ -11,16 +12,17 @@ import { OutputPass } from './vendor/postprocessing/OutputPass.js';
 import { RoundedBoxGeometry } from './vendor/geometries/RoundedBoxGeometry.js';
 
 const COLORS = {
-  bg: 0x06080b,
-  pink: 0xf05aa6,
-  lime: 0x66f05a,
-  cyan: 0x71d8df,
-  amber: 0xf0b429,
-  paper: 0xf0f4ef,
-  body: 0x14181d,
-  grid1: 0x1b2532,
-  grid2: 0x0f151d,
+  bg: 0xf7eef2,
+  pink: 0xe0479b,
+  lime: 0x37a466,
+  cyan: 0x2596a3,
+  paper: 0x43303c,
+  body: 0x1a1d22,
+  grid1: 0xe3c8d6,
+  grid2: 0xefdce6,
 };
+
+const isCoarse = matchMedia('(pointer: coarse)').matches;
 
 // ---------------------------------------------------------------- renderer
 let renderer;
@@ -33,50 +35,38 @@ try {
   document.getElementById('fallback').style.display = 'grid';
   throw e;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isCoarse ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !isCoarse;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.42;
+renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(COLORS.bg);
-scene.fog = new THREE.FogExp2(COLORS.bg, 0.0040);
+scene.fog = new THREE.FogExp2(COLORS.bg, 0.0026);
 
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1200);
-camera.position.set(-8, 4, 38);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1600);
+camera.position.set(-13, 5, 44);
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.72, 0.55, 0.6);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), isCoarse ? 0.22 : 0.3, 0.5, 0.85);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 6;
-controls.maxDistance = 260;
-
-let userControl = false;
-let lastInteract = -1e9;
-renderer.domElement.addEventListener('pointerdown', () => { userControl = true; lastInteract = clockNow(); });
-renderer.domElement.addEventListener('wheel', () => { userControl = true; lastInteract = clockNow(); }, { passive: true });
-
 // ---------------------------------------------------------------- lights
-scene.add(new THREE.AmbientLight(0x4a5866, 2.55));
-const key = new THREE.DirectionalLight(0x9fb4c8, 1.8);
+scene.add(new THREE.AmbientLight(0xfff2f6, 1.55));
+const key = new THREE.DirectionalLight(0xfff3e0, 1.7);
 key.position.set(-60, 90, 40);
-key.castShadow = true;
+key.castShadow = !isCoarse;
 key.shadow.mapSize.set(2048, 2048);
 key.shadow.camera.left = -130; key.shadow.camera.right = 130;
 key.shadow.camera.top = 130; key.shadow.camera.bottom = -130;
 key.shadow.camera.far = 320;
 key.shadow.bias = -0.0004;
 scene.add(key);
-const pinkFill = new THREE.PointLight(COLORS.pink, 50, 90, 1.9);
+const pinkFill = new THREE.PointLight(COLORS.pink, 22, 90, 1.9);
 pinkFill.position.set(0, 14, 22);
 scene.add(pinkFill);
 
@@ -95,6 +85,23 @@ const softDot = (() => {
   return t;
 })();
 
+// ---------------------------------------------------------------- sky
+{
+  const geo = new THREE.SphereGeometry(700, 32, 20);
+  const pos = geo.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  const horizon = new THREE.Color(0xffe1ec), zenith = new THREE.Color(0xbfe0f2);
+  for (let i = 0; i < pos.count; i++) {
+    const t = THREE.MathUtils.clamp(pos.getY(i) / 700 * 2.4, 0, 1);
+    const c = horizon.clone().lerp(zenith, t);
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  scene.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false,
+  })));
+}
+
 // ---------------------------------------------------------------- terrain
 function terrainHeight(x, z) {
   const r = Math.hypot(x, z);
@@ -110,7 +117,7 @@ function terrainHeight(x, z) {
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   const col = new Float32Array(pos.count * 3);
-  const cLow = new THREE.Color(0x11181f), cHigh = new THREE.Color(0x2a3a4c);
+  const cLow = new THREE.Color(0xe9dfd6), cHigh = new THREE.Color(0xf9f3ea);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
     const y = terrainHeight(x, z);
@@ -128,7 +135,7 @@ function terrainHeight(x, z) {
 }
 // distant mountain silhouettes
 {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x121a24, roughness: 1, flatShading: true });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xd5bccb, roughness: 1, flatShading: true });
   for (let i = 0; i < 26; i++) {
     const a = (i / 26) * Math.PI * 2 + Math.sin(i * 7.3) * 0.14;
     const r = 300 + ((i * 37) % 120);
@@ -139,16 +146,16 @@ function terrainHeight(x, z) {
     scene.add(m);
   }
 }
-// grid over the flat field only
+// grid over the flat field only — a faint survey reference, not a floor
 const grid = new THREE.GridHelper(230, 46, COLORS.grid1, COLORS.grid2);
 grid.material.transparent = true;
-grid.material.opacity = 0.5;
+grid.material.opacity = 0.4;
 grid.position.y = 0.02;
 scene.add(grid);
 
 // stars + moon
 {
-  const n = 1400, pos = new Float32Array(n * 3);
+  const n = isCoarse ? 700 : 1400, pos = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
     const r = 420 + Math.random() * 280;
     const th = Math.random() * Math.PI * 2;
@@ -160,77 +167,116 @@ scene.add(grid);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   scene.add(new THREE.Points(g, new THREE.PointsMaterial({
-    color: 0x9db4c4, size: 1.15, sizeAttenuation: false, transparent: true, opacity: 0.55,
+    color: 0xffffff, size: 1.15, sizeAttenuation: false, transparent: true, opacity: 0.0,
   })));
   const moon = new THREE.Mesh(
     new THREE.CircleGeometry(22, 48),
-    new THREE.MeshBasicMaterial({ color: 0xf2b8d4, transparent: true, opacity: 0.85, fog: false })
+    new THREE.MeshBasicMaterial({ color: 0xffbbd9, transparent: true, opacity: 0.95, fog: false })
   );
   moon.position.set(-260, 190, -420);
   moon.lookAt(0, 0, 0);
   scene.add(moon);
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: softDot, color: 0xf05aa6, transparent: true, opacity: 0.16, depthWrite: false,
-    blending: THREE.AdditiveBlending, fog: false,
+    map: softDot, color: 0xffc9de, transparent: true, opacity: 0.5, depthWrite: false,
+    blending: THREE.NormalBlending, fog: false,
   }));
-  glow.scale.setScalar(110);
+  glow.scale.setScalar(85);
   glow.position.copy(moon.position);
   scene.add(glow);
 }
 
-// ---------------------------------------------------------------- helpers
-function makeLabel(text, colorCss, scale = 1) {
-  const pad = 18, fs = 34;
+
+// drifting clouds
+const clouds = [];
+{
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
+  for (let i = 0; i < 9; i++) {
+    const g = new THREE.Group();
+    const puffs = 3 + (i % 3);
+    for (let j = 0; j < puffs; j++) {
+      const r = 6 + ((i * 7 + j * 13) % 8);
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), mat);
+      m.position.set(j * r * 0.9 - puffs * 2.5, ((j * 5) % 3) * 2.2, ((j * 3) % 5) * 1.5);
+      m.scale.y = 0.5;
+      g.add(m);
+    }
+    g.position.set(-260 + ((i * 149) % 520), 62 + ((i * 37) % 42), -260 + ((i * 211) % 420));
+    g.userData.speed = 0.8 + (i % 4) * 0.35;
+    scene.add(g);
+    clouds.push(g);
+  }
+}
+
+// ---------------------------------------------------------------- labels
+// Boxless outlined text, held at constant screen size and faded by distance
+// so annotations read like survey markings instead of floating billboards.
+const worldLabels = [];
+function makeLabel(text, colorCss, scale = 1, maxDist = 240) {
+  const fs = 44, pad = 10;
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d');
   ctx.font = `600 ${fs}px ui-monospace, Menlo, monospace`;
   const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
-  c.width = w; c.height = fs + pad * 1.6;
+  c.width = w; c.height = fs + pad * 2;
   const g = c.getContext('2d');
-  g.fillStyle = 'rgba(6,8,11,0.78)';
-  g.fillRect(0, 0, c.width, c.height);
-  g.strokeStyle = 'rgba(240,244,239,0.25)';
-  g.strokeRect(0.5, 0.5, c.width - 1, c.height - 1);
   g.font = `600 ${fs}px ui-monospace, Menlo, monospace`;
-  g.fillStyle = colorCss;
   g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  g.lineWidth = 7;
+  g.strokeStyle = 'rgba(255,255,255,0.92)';
+  g.strokeText(text, pad, c.height / 2 + 2);
+  g.fillStyle = colorCss;
   g.fillText(text, pad, c.height / 2 + 2);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.95 }));
-  sp.scale.set((c.width / 46) * scale, (c.height / 46) * scale, 1);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthWrite: false, depthTest: false, fog: false, opacity: 0.95,
+  }));
+  sp.userData.aspect = c.width / c.height;
+  sp.userData.base = 0.9 * scale;
+  sp.userData.maxDist = maxDist;
+  worldLabels.push(sp);
   return sp;
 }
-
+const _labelPos = new THREE.Vector3();
+function updateLabels() {
+  for (const sp of worldLabels) {
+    if (!sp.parent) continue;
+    sp.getWorldPosition(_labelPos);
+    const d = _labelPos.distanceTo(camera.position);
+    const h = sp.userData.base * d / 42;
+    sp.scale.set(h * sp.userData.aspect, h, 1);
+    const near = THREE.MathUtils.smoothstep(d, 10, 18);
+    const far = 1 - THREE.MathUtils.smoothstep(d, sp.userData.maxDist * 0.62, sp.userData.maxDist);
+    sp.material.opacity = 0.92 * near * far;
+  }
+}
 
 // ---------------------------------------------------------------- mesh nodes
 const beacons = [];
 function makeRelayNode(label, labelColor, tall = 1) {
   const grp = new THREE.Group();
-  const metal = new THREE.MeshStandardMaterial({ color: 0x28313c, roughness: 0.45, metalness: 0.65 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x4a4550, roughness: 0.5, metalness: 0.45 });
   const H = 7.4 * tall;
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.22, H, 8), metal);
   pole.position.y = H / 2;
   pole.castShadow = true;
   grp.add(pole);
-  // crossbars
   for (let i = 0; i < 3; i++) {
     const bar = new THREE.Mesh(new THREE.BoxGeometry(1.5 - i * 0.35, 0.09, 0.09), metal);
     bar.position.y = H - 0.9 - i * 0.75;
     bar.castShadow = true;
     grp.add(bar);
   }
-  // base pad + equipment box
   const base = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, 0.32, 24), metal);
   base.position.y = 0.16;
   base.castShadow = true;
   grp.add(base);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.5), new THREE.MeshStandardMaterial({ color: 0x1a2129, roughness: 0.7, metalness: 0.3 }));
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.5), new THREE.MeshStandardMaterial({ color: 0x5a5460, roughness: 0.7, metalness: 0.3 }));
   box.position.set(1.15, 0.3, 0.3);
   box.castShadow = true;
   grp.add(box);
-  // guy wires
-  const wireMat = new THREE.LineBasicMaterial({ color: 0x2c3846, transparent: true, opacity: 0.6 });
+  const wireMat = new THREE.LineBasicMaterial({ color: 0x8a7c88, transparent: true, opacity: 0.5 });
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2 + 0.5;
     const g = new THREE.BufferGeometry().setFromPoints([
@@ -239,17 +285,16 @@ function makeRelayNode(label, labelColor, tall = 1) {
     ]);
     grp.add(new THREE.Line(g, wireMat));
   }
-  // beacon
   const beaconMat = new THREE.MeshBasicMaterial({ color: labelColor });
   const tip = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 16), beaconMat);
   tip.position.y = H + 0.2;
   grp.add(tip);
-  const halo = new THREE.PointLight(labelColor, 16, 30, 2);
+  const halo = new THREE.PointLight(labelColor, 8, 26, 2);
   halo.position.y = H + 0.2;
   grp.add(halo);
   beacons.push({ mat: beaconMat, light: halo, base: labelColor, phase: Math.random() * Math.PI * 2 });
-  const lbl = makeLabel(label, '#F0F4EF', 0.78);
-  lbl.position.y = H + 2.1;
+  const lbl = makeLabel(label, '#43303C', 0.72);
+  lbl.position.y = H + 1.8;
   grp.add(lbl);
   grp.userData.h = H;
   return grp;
@@ -275,12 +320,34 @@ for (const k of Object.keys(NODES)) {
   scene.add(n.group);
 }
 const antennaTop = (k) => k === 'tdeck'
-  ? NODES.tdeck.pos.clone().add(new THREE.Vector3(-3.9, 9.2, 0))
+  ? NODES.tdeck.pos.clone().add(new THREE.Vector3(-3.9, 8.4, 0))
   : NODES[k].pos.clone().add(new THREE.Vector3(0, NODES[k].group.userData.h + 0.2, 0));
 
+// field rocks for scale
+{
+  const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0xd9cbc0, roughness: 0.95, flatShading: true });
+  for (let i = 0; i < 34; i++) {
+    const a = (i * 2.399) % (Math.PI * 2);
+    const r = 16 + ((i * 613) % 95);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    let clash = false;
+    for (const k of Object.keys(NODES)) {
+      if (Math.hypot(NODES[k].pos.x - x, NODES[k].pos.z - z) < 7) { clash = true; break; }
+    }
+    if (clash) continue;
+    const sc = 0.25 + ((i * 97) % 10) / 10;
+    const m = new THREE.Mesh(rockGeo, rockMat);
+    m.position.set(x, sc * 0.4 + terrainHeight(x, z), z);
+    m.scale.set(sc * (1 + (i % 3) * 0.3), sc * 0.7, sc);
+    m.rotation.set(i * 0.7, i * 1.3, i * 0.4);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    scene.add(m);
+  }
+}
+
 // ---------------------------------------------------------------- T-Deck
-// Stylized LILYGO T-Deck: landscape screen above a thumb keyboard, trackball,
-// stub antenna. The screen is a live canvas running a fake Lilyshark feed.
 const screenCanvas = document.createElement('canvas');
 screenCanvas.width = 640; screenCanvas.height = 288;
 const sctx = screenCanvas.getContext('2d');
@@ -291,9 +358,10 @@ screenTex.anisotropy = 8;
 const feed = { rows: [], resolved: false, pointerSeen: false };
 const PROTOS = ['MTSTC', 'MSHCR', 'RNODE'];
 function randHex(n) { let s = ''; for (let i = 0; i < n; i++) s += '0123456789ABCDEF'[Math.random() * 16 | 0]; return s; }
+let feedClock = 0;
 function pushFeedRow(shelby = false) {
   feed.rows.push({
-    t: new Date(clockNow() * 1000 + 1755250000000).toISOString().slice(14, 22),
+    t: new Date(feedClock * 1000 + 1755250000000).toISOString().slice(14, 22),
     proto: shelby ? 'MTSTC' : PROTOS[Math.random() * 3 | 0],
     src: '!' + randHex(4), dst: shelby ? '^all ' : (Math.random() < 0.4 ? '^all ' : '!' + randHex(4)),
     type: shelby ? 'SHLB PTR' : ['TEXT', 'POS', 'NODEINFO', 'TELEM', 'ACK', 'ROUTE'][Math.random() * 6 | 0],
@@ -305,10 +373,9 @@ function pushFeedRow(shelby = false) {
   drawScreen();
 }
 function drawResolvedPhoto(x, y, w, h) {
-  // tiny synthetic landscape "photo"
-  const sky = sctx.createLinearGradient(0, y, 0, y + h);
-  sky.addColorStop(0, '#1b2f4a'); sky.addColorStop(0.62, '#7a4a6e'); sky.addColorStop(1, '#f05aa6');
-  sctx.fillStyle = sky; sctx.fillRect(x, y, w, h);
+  const sky2 = sctx.createLinearGradient(0, y, 0, y + h);
+  sky2.addColorStop(0, '#1b2f4a'); sky2.addColorStop(0.62, '#7a4a6e'); sky2.addColorStop(1, '#f05aa6');
+  sctx.fillStyle = sky2; sctx.fillRect(x, y, w, h);
   sctx.fillStyle = '#f2b8d4';
   sctx.beginPath(); sctx.arc(x + w * 0.72, y + h * 0.38, 7, 0, Math.PI * 2); sctx.fill();
   sctx.fillStyle = '#0b1016';
@@ -364,8 +431,7 @@ const tdeck = new THREE.Group();
   const body = new THREE.Mesh(new RoundedBoxGeometry(9, 5.8, 1.0, 4, 0.3), bodyMat);
   body.castShadow = true;
   tdeck.add(body);
-  // screen bezel + screen
-  const bezel = new THREE.Mesh(new THREE.BoxGeometry(8.35, 4.0, 0.06), new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.25, metalness: 0.4 }));
+  const bezel = new THREE.Mesh(new THREE.BoxGeometry(8.35, 4.0, 0.06), new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.2, metalness: 0.3 }));
   bezel.position.set(0, 0.82, 0.5);
   tdeck.add(bezel);
   const screen = new THREE.Mesh(
@@ -374,7 +440,6 @@ const tdeck = new THREE.Group();
   );
   screen.position.set(0, 0.82, 0.54);
   tdeck.add(screen);
-  // keyboard
   const keyGeo = new RoundedBoxGeometry(0.6, 0.38, 0.16, 2, 0.06);
   const keyMat = new THREE.MeshStandardMaterial({ color: 0x232b35, roughness: 0.7, metalness: 0.2 });
   for (let r = 0; r < 3; r++) {
@@ -390,11 +455,9 @@ const tdeck = new THREE.Group();
   );
   ball.position.set(3.9, -1.2, 0.52);
   tdeck.add(ball);
-  // power LED
   const led = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshBasicMaterial({ color: COLORS.lime }));
   led.position.set(4.1, 0.9, 0.52);
   tdeck.add(led);
-  // antenna with collar
   const antMat = new THREE.MeshStandardMaterial({ color: 0x0d1013, roughness: 0.85 });
   const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.5, 12), antMat);
   collar.position.set(-3.9, 3.1, 0);
@@ -407,14 +470,31 @@ const tdeck = new THREE.Group();
     new THREE.MeshBasicMaterial({ color: COLORS.pink }));
   antTip.position.set(-3.9, 5.8, 0);
   tdeck.add(antTip);
-  const lbl = makeLabel('LILYSHARK · LILYGO T-DECK', '#F05AA6', 0.82);
-  lbl.position.set(0, 6.9, 0);
-  tdeck.add(lbl);
+  // light spill from the screen onto the keyboard and ground
+  const spill = new THREE.PointLight(0x7de86f, 7, 10, 2);
+  spill.position.set(0, 0.6, 2.4);
+  tdeck.add(spill);
 
-  tdeck.position.copy(NODES.tdeck.pos).add(new THREE.Vector3(0, 3.4, 0));
-  tdeck.rotation.x = -0.16;
+  // propped against a field case, feet on the ground
+  tdeck.position.copy(NODES.tdeck.pos).add(new THREE.Vector3(0, 2.72, 0));
+  tdeck.rotation.x = -0.38;
   tdeck.rotation.y = 0.10;
   scene.add(tdeck);
+
+  const caseMat = new THREE.MeshStandardMaterial({ color: 0x3a3038, roughness: 0.6, metalness: 0.2 });
+  const kit = new THREE.Mesh(new RoundedBoxGeometry(7.6, 2.4, 4.6, 3, 0.22), caseMat);
+  kit.position.copy(NODES.tdeck.pos).add(new THREE.Vector3(0.4, 1.2, -3.2));
+  kit.rotation.y = 0.18;
+  kit.castShadow = true;
+  kit.receiveShadow = true;
+  scene.add(kit);
+  for (const dx of [-2.2, 0, 2.2]) {
+    const latch = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0x8a7c88, roughness: 0.4, metalness: 0.7 }));
+    latch.position.copy(kit.position).add(new THREE.Vector3(dx, 0.1, 2.32));
+    latch.rotation.y = 0.18;
+    scene.add(latch);
+  }
 }
 
 // ---------------------------------------------------------------- radio waves
@@ -459,17 +539,17 @@ varying vec3 vDir;
 varying vec3 vView;
 varying float vDisp;
 void main() {
-  vec3 n = normalize((vec4(vDir, 0.0)).xyz);
-  float facing = abs(dot(normalize(vView), normalize(n)));
+  vec3 n = normalize(vDir);
+  float facing = abs(dot(normalize(vView), n));
   float fres = pow(1.0 - facing, 1.35);
   float rings = 0.5 + 0.5 * sin((1.0 - vDir.y) * 26.0 - uTime * 9.0);
   float lobes = smoothstep(-0.05, 0.28, vDisp);
   float fade = pow(1.0 - uProgress, 1.4) * smoothstep(0.0, 0.16, uProgress);
   float a = (0.16 + 0.5 * fres) * (0.45 + 0.55 * rings) * (0.5 + 0.5 * lobes) * fade;
-  gl_FragColor = vec4(uColor, a * 0.33);
+  gl_FragColor = vec4(uColor, a * 0.72);
 }
 `;
-const shellGeo = new THREE.SphereGeometry(1, 96, 48, 0, Math.PI * 2, 0, Math.PI / 2);
+const shellGeo = new THREE.SphereGeometry(1, isCoarse ? 64 : 96, isCoarse ? 32 : 48, 0, Math.PI * 2, 0, Math.PI / 2);
 function makeShellMaterial() {
   return new THREE.ShaderMaterial({
     vertexShader: WAVE_VERT,
@@ -484,17 +564,36 @@ function makeShellMaterial() {
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
   });
 }
+// soft gaussian ground ring
+const ringTex = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grd.addColorStop(0.0, 'rgba(255,255,255,0)');
+  grd.addColorStop(0.62, 'rgba(255,255,255,0)');
+  grd.addColorStop(0.72, 'rgba(255,255,255,0.08)');
+  grd.addColorStop(0.82, 'rgba(255,255,255,0.05)');
+  grd.addColorStop(0.88, 'rgba(255,255,255,0.5)');
+  grd.addColorStop(0.93, 'rgba(255,255,255,1)');
+  grd.addColorStop(1.0, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+const waveGeo = new THREE.PlaneGeometry(2, 2);
 
 const wavePool = [];
-const waveGeo = new THREE.RingGeometry(0.96, 1, 72);
 function emitWave(pos, color, radius = 26, life = 2.6, y = 0.12, strong = false) {
   let w = wavePool.find(w => !w.active);
   if (!w) {
     w = {
-      mesh: new THREE.Mesh(waveGeo, new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false })),
+      mesh: new THREE.Mesh(waveGeo, new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.NormalBlending })),
       dome: new THREE.Mesh(shellGeo, makeShellMaterial()),
       active: false,
     };
@@ -527,13 +626,11 @@ function updateWaves(dt) {
     if (k >= 1) { w.active = false; w.mesh.visible = false; w.dome.visible = false; continue; }
     const r = 0.6 + k * w.radius;
     w.mesh.scale.set(r, r, r);
-    w.mesh.material.opacity = 0.8 * (1 - k) * (1 - k);
-    if (w.dome.visible) {
-      const dr = 0.6 + k * w.radius * (w.strong ? 0.5 : 0.38);
-      w.dome.scale.set(dr, dr, dr);
-      w.dome.material.uniforms.uProgress.value = k;
-      w.dome.material.uniforms.uTime.value = elapsed;
-    }
+    w.mesh.material.opacity = 0.9 * (1 - k) * (1 - k);
+    const dr = 0.6 + k * w.radius * (w.strong ? 0.5 : 0.38);
+    w.dome.scale.set(dr, dr, dr);
+    w.dome.material.uniforms.uProgress.value = k;
+    w.dome.material.uniforms.uTime.value = elapsed;
   }
 }
 
@@ -542,17 +639,17 @@ const packet = new THREE.Group();
 {
   const core = new THREE.Mesh(
     new THREE.OctahedronGeometry(0.55),
-    new THREE.MeshBasicMaterial({ color: 0xff7cc0 })
+    new THREE.MeshBasicMaterial({ color: 0xd6357f })
   );
   packet.add(core);
   const shell = new THREE.Mesh(
     new THREE.OctahedronGeometry(0.85),
-    new THREE.MeshBasicMaterial({ color: COLORS.pink, wireframe: true, transparent: true, opacity: 0.55 })
+    new THREE.MeshBasicMaterial({ color: COLORS.pink, wireframe: true, transparent: true, opacity: 0.75 })
   );
   packet.add(shell);
-  const light = new THREE.PointLight(COLORS.pink, 42, 32, 2);
+  const light = new THREE.PointLight(COLORS.pink, 20, 32, 2);
   packet.add(light);
-  const lbl = makeLabel('SHLB · 82 B', '#F05AA6', 0.8);
+  const lbl = makeLabel('SHLB · 82 B', '#D6357F', 0.72);
   lbl.position.y = 1.7;
   packet.add(lbl);
   packet.visible = false;
@@ -562,18 +659,19 @@ const packet = new THREE.Group();
 const trail = [];
 for (let i = 0; i < 70; i++) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: softDot, color: COLORS.pink, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+    map: softDot, color: COLORS.pink, transparent: true, opacity: 0, depthWrite: false, blending: THREE.NormalBlending,
   }));
   s.scale.setScalar(0.9);
   s.visible = false;
   scene.add(s);
   trail.push({ s, t: 1e9 });
 }
-let trailIdx = 0, trailAcc = 0;
-function spawnTrail(dt) {
-  trailAcc += dt;
-  if (trailAcc < 0.035) return;
-  trailAcc = 0;
+let trailIdx = 0;
+const lastTrailPos = new THREE.Vector3(1e9, 1e9, 1e9);
+function maybeSpawnTrail() {
+  if (!packet.visible) return;
+  if (packet.position.distanceTo(lastTrailPos) < 0.6) return;
+  lastTrailPos.copy(packet.position);
   const p = trail[trailIdx];
   trailIdx = (trailIdx + 1) % trail.length;
   p.t = 0;
@@ -586,7 +684,7 @@ function updateTrail(dt) {
     p.t += dt;
     const k = p.t / 0.9;
     if (k >= 1) { p.s.visible = false; continue; }
-    p.s.material.opacity = 0.55 * (1 - k);
+    p.s.material.opacity = 0.6 * (1 - k);
     p.s.scale.setScalar(0.9 * (1 - k * 0.6));
   }
 }
@@ -605,14 +703,14 @@ const lattice = new THREE.Group();
     lattice.add(e);
   }
   const heart = new THREE.Mesh(new THREE.IcosahedronGeometry(1.15, 1),
-    new THREE.MeshBasicMaterial({ color: 0xa8f0f5, wireframe: true }));
+    new THREE.MeshBasicMaterial({ color: 0x1f7e8c, wireframe: true }));
   lattice.add(heart);
   const heartGlow = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: softDot, color: COLORS.cyan, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending,
+    map: softDot, color: COLORS.cyan, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.NormalBlending,
   }));
   heartGlow.scale.setScalar(9);
   lattice.add(heartGlow);
-  const lbl = makeLabel('SHELBY · BLOB STORAGE ON APTOS', '#71D8DF', 1.15);
+  const lbl = makeLabel('SHELBY · BLOB STORAGE ON APTOS', '#1F7E8C', 1.0, 130);
   lbl.position.y = 6.6;
   lattice.add(lbl);
   lattice.position.set(60, 52, -70);
@@ -620,13 +718,27 @@ const lattice = new THREE.Group();
   lattice.userData.heart = heart;
 }
 
-// uplink beam
-const beam = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.35, 0.62, 43, 16, 1, true),
-  new THREE.MeshBasicMaterial({ color: COLORS.cyan, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
-);
-beam.position.set(60, 9.4 + 21.5, -70);
-scene.add(beam);
+// layered soft uplink beam
+const beam = new THREE.Group();
+{
+  const mk = (r0, r1, alpha) => {
+    const m = new THREE.Mesh(
+      new THREE.CylinderGeometry(r0, r1, 43, 20, 1, true),
+      new THREE.MeshBasicMaterial({ color: COLORS.cyan, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.NormalBlending })
+    );
+    m.userData.alpha = alpha;
+    beam.add(m);
+    return m;
+  };
+  mk(0.75, 1.15, 0.05);
+  mk(0.38, 0.6, 0.08);
+  mk(0.09, 0.12, 0.45);
+  beam.position.set(60, 9.4 + 21.5, -70);
+  scene.add(beam);
+}
+function setBeamOpacity(k) {
+  for (const m of beam.children) m.material.opacity = k * m.userData.alpha;
+}
 
 // blob (the resolved payload)
 const blob = new THREE.Group();
@@ -637,10 +749,10 @@ const blob = new THREE.Group();
   const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),
     new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
   blob.add(e);
-  const lbl = makeLabel('BLOB · 4.2 MB', '#F0F4EF', 0.9);
+  const lbl = makeLabel('BLOB · 4.2 MB', '#43303C', 0.8);
   lbl.position.y = 2.6;
   blob.add(lbl);
-  const light = new THREE.PointLight(COLORS.pink, 46, 40, 2);
+  const light = new THREE.PointLight(COLORS.pink, 20, 40, 2);
   blob.add(light);
   blob.visible = false;
   scene.add(blob);
@@ -651,6 +763,7 @@ const capEl = document.getElementById('caption');
 const capPhase = document.getElementById('cap-phase');
 const capText = document.getElementById('cap-text');
 const tfill = document.getElementById('tfill');
+const scrollCue = document.getElementById('scrollcue');
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const lookTD = V(-2, 4.4, 26);
@@ -688,7 +801,6 @@ const PHASES = [
     len: 10, tag: '04 · THE POINTER',
     html: 'So the mesh never carries media. The device emits an <em>82-byte Shelby pointer</em> — blob commitment · owner · size · expiry — a <b>reference, not a payload</b>.',
     camA: V(8, 5, 36), camB: V(-6, 7, 34), lookA: lookTD, lookB: lookTD,
-    onEnter() { pushFeedRow(true); emitBurst(NODES.tdeck.pos, COLORS.pink, 30); startPacket(); },
   },
   {
     len: 14, tag: '05 · THE MESH',
@@ -699,232 +811,269 @@ const PHASES = [
     len: 12, tag: '06 · THE GATEWAY',
     html: 'Any node with an IP path — a phone regaining signal, a base station — resolves the pointer against <em>Shelby</em>: paid, verifiable blob storage on <i>Aptos</i>.',
     camA: V(96, 18, -30), camB: V(84, 34, -22), lookA: V(60, 24, -70), lookB: V(60, 30, -70),
-    onEnter() { uplink.active = true; uplink.t = 0; },
   },
   {
     len: 12, tag: '07 · THE RESOLUTION',
     html: 'The photo arrives — intact, persistent, verifiable on <em>Shelby</em> — and the mesh stayed free for everyone else’s traffic. <b>~50,000× fewer bytes</b> ever touched the air.',
     camA: V(100, 42, -14), camB: V(34, 18, 10), lookA: V(60, 30, -70), lookB: V(28, 8, -18),
-    onEnter() { resolveBlob.active = true; resolveBlob.t = 0; },
   },
   {
     len: 11, tag: '08 · OPEN STACK',
     html: 'Open hardware · GPL-3.0 firmware · open mesh protocols · open webapp.<br><i>github.com/maxmoneycash/lilyshark</i>',
     orbit: true,
-    onEnter() { feed.resolved = true; drawScreen(); },
   },
 ];
 const TOTAL = PHASES.reduce((s, p) => s + p.len, 0);
+const BOUNDS = [];
+{
+  let acc = 0;
+  for (const p of PHASES) { BOUNDS.push({ start: acc, end: acc + p.len }); acc += p.len; }
+}
+const T_POINTER = BOUNDS[3].start;
+const T_MESH = BOUNDS[4].start;
+const T_GATE = BOUNDS[5].start;
+const T_RES = BOUNDS[6].start;
+const T_END = BOUNDS[7].start;
 
 // chapter ticks on the timeline
 {
   const bar = document.getElementById('timeline');
-  let acc = 0;
-  for (const p of PHASES) {
-    if (acc > 0) {
-      const tick = document.createElement('div');
-      tick.className = 'tick';
-      tick.style.left = `${(acc / TOTAL) * 100}%`;
-      bar.appendChild(tick);
-    }
-    acc += p.len;
+  for (const b of BOUNDS) {
+    if (b.start === 0) continue;
+    const tick = document.createElement('div');
+    tick.className = 'tick';
+    tick.style.left = `${(b.start / TOTAL) * 100}%`;
+    bar.appendChild(tick);
   }
 }
 
-// packet flight across the mesh (phase 05, but state machine is global)
-const HOPS = ['tdeck', 'r1', 'r2', 'gateway'];
-const flight = { active: false, seg: 0, t: 0, segLen: 4.2 };
-function startPacket() {
-  flight.active = true; flight.seg = 0; flight.t = 0;
-  packet.visible = true;
-  packet.position.copy(antennaTop('tdeck'));
-}
-function updateFlight(dt) {
-  if (!flight.active) return;
-  flight.t += dt;
-  const k = Math.min(flight.t / flight.segLen, 1);
-  const a = antennaTop(HOPS[flight.seg]);
-  const b = antennaTop(HOPS[flight.seg + 1]);
-  const e = k * k * (3 - 2 * k); // smoothstep
-  packet.position.lerpVectors(a, b, e);
-  packet.position.y += Math.sin(e * Math.PI) * 7;
-  packet.userData.core.rotation.y += dt * 2.4;
-  packet.userData.shell.rotation.x += dt * 1.1;
-  if (k > 0 && k < 1) spawnTrail(dt);
-  if (k >= 1) {
-    emitBurst(NODES[HOPS[flight.seg + 1]].pos, COLORS.pink, 26);
-    flight.seg += 1; flight.t = -0.9; // hold at node briefly
-    if (flight.seg >= HOPS.length - 1) { flight.active = false; }
-  }
-}
+// ---------------------------------------------------------------- scroll drive
+// The page scrolls; the scene scrubs. scrollspace height defines the pace.
+const scrollspace = document.getElementById('scrollspace');
+scrollspace.style.height = `${Math.round(TOTAL * 9)}vh`;
 
-// gateway → Shelby ascent
-const uplink = { active: false, t: 0, dur: 6 };
-function updateUplink(dt) {
-  if (!uplink.active) return;
-  uplink.t += dt;
-  beam.material.opacity = Math.min(uplink.t / 1.5, 1) * 0.11;
-  const k = Math.min(Math.max((uplink.t - 1.2) / uplink.dur, 0), 1);
-  const a = antennaTop('gateway'), b = lattice.position.clone();
-  packet.position.lerpVectors(a, b, k * k * (3 - 2 * k));
-  if (k > 0 && k < 1) spawnTrail(dt);
-  if (k >= 1 && packet.visible) {
-    packet.visible = false;
-    uplink.flash = 1;
-  }
-  if (uplink.flash > 0) {
-    uplink.flash = Math.max(uplink.flash - dt * 0.8, 0);
-    lattice.userData.heart.scale.setScalar(1 + uplink.flash * 1.6);
-  }
-}
-
-// Shelby → gateway blob descent
-const resolveBlob = { active: false, t: 0, dur: 5 };
-function updateBlob(dt) {
-  if (!resolveBlob.active) return;
-  resolveBlob.t += dt;
-  const k = Math.min(resolveBlob.t / resolveBlob.dur, 1);
-  blob.visible = k < 1;
-  const a = lattice.position.clone(), b = antennaTop('gateway');
-  blob.position.lerpVectors(a, b, k * k);
-  blob.rotation.y += dt * 1.5;
-  if (k >= 1 && !resolveBlob.done) {
-    resolveBlob.done = true;
-    emitBurst(NODES.gateway.pos, COLORS.cyan, 34);
-  }
-}
-
-// ambient chatter — phase 1 floods to show congestion
-let nextChatter = 2;
-const AMBIENT = ['r1', 'r2', 'amb1', 'amb2', 'amb3', 'amb4', 'amb5', 'amb6', 'gateway'];
-function updateAmbient(t, dt, phaseIdx) {
-  if (phaseIdx < 1) return;
-  if (t > nextChatter) {
-    const flood = phaseIdx === 1;
-    nextChatter = t + (flood ? 0.3 + Math.random() * 0.5 : 1.0 + Math.random() * 1.7);
-    const n = AMBIENT[Math.random() * AMBIENT.length | 0];
-    emitWave(NODES[n].pos, Math.random() < 0.2 ? COLORS.cyan : COLORS.lime, 15 + Math.random() * 11);
-    if (Math.random() < 0.7) pushFeedRow(false);
-  }
-}
-
-// beacon blink
-function updateBeacons(t) {
-  for (const b of beacons) {
-    const k = 0.55 + 0.45 * Math.sin(t * 2.1 + b.phase);
-    b.light.intensity = 10 + 14 * k;
-    b.mat.color.set(b.base).multiplyScalar(0.55 + 0.65 * k);
-  }
-}
-
-// ---------------------------------------------------------------- clock & loop
-const clock = new THREE.Clock();
-let elapsed = 0;
-function clockNow() { return elapsed; }
-
-let phaseIdx = -1;
-let phaseStart = 0;
+let targetT = 0;
 let timelineT = 0;
-
-function resetCycle() {
-  timelineT = 0; phaseIdx = -1;
-  flight.active = false; packet.visible = false;
-  uplink.active = false; uplink.flash = 0; beam.material.opacity = 0;
-  resolveBlob.active = false; resolveBlob.done = false; blob.visible = false;
-  feed.resolved = false; feed.pointerSeen = false;
-  feed.rows.length = 0;
-  for (let i = 0; i < 7; i++) pushFeedRow(false);
-  lattice.userData.heart.scale.setScalar(1);
-  drawScreen();
+function readScroll() {
+  const max = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
+  targetT = (window.scrollY / max) * (TOTAL - 0.001);
 }
+addEventListener('scroll', readScroll, { passive: true });
+readScroll();
 
-function setPhase(i) {
-  phaseIdx = i;
-  const p = PHASES[i];
-  phaseStart = timelineT;
-  capPhase.textContent = p.tag;
-  capText.innerHTML = p.html;
-  capEl.classList.remove('show');
-  requestAnimationFrame(() => requestAnimationFrame(() => capEl.classList.add('show')));
-  if (p.onEnter) p.onEnter();
+// auto-scroll for record mode: 1 timeline second per real second
+let autoScroll = null;
+function startAutoScroll() {
+  const max = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
+  const fromY = window.scrollY;
+  const fromT = (fromY / max) * TOTAL;
+  const durMs = (TOTAL - fromT) * 1000;
+  const t0 = performance.now();
+  cancelAutoScroll();
+  autoScroll = requestAnimationFrame(function step(now) {
+    const p = Math.min((now - t0) / durMs, 1);
+    window.scrollTo(0, fromY + (max - fromY) * p);
+    if (p < 1 && autoScroll) autoScroll = requestAnimationFrame(step);
+  });
 }
-
-document.getElementById('skipbtn').addEventListener('click', () => {
-  let acc = 0;
-  for (let i = 0; i <= phaseIdx; i++) acc += PHASES[i].len;
-  if (phaseIdx >= PHASES.length - 1) { resetCycle(); return; }
-  timelineT = acc;
-});
+function cancelAutoScroll() {
+  if (autoScroll) cancelAnimationFrame(autoScroll);
+  autoScroll = null;
+}
+addEventListener('wheel', cancelAutoScroll, { passive: true });
+addEventListener('touchstart', cancelAutoScroll, { passive: true });
 
 const recbtn = document.getElementById('recbtn');
 recbtn.addEventListener('click', () => {
   const on = document.body.classList.toggle('rec');
   recbtn.classList.toggle('on', on);
-  resetCycle();
+  if (on) {
+    window.scrollTo(0, 0);
+    setTimeout(startAutoScroll, 600);
+  } else {
+    cancelAutoScroll();
+  }
+});
+document.getElementById('skipbtn').addEventListener('click', () => {
+  const next = BOUNDS.find(b => b.start > timelineT + 0.2);
+  const max = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
+  const y = next ? (next.start / TOTAL) * max : 0;
+  window.scrollTo({ top: y, behavior: 'smooth' });
 });
 
-const tmpLook = new THREE.Vector3();
+// one-shot decorations fired when the timeline crosses a marker going forward
+let latticeFlash = 0;
+const cues = [
+  { at: T_POINTER + 0.3, fn: () => { if (!feed.pointerSeen) pushFeedRow(true); emitBurst(NODES.tdeck.pos, COLORS.pink, 30); } },
+  { at: T_MESH + 14 / 3, fn: () => emitBurst(NODES.r1.pos, COLORS.pink, 26) },
+  { at: T_MESH + 28 / 3, fn: () => emitBurst(NODES.r2.pos, COLORS.pink, 26) },
+  { at: T_GATE - 0.2, fn: () => emitBurst(NODES.gateway.pos, COLORS.pink, 26) },
+  { at: T_GATE + 7.4, fn: () => { latticeFlash = 1; } },
+  { at: T_RES + 5.1, fn: () => emitBurst(NODES.gateway.pos, COLORS.cyan, 34) },
+];
+let prevT = -1;
+function fireCues() {
+  for (const c of cues) {
+    if (prevT < c.at && timelineT >= c.at && timelineT - c.at < 3) c.fn();
+  }
+  prevT = timelineT;
+}
+
+// ---------------------------------------------------------------- deterministic actors
+const HOP_POINTS = ['tdeck', 'r1', 'r2', 'gateway'];
+function evalPacket(t) {
+  // hidden before the pointer exists and after it enters Shelby
+  if (t < T_POINTER + 0.3 || t >= T_GATE + 7.4) { packet.visible = false; return; }
+  packet.visible = true;
+  if (t < T_MESH) {
+    // hover above the device antenna
+    const p = antennaTop('tdeck');
+    packet.position.set(p.x, p.y + 1.2 + Math.sin(elapsed * 1.8) * 0.25, p.z);
+  } else if (t < T_GATE) {
+    // three hops across the phase, each with a short hold at the node
+    const u = (t - T_MESH) / (T_GATE - T_MESH) * 3;
+    const seg = Math.min(Math.floor(u), 2);
+    const k = THREE.MathUtils.clamp(u - seg, 0, 1);
+    const hold = 0.16; // fraction of each segment spent holding at the node
+    const kk = THREE.MathUtils.clamp((k - hold) / (1 - hold), 0, 1);
+    const e = kk * kk * (3 - 2 * kk);
+    const a = antennaTop(HOP_POINTS[seg]);
+    const b = antennaTop(HOP_POINTS[seg + 1]);
+    packet.position.lerpVectors(a, b, e);
+    packet.position.y += Math.sin(e * Math.PI) * 7;
+  } else {
+    // ascend the beam into the lattice
+    const u = t - T_GATE;
+    const k = THREE.MathUtils.clamp((u - 1.2) / 6, 0, 1);
+    const e = k * k * (3 - 2 * k);
+    packet.position.lerpVectors(antennaTop('gateway'), lattice.position, e);
+  }
+  packet.userData.core.rotation.y = elapsed * 2.4;
+  packet.userData.shell.rotation.x = elapsed * 1.1;
+  maybeSpawnTrail();
+}
+function evalBeam(t) {
+  let k = 0;
+  if (t >= T_GATE) k = THREE.MathUtils.clamp((t - T_GATE) / 1.5, 0, 1);
+  if (t >= T_END) k *= THREE.MathUtils.clamp(1 - (t - T_END) / 3, 0, 1);
+  setBeamOpacity(k);
+}
+function evalBlob(t) {
+  const u = t - T_RES;
+  if (u <= 0 || u >= 5) { blob.visible = false; return; }
+  blob.visible = true;
+  const k = THREE.MathUtils.clamp(u / 5, 0, 1);
+  blob.position.lerpVectors(lattice.position, antennaTop('gateway'), k * k);
+  blob.rotation.y = elapsed * 1.5;
+}
+function evalScreen(t) {
+  const resolved = t >= T_END - 1;
+  if (resolved !== feed.resolved) { feed.resolved = resolved; drawScreen(); }
+}
+
+// ambient chatter — the constraint chapters flood the channel
+let nextChatter = 0.5;
+const AMBIENT = ['r1', 'r2', 'amb1', 'amb2', 'amb3', 'amb4', 'amb5', 'amb6', 'gateway'];
+function updateAmbient(phaseIdx) {
+  if (elapsed > nextChatter) {
+    const flood = phaseIdx === 1 || phaseIdx === 2;
+    nextChatter = elapsed + (flood ? 0.3 + Math.random() * 0.5 : 1.0 + Math.random() * 1.7);
+    const n = AMBIENT[Math.random() * AMBIENT.length | 0];
+    emitWave(NODES[n].pos, Math.random() < 0.2 ? COLORS.cyan : COLORS.lime, 15 + Math.random() * 11);
+    if (Math.random() < 0.7) { feedClock += 0.6 + Math.random(); pushFeedRow(false); }
+  }
+}
+function updateBeacons(t) {
+  for (const b of beacons) {
+    const k = 0.55 + 0.45 * Math.sin(t * 2.1 + b.phase);
+    b.light.intensity = 5 + 7 * k;
+    b.mat.color.set(b.base).multiplyScalar(0.55 + 0.65 * k);
+  }
+}
+
+// ---------------------------------------------------------------- camera & loop
+const clock = new THREE.Clock();
+let elapsed = 0;
+let phaseIdx = -1;
+
+function setPhase(i) {
+  phaseIdx = i;
+  const p = PHASES[i];
+  capPhase.textContent = p.tag;
+  capText.innerHTML = p.html;
+  capEl.classList.remove('show');
+  requestAnimationFrame(() => requestAnimationFrame(() => capEl.classList.add('show')));
+}
+
+const camLook = new THREE.Vector3().copy(lookTD);
 const drift = new THREE.Vector3();
 function updateCamera(dt) {
-  if (userControl) {
-    if (elapsed - lastInteract > 6) userControl = false;
-    controls.update();
-    return;
-  }
   const p = PHASES[phaseIdx];
-  const k = Math.min((timelineT - phaseStart) / p.len, 1);
+  const b = BOUNDS[phaseIdx];
+  const k = THREE.MathUtils.clamp((timelineT - b.start) / p.len, 0, 1);
   const e = k * k * (3 - 2 * k);
   let target, look;
   if (p.followPacket) {
     target = packet.position.clone().add(V(13, 8, 16));
-    look = packet.position;
+    look = packet.position.clone();
   } else if (p.orbit) {
     const a = timelineT * 0.16;
     target = V(Math.sin(a) * 80, 30, Math.cos(a) * 80 - 10);
     look = V(0, 4, -6);
   } else {
     target = p.camA.clone().lerp(p.camB, e);
-    tmpLook.copy(p.lookA).lerp(p.lookB, e);
-    look = tmpLook;
+    look = p.lookA.clone().lerp(p.lookB, e);
   }
-  // handheld drift
+  // portrait screens need more distance to hold the same framing
+  if (camera.aspect < 0.9) {
+    target = look.clone().add(target.clone().sub(look).multiplyScalar(1.5));
+  }
   drift.set(
     Math.sin(elapsed * 0.55) * 0.5 + Math.sin(elapsed * 1.31) * 0.18,
     Math.sin(elapsed * 0.42 + 2.1) * 0.32,
     Math.cos(elapsed * 0.61 + 0.7) * 0.4
   );
-  target = target.clone().add(drift);
-  camera.position.lerp(target, Math.min(dt * 1.6, 1));
-  controls.target.lerp(look, Math.min(dt * 2.2, 1));
-  controls.update();
+  target.add(drift);
+  camera.position.lerp(target, Math.min(dt * 2.2, 1));
+  camLook.lerp(look, Math.min(dt * 3.0, 1));
+  camera.lookAt(camLook);
 }
 
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   elapsed += dt;
-  timelineT += dt;
 
-  if (timelineT >= TOTAL) resetCycle();
-  let acc = 0, idx = 0;
+  // smooth scrub toward the scroll position
+  timelineT += (targetT - timelineT) * Math.min(dt * 4.5, 1);
+
+  let idx = 0;
   for (let i = 0; i < PHASES.length; i++) {
-    if (timelineT < acc + PHASES[i].len) { idx = i; break; }
-    acc += PHASES[i].len;
+    if (timelineT >= BOUNDS[i].start - 0.001) idx = i;
   }
-  if (idx !== phaseIdx) { phaseStart = acc; setPhase(idx); }
+  if (idx !== phaseIdx) setPhase(idx);
 
+  fireCues();
+  evalPacket(timelineT);
+  evalBeam(timelineT);
+  evalBlob(timelineT);
+  evalScreen(timelineT);
   updateWaves(dt);
-  updateFlight(dt);
-  updateUplink(dt);
-  updateBlob(dt);
   updateTrail(dt);
-  updateAmbient(timelineT, dt, phaseIdx);
+  updateAmbient(phaseIdx);
   updateBeacons(elapsed);
+  updateLabels();
+  if (latticeFlash > 0) {
+    latticeFlash = Math.max(latticeFlash - dt * 0.8, 0);
+    lattice.userData.heart.scale.setScalar(1 + latticeFlash * 1.6);
+  }
+  for (const c of clouds) { c.position.x += c.userData.speed * dt; if (c.position.x > 340) c.position.x = -340; }
   lattice.rotation.y += dt * 0.12;
   lattice.userData.heart.rotation.x += dt * 0.4;
   updateCamera(dt);
 
   tfill.style.width = `${(timelineT / TOTAL) * 100}%`;
+  if (scrollCue) scrollCue.style.opacity = timelineT < 1.5 ? 1 : 0;
   composer.render();
 }
 
@@ -933,7 +1082,10 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
+  readScroll();
 });
 
-resetCycle();
+// seed the device feed so the screen is alive on load
+for (let i = 0; i < 7; i++) { feedClock += 0.8 + Math.random(); pushFeedRow(false); }
+setPhase(0);
 animate();
