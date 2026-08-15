@@ -757,6 +757,8 @@ The T-Deck is the first hardware target. The capture record, decoder registry, a
 
 Lilyshark is licensed under [GPL-3.0](LICENSE). Barlow Condensed and IBM Plex Mono are distributed under the SIL Open Font License; their license texts are included in [assets/fonts](assets/fonts).
 
+Lilyshark incorporates [SigurdOS](https://github.com/hermes-gadget/SigurdOS-tdeck) (GPL-3.0-or-later, Copyright (C) 2025 Ben) under `third_party/sigurdos/` — standalone MeshCore messaging firmware for this same board, vendored verbatim with its license intact. The analyzer, the capture formats, and the Shelby layer are Lilyshark's; the MeshCore client, companion bridge, and board HAL underneath them are SigurdOS's. See [`NOTICE.md`](NOTICE.md) and [`third_party/sigurdos/ATTRIBUTION.md`](third_party/sigurdos/ATTRIBUTION.md). Support for that work belongs upstream: SigurdOS's maintainer asks that it go to [MeshCore](https://meshcore.co.uk).
+
 The web app's terminal interface is ported from [meshcore-terminal](https://github.com/maxmoneycash/meshcore-terminal) (MIT), whose UI was itself ported from perereus/meshtastic-terminal (MIT); both are recolored and extended here under their licenses. The web terminal's JetBrains Mono build is distributed under the SIL Open Font License (`webapp/src/mesh/assets/fonts/OFL.txt`).
 
 Meshtastic, MeshCore, Reticulum, RNode, Wireshark, and LILYGO are referenced to describe compatibility, protocol coverage, and target hardware. Lilyshark is an independent project and is not an official release from those projects.

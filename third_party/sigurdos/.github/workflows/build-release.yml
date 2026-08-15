@@ -1,0 +1,301 @@
+name: Build & Release
+
+"on":
+  push:
+    tags: ['*']
+  workflow_dispatch:
+
+jobs:
+  full-matrix:
+    name: Full firmware environment gate
+    uses: ./.github/workflows/build-validation-matrix.yml
+
+  test:
+    name: Native tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          submodules: recursive
+
+      - name: Check MeshCore lock and remote pin
+        run: python3 scripts/check_meshcore_pin.py --check-remote
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12.11'
+
+      - name: Restore PlatformIO packages
+        uses: ./.github/actions/cache-platformio
+        with:
+          dependency-hash: ${{ hashFiles('platformio.ini', 'lib/meshcore/library.json', 'ci/requirements-platformio.in', 'ci/requirements-platformio.txt', 'ci/platformio-packages.lock') }}
+
+      - name: Install PlatformIO
+        run: python -m pip install --require-hashes -r ci/requirements-platformio.txt
+
+      - name: Resolve exact firmware packages
+        run: pio pkg install -e SigurdOS_TDeck
+
+      - name: Verify resolved PlatformIO graph
+        run: python scripts/platformio_lock.py --check --environment SigurdOS_TDeck
+
+      - name: Run native tests
+        run: pio test -e native_test -v
+
+      - name: Run production-linked MeshCore integration tests
+        run: pio test -e native_mesh_integration -v
+
+      - name: Run native sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1:check_initialization_order=1:halt_on_error=1
+          LSAN_OPTIONS: exitcode=23:print_suppressions=0
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: pio test -e native_sanitize -v
+
+      - name: Verify release evidence contracts
+        run: python -m unittest discover -s scripts/tests -p 'test_*.py' -v
+
+  build:
+    name: Build firmware
+    runs-on: ubuntu-latest
+    needs: [test, full-matrix]
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Check MeshCore lock and remote pin
+        run: python3 scripts/check_meshcore_pin.py --check-remote
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12.11'
+
+      - name: Restore PlatformIO packages
+        uses: ./.github/actions/cache-platformio
+        with:
+          dependency-hash: ${{ hashFiles('platformio.ini', 'lib/meshcore/library.json', 'ci/requirements-platformio.in', 'ci/requirements-platformio.txt', 'ci/platformio-packages.lock') }}
+
+      - name: Install PlatformIO
+        run: python -m pip install --require-hashes -r ci/requirements-platformio.txt
+
+      - name: Resolve exact firmware packages
+        run: pio pkg install -e SigurdOS_TDeck
+
+      - name: Check version fallback matches tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          FALLBACK=$(grep -oP '#define SIGURDOS_VERSION\s+"\K[^"]+' src/hal/tdeck_pins.h)
+          if [ "$TAG" != "$FALLBACK" ]; then
+            echo "::error::Tag $TAG != tdeck_pins.h fallback $FALLBACK — bump SIGURDOS_VERSION before tagging"
+            exit 1
+          fi
+
+      - name: Enforce completed release evidence
+        if: startsWith(github.ref, 'refs/tags/')
+        run: >-
+          python scripts/verify_release_evidence.py
+          --evidence "release-evidence/${GITHUB_REF_NAME}.json"
+          --tag "$GITHUB_REF_NAME"
+
+      - name: Build firmware
+        run: |
+          set -o pipefail
+          pio run -e SigurdOS_TDeck 2>&1 | tee build.log
+
+      - name: Enforce first-party warning budget
+        run: >-
+          python scripts/check_first_party_warnings.py
+          --log build.log
+          --baseline ci/first_party_warnings.json
+          --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Save webflasher assets (before debug build overwrites)
+        run: |
+          mkdir -p webflasher_release
+          cp webflasher/manifest.json                    webflasher_release/manifest.json
+          cp webflasher/build-metadata.json              webflasher_release/build-metadata.json
+          cp webflasher/sigurdos-tdeck-bootloader.bin    webflasher_release/sigurdos-tdeck-bootloader.bin
+          cp webflasher/sigurdos-tdeck-partitions.bin    webflasher_release/sigurdos-tdeck-partitions.bin
+          cp webflasher/sigurdos-tdeck-boot_app0.bin     webflasher_release/sigurdos-tdeck-boot_app0.bin
+          cp webflasher/sigurdos-tdeck-firmware.bin      webflasher_release/sigurdos-tdeck-firmware.bin
+          cp webflasher/sigurdos-tdeck-full.bin          webflasher_release/sigurdos-tdeck-full.bin
+          cp webflasher/sigurdos-tdeck-launcher.bin      webflasher_release/sigurdos-tdeck-launcher.bin
+
+      - name: Build debug firmware
+        run: pio run -e SigurdOS_TDeck_debug
+
+      - name: Create Launcher artifact
+        run: cp .pio/build/SigurdOS_TDeck/firmware-merged.bin .pio/build/SigurdOS_TDeck/SigurdOS-tdeck-launcher.bin
+
+      - name: Flatten for artifact upload
+        run: |
+          mkdir -p artifacts
+          cp .pio/build/SigurdOS_TDeck/firmware.bin           artifacts/firmware.bin
+          cp .pio/build/SigurdOS_TDeck/firmware-merged.bin    artifacts/firmware-merged.bin
+          cp .pio/build/SigurdOS_TDeck/SigurdOS-tdeck-launcher.bin artifacts/SigurdOS-tdeck-launcher.bin
+          cp .pio/build/SigurdOS_TDeck_debug/firmware-merged.bin artifacts/firmware-debug.bin
+          # Web flasher assets (saved from release build before debug build overwrote)
+          cp webflasher_release/manifest.json                    artifacts/manifest.json
+          cp webflasher_release/build-metadata.json              artifacts/build-metadata.json
+          cp webflasher_release/sigurdos-tdeck-bootloader.bin    artifacts/sigurdos-tdeck-bootloader.bin
+          cp webflasher_release/sigurdos-tdeck-partitions.bin    artifacts/sigurdos-tdeck-partitions.bin
+          cp webflasher_release/sigurdos-tdeck-boot_app0.bin     artifacts/sigurdos-tdeck-boot_app0.bin
+          cp webflasher_release/sigurdos-tdeck-firmware.bin      artifacts/sigurdos-tdeck-firmware.bin
+          cp webflasher_release/sigurdos-tdeck-full.bin          artifacts/sigurdos-tdeck-full.bin
+          # Keep the exact filename referenced by manifest.json.
+          cp webflasher_release/sigurdos-tdeck-launcher.bin      artifacts/sigurdos-tdeck-launcher.bin
+
+      - name: Verify resolved PlatformIO graph
+        run: python scripts/platformio_lock.py --check --environment SigurdOS_TDeck
+
+      - name: Generate firmware CycloneDX SBOM from resolved lock
+        run: >-
+          python scripts/generate_platformio_sbom.py
+          --lock ci/platformio-packages.lock
+          --output artifacts/sbom.cdx.json
+
+      - name: Validate final release artifact set
+        run: |
+          args=(
+            --artifacts-dir artifacts
+            --expected-commit "$GITHUB_SHA"
+          )
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            args+=(--expected-version "$GITHUB_REF_NAME")
+          fi
+          python scripts/validate_release_artifacts.py "${args[@]}"
+
+      - name: Bind evidence to produced artifact bytes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          python scripts/verify_release_evidence.py \
+            --evidence "release-evidence/${GITHUB_REF_NAME}.json" \
+            --commit "$GITHUB_SHA" \
+            --tag "$GITHUB_REF_NAME" \
+            --artifacts-dir artifacts \
+            --write-attestation artifacts/release-evidence.json
+          python scripts/verify_release_evidence.py \
+            --attestation artifacts/release-evidence.json \
+            --commit "$GITHUB_SHA" \
+            --tag "$GITHUB_REF_NAME" \
+            --artifacts-dir artifacts
+
+      - name: Generate checksums for every published input
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          cd artifacts
+          find . -maxdepth 1 -type f \
+            ! -name SHA256SUMS.txt \
+            ! -name SHA256SUMS.sigstore.json \
+            -printf '%f\0' \
+            | sort -z \
+            | xargs -0 sha256sum > SHA256SUMS.txt
+
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign release checksums with GitHub OIDC
+        if: startsWith(github.ref, 'refs/tags/')
+        run: >-
+          cosign sign-blob --yes
+          --bundle artifacts/SHA256SUMS.sigstore.json
+          artifacts/SHA256SUMS.txt
+
+      - name: Attest release build provenance
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: artifacts/*
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sigurdos-tdeck-firmware
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download firmware
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sigurdos-tdeck-firmware
+          path: firmware
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            **SigurdOS T-Deck Firmware** — ${{ github.ref_name }}
+
+            ### Flash with esptool
+            ```bash
+            # Full flash (first install):
+            esptool.py --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 firmware-merged.bin
+
+            # App update (keep settings):
+            esptool.py --chip esp32s3 --port /dev/ttyACM0 \
+              write_flash 0x10000 firmware.bin
+            ```
+
+            ### Web Flasher
+            Use `manifest.json` with [ESP Web Tools](https://esphome.github.io/esp-web-tools/).
+
+            | File | Use |
+            |------|-----|
+            | `firmware.bin` | App only (flash at 0x10000) |
+            | `firmware-merged.bin` | Full flash (flash at 0x0) |
+            | `SigurdOS-tdeck-launcher.bin` | For bmorcelli/Launcher install |
+            | `firmware-debug.bin` | Debug build with verbose logging |
+            | `sbom.cdx.json` | CycloneDX firmware dependency inventory |
+            | `manifest.json` | Web flasher manifest |
+            | `build-metadata.json` | Build provenance and component hashes |
+            | `sigurdos-tdeck-bootloader.bin` | Bootloader (web flasher) |
+            | `sigurdos-tdeck-partitions.bin` | Partition table (web flasher) |
+            | `sigurdos-tdeck-boot_app0.bin` | Boot app0 (web flasher) |
+            | `sigurdos-tdeck-firmware.bin` | App firmware (web flasher) |
+            | `sigurdos-tdeck-full.bin` | Full image (web flasher) |
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+          preserve_order: true
+          files: |
+            firmware/firmware.bin
+            firmware/firmware-merged.bin
+            firmware/SigurdOS-tdeck-launcher.bin
+            firmware/firmware-debug.bin
+            firmware/sbom.cdx.json
+            firmware/SHA256SUMS.txt
+            firmware/SHA256SUMS.sigstore.json
+            firmware/manifest.json
+            firmware/build-metadata.json
+            firmware/sigurdos-tdeck-bootloader.bin
+            firmware/sigurdos-tdeck-partitions.bin
+            firmware/sigurdos-tdeck-boot_app0.bin
+            firmware/sigurdos-tdeck-firmware.bin
+            firmware/sigurdos-tdeck-full.bin
+            firmware/sigurdos-tdeck-launcher.bin
+            firmware/release-evidence.json

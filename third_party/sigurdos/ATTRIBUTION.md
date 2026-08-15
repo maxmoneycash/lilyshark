@@ -1,36 +1,64 @@
 # Third-party: SigurdOS
 
-The code in this directory is from **SigurdOS**
-(https://github.com/hermes-gadget/SigurdOS-tdeck), Copyright (C) 2025 Ben,
-licensed **GPL-3.0-or-later** — see `LICENSE` in this directory and the
-SPDX headers preserved on every file. Imported at upstream commit
-`ce59f0f` (release `beta-0.1.47-RC9`, 2026-08-02).
+Everything in this directory is **SigurdOS**, not Lilyshark.
 
-Lilyshark is GPL-3.0, so this incorporation is license-compatible. Per
-GPL §5(a), files modified for Lilyshark carry a "Modified for Lilyshark"
-notice below their original header; unmodified files are verbatim.
+- **Upstream:** https://github.com/hermes-gadget/SigurdOS-tdeck
+- **Copyright:** (C) 2025 Ben (GitHub `hermes-gadget`), with contributions
+  from `n30nex`, `gadgethd`, `Jah-yee`
+- **License:** GPL-3.0-or-later — full text in `LICENSE` beside this file
+- **Imported at:** commit `ce59f0f`, release `beta-0.1.47-RC9` (2026-08-02)
+- **Modifications by Lilyshark:** none. This is a verbatim import.
 
-## What was taken, and why
+Lilyshark is also GPL-3.0, which is what makes this incorporation
+license-compatible. The obligation that comes with it is simple and we keep
+it: the copyright notices and the license stay attached, and any file we
+later modify will say so in place, per GPL §5(a).
 
-| Subtree | Lines | Why |
-| --- | --- | --- |
-| `comms/` | ~5,400 | The MeshCore **companion bridge** (BLE + USB CDC + WebSocket/TCP transports). Adapting this lets a T-Deck running Lilyshark speak the companion protocol the Lilyshark web analyzer already uses (`@liamcottle/meshcore.js`), so the device and the webapp connect directly. |
-| `hal/` (subset) | ~5,500 | Field-hardened drivers for the exact same board: I2C keyboard + layouts, trackball debounce, GT911 touch, shared-SPI arbitration (display vs microSD — the precise contention our README warns about), battery curve, prefs with atomic writes, boot watchdog, sleep orchestration. Reference and port material for our device layer. |
-| `mesh/path_codec` | ~450 | Companion-bridge dependency. |
+Most source files carry their own `SPDX-License-Identifier: GPL-3.0-or-later`
+header. A small number of upstream files do not; those are covered by the
+repository-level `LICENSE` here, exactly as they are upstream. We have not
+added, altered, or removed any copyright or license notice.
 
-## What was deliberately NOT taken
+## Why it is here
 
-- Their 16.7k-line MeshCore client stack — for protocol behavior we go to
-  upstream MeshCore (MIT) directly rather than inheriting a divergent fork.
-- All UI (`ui/`, `app/`, fonts, i18n) — Lilyshark's instrument shell is its
-  identity; theirs is a messenger's.
-- OTA/web-flasher infrastructure — planned separately.
+SigurdOS is the most complete MeshCore *client* firmware for the LilyGo
+T-Deck — messaging, contacts, rooms, BLE/USB companion bridging, offline
+maps, and a hardened HAL for this exact board, validated across 30 build
+environments and ~1,600 host tests.
 
-## Integration rules
+Lilyshark is a different thing: a packet sniffer and RF analyzer that
+captures frames with their radio physics, writes `.lscap` and LoRaTap PCAP,
+and anchors captures in Shelby content-addressed storage. The two are
+complementary rather than competing — vendoring their client gives Lilyshark
+a proven messaging and companion-bridge foundation to build the analyzer on
+top of, instead of reimplementing a mesh client from scratch.
 
-1. Never edit these files in place for feature work — port into
-   `src/`/`include/lilyshark/` behind our interfaces, keeping the SPDX
-   header plus a provenance line on any file that carries copied code.
-2. The firmware build does not compile this directory; it is a vendored
-   reference until the companion-bridge port lands.
-3. Keep this import pinned; refresh deliberately, never automatically.
+## What we are building on it
+
+Highest value first:
+
+1. **Companion bridge** (`src/comms/`) — speaks the MeshCore companion
+   protocol over USB CDC, BLE, and WebSocket. This is the protocol the
+   Lilyshark web analyzer already speaks via `@liamcottle/meshcore.js`, so
+   porting it means lilyshark.com connects directly to a Lilyshark device.
+2. **HAL** (`src/hal/`) — keyboard, trackball, GT911 touch, battery curve,
+   shared-SPI arbitration between display and microSD, sleep orchestration,
+   atomic preference writes. Field-hardened on the same silicon.
+3. **Mesh client** (`src/mesh/`) — MeshCore protocol, stores, persistence.
+4. **Diagnostics** (`src/diagnostics/`) — logging, telemetry, crash capture.
+
+## Ground rules
+
+- Do not edit files in this directory for Lilyshark feature work. Port into
+  `src/` and `include/lilyshark/` behind our own interfaces, carrying the
+  SPDX header and a provenance line onto any file that contains copied code.
+- The Lilyshark firmware build does not compile this directory. It is a
+  pinned reference and porting source until integration lands.
+- Refresh deliberately by re-importing a named upstream commit and updating
+  the header of this file. Never merge upstream silently.
+
+## Upstream's own request
+
+The SigurdOS maintainer declines donations and asks that support go to
+MeshCore instead (https://meshcore.co.uk). Lilyshark passes that request
+along rather than quietly benefiting from it.
