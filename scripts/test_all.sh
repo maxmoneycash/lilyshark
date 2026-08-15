@@ -110,6 +110,18 @@ build_and_run runtime_event_history \
   src/core/runtime_event_history.cpp \
   test/runtime_event_history/test_runtime_event_history.cpp
 
+build_and_run rolling_diagnostics \
+  src/core/rolling_diagnostics.cpp \
+  test/rolling_diagnostics/test_rolling_diagnostics.cpp
+
+build_and_run live_telemetry \
+  src/simulator/live_telemetry.cpp \
+  test/live_telemetry/test_live_telemetry.cpp
+
+build_and_run diagnostic_tools \
+  src/core/diagnostic_tools.cpp \
+  test/diagnostic_tools/test_diagnostic_tools.cpp
+
 build_and_run survey_accumulator \
   src/core/survey_accumulator.cpp \
   test/survey_accumulator/test_survey_accumulator.cpp
@@ -144,6 +156,15 @@ build_and_run shelby_pointer \
   src/shelby/shelby_pointer.cpp \
   src/shelby/shelby_pointer_decoder.cpp \
   test/shelby_pointer/test_shelby_pointer.cpp
+
+build_and_run shelby_registry \
+  src/core/decoder_registry.cpp \
+  src/core/meshtastic_decoder.cpp \
+  src/core/meshcore_decoder.cpp \
+  src/core/reticulum_decoder.cpp \
+  src/shelby/shelby_pointer.cpp \
+  src/shelby/shelby_pointer_decoder.cpp \
+  test/shelby_registry/test_shelby_registry.cpp
 
 build_and_run spectrum \
   src/core/spectrum.cpp \
@@ -181,6 +202,9 @@ python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
 
 echo "Testing shelby_pointer_py"
 python3 -m unittest discover -s test/shelby_pointer_py -p 'test_*.py'
+
+echo "Testing analysis_sim"
+python3 -m unittest discover -s test/analysis_sim -p 'test_*.py'
 
 echo "Testing serial_smoke"
 python3 -m unittest discover -s test/serial_smoke -p 'test_*.py'
@@ -246,8 +270,31 @@ if ! "${timeout_command}" 10 .pio/build/simulator/program --render-test >"${rend
   exit 1
 fi
 
-echo "Smoke testing all nine simulator screens"
-for screen in 1 2 3 4 5 6 7 8 9; do
+echo "Testing visible motion across every live analyzer screen"
+animation_log="${test_dir}/simulator-animation.log"
+if ! "${timeout_command}" 10 .pio/build/simulator/program --animation-test >"${animation_log}" 2>&1 || \
+   ! grep -q '^Lilyshark simulator animation test passed$' "${animation_log}"; then
+  echo "Simulator animation test did not complete" >&2
+  cat "${animation_log}" >&2
+  exit 1
+fi
+
+echo "Testing deterministic README animation frames"
+readme_frame_dir="${test_dir}/readme-live-frames"
+mkdir -p "${readme_frame_dir}"
+readme_frame_log="${test_dir}/readme-live-frames.log"
+if ! "${timeout_command}" 10 \
+     .pio/build/simulator/program --readme-frames "${readme_frame_dir}" \
+     >"${readme_frame_log}" 2>&1 || \
+   ! grep -q '^Lilyshark README live frames written: 118$' "${readme_frame_log}" || \
+   [[ "$(find "${readme_frame_dir}" -type f -name 'live-*.ppm' | wc -l | tr -d ' ')" -ne 118 ]]; then
+  echo "Simulator README animation frames were incomplete" >&2
+  cat "${readme_frame_log}" >&2
+  exit 1
+fi
+
+echo "Smoke testing all thirteen simulator screens"
+for screen in $(seq 1 13); do
   log="${test_dir}/simulator-screen-${screen}.log"
   set +e
   SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
@@ -286,11 +333,50 @@ if ! SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
      LILYSHARK_DEMO_LEAD_MS=0 LILYSHARK_DEMO_STEP_MS=5 LILYSHARK_DEMO_ONCE=1 \
      "${timeout_command}" 10 .pio/build/simulator/program --demo >"${demo_log}" 2>&1 || \
    ! grep -q '^Lilyshark UI tour test passed$' "${demo_log}" || \
-   [[ "$(grep -c '^UI tour [0-9][0-9]/[0-9][0-9]:' "${demo_log}")" -ne 63 ]]; then
+   [[ "$(grep -c '^UI tour [0-9][0-9]/[0-9][0-9]:' "${demo_log}")" -ne 87 ]]; then
   echo "Simulator screen-recording tour did not complete every step" >&2
   cat "${demo_log}" >&2
   exit 1
 fi
+
+echo "Testing screen-recording start and completion synchronization"
+demo_signal_dir="${test_dir}/simulator-demo-signals"
+mkdir -p "${demo_signal_dir}"
+demo_start_signal="${demo_signal_dir}/start"
+demo_done_signal="${demo_signal_dir}/done"
+demo_sync_log="${test_dir}/simulator-demo-sync.log"
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+  LILYSHARK_DEMO_LEAD_MS=0 LILYSHARK_DEMO_STEP_MS=5 LILYSHARK_DEMO_ONCE=1 \
+  LILYSHARK_DEMO_START_FILE="${demo_start_signal}" \
+  LILYSHARK_DEMO_DONE_FILE="${demo_done_signal}" \
+  "${timeout_command}" 10 .pio/build/simulator/program --demo >"${demo_sync_log}" 2>&1 &
+demo_sync_pid=$!
+sleep 0.1
+if grep -q '^UI tour 01/' "${demo_sync_log}"; then
+  echo "Synchronized UI tour started before the recording signal" >&2
+  kill "${demo_sync_pid}" 2>/dev/null || true
+  wait "${demo_sync_pid}" 2>/dev/null || true
+  cat "${demo_sync_log}" >&2
+  exit 1
+fi
+touch "${demo_start_signal}"
+for _ in $(seq 1 100); do
+  [[ -f "${demo_done_signal}" ]] && break
+  sleep 0.05
+done
+if [[ ! -f "${demo_done_signal}" ]] || \
+   ! grep -q '^UI tour ready: waiting for recording signal$' "${demo_sync_log}" || \
+   ! grep -q '^UI tour recording synchronized; starts in 0.0 seconds$' "${demo_sync_log}" || \
+   ! grep -q '^Lilyshark UI tour complete; holding final frame$' "${demo_sync_log}" || \
+   [[ "$(grep -c '^UI tour [0-9][0-9]/[0-9][0-9]:' "${demo_sync_log}")" -ne 87 ]]; then
+  echo "Simulator recording synchronization did not complete every step" >&2
+  kill "${demo_sync_pid}" 2>/dev/null || true
+  wait "${demo_sync_pid}" 2>/dev/null || true
+  cat "${demo_sync_log}" >&2
+  exit 1
+fi
+kill "${demo_sync_pid}" 2>/dev/null || true
+wait "${demo_sync_pid}" 2>/dev/null || true
 
 echo "Smoke testing continuous simulator cycling"
 soak_log="${test_dir}/simulator-soak.log"

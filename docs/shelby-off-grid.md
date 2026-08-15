@@ -17,7 +17,10 @@ payloads through the pipe is how you get the two oldest complaints about
 mesh radio — no photos, and messages that die when you are offline.
 
 The design rule follows directly: **send a reference, let a connected node
-carry the bytes.**
+carry the bytes.** The scaling math behind that rule — pointer capacity at
+each architecture step, capture accumulation on Shelby, and the
+reference-vs-payload airtime gap — is modeled with tested invariants in
+`analysis/` (`analysis/results.md`).
 
 ## The pointer
 

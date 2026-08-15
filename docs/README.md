@@ -18,6 +18,13 @@
 Both are cross-language wire formats pinned by golden test vectors; every
 implementation (C++, TypeScript, Python) accepts exactly the same bytes.
 
+## Analysis
+
+`analysis/` (repository root) — a parameterized Shelby × LoRa scaling model
+(pointer capacity, capture storage, the reference-vs-payload asymmetry) with
+generated charts and tested invariants. See `analysis/README.md` and
+`analysis/results.md`.
+
 ## Operating
 
 | Document | Task |
