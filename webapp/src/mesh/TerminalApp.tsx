@@ -11,7 +11,7 @@ import {
   setConnectionLostHandler,
 } from "./radio";
 import { evalAlerts, evalAutonomia, getAlertCfg } from "./alerts";
-import { clearDemo, isDemo, seedDemo } from "./demo";
+import { clearDemo, seedDemo } from "./demo";
 import { preverBateria } from "./battery";
 import { addLog, DeviceStatus, fmtLog, getSnapshot, subscribe } from "./store";
 import { getAutoPurgeDays, loadTelemetry, purgeOlderThan } from "./db";
@@ -19,6 +19,7 @@ import Chat from "./screens/Chat";
 import Nodes from "./screens/Nodes";
 import Mesh from "./screens/Mesh";
 import Config from "./screens/Config";
+import { IntroTab } from "../components/IntroTab";
 import { TrafficTab } from "../components/TrafficTab";
 import { WhitepaperTab } from "../components/WhitepaperTab";
 import { ShelbyScreen } from "./screens/Shelby";
@@ -37,6 +38,7 @@ import "./meshterm.css";
 const VERSION = "0.1.0";
 
 const TABS = [
+  "INTRO",
   "PAPER",
   "TRAFFIC",
   "SHELBY",
@@ -185,10 +187,15 @@ function App() {
   useHourTick();
   useLangTick();
   const hostBat = useHostBattery();
-  // The paper opens first: it is the argument the rest of the app demonstrates.
-  const [tab, setTab] = useState<Tab>("PAPER");
+  // The intro opens first: the device, its screens, and why it exists.
+  const [tab, setTab] = useState<Tab>("INTRO");
   // Phone nav: the ten tabs live behind a hamburger instead of a side-scroll.
   const [menuOpen, setMenuOpen] = useState(false);
+  // CONNECT opens a sheet with the steps and both transports; the header
+  // itself carries no dropdown.
+  const [connectOpen, setConnectOpen] = useState(false);
+  const hasSerial = typeof navigator !== "undefined" && "serial" in navigator;
+  const hasBle = typeof navigator !== "undefined" && "bluetooth" in navigator;
   const [chatConvo, setChatConvo] = useState("ch:0");
   // node to preselect when jumping MAP → NODES with [+INFO]
   const [nodeFocus, setNodeFocus] = useState<number | undefined>();
@@ -402,7 +409,10 @@ function App() {
     }, ms) as unknown as number;
   };
 
-  const onConnect = async () => {
+  // Takes the transport explicitly: the connect sheet picks one and connects
+  // in the same click, and reading `mode` from the closure there would see
+  // the value from before setMode landed.
+  const onConnect = async (m: Mode = mode) => {
     setError("");
     setConnecting(true);
     canceledRef.current = false;
@@ -410,10 +420,10 @@ function App() {
     try {
       // The browser's device picker is the port selector of a web app: it
       // opens on this click (a user gesture is mandatory for Web Serial/BLE).
-      await (mode === "serie" ? connectSerial() : connectBle());
+      await (m === "serie" ? connectSerial() : connectBle());
       if (canceledRef.current) return;
       setConnectedAt(Date.now());
-      saveLastMode(mode);
+      saveLastMode(m);
     } catch (e) {
       wantRef.current = false; // manual connect failed: don't retry behind their back
       if (!canceledRef.current) setError(String(e));
@@ -535,15 +545,6 @@ function App() {
           <span />
         </button>
         <span className="spacer" />
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as Mode)}
-          disabled={connected || connecting}
-          title={t("El navegador pedirá el dispositivo al conectar")}
-        >
-          <option value="serie">USB</option>
-          <option value="ble">BLE</option>
-        </select>
         {connected ? (
           <button className="primary" onClick={stopAndForget}>
             {t("DESCONECTAR")}
@@ -553,7 +554,7 @@ function App() {
             {t("CANCELAR")}
           </button>
         ) : (
-          <button className="primary" onClick={onConnect}>
+          <button className="primary" onClick={() => setConnectOpen(true)}>
             {t("CONECTAR")}
           </button>
         )}
@@ -569,6 +570,83 @@ function App() {
         </div>
       </header>
 
+      {/* The connect sheet: the same surface as the tab sheet, holding the
+          three steps instead of a transport dropdown squeezed into the header. */}
+      {connectOpen && (
+        <div className="overlay-sheet" role="dialog" aria-label="Connect a radio">
+          <button
+            className="sheet-close"
+            aria-label="Close"
+            onClick={() => setConnectOpen(false)}
+          >
+            ✕
+          </button>
+          <div className="sheet-title">CONNECT A RADIO</div>
+          <div className="flow">
+            <div className="flow-step">
+              <span className="flow-n">01</span>
+              <span className="flow-k">FLASH</span>
+              <span className="flow-v">
+                the radio runs the MeshCore companion firmware — a T-Deck,
+                Heltec, RAK or any supported LoRa board
+              </span>
+            </div>
+            <div className="flow-step">
+              <span className="flow-n">02</span>
+              <span className="flow-k">LINK</span>
+              <span className="flow-v">
+                pick how this browser reaches it — the device picker opens on
+                the same tap
+              </span>
+            </div>
+            <div className="flow-step">
+              <span className="flow-n">03</span>
+              <span className="flow-k">LISTEN</span>
+              <span className="flow-v">
+                the terminal configures itself and every screen switches from
+                the demo mesh to what your radio hears
+              </span>
+            </div>
+          </div>
+          <div className="sheet-actions">
+            <button
+              className="primary"
+              disabled={!hasSerial}
+              onClick={() => {
+                setMode("serie");
+                setConnectOpen(false);
+                void onConnect("serie");
+              }}
+            >
+              USB SERIAL
+            </button>
+            <button
+              className="primary"
+              disabled={!hasBle}
+              onClick={() => {
+                setMode("ble");
+                setConnectOpen(false);
+                void onConnect("ble");
+              }}
+            >
+              BLUETOOTH
+            </button>
+          </div>
+          {!hasSerial && !hasBle && (
+            <p className="sheet-note">
+              This browser exposes neither Web Serial nor Web Bluetooth — open
+              lilyshark.com in Chrome or Edge on a computer, or Chrome on
+              Android, to attach a radio. Everything else works right here.
+            </p>
+          )}
+          {!hasSerial && hasBle && (
+            <p className="sheet-note">
+              USB needs Chrome or Edge on a computer; Bluetooth works here.
+            </p>
+          )}
+        </div>
+      )}
+
       {error && <p className="error">{error}</p>}
 
       <ScreenBoundary key={tab}>
@@ -583,6 +661,7 @@ function App() {
       >
       {tab === "TRAFFIC" && <TrafficTab />}
       {tab === "SHELBY" && <ShelbyScreen />}
+      {tab === "INTRO" && <IntroTab onOpen={(next) => setTab(next as Tab)} />}
       {tab === "PAPER" && <WhitepaperTab />}
       {tab === "CHAT" && (
         <Chat
@@ -657,7 +736,6 @@ function App() {
       <footer>
         {/* The node counts to the right are invented while no radio is
             attached: say so before they are read as a measurement. */}
-        {isDemo() && <span className="warn">DEMO DATA</span>}
         {s.deviceInfo?.model && <span>HW {s.deviceInfo.model}</span>}
         {s.selfInfo && (
           <span>

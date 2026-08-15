@@ -1366,7 +1366,9 @@ body {
 		width: 46px;
 		min-height: 40px;
 		padding: 0 12px;
-		margin-left: auto;
+		/* No margin-left auto here: CONNECT carries the push-right, so the
+		   two sit adjacent — a second auto margin split the free space and
+		   stranded CONNECT in the middle of the header. */
 		position: relative;
 		z-index: 61;
 		background: transparent;
@@ -1379,6 +1381,14 @@ body {
 		transition:
 			transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
 			opacity 0.15s ease-out;
+	}
+	/* Open state: the button fills and the bars flip to paper — the browser's
+	   own focus fill was painting fg-on-fg and the ✕ disappeared into it. */
+	.meshterm .app.menu-open .menu-btn {
+		background: var(--fg);
+	}
+	.meshterm .app.menu-open .menu-btn span {
+		background: var(--bg);
 	}
 	.meshterm .app.menu-open .menu-btn span:nth-child(1) {
 		transform: translateY(7px) rotate(45deg);
@@ -1614,6 +1624,255 @@ body:has(.meshterm .app.menu-open) {
 }
 @media (prefers-reduced-motion: reduce) {
 	.meshterm table.grid tbody tr:last-child {
+		animation: none;
+	}
+}
+
+/* ── Sheets ───────────────────────────────────────────────────────────────
+   One overlay grammar shared by the tab sheet and the connect sheet: a
+   full-viewport surface in the sheet tint, content centered, close at the
+   top right. The nav sheet keeps its own rules; this class is for sheets
+   built as plain elements. */
+.meshterm .overlay-sheet {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 100dvh;
+	z-index: 70;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 18px;
+	padding: max(64px, env(safe-area-inset-top) + 52px) clamp(20px, 8vw, 120px)
+		max(30px, env(safe-area-inset-bottom) + 18px);
+	background: color-mix(in srgb, var(--bg) 94%, var(--fg));
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.meshterm .overlay-sheet .flow {
+	border-top: 1px solid var(--border);
+	max-width: 640px;
+}
+.meshterm .sheet-title {
+	font-size: 13px;
+	letter-spacing: 3px;
+	color: var(--fg);
+}
+.meshterm .sheet-close {
+	position: absolute;
+	top: max(10px, env(safe-area-inset-top));
+	right: 12px;
+	width: 46px;
+	min-height: 42px;
+	font-size: 16px;
+	background: transparent;
+}
+.meshterm .sheet-actions {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+.meshterm .sheet-actions button {
+	min-height: 46px;
+	padding: 0 22px;
+	letter-spacing: 1.5px;
+}
+.meshterm .sheet-note {
+	max-width: 56ch;
+	font-size: 12px;
+	line-height: 1.6;
+	margin: 0;
+	color: var(--fg-dim);
+}
+
+/* With the sheet open the header rides on top of it, so the wordmark and the
+   ✕ stay visible and tappable. `sticky` matters twice over: it beats the
+   sheet's z-index (the fill screens keep a static header, and z-index on a
+   static element is inert — the ✕ silently vanished on exactly those tabs),
+   and it keeps the header pinned on the tabs that scroll. */
+@media (max-width: 860px) {
+	.meshterm .app.menu-open header {
+		position: sticky;
+		top: 0;
+		z-index: 62;
+	}
+
+	/* Eleven destinations outgrow a short phone: centered with overflow they
+	   clipped at both ends. Auto margins center when there is room and scroll
+	   honestly when there is not. */
+	.meshterm header nav {
+		justify-content: flex-start;
+	}
+	.meshterm header nav > .tab:first-child {
+		margin-top: auto;
+	}
+	.meshterm header nav > .tab:last-child {
+		margin-bottom: auto;
+	}
+	.meshterm header nav > .tab {
+		font-size: 15px;
+		padding: 11px 16px;
+		flex-shrink: 0;
+	}
+}
+
+/* ── Intro ────────────────────────────────────────────────────────────────
+   The scroll stage: a tall track drives progress; a sticky viewport inside it
+   holds the copy, the device, and the section rail. The device photo is the
+   fixed object; scrolling swaps what its display shows. */
+.meshterm .intro-scroll {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
+}
+.meshterm .intro-scroll::-webkit-scrollbar {
+	display: none;
+}
+.meshterm .intro-track {
+	position: relative;
+}
+.meshterm .intro-stage {
+	position: sticky;
+	top: 0;
+	height: 100%;
+	max-height: calc(100% / var(--intro-n, 5));
+	display: grid;
+	grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+	align-items: center;
+	gap: clamp(16px, 4vw, 56px);
+	padding: 0 clamp(18px, 5vw, 72px);
+	overflow: hidden;
+}
+.meshterm .intro-copy {
+	position: relative;
+	min-width: 0;
+}
+.meshterm .intro-head {
+	margin: 0 0 18px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	line-height: 1.18;
+	color: var(--ink, var(--fg));
+}
+.meshterm .intro-line {
+	display: block;
+	white-space: nowrap;
+}
+.meshterm .intro-word {
+	display: inline-block;
+	margin-right: 0.32em;
+}
+.meshterm .intro-body {
+	margin: 0;
+	max-width: 46ch;
+	font-size: 14px;
+	line-height: 1.75;
+	color: var(--ink);
+}
+.meshterm .intro-cta {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-top: 26px;
+}
+.meshterm .intro-cta button {
+	min-height: 46px;
+	padding: 0 22px;
+	letter-spacing: 1.5px;
+}
+.meshterm .intro-hint {
+	position: absolute;
+	bottom: -64px;
+	left: 2px;
+	font-size: 11px;
+	letter-spacing: 3px;
+	animation: meshterm-ledblink 1.6s infinite;
+}
+.meshterm .intro-device {
+	position: relative;
+	justify-self: center;
+	height: min(78vh, 640px);
+	aspect-ratio: 517 / 1116;
+}
+.meshterm .intro-device-img {
+	width: 100%;
+	height: 100%;
+	display: block;
+	filter: drop-shadow(0 18px 40px rgba(64, 0, 34, 0.28));
+}
+.meshterm .intro-screen {
+	position: absolute;
+	overflow: hidden;
+	border-radius: 2px;
+	background: #000;
+}
+.meshterm .intro-screen img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: fill;
+	display: block;
+}
+.meshterm .intro-rail {
+	position: absolute;
+	right: clamp(8px, 2vw, 26px);
+	top: 50%;
+	transform: translateY(-50%);
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.meshterm .intro-rail button {
+	width: 10px;
+	min-height: 10px;
+	height: 10px;
+	padding: 0;
+	border: 1px solid var(--fg);
+	background: transparent;
+	border-radius: 50%;
+}
+.meshterm .intro-rail button.on {
+	background: var(--fg);
+}
+
+@media (max-width: 860px) {
+	/* Copy above, device below, both inside one still viewport. */
+	.meshterm .intro-stage {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
+		align-items: start;
+		padding: 18px 18px 8px;
+		gap: 8px;
+	}
+	.meshterm .intro-copy {
+		padding-top: 6px;
+	}
+	.meshterm .intro-body {
+		font-size: 13px;
+	}
+	.meshterm .intro-device {
+		height: auto;
+		max-height: 100%;
+		width: min(64vw, 300px);
+		aspect-ratio: 517 / 1116;
+		align-self: start;
+		margin-top: 4px;
+	}
+	.meshterm .intro-hint {
+		position: static;
+		margin-top: 14px;
+	}
+	.meshterm .intro-rail {
+		right: 6px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.meshterm .intro-hint {
 		animation: none;
 	}
 }
