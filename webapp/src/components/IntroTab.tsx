@@ -27,31 +27,40 @@ interface Section {
   body: string;
 }
 
+/**
+ * The argument, in six beats. Every number here is from the whitepaper the
+ * PAPER tab ships — measured or sourced there, not invented for the landing.
+ */
 const SECTIONS: Section[] = [
   {
     screen: '/intro/screen-splash.png',
     head: 'Wireshark for mesh radio.',
-    body: 'Lilyshark turns a LILYGO T-Deck into a handheld analyzer for the traffic already on the air.',
-  },
-  {
-    screen: '/intro/screen-traffic.png',
-    head: 'Every frame, with its physics.',
-    body: 'Meshtastic, MeshCore and Reticulum share one capture engine — raw bytes kept with RSSI, SNR, airtime and CRC.',
-  },
-  {
-    screen: '/intro/screen-spectrum.png',
-    head: 'Survey the band.',
-    body: 'Noise floor, busiest and quietest channels — watch 906 MHz breathe before you pick a slot.',
+    body: 'Lilyshark turns a LILYGO T-Deck into a handheld analyzer for LoRa mesh traffic — and the first firmware on this hardware built to look as good as it works.',
   },
   {
     screen: '/intro/screen-home.png',
-    head: 'Evidence, not vibes.',
-    body: 'Captures land on microSD as .lscap and export as LoRaTap PCAP — Wireshark itself opens them.',
+    head: 'Off-grid is having a moment.',
+    body: 'No carrier, no account, no server. During the 2025–26 blackouts one Bluetooth-mesh app was downloaded 48,800 times in a single day in Nepal and hit 430,000 daily users in India — and LoRa meshes like Meshtastic and MeshCore carry the same idea kilometres per hop.',
+  },
+  {
+    screen: '/intro/screen-traffic.png',
+    head: 'The air is the bottleneck.',
+    body: 'A LongFast channel moves about 987 bit/s, and flood routing makes every node repeat everything. We measured a rebroadcast factor of 7.36 — delivery reach collapses from 68.6% to 25.8% as a mesh grows, saturating near 6,721 nodes.',
+  },
+  {
+    screen: '/intro/screen-spectrum.png',
+    head: "You can't fix what you can't see.",
+    body: 'So we built the instrument: every frame captured with its RSSI, SNR, airtime and CRC, a live survey of the band, node and route maps, and LoRaTap PCAP export that Wireshark itself opens.',
+  },
+  {
+    screen: '/intro/screen-settings.png',
+    head: "Firmware you'd show someone.",
+    body: 'A complete device shell — guided first run, live diagnostics, capture to microSD — on the T-Deck first, and built to travel to any Meshtastic-class radio with a screen.',
   },
   {
     screen: '/intro/screen-onboarding.png',
-    head: 'Off-grid. On Shelby.',
-    body: 'A capture is too big for LoRa; its receipt is not. An 82-byte pointer on the air says where the bytes live.',
+    head: 'Storage meets radio.',
+    body: "The first application pairing Shelby's content-addressed storage with LoRa mesh: a capture is too big for the air, so the radio broadcasts an 82-byte pointer and any connected node resolves the bytes — evidence nobody can quietly edit.",
   },
 ];
 

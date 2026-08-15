@@ -68,7 +68,14 @@ export default function MapView({
 			});
 		});
 		mapRef.current = map;
+		// Leaflet caches the container size at creation; when the layout later
+		// gives the map its real box (the phone window model does this after
+		// mount), hit-testing runs against the stale size and taps land beside
+		// the markers. Re-measure whenever the box changes.
+		const ro = new ResizeObserver(() => map.invalidateSize());
+		ro.observe(divRef.current);
 		return () => {
+			ro.disconnect();
 			map.remove();
 			mapRef.current = null;
 			fittedRef.current = false;
@@ -283,8 +290,11 @@ export default function MapView({
 	);
 	const puntos = new Set(drawn.map((n) => `${n.lat},${n.lon}`)).size;
 
+	// map-main: on phones this screen becomes a full app-window (the page does
+	// not scroll), so the map takes everything between header and footer and a
+	// swipe pans the map instead of fighting the page.
 	return (
-		<main>
+		<main className="map-main">
 			<div className="panel" style={{ flex: 1 }}>
 				<div className="panel-title">
 					<span>

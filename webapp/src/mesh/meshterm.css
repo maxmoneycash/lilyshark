@@ -1377,18 +1377,21 @@ body {
 		display: block;
 		height: 2px;
 		width: 100%;
-		background: var(--fg);
+		/* currentColor: whatever fills the button, the bars take its text
+		   color — the iOS focus fill was leaving a blank pink square. */
+		background: currentColor;
 		transition:
 			transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
 			opacity 0.15s ease-out;
 	}
 	/* Open state: the button fills and the bars flip to paper — the browser's
 	   own focus fill was painting fg-on-fg and the ✕ disappeared into it. */
+	.meshterm .menu-btn {
+		color: var(--fg);
+	}
 	.meshterm .app.menu-open .menu-btn {
 		background: var(--fg);
-	}
-	.meshterm .app.menu-open .menu-btn span {
-		background: var(--bg);
+		color: var(--bg);
 	}
 	.meshterm .app.menu-open .menu-btn span:nth-child(1) {
 		transform: translateY(7px) rotate(45deg);
@@ -1874,5 +1877,63 @@ body:has(.meshterm .app.menu-open) {
 @media (prefers-reduced-motion: reduce) {
 	.meshterm .intro-hint {
 		animation: none;
+	}
+}
+
+/* ── Phone map window ─────────────────────────────────────────────────────
+   The tactical map becomes the whole screen between header and footer, and
+   the page behind it stops scrolling — a swipe pans the map instead of
+   fighting the document, and the header (with the ✕/hamburger) is always
+   there to leave by. */
+@media (max-width: 860px) {
+	.meshterm .app:has(.map-main) {
+		height: 100dvh;
+		min-height: 0;
+		overflow: hidden;
+	}
+	.meshterm .app:has(.map-main) header {
+		position: static;
+	}
+	.meshterm .map-main {
+		flex: 1 1 0 !important;
+		min-height: 0;
+		overflow: hidden;
+		padding: 0;
+		gap: 0;
+	}
+	.meshterm .map-main > .panel {
+		flex: 1 1 auto !important;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.meshterm .map-main .map-wrap {
+		flex: 1;
+		min-height: 0;
+		height: auto;
+	}
+}
+
+/* ── Intro: the device never breathes ─────────────────────────────────────
+   On phones the copy block was sizing its grid row, so a longer section
+   shrank the radio and the whole page pumped while scrolling. Fixed rows:
+   the copy gets a constant band (scrolling inside itself in the worst case)
+   and the device fills a constant remainder, sized by height. */
+@media (max-width: 860px) {
+	.meshterm .intro-stage {
+		grid-template-rows: minmax(0, 44%) minmax(0, 56%);
+		align-items: stretch;
+	}
+	.meshterm .intro-copy {
+		overflow: hidden;
+		align-self: stretch;
+	}
+	.meshterm .intro-device {
+		height: 100%;
+		width: auto;
+		max-width: 78vw;
+		justify-self: center;
+		align-self: center;
+		margin-top: 0;
 	}
 }
