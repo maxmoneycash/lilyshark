@@ -38,20 +38,20 @@ Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAM
 
 <table>
   <tr>
-    <td width="50%"><img src="design/previews/webapp-traffic.png" alt="TRAFFIC screen: .lscap frame list with RF metadata and a decoded Shelby pointer"></td>
-    <td width="50%"><img src="design/previews/webapp-shelby.png" alt="SHELBY screen: the off-grid pointer design with measured airtime math"></td>
+    <td width="50%"><img src="design/previews/webapp-intro.png" alt="INTRO: the T-Deck with real firmware screens, scroll-driven"></td>
+    <td width="50%"><img src="design/previews/webapp-traffic.png" alt="TRAFFIC: live frame list with RF metadata and a decoded Shelby pointer"></td>
   </tr>
   <tr>
-    <td align="center"><sub>TRAFFIC — the analyzer, frame 9 carrying a Shelby pointer</sub></td>
+    <td align="center"><sub>INTRO — the device, cycling all 38 real firmware screens</sub></td>
+    <td align="center"><sub>TRAFFIC — live frames streaming, frame 9 carrying a Shelby pointer</sub></td>
+  </tr>
+  <tr>
+    <td><img src="design/previews/webapp-shelby.png" alt="SHELBY: the off-grid pointer design with measured airtime math"></td>
+    <td><img src="design/previews/webapp-map.png" alt="MAP: mesh nodes across Palo Alto"></td>
+  </tr>
+  <tr>
     <td align="center"><sub>SHELBY — why an 82-byte pointer, with airtime measured from the capture</sub></td>
-  </tr>
-  <tr>
-    <td><img src="design/previews/webapp-map.png" alt="MAP screen: mesh nodes across Palo Alto"></td>
-    <td><img src="design/previews/webapp-mobile.png" alt="The analyzer on a phone with the hamburger nav"></td>
-  </tr>
-  <tr>
     <td align="center"><sub>MAP — the demo mesh across Palo Alto</sub></td>
-    <td align="center"><sub>The same instrument on a phone</sub></td>
   </tr>
 </table>
 
