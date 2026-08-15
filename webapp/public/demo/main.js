@@ -319,8 +319,9 @@ for (const k of Object.keys(NODES)) {
   n.group.position.copy(n.pos);
   scene.add(n.group);
 }
+const _antTip = new THREE.Vector3();
 const antennaTop = (k) => k === 'tdeck'
-  ? NODES.tdeck.pos.clone().add(new THREE.Vector3(-3.9, 8.4, 0))
+  ? tdeckAntennaTip.getWorldPosition(_antTip).clone()
   : NODES[k].pos.clone().add(new THREE.Vector3(0, NODES[k].group.userData.h + 0.2, 0));
 
 // field rocks for scale
@@ -349,7 +350,7 @@ const antennaTop = (k) => k === 'tdeck'
 
 // ---------------------------------------------------------------- T-Deck
 const screenCanvas = document.createElement('canvas');
-screenCanvas.width = 640; screenCanvas.height = 288;
+screenCanvas.width = 640; screenCanvas.height = 480;
 const sctx = screenCanvas.getContext('2d');
 const screenTex = new THREE.CanvasTexture(screenCanvas);
 screenTex.colorSpace = THREE.SRGBColorSpace;
@@ -369,7 +370,7 @@ function pushFeedRow(shelby = false) {
     shelby,
   });
   if (shelby) feed.pointerSeen = true;
-  if (feed.rows.length > 9) feed.rows.shift();
+  if (feed.rows.length > 11) feed.rows.shift();
   drawScreen();
 }
 function drawResolvedPhoto(x, y, w, h) {
@@ -377,7 +378,7 @@ function drawResolvedPhoto(x, y, w, h) {
   sky2.addColorStop(0, '#1b2f4a'); sky2.addColorStop(0.62, '#7a4a6e'); sky2.addColorStop(1, '#f05aa6');
   sctx.fillStyle = sky2; sctx.fillRect(x, y, w, h);
   sctx.fillStyle = '#f2b8d4';
-  sctx.beginPath(); sctx.arc(x + w * 0.72, y + h * 0.38, 7, 0, Math.PI * 2); sctx.fill();
+  sctx.beginPath(); sctx.arc(x + w * 0.72, y + h * 0.38, 9, 0, Math.PI * 2); sctx.fill();
   sctx.fillStyle = '#0b1016';
   sctx.beginPath();
   sctx.moveTo(x, y + h);
@@ -387,103 +388,169 @@ function drawResolvedPhoto(x, y, w, h) {
   sctx.moveTo(x + w * 0.4, y + h);
   sctx.lineTo(x + w * 0.72, y + h * 0.58); sctx.lineTo(x + w, y + h);
   sctx.closePath(); sctx.fill();
-  sctx.strokeStyle = '#66F05A'; sctx.lineWidth = 2;
+  sctx.strokeStyle = '#66F05A'; sctx.lineWidth = 3;
   sctx.strokeRect(x, y, w, h);
 }
 function drawScreen() {
   const w = screenCanvas.width, h = screenCanvas.height;
   sctx.fillStyle = '#04070a'; sctx.fillRect(0, 0, w, h);
-  sctx.fillStyle = '#F05AA6'; sctx.fillRect(0, 0, w, 30);
-  sctx.fillStyle = '#04070a'; sctx.font = '600 19px ui-monospace, Menlo, monospace';
-  sctx.fillText('LILYSHARK α  ·  1 TRAFFIC', 10, 21);
+  sctx.fillStyle = '#F05AA6'; sctx.fillRect(0, 0, w, 42);
+  sctx.fillStyle = '#04070a'; sctx.font = '600 25px ui-monospace, Menlo, monospace';
+  sctx.fillText('LILYSHARK α · 1 TRAFFIC', 12, 30);
   sctx.textAlign = 'right';
-  sctx.fillText('906.875MHz SF11', w - 10, 21);
+  sctx.font = '600 20px ui-monospace, Menlo, monospace';
+  sctx.fillText('906.875MHz SF11', w - 12, 29);
   sctx.textAlign = 'left';
-  sctx.fillStyle = '#71D8DF'; sctx.font = '15px ui-monospace, Menlo, monospace';
-  sctx.fillText('TIME      PROTO  SRC    DST    TYPE      SNR', 10, 50);
+  sctx.fillStyle = '#71D8DF'; sctx.font = '19px ui-monospace, Menlo, monospace';
+  sctx.fillText('TIME      PROTO  SRC    DST    TYPE     SNR', 12, 74);
   sctx.strokeStyle = 'rgba(240,244,239,0.25)';
-  sctx.beginPath(); sctx.moveTo(0, 58); sctx.lineTo(w, 58); sctx.stroke();
-  sctx.font = '16px ui-monospace, Menlo, monospace';
+  sctx.beginPath(); sctx.moveTo(0, 86); sctx.lineTo(w, 86); sctx.stroke();
+  sctx.font = '20px ui-monospace, Menlo, monospace';
   feed.rows.forEach((r, i) => {
-    const y = 78 + i * 22;
-    if (r.shelby) { sctx.fillStyle = 'rgba(240,90,166,0.22)'; sctx.fillRect(0, y - 15, w, 20); }
+    const y = 116 + i * 32;
+    if (r.shelby) { sctx.fillStyle = 'rgba(240,90,166,0.22)'; sctx.fillRect(0, y - 22, w, 29); }
     sctx.fillStyle = r.shelby ? '#F05AA6' : '#66F05A';
-    sctx.fillText(`${r.t}  ${r.proto}  ${r.src}  ${r.dst}  ${r.type.padEnd(8)}  ${r.snr}`, 10, y);
+    sctx.fillText(`${r.t} ${r.proto} ${r.src} ${r.dst} ${r.type.padEnd(8)} ${r.snr}`, 12, y);
   });
   if (feed.resolved) {
-    sctx.fillStyle = 'rgba(4,7,10,0.92)'; sctx.fillRect(50, 84, w - 100, 120);
-    sctx.strokeStyle = '#66F05A'; sctx.lineWidth = 2; sctx.strokeRect(50, 84, w - 100, 120);
-    drawResolvedPhoto(66, 100, 118, 88);
-    sctx.fillStyle = '#66F05A'; sctx.font = '600 21px ui-monospace, Menlo, monospace';
-    sctx.fillText('SHELBY POINTER', 202, 124);
-    sctx.fillText('RESOLVED ✓', 202, 150);
-    sctx.font = '15px ui-monospace, Menlo, monospace'; sctx.fillStyle = '#F0F4EF';
-    sctx.fillText('blob 4.2 MB · owner 0x9c…e1', 202, 178);
+    sctx.fillStyle = 'rgba(4,7,10,0.92)'; sctx.fillRect(46, 130, w - 92, 220);
+    sctx.strokeStyle = '#66F05A'; sctx.lineWidth = 3; sctx.strokeRect(46, 130, w - 92, 220);
+    drawResolvedPhoto(66, 152, 176, 140);
+    sctx.fillStyle = '#66F05A'; sctx.font = '600 27px ui-monospace, Menlo, monospace';
+    sctx.fillText('SHELBY POINTER', 264, 196);
+    sctx.fillText('RESOLVED ✓', 264, 230);
+    sctx.font = '19px ui-monospace, Menlo, monospace'; sctx.fillStyle = '#F0F4EF';
+    sctx.fillText('blob 4.2 MB', 264, 272);
+    sctx.fillText('owner 0x9c…e1', 264, 300);
     sctx.lineWidth = 1;
   }
   screenTex.needsUpdate = true;
 }
 drawScreen();
 
+function textPlane(text, colorCss, fontPx, wUnits, hUnits) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = Math.round(512 * hUnits / wUnits);
+  const g = c.getContext('2d');
+  g.font = `600 ${fontPx}px ui-rounded, "SF Pro Rounded", system-ui, sans-serif`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = colorCss;
+  g.fillText(text, c.width / 2, c.height / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(wUnits, hUnits),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  return m;
+}
+
+// LILYGO T-Deck Pro: portrait body, logo strip over a 4:3 screen, trackball
+// band with chevrons, QWERTY panel below, whip antenna off the top edge.
 const tdeck = new THREE.Group();
+let tdeckAntennaTip;
 {
-  const bodyMat = new THREE.MeshStandardMaterial({ color: COLORS.body, roughness: 0.38, metalness: 0.35 });
-  const body = new THREE.Mesh(new RoundedBoxGeometry(9, 5.8, 1.0, 4, 0.3), bodyMat);
+  const W = 7.2, H = 11.2, D = 1.5, Z = D / 2;
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5, metalness: 0.25 });
+  const body = new THREE.Mesh(new RoundedBoxGeometry(W, H, D, 4, 0.55), bodyMat);
   body.castShadow = true;
   tdeck.add(body);
-  const bezel = new THREE.Mesh(new THREE.BoxGeometry(8.35, 4.0, 0.06), new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.2, metalness: 0.3 }));
-  bezel.position.set(0, 0.82, 0.5);
+
+  // logo strip
+  const logo = textPlane('LILYGO', '#c9ccd2', 72, 2.0, 0.5);
+  logo.position.set(0, H / 2 - 0.62, Z + 0.011);
+  tdeck.add(logo);
+
+  // 4:3 screen with glass bezel
+  const bezel = new THREE.Mesh(new THREE.BoxGeometry(6.9, 5.3, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0x090b0e, roughness: 0.18, metalness: 0.35 }));
+  bezel.position.set(0, 2.35, Z + 0.02);
   tdeck.add(bezel);
   const screen = new THREE.Mesh(
-    new THREE.PlaneGeometry(7.9, 3.55),
+    new THREE.PlaneGeometry(6.4, 4.8),
     new THREE.MeshBasicMaterial({ map: screenTex })
   );
-  screen.position.set(0, 0.82, 0.54);
+  screen.position.set(0, 2.35, Z + 0.06);
   tdeck.add(screen);
-  const keyGeo = new RoundedBoxGeometry(0.6, 0.38, 0.16, 2, 0.06);
-  const keyMat = new THREE.MeshStandardMaterial({ color: 0x232b35, roughness: 0.7, metalness: 0.2 });
+
+  // trackball band with chevrons
+  const chevL = textPlane('❯❯❯', '#d0d3d8', 84, 1.7, 0.55);
+  chevL.position.set(-2.1, -0.62, Z + 0.011);
+  tdeck.add(chevL);
+  const chevR = textPlane('❮❮❮', '#d0d3d8', 84, 1.7, 0.55);
+  chevR.position.set(2.1, -0.62, Z + 0.011);
+  tdeck.add(chevR);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.09, 12, 32),
+    new THREE.MeshStandardMaterial({ color: 0x9aa0a8, roughness: 0.3, metalness: 0.8 }));
+  ring.position.set(0, -0.62, Z + 0.05);
+  tdeck.add(ring);
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.36, 20, 20),
+    new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: 0.35, metalness: 0.4 }));
+  ball.position.set(0, -0.62, Z + 0.12);
+  tdeck.add(ball);
+
+  // keyboard: light panel, dark rounded keys, wide spacebar row
+  const panel = new THREE.Mesh(new RoundedBoxGeometry(6.7, 4.3, 0.1, 2, 0.24),
+    new THREE.MeshStandardMaterial({ color: 0xb6bac2, roughness: 0.55, metalness: 0.1 }));
+  panel.position.set(0, -3.35, Z);
+  tdeck.add(panel);
+  const keyGeo = new RoundedBoxGeometry(0.52, 0.6, 0.16, 2, 0.1);
+  const keyMat = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.65, metalness: 0.15 });
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 10; c++) {
       const kbtn = new THREE.Mesh(keyGeo, keyMat);
-      kbtn.position.set(-3.6 + c * 0.8, -1.55 - r * 0.52, 0.52);
+      kbtn.position.set(-2.88 + c * 0.64, -2.0 - r * 0.78, Z + 0.1);
       tdeck.add(kbtn);
     }
   }
-  const ball = new THREE.Mesh(
-    new THREE.SphereGeometry(0.3, 20, 20),
-    new THREE.MeshStandardMaterial({ color: 0x39434f, roughness: 0.25, metalness: 0.6 })
-  );
-  ball.position.set(3.9, -1.2, 0.52);
-  tdeck.add(ball);
-  const led = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshBasicMaterial({ color: COLORS.lime }));
-  led.position.set(4.1, 0.9, 0.52);
-  tdeck.add(led);
-  const antMat = new THREE.MeshStandardMaterial({ color: 0x0d1013, roughness: 0.85 });
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.5, 12), antMat);
-  collar.position.set(-3.9, 3.1, 0);
-  tdeck.add(collar);
-  const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 2.6, 8), antMat);
-  ant.position.set(-3.9, 4.5, 0);
-  ant.castShadow = true;
-  tdeck.add(ant);
-  const antTip = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 12),
-    new THREE.MeshBasicMaterial({ color: COLORS.pink }));
-  antTip.position.set(-3.9, 5.8, 0);
-  tdeck.add(antTip);
-  // light spill from the screen onto the keyboard and ground
-  const spill = new THREE.PointLight(0x7de86f, 7, 10, 2);
-  spill.position.set(0, 0.6, 2.4);
+  // bottom row: modifiers + spacebar
+  const bottomY = -4.34;
+  for (const [x, w] of [[-2.88, 0.52], [-2.24, 0.52], [0, 2.6], [2.24, 0.52], [2.88, 0.52]]) {
+    const g = new RoundedBoxGeometry(w, 0.6, 0.16, 2, 0.1);
+    const kbtn = new THREE.Mesh(g, keyMat);
+    kbtn.position.set(x, bottomY, Z + 0.1);
+    tdeck.add(kbtn);
+  }
+  const foot = textPlane('▸ LILYGO ◂', '#7d828b', 44, 1.9, 0.4);
+  foot.position.set(0, -5.15, Z + 0.011);
+  tdeck.add(foot);
+
+  // whip antenna off the top edge
+  const antGrp = new THREE.Group();
+  antGrp.position.set(2.35, H / 2, 0);
+  antGrp.rotation.z = -0.14;
+  const antMat = new THREE.MeshStandardMaterial({ color: 0x101215, roughness: 0.85 });
+  const sma = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.6, 12), antMat);
+  sma.position.y = 0.3;
+  antGrp.add(sma);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.25, 12),
+    new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.6 }));
+  band.position.y = 0.72;
+  antGrp.add(band);
+  const whip = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.085, 8.2, 8), antMat);
+  whip.position.y = 4.95;
+  whip.castShadow = true;
+  antGrp.add(whip);
+  const whipTip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), antMat);
+  whipTip.position.y = 9.1;
+  antGrp.add(whipTip);
+  tdeckAntennaTip = new THREE.Object3D();
+  tdeckAntennaTip.position.y = 9.1;
+  antGrp.add(tdeckAntennaTip);
+  tdeck.add(antGrp);
+
+  // light spill from the screen
+  const spill = new THREE.PointLight(0x7de86f, 6, 10, 2);
+  spill.position.set(0, 2.2, Z + 2.2);
   tdeck.add(spill);
 
-  // propped against a field case, feet on the ground
-  tdeck.position.copy(NODES.tdeck.pos).add(new THREE.Vector3(0, 2.72, 0));
-  tdeck.rotation.x = -0.38;
+  // propped against the field case, feet on the ground
+  tdeck.position.copy(NODES.tdeck.pos).add(new THREE.Vector3(0, 5.3, 0));
+  tdeck.rotation.x = -0.30;
   tdeck.rotation.y = 0.10;
   scene.add(tdeck);
 
   const caseMat = new THREE.MeshStandardMaterial({ color: 0x3a3038, roughness: 0.6, metalness: 0.2 });
-  const kit = new THREE.Mesh(new RoundedBoxGeometry(7.6, 2.4, 4.6, 3, 0.22), caseMat);
-  kit.position.copy(NODES.tdeck.pos).add(new THREE.Vector3(0.4, 1.2, -3.2));
+  const kit = new THREE.Mesh(new RoundedBoxGeometry(7.6, 2.6, 4.6, 3, 0.22), caseMat);
+  kit.position.copy(NODES.tdeck.pos).add(new THREE.Vector3(0.4, 1.3, -3.9));
   kit.rotation.y = 0.18;
   kit.castShadow = true;
   kit.receiveShadow = true;
@@ -766,13 +833,13 @@ const tfill = document.getElementById('tfill');
 const scrollCue = document.getElementById('scrollcue');
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-const lookTD = V(-2, 4.4, 26);
+const lookTD = V(-2, 5.8, 26);
 
 const PHASES = [
   {
     len: 9, tag: '01 · THE DEVICE',
     html: '<b>Lilyshark</b> turns a LILYGO <i>T-Deck</i> into a handheld LoRa analyzer — capture, decode, spectrum, evidence. Open firmware on open hardware.',
-    camA: V(-13, 5, 44), camB: V(13, 6.5, 44), lookA: lookTD, lookB: lookTD,
+    camA: V(-13, 5.5, 46), camB: V(13, 7, 46), lookA: lookTD, lookB: lookTD,
   },
   {
     len: 10, tag: '02 · THE CONSTRAINT',
@@ -800,7 +867,7 @@ const PHASES = [
   {
     len: 10, tag: '04 · THE POINTER',
     html: 'So the mesh never carries media. The device emits an <em>82-byte Shelby pointer</em> — blob commitment · owner · size · expiry — a <b>reference, not a payload</b>.',
-    camA: V(8, 5, 36), camB: V(-6, 7, 34), lookA: lookTD, lookB: lookTD,
+    camA: V(9, 5.5, 38), camB: V(-6, 7.5, 36), lookA: lookTD, lookB: lookTD,
   },
   {
     len: 14, tag: '05 · THE MESH',
