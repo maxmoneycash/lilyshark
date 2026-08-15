@@ -108,27 +108,87 @@ export function TrafficTab() {
   };
 
   /**
-   * The full off-grid loop, in one click: the decoded pointer's commitment is
-   * looked up on the shelbynet indexer, the returned object name is fetched
-   * from the Shelby RPC, and the bytes open as the current capture.
+   * The full off-grid loop, in one click — and narrated on screen while it
+   * happens, because to a viewer a bare button press followed by a table
+   * reload explains nothing. Each step lands in the trace with its real
+   * timing: the indexer lookup that turns a commitment into an object name,
+   * the RPC fetch, the size check against what the pointer promised, and the
+   * open. The trace stays up afterward so the story can be read back.
    */
-  const [resolving, setResolving] = useState<string | null>(null);
+  interface TraceStep {
+    label: string;
+    detail: string;
+    state: 'run' | 'ok' | 'err';
+  }
+  const [trace, setTrace] = useState<TraceStep[] | null>(null);
+  const resolving = trace?.some((t) => t.state === 'run') ?? false;
+
   const resolvePointer = async () => {
     if (!ptr) return;
-    setResolving('resolving commitment on the indexer…');
     setLive(false);
+    const p = ptr.pointer;
+    const steps: TraceStep[] = [
+      { label: 'POINTER', detail: `82 B decoded from the frame`, state: 'ok' },
+      { label: 'INDEXER', detail: 'commitment → object name…', state: 'run' },
+    ];
+    const show = () => setTrace([...steps]);
+    show();
     try {
-      const found = await resolveByCommitment(ptr.pointer.owner, ptr.pointer.commitment);
+      let t0 = performance.now();
+      const found = await resolveByCommitment(p.owner, p.commitment);
       if (!found) throw new Error('no blob with this commitment under that owner');
-      setResolving(`fetching ${found.name} from the Shelby RPC…`);
-      const bytes = await fetchBlobBytes(ptr.pointer.owner, found.name);
+      steps[1] = {
+        label: 'INDEXER',
+        detail: `${found.name} · ${Math.round(performance.now() - t0)} ms`,
+        state: 'ok',
+      };
+      steps.push({ label: 'SHELBY RPC', detail: 'fetching the bytes…', state: 'run' });
+      show();
+
+      t0 = performance.now();
+      const bytes = await fetchBlobBytes(p.owner, found.name);
+      steps[2] = {
+        label: 'SHELBY RPC',
+        detail: `${bytes.byteLength.toLocaleString()} B · ${Math.round(performance.now() - t0)} ms`,
+        state: 'ok',
+      };
+      const sizeOk = bytes.byteLength === p.sizeBytes;
+      steps.push({
+        label: 'VERIFY',
+        detail: sizeOk
+          ? `size matches the pointer: ${p.sizeBytes.toLocaleString()} B`
+          : `size mismatch: pointer said ${p.sizeBytes.toLocaleString()} B`,
+        state: sizeOk ? 'ok' : 'err',
+      });
+      show();
+
+      keepTrace.current = true;
       load(bytes, found.name);
-      setResolving(null);
+      steps.push({ label: 'OPENED', detail: `${found.name}`, state: 'ok' });
+      show();
     } catch (e) {
-      setResolving(null);
-      setError(e instanceof Error ? e.message : 'resolve failed');
+      const running = steps.findIndex((s) => s.state === 'run');
+      if (running >= 0)
+        steps[running] = {
+          ...steps[running],
+          detail: e instanceof Error ? e.message : 'failed',
+          state: 'err',
+        };
+      show();
     }
   };
+
+  // A new frame selection is a new story; the old trace would misattribute —
+  // except for the load the resolve itself performs, which must keep its
+  // trace on screen so the finished story can be read back.
+  const keepTrace = useRef(false);
+  useEffect(() => {
+    if (keepTrace.current) {
+      keepTrace.current = false;
+      return;
+    }
+    setTrace(null);
+  }, [selected, capture]);
 
   /** Bundled demo capture: 24 frames with a Shelby pointer at sequence 9. */
   const openSample = async () => {
@@ -407,11 +467,10 @@ export function TrafficTab() {
                 <div className="panel-title">
                   SHELBY POINTER · OFFSET {ptr.offset}
                   <span className="spacer" />
-                  <button onClick={() => void resolvePointer()} disabled={!!resolving}>
+                  <button onClick={() => void resolvePointer()} disabled={resolving}>
                     {resolving ? 'RESOLVING…' : '⇓ RESOLVE'}
                   </button>
                 </div>
-                {resolving && <div className="panel-foot dim">{resolving}</div>}
                 <div className="kv">
                   <span className="k">COMMITMENT</span>
                   <span className="v">{ptr.pointer.commitment}</span>
@@ -423,6 +482,29 @@ export function TrafficTab() {
                   <span className="v">
                     {ptr.pointer.chunkIndex + 1} / {ptr.pointer.chunkCount}
                   </span>
+                </div>
+              </>
+            )}
+
+            {trace && (
+              <>
+                <div className="panel-title">
+                  SHELBY RESOLVE
+                  <span className="spacer" />
+                  {!resolving && (
+                    <button onClick={() => setTrace(null)}>DISMISS</button>
+                  )}
+                </div>
+                <div className="trace">
+                  {trace.map((t) => (
+                    <div className={`trace-step ${t.state}`} key={t.label}>
+                      <span className="trace-glyph">
+                        {t.state === 'ok' ? '✓' : t.state === 'err' ? '✕' : '▸'}
+                      </span>
+                      <span className="trace-label">{t.label}</span>
+                      <span className="trace-detail">{t.detail}</span>
+                    </div>
+                  ))}
                 </div>
               </>
             )}

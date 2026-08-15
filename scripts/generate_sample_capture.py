@@ -52,16 +52,16 @@ US_LONGFAST_HZ = 906_875_000
 # field capture uploaded via scripts/shelby-put.ts (webapp). Resolving this
 # commitment through the indexer and fetching the bytes from the Shelby RPC
 # is exactly what the analyzer's RESOLVE button does.
-#   object: @3494…8728/captures/field-capture-0847.lscap
-#   expires: 2026-11-13T21:34:07Z
+#   object: @3494…8728/captures/field-capture-0846.lscap
+#   expires: 2026-11-13T21:51:31Z
 OWNER = bytes.fromhex(
     "34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728"
 )
 REAL_COMMITMENT = bytes.fromhex(
-    "acae433ef0821bee7e99a9c1687473fc9f3a432fc06a97fb908cbf8f35596d4b"
+    "6ab9566563ba70a73965f89a46edf3d49978c5091b8da8786e8cb58a449a32c9"
 )
-REAL_SIZE = 4689
-REAL_EXPIRY_UNIX = 1_794_605_647
+REAL_SIZE = 4495
+REAL_EXPIRY_UNIX = 1_794_606_691
 
 
 def demo_pointer() -> bytes:
@@ -75,11 +75,11 @@ def demo_pointer() -> bytes:
     )
 
 
-def payloads() -> list[tuple[str, bytes]]:
+def payloads(plain: bool = False) -> list[tuple[str, bytes]]:
     rng = random.Random(0x51B)
     frames: list[tuple[str, bytes]] = []
     for index in range(24):
-        if index == 9:
+        if index == 9 and not plain:
             # A pointer inside an enclosing protocol's payload: 16 header
             # bytes first, exactly how it arrives off the air.
             header = bytes(rng.randrange(256) for _ in range(16))
@@ -91,11 +91,11 @@ def payloads() -> list[tuple[str, bytes]]:
     return frames
 
 
-def build() -> bytes:
+def build(plain: bool = False) -> bytes:
     rng = random.Random(0x15CA9)
     out = bytearray(FILE_HEADER)
     timestamp = 5_000_000
-    for sequence, (kind, payload) in enumerate(payloads()):
+    for sequence, (kind, payload) in enumerate(payloads(plain)):
         truncated = kind == "reticulum" and sequence == 20
         captured = payload[:-7] if truncated else payload
         crc = 3 if sequence == 14 else 2  # one CRC failure at sequence 14
@@ -138,6 +138,16 @@ def build() -> bytes:
 
 
 def main() -> int:
+    # --plain: the capture the demo pointer references — same shape, no
+    # pointer of its own, so the resolved capture terminates the story
+    # instead of dead-ending on a second RESOLVE.
+    if "--plain" in sys.argv:
+        out = Path(__file__).resolve().parents[1] / "samples" / "field-capture-0846.lscap"
+        data = build(plain=True)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data)
+        print(f"wrote {out} ({len(data)} bytes, 24 records, no pointer)")
+        return 0
     data = build()
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_bytes(data)

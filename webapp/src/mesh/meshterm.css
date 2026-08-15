@@ -1991,3 +1991,52 @@ body:has(.meshterm .app.menu-open) {
 		padding: 0 16px;
 	}
 }
+
+/* ── Resolution trace ─────────────────────────────────────────────────────
+   The RESOLVE story, told as it happens: one row per step with its real
+   timing, in the same grammar as the SHELBY screen's flow. It stays on
+   screen when the loop finishes so a viewer can read it back. */
+.meshterm .trace {
+	border-bottom: 1px solid var(--border);
+	padding: 8px 14px 10px;
+	display: grid;
+	gap: 5px;
+	font-size: 12px;
+}
+.meshterm .trace-step {
+	display: grid;
+	grid-template-columns: 2ch 11ch minmax(0, 1fr);
+	gap: 8px;
+	align-items: baseline;
+}
+.meshterm .trace-glyph {
+	text-align: center;
+}
+.meshterm .trace-step.ok .trace-glyph,
+.meshterm .trace-step.ok .trace-label {
+	color: var(--ok, var(--fg));
+}
+.meshterm .trace-step.err .trace-glyph,
+.meshterm .trace-step.err .trace-label,
+.meshterm .trace-step.err .trace-detail {
+	color: var(--err);
+}
+.meshterm .trace-step.run .trace-glyph {
+	animation: meshterm-blink 1s infinite;
+}
+.meshterm .trace-label {
+	letter-spacing: 1px;
+	font-size: 10.5px;
+	color: var(--fg-dim);
+}
+.meshterm .trace-detail {
+	overflow-wrap: anywhere;
+}
+:root.light .meshterm .trace-detail {
+	color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+	.meshterm .trace-step.run .trace-glyph {
+		animation: none;
+	}
+}

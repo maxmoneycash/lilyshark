@@ -262,9 +262,9 @@ to 25.8% as nodes are added. Airtime is the scarce resource, so send a reference
 let a connected node carry the payload.
 
 The loop is live, not planned. A field capture is stored on shelbynet right now —
-object `captures/field-capture-0847.lscap`, owner
+object `captures/field-capture-0846.lscap`, owner
 `0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728`, commitment
-`0xacae433ef0821bee7e99a9c1687473fc9f3a432fc06a97fb908cbf8f35596d4b` — uploaded with
+`0x6ab9566563ba70a73965f89a46edf3d49978c5091b8da8786e8cb58a449a32c9` — uploaded with
 `webapp/scripts/shelby-put.ts` through the official Shelby SDK (commitment
 generation, on-chain registration, chunkset upload, commit ack). The bundled
 sample's frame 9 carries that blob's real coordinates, and the analyzer's
@@ -273,7 +273,7 @@ between: commitment → object name on the shelbynet indexer → bytes from the 
 RPC → the capture opens. Fetch it yourself:
 
 ```
-curl https://shelby.shelbynet.shelby.xyz/shelby/v1/blobs/0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728/captures/field-capture-0847.lscap
+curl https://shelby.shelbynet.shelby.xyz/shelby/v1/blobs/0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728/captures/field-capture-0846.lscap
 ```
 
 > **Status:** the pointer codec, the cross-protocol decoder, the capture format,

@@ -23,10 +23,10 @@ export const SHELBY_INDEXER = 'https://api.shelbynet.aptoslabs.com/v1/graphql';
  */
 export const DEMO_BLOB = {
   owner: '0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728',
-  name: 'captures/field-capture-0847.lscap',
-  commitment: '0xacae433ef0821bee7e99a9c1687473fc9f3a432fc06a97fb908cbf8f35596d4b',
-  sizeBytes: 4689,
-  expiresAtUnix: 1_794_605_647,
+  name: 'captures/field-capture-0846.lscap',
+  commitment: '0x6ab9566563ba70a73965f89a46edf3d49978c5091b8da8786e8cb58a449a32c9',
+  sizeBytes: 4495,
+  expiresAtUnix: 1_794_606_691,
 } as const;
 
 export interface ResolvedBlob {
