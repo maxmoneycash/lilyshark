@@ -55,9 +55,11 @@
     text-transform: uppercase; margin-bottom: 10px;
   }
   #caption .text {
-    font-size: 15px; line-height: 1.65; color: var(--paper);
+    font-size: 15.5px; line-height: 1.65; color: var(--paper);
     background: var(--panel); border: 1px solid var(--rule);
-    padding: 14px 22px; opacity: 0; transition: opacity 0.5s;
+    padding: 15px 24px; opacity: 0; transition: opacity 0.5s;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
   }
   #caption .text b { color: var(--lime); font-weight: 600; }
   #caption .text i { color: var(--cyan); font-style: normal; }
@@ -79,6 +81,15 @@
     left: 0; right: 0; bottom: 0; height: 3px; background: rgba(240,244,239,0.08); pointer-events: none;
   }
   #timeline .fill { height: 100%; width: 0%; background: var(--pink); transition: width 0.25s linear; }
+  #timeline .tick { position: absolute; top: -2px; width: 1px; height: 7px; background: rgba(240,244,239,0.35); }
+
+  #vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 4;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(2,3,5,0.55) 100%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #caption .text { transition: none; }
+  }
 
   #controls { bottom: 18px; right: 20px; display: flex; gap: 10px; }
   #hint {
@@ -101,6 +112,7 @@
 </head>
 <body>
 <canvas id="scene"></canvas>
+<div id="vignette"></div>
 
 <div class="bar" id="bartop"></div>
 <div class="bar" id="barbot"></div>
