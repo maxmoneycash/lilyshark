@@ -1,320 +1,131 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   Lilyshark — instrument surface
+   Lilyshark — layout only.
 
-   The firmware owns the visual language: a dark 320x240 panel where lime is
-   live data, cyan is navigation, amber warns and coral faults. The web app is
-   the same instrument on a larger screen, so it inherits that vocabulary
-   rather than inventing a second one. Pink is the wordmark and the active
-   marker; it is never a background.
+   WebTUI (https://github.com/webtui/webtui) owns every component: buttons,
+   badges, boxes, inputs, tables, typography, colour. This file adds none of
+   that, so a button here is the same button as everywhere else in the app. It
+   exists purely to place things on the page and to make the small screen work.
+
+   Layered so WebTUI's own rules keep priority over anything here.
    ───────────────────────────────────────────────────────────────────────── */
 
-  :root {
-    /* Ground — cool near-black, tinted a few points toward the brand hue so the
-       dark is Lilyshark's own rather than a generic #111. */
-    --ls-bg:        oklch(0.165 0.012 320);
-    --ls-surface:   oklch(0.205 0.014 320);
-    --ls-raised:    oklch(0.245 0.016 320);
-    --ls-line:      oklch(0.305 0.018 320);
-    --ls-line-soft: oklch(0.255 0.014 320);
-
-    /* Ink — the muted step is deliberately light enough to clear 4.5:1 on
-       --ls-bg. Elegant-but-unreadable gray is the usual failure here. */
-    --ls-ink:       oklch(0.965 0.004 320);
-    --ls-ink-2:     oklch(0.862 0.010 320);
-    --ls-ink-3:     oklch(0.745 0.012 320);
-
-    /* Brand + firmware semantics */
-    --ls-pink:      oklch(0.702 0.212 356);
-    --ls-pink-dim:  oklch(0.702 0.212 356 / 0.14);
-    --ls-lime:      oklch(0.855 0.202 145);
-    --ls-cyan:      oklch(0.820 0.108 205);
-    --ls-amber:     oklch(0.840 0.155 85);
-    --ls-coral:     oklch(0.720 0.170 25);
-
-    --ls-radius:    10px;
-    --ls-radius-sm: 6px;
-
-    /* Type: one sans for the interface, one mono for measurements. Never mono
-       for prose — that is the terminal-costume tell. */
-    --ls-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --ls-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-
-    /* z-scale, named so nothing ever reaches for 9999 */
-    --z-sticky: 100;
-    --z-scrim:  200;
-    --z-modal:  210;
-
-    --ls-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  html, body, #root { height: 100%; }
-
-  /* The inherited WebTUI theme sets a monospace family broadly. Prose in this
-     app is sans; monospace is reserved for measurements, so the app subtree
-     resets the family and the data classes opt back in. */
-  .ls-app, .ls-app :where(p, span, div, h1, h2, h3, button, input, dt, dd, a, strong, code, li) {
-    font-family: var(--ls-sans);
-  }
-  .ls-app :where(.ls-num, .ls-hex, .ls-live, .ls-input, .ls-table, .ls-kv dd, .ls-readout dd, .ls-msg-meta),
-  .ls-app :where(.ls-num, .ls-hex, .ls-live, .ls-table, .ls-kv dd, .ls-readout dd) * {
-    font-family: var(--ls-mono);
-  }
-
-  body {
-    margin: 0;
-    background: var(--ls-bg);
-    color: var(--ls-ink);
-    font-family: var(--ls-sans);
-    font-size: 16px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    /* The page itself never scrolls sideways. */
-    overflow-x: hidden;
-  }
-
-  /* Scrollbars are hidden but scrolling still works, on every pane. */
+@layer lilyshark-layout {
+  /* Panes scroll without showing a bar; the page never scrolls sideways. */
   .ls-scroll { overflow: auto; scrollbar-width: none; -ms-overflow-style: none; }
   .ls-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  body { overflow-x: hidden; }
 
-  /* ── App frame ─────────────────────────────────────────────────────── */
+  /* App frame ------------------------------------------------------------ */
   .ls-app { display: flex; flex-direction: column; min-height: 100dvh; }
+  .ls-main { flex: 1; padding: clamp(0.75rem, 3vw, 1.5rem); }
+  .ls-wrap { max-width: 1200px; margin: 0 auto; }
+  .ls-stack { display: grid; gap: clamp(0.75rem, 2.5vw, 1rem); }
 
+  /* Header + nav --------------------------------------------------------- */
   .ls-header {
-    position: sticky; top: 0; z-index: var(--z-sticky);
-    display: flex; align-items: center; gap: 1rem;
-    padding: 0.7rem clamp(0.9rem, 3vw, 1.6rem);
-    background: color-mix(in oklab, var(--ls-bg) 82%, transparent);
-    backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--ls-line-soft);
+    display: flex; align-items: center; gap: 0.75rem 1rem; flex-wrap: wrap;
+    padding: 0.6rem clamp(0.75rem, 3vw, 1.5rem);
   }
+  .ls-mark { height: 1.5rem; width: auto; display: block; }
+  .ls-live { display: flex; align-items: center; gap: 0.4rem 0.9rem; flex-wrap: wrap; margin-left: auto; }
 
-  .ls-mark { height: 1.45rem; width: auto; display: block; }
-
-  /* Live strip — one line of truth about the network, always visible. */
-  .ls-live {
-    min-width: 0; flex-wrap: wrap;
-    display: flex; align-items: center; gap: 0.5rem 1.1rem; flex-wrap: wrap;
-    margin-left: auto; font-family: var(--ls-mono);
-    font-size: 0.84rem; color: var(--ls-ink-3);
-  }
-  .ls-live b { color: var(--ls-ink-2); font-weight: 500; font-variant-numeric: tabular-nums; }
-
-  .ls-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--ls-lime); box-shadow: 0 0 0 3px oklch(0.855 0.202 145 / 0.16);
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .ls-dot { animation: ls-pulse 2.4s var(--ls-ease) infinite; }
-  }
-  @keyframes ls-pulse { 50% { box-shadow: 0 0 0 6px oklch(0.855 0.202 145 / 0); } }
-
-  /* ── Navigation ────────────────────────────────────────────────────── */
   .ls-nav {
-    display: flex; gap: 0.15rem;
-    padding: 0 clamp(0.9rem, 3vw, 1.6rem);
-    border-bottom: 1px solid var(--ls-line-soft);
-    position: sticky; top: 47px; z-index: var(--z-sticky);
-    background: color-mix(in oklab, var(--ls-bg) 82%, transparent);
-    backdrop-filter: blur(14px);
+    display: flex; gap: 0.25rem;
+    padding: 0 clamp(0.75rem, 3vw, 1.5rem);
+    overflow-x: auto; overflow-y: hidden;
+    /* Snap so a partially-scrolled tab never sits half off-screen. */
+    scroll-snap-type: x proximity;
   }
-  .ls-nav.ls-scroll { overflow-x: auto; overflow-y: hidden; }
+  .ls-nav > * { scroll-snap-align: start; flex: 0 0 auto; }
 
-  .ls-tab {
-    appearance: none; background: none; border: 0;
-    padding: 0.72rem 0.85rem; cursor: pointer;
-    font: inherit; font-size: 0.92rem; font-weight: 500;
-    color: var(--ls-ink-3); white-space: nowrap;
-    border-bottom: 2px solid transparent;
-    transition: color 180ms var(--ls-ease), border-color 180ms var(--ls-ease);
-  }
-  .ls-tab:hover { color: var(--ls-ink); }
-  .ls-tab[aria-selected='true'] { color: var(--ls-ink); border-bottom-color: var(--ls-pink); }
-  .ls-tab:focus-visible { outline: 2px solid var(--ls-cyan); outline-offset: -2px; border-radius: 4px; }
+  /* Toolbars and rows ---------------------------------------------------- */
+  .ls-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .ls-bar > .ls-grow { flex: 1 1 12rem; min-width: 0; }
+  .ls-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-  .ls-main { flex: 1; padding: clamp(1rem, 3vw, 1.75rem); }
-  .ls-wrap { max-width: 1240px; margin: 0 auto; }
+  /* Readouts and detail panes -------------------------------------------- */
+  .ls-readouts { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .ls-split { display: grid; gap: clamp(0.75rem, 2.5vw, 1rem); grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .ls-hero { display: grid; gap: clamp(1rem, 4vw, 2.5rem); align-items: center; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr); }
+  .ls-device { width: 100%; height: auto; display: block; }
 
-  /* ── Type ──────────────────────────────────────────────────────────── */
-  .ls-h1 { font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.1rem); font-weight: 650; letter-spacing: -0.02em; line-height: 1.15; margin: 0; text-wrap: balance; }
-  .ls-h2 { font-size: 1.02rem; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
-  .ls-sub { color: var(--ls-ink-2); margin: 0.35rem 0 0; max-width: 68ch; text-wrap: pretty; }
-  .ls-label { font-size: 0.8rem; font-weight: 500; color: var(--ls-ink-3); letter-spacing: 0.02em; }
-  .ls-num { font-family: var(--ls-mono); font-variant-numeric: tabular-nums; }
-
-  /* ── Surfaces ──────────────────────────────────────────────────────── */
-  .ls-panel {
-    background: var(--ls-surface);
-    border: 1px solid var(--ls-line-soft);
-    border-radius: var(--ls-radius);
-  }
-  .ls-panel-h {
-    display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
-    padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--ls-line-soft);
-  }
-  .ls-panel-b { padding: 0.9rem; }
-
-  /* ── Controls ──────────────────────────────────────────────────────── */
-  .ls-btn {
-    appearance: none; display: inline-flex; align-items: center; gap: 0.45rem;
-    padding: 0.5rem 0.85rem; border-radius: var(--ls-radius-sm);
-    border: 1px solid var(--ls-line); background: var(--ls-raised);
-    color: var(--ls-ink); font: inherit; font-size: 0.86rem; font-weight: 500;
-    cursor: pointer; white-space: nowrap;
-    transition: background 160ms var(--ls-ease), border-color 160ms var(--ls-ease), opacity 160ms var(--ls-ease);
-  }
-  .ls-btn:hover { background: color-mix(in oklab, var(--ls-raised) 70%, var(--ls-ink) 8%); border-color: var(--ls-ink-3); }
-  .ls-btn:focus-visible { outline: 2px solid var(--ls-cyan); outline-offset: 2px; }
-  .ls-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .ls-btn--primary { background: var(--ls-pink); border-color: var(--ls-pink); color: oklch(0.16 0.02 340); font-weight: 600; }
-  .ls-btn--primary:hover { background: color-mix(in oklab, var(--ls-pink) 88%, white); border-color: transparent; }
-
-  .ls-input {
-    flex: 1 1 12rem; min-width: 0;
-    padding: 0.5rem 0.7rem; border-radius: var(--ls-radius-sm);
-    border: 1px solid var(--ls-line); background: var(--ls-bg);
-    color: var(--ls-ink); font-family: var(--ls-mono); font-size: 0.82rem;
-  }
-  .ls-input::placeholder { color: var(--ls-ink-3); }
-  .ls-input:focus { outline: none; border-color: var(--ls-cyan); }
-
-  /* ── Readouts ──────────────────────────────────────────────────────── */
-  .ls-readouts {
-    display: grid; gap: 1px; background: var(--ls-line-soft);
-    border: 1px solid var(--ls-line-soft); border-radius: var(--ls-radius);
-    overflow: hidden;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
-  .ls-readout { background: var(--ls-surface); padding: 0.8rem 0.9rem; }
-  .ls-readout dt { font-size: 0.8rem; color: var(--ls-ink-3); margin: 0 0 0.3rem; }
-  .ls-readout dd { margin: 0; font-family: var(--ls-mono); font-variant-numeric: tabular-nums; font-size: 1.28rem; font-weight: 500; letter-spacing: -0.01em; }
-  .ls-readout dd span { font-size: 0.75rem; color: var(--ls-ink-3); font-weight: 400; }
-
-  /* ── Table ─────────────────────────────────────────────────────────── */
   .ls-tablewrap { max-height: 46vh; }
-  table.ls-table { width: 100%; border-collapse: collapse; font-family: var(--ls-mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-  .ls-table th {
-    position: sticky; top: 0; z-index: 1; text-align: left; font-weight: 500;
-    color: var(--ls-ink-3); background: var(--ls-raised);
-    padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--ls-line);
-    white-space: nowrap;
-  }
-  .ls-table td { padding: 0.42rem 0.7rem; border-bottom: 1px solid var(--ls-line-soft); white-space: nowrap; color: var(--ls-ink-2); }
-  .ls-table tbody tr { cursor: pointer; transition: background 120ms var(--ls-ease); }
-  .ls-table tbody tr:hover { background: var(--ls-raised); }
-  .ls-table tbody tr[aria-selected='true'] { background: var(--ls-pink-dim); }
-  .ls-table tbody tr[aria-selected='true'] td { color: var(--ls-ink); }
+  .ls-kv { display: grid; grid-template-columns: minmax(7rem, auto) 1fr; gap: 0.35rem 1rem; margin: 0; }
+  .ls-kv dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+  .ls-hex { margin: 0; white-space: pre; overflow-x: auto; }
 
-  .ok   { color: var(--ls-lime); }
-  .bad  { color: var(--ls-coral); }
-  .warn { color: var(--ls-amber); }
-  .dim  { color: var(--ls-ink-3); }
-
-  /* ── Key/value list ────────────────────────────────────────────────── */
-  .ls-kv { display: grid; grid-template-columns: minmax(8rem, auto) 1fr; gap: 0.42rem 1rem; margin: 0; font-size: 0.9rem; }
-  .ls-kv dt { color: var(--ls-ink-3); }
-  .ls-kv dd { margin: 0; font-family: var(--ls-mono); font-variant-numeric: tabular-nums; color: var(--ls-ink); text-align: right; }
-
-  .ls-hex {
-    margin: 0; font-family: var(--ls-mono); font-size: 0.82rem; line-height: 1.65;
-    color: var(--ls-ink-2); white-space: pre;
-  }
-
-  /* ── Modal ─────────────────────────────────────────────────────────── */
-  .ls-scrim {
-    position: fixed; inset: 0; z-index: var(--z-scrim);
-    background: oklch(0.12 0.01 320 / 0.72); backdrop-filter: blur(6px);
-    display: grid; place-items: center; padding: clamp(0.5rem, 3vw, 2rem);
-  }
-  .ls-modal {
-    position: relative; z-index: var(--z-modal);
-    width: min(1100px, 100%); height: min(92dvh, 100%);
-    display: flex; flex-direction: column;
-    background: var(--ls-surface); border: 1px solid var(--ls-line);
-    border-radius: var(--ls-radius); overflow: hidden;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .ls-scrim { animation: ls-fade 160ms var(--ls-ease); }
-    .ls-modal { animation: ls-rise 220ms var(--ls-ease); }
-  }
-  @keyframes ls-fade { from { opacity: 0; } }
-  @keyframes ls-rise { from { opacity: 0; transform: translateY(10px) scale(0.99); } }
-
-  /* ── Empty state ───────────────────────────────────────────────────── */
-  .ls-empty { display: grid; place-items: center; gap: 0.55rem; padding: clamp(2rem, 8vw, 4rem) 1rem; text-align: center; }
-  .ls-empty p { margin: 0; color: var(--ls-ink-2); max-width: 44ch; }
-
-  /* ── Mobile ────────────────────────────────────────────────────────── */
-  @media (max-width: 640px) {
-    body { font-size: 14px; }
-    .ls-live { width: 100%; margin-left: 0; order: 3; }
-    .ls-header { flex-wrap: wrap; gap: 0.5rem 0.9rem; }
-    .ls-nav { top: 0; position: sticky; }
-    .ls-tablewrap { max-height: 40vh; }
+  /* Small screen --------------------------------------------------------- */
+  @media (max-width: 760px) {
+    .ls-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+    .ls-device { max-width: 16rem; }
+    .ls-split { grid-template-columns: 1fr; }
     .ls-kv { grid-template-columns: 1fr auto; }
+    .ls-tablewrap { max-height: 52vh; }
+
+    /* Comfortable touch targets, without restyling the controls themselves. */
+    .ls-app :where(button, [is-="button"], a[is-="button"], input, select) { min-height: 44px; }
+
+    /* Respect the notch and the home indicator. */
+    .ls-header { padding-top: max(0.6rem, env(safe-area-inset-top)); }
+    .ls-main {
+      padding-left: max(0.75rem, env(safe-area-inset-left));
+      padding-right: max(0.75rem, env(safe-area-inset-right));
+      padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    }
   }
 
-
-  /* ── Mesh: contacts + thread ───────────────────────────────────────── */
-  .ls-contact {
-    display: grid; gap: 0.1rem; width: 100%; text-align: left;
-    padding: 0.55rem 0.9rem; border: 0; background: none; cursor: pointer;
-    color: var(--ls-ink-2); font: inherit;
-    border-bottom: 1px solid var(--ls-line-soft);
-    transition: background 140ms var(--ls-ease);
+  @media (max-width: 420px) {
+    .ls-live { width: 100%; margin-left: 0; }
+    .ls-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
-  .ls-contact:hover { background: var(--ls-raised); }
-  .ls-contact[aria-selected='true'] { background: var(--ls-pink-dim); color: var(--ls-ink); }
-  .ls-contact-name { font-size: 0.88rem; font-weight: 500; }
+}
 
-  .ls-msg {
-    justify-self: start; max-width: min(80%, 46ch);
-    display: grid; gap: 0.15rem;
-    padding: 0.45rem 0.65rem; border-radius: var(--ls-radius-sm);
-    background: var(--ls-raised); font-size: 0.88rem; line-height: 1.45;
-    overflow-wrap: anywhere;
+@layer lilyshark-layout {
+  /* Spacing helpers only — colour, borders and type stay with WebTUI. */
+  .ls-pad { padding: 1ch 2ch; }
+  .ls-muted { opacity: 0.7; }
+  .ls-readout { padding: 0.5ch 1ch; }
+  .ls-readout dt { margin: 0 0 0.2rem; opacity: 0.7; font-size: 0.85em; }
+  .ls-readout dd { margin: 0; font-weight: 600; }
+  .ls-bar { padding: 1ch 2ch; }
+  .ls-hero { padding: 2ch; }
+}
+
+@layer lilyshark-layout {
+  /* ── Uniform controls ──────────────────────────────────────────────────
+     WebTUI sizes a button to its label, so a toolbar of them comes out ragged.
+     One height and one minimum width across the app makes a row of buttons
+     read as a set. Colour and border still come from WebTUI. */
+  .ls-app :where(button, [is-~="button"], a[is-~="button"]) {
+    height: 3lh;
+    min-width: 14ch;
+    padding-inline: 2ch;
+    box-sizing: border-box;
   }
-  .ls-msg--mine { justify-self: end; background: var(--ls-pink-dim); }
-  .ls-msg-meta { font-family: var(--ls-mono); font-size: 0.68rem; color: var(--ls-ink-3); }
+  /* Nav tabs are a set of their own: every tab identical, so the row is even. */
+  .ls-nav > button { min-width: 13ch; }
+  /* Inputs sit on the same baseline as the buttons beside them. */
+  .ls-app :where(input[is-~="input"], select) { height: 3lh; box-sizing: border-box; }
+
+  /* ── Status strips, after meshcore-terminal ────────────────────────────
+     A thin line of truth pinned above and below the work area. */
+  .ls-strip {
+    display: flex; align-items: center; gap: 1ch 2ch; flex-wrap: wrap;
+    padding: 0.25lh 2ch; font-size: 0.85em;
+  }
+  .ls-strip .ls-right { margin-left: auto; }
+
+  /* ── Sidebar + main, the two-column body ───────────────────────────────── */
+  .ls-body { display: grid; gap: 1ch; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); align-items: start; }
+
+  /* ── Panel header: title left, actions right ───────────────────────────── */
+  .ls-panelhead { display: flex; align-items: center; gap: 1ch 2ch; flex-wrap: wrap; padding: 0.5lh 2ch; }
+  .ls-panelhead .ls-right { margin-left: auto; }
 
   @media (max-width: 760px) {
-    .ls-mesh-grid { grid-template-columns: 1fr !important; }
+    .ls-body { grid-template-columns: 1fr; }
+    /* On a phone a full-width control is easier to hit than a ragged row. */
+    .ls-app :where(button, [is-~="button"], a[is-~="button"]) { min-width: 0; flex: 1 1 12ch; }
+    .ls-nav > button { flex: 0 0 auto; min-width: 11ch; }
   }
-
-
-/* The inherited theme decorates links and buttons with [ ] pseudo-elements.
-   This app draws its own controls, so those brackets are removed inside it. */
-.ls-app a::before, .ls-app a::after,
-.ls-app button::before, .ls-app button::after { content: none !important; }
-.ls-app a { color: inherit; text-decoration: none; }
-.ls-app a:where(:not(.ls-btn)) { color: var(--ls-cyan); text-decoration: underline; text-underline-offset: 2px; }
-
-/* ── First run: the device, and one obvious way in ───────────────────── */
-.ls-first {
-  display: grid; align-items: center; gap: clamp(1.25rem, 4vw, 3rem);
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-  padding: clamp(1.25rem, 4vw, 2.5rem);
 }
-/* The mockup ships on a white plate. Rather than fake a cut-out, it sits on a
-   deliberate light product surface — reads as a photograph, not a stray box. */
-.ls-device {
-  width: 100%; height: auto; display: block;
-  border-radius: var(--ls-radius);
-  background: oklch(0.97 0.004 320);
-  padding: clamp(0.5rem, 2vw, 1.1rem);
-  box-shadow: 0 18px 40px -22px oklch(0 0 0 / 0.85);
-}
-.ls-first-copy { display: grid; gap: 0.4rem; }
-.ls-first-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.9rem; }
-@media (max-width: 760px) {
-  .ls-first { grid-template-columns: 1fr; text-align: center; justify-items: center; }
-  .ls-device { max-width: 15rem; }
-  .ls-first-actions { justify-content: center; }
-}
-
-/* The inherited theme outlines every table cell. This table separates rows with
-   a single hairline instead, so the numbers stay the loudest thing in it. */
-.ls-app table.ls-table, .ls-app table.ls-table * { border-color: transparent; }
-.ls-app table.ls-table th { border: 0 !important; border-bottom: 1px solid var(--ls-line) !important; }
-.ls-app table.ls-table td { border: 0 !important; border-bottom: 1px solid var(--ls-line-soft) !important; }
-.ls-app table.ls-table th::before, .ls-app table.ls-table td::before,
-.ls-app table.ls-table th::after,  .ls-app table.ls-table td::after { content: none !important; }

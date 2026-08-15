@@ -23,25 +23,25 @@
 
 @layer base {
   :root {
-    /* Lilyshark instrument theme — the same dark vocabulary as
+    /* Lilyshark — the original Shelby Pulse light pink WebTUI palette,
        styles/lilyshark.css, expressed in the WebTUI variable names the
        older tabs consume. Pink is the brand marker, never a background. */
     --root: oklch(0.165 0.012 320);
-    --background0: oklch(0.165 0.012 320);
-    --background1: oklch(0.205 0.014 320);
-    --background2: oklch(0.245 0.016 320);
-    --background3: oklch(0.305 0.018 320);
+    --background0: #F7F1E9;
+    --background1: #FFDFEF;
+    --background2: #FFC2E1;
+    --background3: #FF77C9;
 
     /* Ink — muted step still clears 4.5:1 on --root. */
-    --foreground0: oklch(0.965 0.004 320);
-    --foreground1: oklch(0.800 0.010 320);
-    --foreground2: oklch(0.660 0.012 320);
+    --foreground0: #1a1a1a;
+    --foreground1: #404040;
+    --foreground2: #737373;
 
     /* Accents — firmware semantics: lime is live, cyan navigates, amber
        warns, coral faults, pink is the brand. */
-    --accent: oklch(0.702 0.212 356);
-    --accent-light: oklch(0.760 0.180 356);
-    --accent-soft: oklch(0.702 0.212 356 / 0.35);
+    --accent: #FF1493;
+    --accent-light: #FF69B4;
+    --accent-soft: #FFB6D9;
     --pink-bright: oklch(0.702 0.212 356);
     --pink-pastel: oklch(0.760 0.180 356);
     --pink-soft: oklch(0.702 0.212 356 / 0.35);

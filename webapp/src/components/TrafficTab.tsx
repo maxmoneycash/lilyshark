@@ -85,50 +85,50 @@ export function TrafficTab() {
   const ptr = f ? pointers[selected] : null;
 
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
+    <div className="ls-stack">
       {/* ── Source ─────────────────────────────────────────────────── */}
-      <div className="ls-panel">
-        <div className="ls-panel-h">
-          <span className="ls-label">CAPTURE</span>
-          <button className="ls-btn ls-btn--primary" onClick={() => fileRef.current?.click()} disabled={busy}>
+      <div box-="round">
+        <div className="ls-bar">
+          <span is-="badge" variant-="background2">CAPTURE</span>
+          <button variant-="accent" onClick={() => fileRef.current?.click()} disabled={busy}>
             Open .lscap
           </button>
-          <button className="ls-btn" onClick={() => void openSample()} disabled={busy}>
+          <button variant-="background1" onClick={() => void openSample()} disabled={busy}>
             Sample
           </button>
           <input ref={fileRef} type="file" accept=".lscap,application/octet-stream" hidden
             onChange={(e) => { const x = e.target.files?.[0]; if (x) void openFile(x); }} />
-          <input className="ls-input" placeholder="…or a Shelby blob name" value={blob}
+          <input is-="input" placeholder="…or a Shelby blob name" value={blob}
             onChange={(e) => setBlob(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void fetchBlob()} />
-          <button className="ls-btn" onClick={() => void fetchBlob()} disabled={busy || !blob.trim()}>
+          <button variant-="background1" onClick={() => void fetchBlob()} disabled={busy || !blob.trim()}>
             Fetch
           </button>
-          {name && <span className="ls-label dim" style={{ marginLeft: 'auto' }}>{name}</span>}
+          {name && <span className="ls-muted">{name}</span>}
         </div>
 
         {error && (
-          <div className="ls-panel-b">
-            <span className="bad" style={{ fontSize: '0.85rem' }}>{error}</span>
+          <div className="ls-pad">
+            <span className="bad">{error}</span>
           </div>
         )}
 
         {!capture && !busy && !error && (
-          <div className="ls-first">
+          <div className="ls-hero">
             <img className="ls-device" src="/lilyshark-device.png"
                  alt="A LILYGO T-Deck running Lilyshark, showing a live frame feed" />
-            <div className="ls-first-copy">
-              <h1 className="ls-h1">Read what is on the air</h1>
-              <p className="ls-sub">
+            <div>
+              <h1>Read what is on the air</h1>
+              <p>
                 Lilyshark turns a LILYGO T-Deck into a handheld LoRa analyzer. It captures
                 Meshtastic, MeshCore, and Reticulum frames with their radio measurements and
                 writes them to microSD as <code>.lscap</code>.
               </p>
-              <div className="ls-first-actions">
-                <button className="ls-btn ls-btn--primary" onClick={() => void openSample()} disabled={busy}>
+              <div className="ls-actions">
+                <button variant-="accent" onClick={() => void openSample()} disabled={busy}>
                   Open a sample capture
                 </button>
-                <button className="ls-btn" onClick={() => fileRef.current?.click()} disabled={busy}>
+                <button variant-="background1" onClick={() => fileRef.current?.click()} disabled={busy}>
                   Open your own
                 </button>
               </div>
@@ -158,9 +158,9 @@ export function TrafficTab() {
           </dl>
 
           {/* ── Frames ───────────────────────────────────────────── */}
-          <div className="ls-panel">
+          <div box-="round">
             <div className="ls-tablewrap ls-scroll">
-              <table className="ls-table">
+              <table>
                 <thead>
                   <tr>
                     <th>#</th><th>Time</th><th>Dir</th><th>Len</th>
@@ -192,10 +192,10 @@ export function TrafficTab() {
 
           {/* ── Selected frame ───────────────────────────────────── */}
           {f && (
-            <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))' }}>
-              <div className="ls-panel">
-                <div className="ls-panel-h"><span className="ls-label">FRAME {Number(f.sequence)}</span></div>
-                <div className="ls-panel-b">
+            <div>
+              <div box-="round">
+                <div className="ls-bar"><span is-="badge" variant-="background2">FRAME {Number(f.sequence)}</span></div>
+                <div className="ls-pad">
                   <dl className="ls-kv">
                     <dt>Modulation</dt><dd>{f.modulation.toUpperCase()}</dd>
                     <dt>Captured</dt><dd>{f.capturedLength} / {f.originalLength} B</dd>
@@ -212,16 +212,16 @@ export function TrafficTab() {
                 </div>
               </div>
 
-              <div className="ls-panel">
-                <div className="ls-panel-h">
-                  <span className="ls-label">{ptr ? 'SHELBY POINTER' : 'RAW BYTES'}</span>
-                  {ptr && <span className="ls-label ok" style={{ marginLeft: 'auto' }}>at offset {ptr.offset}</span>}
+              <div box-="round">
+                <div className="ls-bar">
+                  <span is-="badge" variant-="background2">{ptr ? 'SHELBY POINTER' : 'RAW BYTES'}</span>
+                  {ptr && <span className="ls-muted">at offset {ptr.offset}</span>}
                 </div>
-                <div className="ls-panel-b ls-scroll" style={{ maxHeight: '20rem' }}>
+                <div className="ls-panel-b ls-scroll">
                   {ptr ? (
                     <dl className="ls-kv">
-                      <dt>Commitment</dt><dd style={{ wordBreak: 'break-all', textAlign: 'left' }}>{ptr.pointer.commitment}</dd>
-                      <dt>Owner</dt><dd style={{ wordBreak: 'break-all', textAlign: 'left' }}>{ptr.pointer.owner}</dd>
+                      <dt>Commitment</dt><dd>{ptr.pointer.commitment}</dd>
+                      <dt>Owner</dt><dd>{ptr.pointer.owner}</dd>
                       <dt>Blob size</dt><dd>{ptr.pointer.sizeBytes.toLocaleString()} B</dd>
                       <dt>Chunk</dt><dd>{ptr.pointer.chunkIndex + 1} / {ptr.pointer.chunkCount}</dd>
                       <dt>Encrypted</dt><dd className={ptr.pointer.encrypted ? 'ok' : 'dim'}>{ptr.pointer.encrypted ? 'yes' : 'no'}</dd>
