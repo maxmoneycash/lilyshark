@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""Generate samples/sample-mesh-traffic.lscap, a deterministic demo capture.
+
+The capture is what an afternoon on a T-Deck might hear on the US LongFast
+slot: a couple dozen frames across the three mesh protocols Lilyshark
+decodes, one CRC failure, one truncated frame — and, at sequence 9, a Shelby
+off-grid pointer riding behind a 16-byte protocol header. The webapp
+analyzer, the Python scanner, and the firmware decoder all find it there.
+
+Deterministic: regenerating always produces the same bytes.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import random
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import lscap  # noqa: E402
+import shelby_pointer  # noqa: E402
+
+OUT_PATH = Path(__file__).resolve().parents[1] / "samples" / "sample-mesh-traffic.lscap"
+
+FILE_HEADER = lscap.FILE_HEADER.pack(
+    lscap.FILE_MAGIC, 1, 0, lscap.FILE_HEADER_SIZE, lscap.RECORD_HEADER_SIZE,
+    0, 1_000_000, 0,
+)
+
+# present_fields bits for everything the demo frames report.
+PRESENT = (
+    (1 << 0)   # timestamp
+    | (1 << 1)  # center_frequency
+    | (1 << 2)  # bandwidth
+    | (1 << 3)  # airtime
+    | (1 << 4)  # frequency_error
+    | (1 << 5)  # rssi
+    | (1 << 6)  # snr
+    | (1 << 8)  # preamble
+    | (1 << 9)  # sync_word
+    | (1 << 10)  # profile_id
+    | (1 << 11)  # spreading_factor
+    | (1 << 12)  # coding_rate
+    | (1 << 14)  # radio_status
+)
+
+US_LONGFAST_HZ = 906_875_000
+OWNER = bytes(((i * 3 + 1) & 0xFF) for i in range(32))  # demo account
+
+
+def demo_pointer() -> bytes:
+    """The pointer embedded at sequence 9: an .lscap capture stored on Shelby."""
+    referenced = b"lilyshark field capture, gateway-uploaded earlier\n" * 384
+    return shelby_pointer.encode_pointer(
+        flags=shelby_pointer.FLAG_CAPTURE,
+        commitment=hashlib.sha256(referenced).digest(),
+        owner=OWNER,
+        size_bytes=len(referenced),
+        expires_at_unix=1_893_456_000,  # 2030-01-01T00:00:00Z
+    )
+
+
+def payloads() -> list[tuple[str, bytes]]:
+    rng = random.Random(0x51B)
+    frames: list[tuple[str, bytes]] = []
+    for index in range(24):
+        if index == 9:
+            # A pointer inside an enclosing protocol's payload: 16 header
+            # bytes first, exactly how it arrives off the air.
+            header = bytes(rng.randrange(256) for _ in range(16))
+            frames.append(("meshtastic+shelby-pointer", header + demo_pointer()))
+            continue
+        kind = ("meshtastic", "meshcore", "reticulum")[index % 3]
+        length = rng.randrange(24, 180)
+        frames.append((kind, bytes(rng.randrange(256) for _ in range(length))))
+    return frames
+
+
+def build() -> bytes:
+    rng = random.Random(0x15CA9)
+    out = bytearray(FILE_HEADER)
+    timestamp = 5_000_000
+    for sequence, (kind, payload) in enumerate(payloads()):
+        truncated = kind == "reticulum" and sequence == 20
+        captured = payload[:-7] if truncated else payload
+        crc = 3 if sequence == 14 else 2  # one CRC failure at sequence 14
+        direction = 2 if sequence == 17 else 1  # one transmitted frame
+        timestamp += rng.randrange(1_800_000, 4_200_000)
+        out += lscap.RECORD_HEADER.pack(
+            lscap.RECORD_MAGIC,
+            lscap.RECORD_HEADER_SIZE,
+            1,                     # record layout version
+            len(captured),
+            len(payload),
+            sequence,
+            timestamp,
+            PRESENT,
+            US_LONGFAST_HZ,
+            250_000,               # bandwidth Hz
+            439,                   # bit rate bps at SF11/BW250/CR4:5
+            0,                     # frequency deviation (LoRa)
+            400_000 + len(payload) * 4_600,  # airtime us
+            rng.randrange(-4_200, 4_200),    # frequency error Hz
+            rng.randrange(-1150, -820),      # RSSI dBm x10
+            rng.randrange(-120, 105),        # SNR dB x10
+            16,                    # preamble symbols
+            0x2B,                  # sync word
+            1,                     # profile id
+            0,                     # radio status
+            0,                     # tx power (not reported on rx)
+            11,                    # spreading factor
+            5,                     # coding rate denominator
+            20,                    # channel index (US slot 20)
+            0,                     # radio index
+            1,                     # modulation: LoRa
+            direction,
+            crc,
+            0,                     # metadata flags
+            b"\x00\x00\x00",
+        )
+        out += captured
+    return bytes(out)
+
+
+def main() -> int:
+    data = build()
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUT_PATH.write_bytes(data)
+    print(f"wrote {OUT_PATH} ({len(data)} bytes, 24 records)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

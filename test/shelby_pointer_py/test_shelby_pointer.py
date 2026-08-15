@@ -234,5 +234,25 @@ class CliTest(unittest.TestCase):
         self.assertIn("1 Shelby pointer(s)", stderr)
 
 
+class SampleCaptureTest(unittest.TestCase):
+    """The committed demo capture must keep carrying exactly one pointer."""
+
+    SAMPLE = REPO_ROOT / "samples" / "sample-mesh-traffic.lscap"
+
+    def test_sample_scans_to_one_pointer_at_sequence_9(self):
+        code, stdout, _ = run_cli(["scan", str(self.SAMPLE)])
+        self.assertEqual(code, 0)
+        hits = [json.loads(line) for line in stdout.splitlines()]
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]["sequence"], 9)
+        self.assertEqual(hits[0]["payload_offset"], 16)
+        self.assertTrue(hits[0]["pointer"]["capture"])
+
+    def test_sample_is_regenerated_deterministically(self):
+        import generate_sample_capture  # noqa: PLC0415 -- scripts dir on sys.path
+
+        self.assertEqual(self.SAMPLE.read_bytes(), generate_sample_capture.build())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -96,7 +96,7 @@ test('finds the pointer behind an enclosing protocol header', () => {
 // scan every payload. The pointer must surface on frame 9, behind the 16-byte
 // protocol header the generator puts there.
 test('finds the pointer in samples/sample-mesh-traffic.lscap', async () => {
-  const sampleUrl = new URL('../../samples/sample-mesh-traffic.lscap', import.meta.url);
+  const sampleUrl = new URL('../../../samples/sample-mesh-traffic.lscap', import.meta.url);
   const buffer = await readFile(sampleUrl);
   const capture = parseLscap(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
 
