@@ -399,30 +399,48 @@ const PHASES = [
     camA: V(10, 42, 66), camB: V(-14, 52, 58), lookA: V(0, 0, -18), lookB: V(0, 0, -22),
   },
   {
-    len: 10, tag: '03 · THE POINTER',
+    len: 13, tag: '03 · THE MATH',
+    html: 'Try to push one <b>4.2 MB</b> photo through the mesh, and it starves. Send a <em>reference</em> instead, and the mesh barely notices.'
+      + '<div class="vs">'
+      + '<div class="col bad"><h4>RAW BYTES OVER MESH</h4><ul>'
+      + '<li><strong>~22,000</strong> frames <span>(~200 B each)</span></li>'
+      + '<li><strong>~160,000</strong> transmissions <span>(× 7.36)</span></li>'
+      + '<li><strong>days</strong> of shared channel time</li>'
+      + '<li>blocks every other node<span> · likely never completes</span></li>'
+      + '</ul></div>'
+      + '<div class="col good"><h4>SHELBY POINTER</h4><ul>'
+      + '<li><strong>1</strong> frame <span>· 82 bytes</span></li>'
+      + '<li><strong>~7</strong> transmissions</li>'
+      + '<li><strong>&lt;1 s</strong> of air</li>'
+      + '<li>photo moves over IP<span> · mesh stays free</span></li>'
+      + '</ul></div></div>',
+    camA: V(-14, 52, 58), camB: V(16, 40, 50), lookA: V(0, 0, -22), lookB: V(0, 0, -18),
+  },
+  {
+    len: 10, tag: '04 · THE POINTER',
     html: 'So the mesh never carries media. The device emits an <em>82-byte Shelby pointer</em> — blob commitment · owner · size · expiry — a <b>reference, not a payload</b>.',
     camA: V(8, 5, 36), camB: V(-6, 7, 34), lookA: lookTD, lookB: lookTD,
     onEnter() { pushFeedRow(true); emitBurst(NODES.tdeck.pos, COLORS.pink, 30); startPacket(); },
   },
   {
-    len: 14, tag: '04 · THE MESH',
+    len: 14, tag: '05 · THE MESH',
     html: 'The pointer rides inside an ordinary <i>Meshtastic · MeshCore · Reticulum</i> payload. Unmodified nodes forward it untouched — a payload convention, not a new link layer.',
     followPacket: true,
   },
   {
-    len: 12, tag: '05 · THE GATEWAY',
+    len: 12, tag: '06 · THE GATEWAY',
     html: 'Any node with an IP path — a phone regaining signal, a base station — resolves the pointer against <em>Shelby</em>: paid, verifiable blob storage on <i>Aptos</i>.',
     camA: V(96, 18, -30), camB: V(84, 34, -22), lookA: V(60, 24, -70), lookB: V(60, 30, -70),
     onEnter() { uplink.active = true; uplink.t = 0; },
   },
   {
-    len: 12, tag: '06 · THE RESOLUTION',
-    html: 'Gigabytes move over IP. The radio mesh only ever carried <b>82 bytes</b>.',
+    len: 12, tag: '07 · THE RESOLUTION',
+    html: 'The photo arrives — intact, persistent, verifiable on <em>Shelby</em> — and the mesh stayed free for everyone else\u2019s traffic. <b>~50,000\u00d7 fewer bytes</b> ever touched the air.',
     camA: V(84, 30, -24), camB: V(30, 16, 8), lookA: V(60, 26, -70), lookB: V(30, 8, -20),
     onEnter() { resolveBlob.active = true; resolveBlob.t = 0; },
   },
   {
-    len: 11, tag: '07 · OPEN STACK',
+    len: 11, tag: '08 · OPEN STACK',
     html: 'Open hardware · GPL-3.0 firmware · open mesh protocols · open webapp.<br><i>github.com/maxmoneycash/lilyshark</i>',
     orbit: true,
     onEnter() { feed.resolved = true; drawScreen(); },

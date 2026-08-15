@@ -43,7 +43,10 @@ read the narration over the cut, or record the narration first and cut to it.
 > A flooded LoRa mesh spends most of its airtime repeating itself. Measured
 > against Meshtastic's own simulator, a delivered message costs 7.36
 > transmissions at realistic density, and reach falls from 68.6 percent to
-> 25.8 percent as nodes are added. Airtime is the scarce resource.
+> 25.8 percent as nodes are added. Airtime is the scarce resource. Pushing
+> one 4-megabyte photo through the mesh would take around twenty-two
+> thousand frames — over a hundred and fifty thousand transmissions — days
+> of channel time that starve every other node.
 >
 > This is Lilyshark: Wireshark for mesh radio, running on a LILYGO T-Deck. It
 > captures Meshtastic, MeshCore, and Reticulum frames straight off the SX1262
@@ -51,14 +54,17 @@ read the narration over the cut, or record the narration first and cut to it.
 >
 > Here it decodes something new: a Shelby pointer. Eighty-two bytes that
 > reference a blob on Shelby, the storage protocol built on Aptos. Instead of
-> pushing a photo or a capture file through the mesh, a node sends the
-> reference. Any unmodified node forwards it — it is a payload convention,
-> not a new protocol.
+> pushing the photo through the mesh, a node sends the reference — one
+> frame, under a second of air. Any unmodified node forwards it — it is a
+> payload convention, not a new protocol.
 >
 > When the pointer reaches a gateway with an IP path, the gateway resolves it
-> against Shelby and fetches the real bytes. On the dashboard, the same
-> capture opens in the browser, and Shelby's network activity is live
-> underneath it.
+> against Shelby and fetches the real bytes. The photo arrives intact,
+> persistent, and verifiable, fifty thousand times fewer bytes ever touched
+> the air, and the mesh stayed free for everyone else's traffic. Shelby is
+> what lets a hundred-bit-per-second radio network move megabytes. On the
+> dashboard, the same capture opens in the browser, and Shelby's network
+> activity is live underneath it.
 >
 > Everything here is open source, GPL-3.0, and runs on any Meshtastic-class
 > hardware with a screen.

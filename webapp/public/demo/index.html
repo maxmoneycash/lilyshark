@@ -63,6 +63,17 @@
   #caption .text i { color: var(--cyan); font-style: normal; }
   #caption .text em { color: var(--pink); font-style: normal; }
   #caption.show .text { opacity: 1; }
+  .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 12px; text-align: left; border-top: 1px solid var(--rule); }
+  .vs .col { padding: 10px 14px 4px; }
+  .vs .col + .col { border-left: 1px solid var(--rule); }
+  .vs h4 { font-size: 10px; letter-spacing: 0.18em; margin-bottom: 8px; font-weight: 600; }
+  .vs .bad h4 { color: #F0715A; }
+  .vs .good h4 { color: var(--lime); }
+  .vs ul { list-style: none; }
+  .vs li { font-size: 12.5px; line-height: 1.8; color: var(--paper); }
+  .vs li span { color: rgba(240,244,239,0.55); }
+  .vs .bad li strong { color: #F0715A; font-weight: 600; }
+  .vs .good li strong { color: var(--lime); font-weight: 600; }
 
   #timeline {
     left: 0; right: 0; bottom: 0; height: 3px; background: rgba(240,244,239,0.08); pointer-events: none;
