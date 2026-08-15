@@ -1161,18 +1161,8 @@ body {
 /* Between the single desktop row and the phone hamburger, the tabs take
    their own row and wrap — a sliding strip hides half the destinations.
    Eleven tabs collide with CONNECT up to ~1540px, hence the ceiling. */
-@media (min-width: 861px) and (max-width: 1540px) {
-	.meshterm header {
-		flex-wrap: wrap;
-		row-gap: 6px;
-	}
-	.meshterm header nav {
-		order: 3;
-		width: 100%;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
-}
+/* Superseded: the header is one unwrapped line at every desktop width now —
+   see "Desktop header: one line, nothing moves" at the end of this file. */
 
 /* ── Phone ────────────────────────────────────────────────────────────────
    One model: the document scrolls, full stop. The desktop app-window (fixed
@@ -2040,37 +2030,66 @@ body:has(.meshterm .app.menu-open) {
 		animation: none;
 	}
 }
-	}
-}
 
-/* ── Desktop nav: one line, always ────────────────────────────────────────
-   Zooming in shrinks the CSS viewport, which used to wrap the eleven tabs
-   onto a second and third line and shove the screen down. Above the phone
-   breakpoint the row never wraps; instead the tabs scale with the viewport
-   so all eleven keep fitting. Below 861px the hamburger takes over and none
-   of this applies. */
+/* ── Desktop header: one line, nothing moves ──────────────────────────────
+   Identity, all eleven tabs, and the connect control share a single
+   unwrapped row at every desktop width. Zooming in shrinks the CSS
+   viewport, which used to wrap the nav onto a second row and shove the
+   whole screen down; now every part scales with the viewport instead, so
+   the layout keeps its shape and nothing jumps. Below 861px the hamburger
+   takes over and none of this applies. */
 @media (min-width: 861px) {
+	.meshterm header {
+		flex-wrap: nowrap;
+		gap: clamp(5px, 0.8vw, 16px);
+		padding: 10px clamp(8px, 1vw, 16px);
+	}
+
+	/* The tabs are the point of the row, so they surrender width last. */
 	.meshterm header nav {
+		flex: 0 1 auto;
 		flex-wrap: nowrap;
 		min-width: 0;
-		gap: clamp(2px, 0.35vw, 6px);
+		order: 0;
+		width: auto;
+		gap: clamp(2px, 0.3vw, 6px);
 	}
 	.meshterm header nav > .tab {
 		flex: 0 1 auto;
 		min-width: 0;
 		white-space: nowrap;
-		font-size: clamp(8px, 0.76vw, 11px);
-		letter-spacing: clamp(0px, 0.06vw, 1px);
-		padding: 0 clamp(3px, 0.55vw, 12px);
+		font-size: clamp(7.5px, 0.72vw, 11px);
+		letter-spacing: clamp(0px, 0.05vw, 1px);
+		padding: 0 clamp(2px, 0.5vw, 12px);
 	}
-	/* The identity and the controls give up their slack before the tabs do. */
-	.meshterm header {
-		gap: clamp(6px, 1vw, 16px);
+
+	/* Identity and controls give up their slack first. */
+	.meshterm .logo {
+		flex: 0 0 auto;
+		gap: clamp(4px, 0.5vw, 9px);
 	}
 	.meshterm .logo .wordmark {
-		font-size: clamp(15px, 1.35vw, 20px);
+		font-size: clamp(13px, 1.2vw, 20px);
 	}
 	.meshterm .logo .logo-mark {
-		height: clamp(19px, 1.8vw, 26px);
+		height: clamp(17px, 1.6vw, 26px);
+	}
+	.meshterm header > .primary {
+		flex: 0 0 auto;
+		font-size: clamp(8px, 0.72vw, 12px);
+		padding: 0 clamp(6px, 0.8vw, 16px);
+	}
+	/* The spacer only pushes when there is genuinely slack to push with. */
+	.meshterm header > .spacer {
+		flex: 1 1 0;
+		min-width: 0;
+	}
+}
+
+/* The link pill repeats what the CONNECT button's own label already says,
+   so it is the first thing to go when the row gets tight. */
+@media (min-width: 861px) and (max-width: 1180px) {
+	.meshterm header > .conn-pill {
+		display: none;
 	}
 }
