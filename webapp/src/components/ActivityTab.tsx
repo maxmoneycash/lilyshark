@@ -195,18 +195,6 @@ export function ActivityTab({ currentTime }: ActivityTabProps) {
         ctx.shadowBlur = 0
         ctx.globalAlpha = 1
 
-        // Mobile: Draw "SHELBY PULSE" overlay in top left
-        const isMobile = window.innerWidth < 768
-        if (isMobile) {
-          ctx.font = 'bold 24px Cascadia Code, monospace'
-          ctx.fillStyle = '#FF1493'
-          ctx.globalAlpha = 0.15
-          ctx.textAlign = 'left'
-          ctx.fillText('SHELBY', 15, 40)
-          ctx.fillText('PULSE', 15, 68)
-          ctx.globalAlpha = 1
-        }
-
         // Always draw Y-axis labels
         ctx.font = '12px Cascadia Code, monospace'
         ctx.fillStyle = '#666666'

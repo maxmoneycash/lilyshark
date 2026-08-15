@@ -62,6 +62,19 @@ export function TrafficTab() {
     } finally { setBusy(false); }
   };
 
+  /** The bundled demo capture: 24 frames of LongFast traffic with a Shelby
+      pointer at sequence 9. No device, no upload — always works. */
+  const openSample = async () => {
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch('/sample-mesh-traffic.lscap');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      load(await res.arrayBuffer(), 'sample-mesh-traffic.lscap');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load the sample capture');
+    } finally { setBusy(false); }
+  };
+
   const frames = capture?.frames ?? [];
   const stats = useMemo(() => summarize(frames), [frames]);
   // Scan every payload once: a pointer rides behind whatever protocol header
@@ -79,6 +92,9 @@ export function TrafficTab() {
           <span className="ls-label">CAPTURE</span>
           <button className="ls-btn ls-btn--primary" onClick={() => fileRef.current?.click()} disabled={busy}>
             Open .lscap
+          </button>
+          <button className="ls-btn" onClick={() => void openSample()} disabled={busy}>
+            Sample
           </button>
           <input ref={fileRef} type="file" accept=".lscap,application/octet-stream" hidden
             onChange={(e) => { const x = e.target.files?.[0]; if (x) void openFile(x); }} />
@@ -98,9 +114,25 @@ export function TrafficTab() {
         )}
 
         {!capture && !busy && !error && (
-          <div className="ls-empty">
-            <p>The T-Deck writes <code>.lscap</code> captures to microSD. Open one to read its
-              frames, radio measurements, and bytes.</p>
+          <div className="ls-first">
+            <img className="ls-device" src="/lilyshark-device.png"
+                 alt="A LILYGO T-Deck running Lilyshark, showing a live frame feed" />
+            <div className="ls-first-copy">
+              <h1 className="ls-h1">Read what is on the air</h1>
+              <p className="ls-sub">
+                Lilyshark turns a LILYGO T-Deck into a handheld LoRa analyzer. It captures
+                Meshtastic, MeshCore, and Reticulum frames with their radio measurements and
+                writes them to microSD as <code>.lscap</code>.
+              </p>
+              <div className="ls-first-actions">
+                <button className="ls-btn ls-btn--primary" onClick={() => void openSample()} disabled={busy}>
+                  Open a sample capture
+                </button>
+                <button className="ls-btn" onClick={() => fileRef.current?.click()} disabled={busy}>
+                  Open your own
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
