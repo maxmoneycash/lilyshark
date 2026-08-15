@@ -1938,3 +1938,56 @@ body:has(.meshterm .app.menu-open) {
 		margin-top: 0;
 	}
 }
+
+/* ── Intro: paged, and phone-first around the device ──────────────────────
+   Free scrolling through a sticky stage felt dead (nothing moves within a
+   section) and loose (one flick sails past three sections). Mandatory snap
+   with snap-stop makes each gesture land exactly one section, natively
+   animated by the browser — no scroll listener in the way. */
+.meshterm .intro-scroll {
+	scroll-snap-type: y mandatory;
+	overscroll-behavior: contain;
+}
+.meshterm .intro-snap {
+	position: absolute;
+	left: 0;
+	width: 1px;
+	height: calc(100% / var(--intro-n, 8));
+	scroll-snap-align: start;
+	scroll-snap-stop: always;
+	pointer-events: none;
+}
+
+@media (max-width: 860px) {
+	/* The radio leads and gets the larger share; all the copy sits under it.
+	   Later block wins over the earlier copy-first rows. */
+	.meshterm .intro-stage {
+		grid-template-rows: minmax(0, 57%) minmax(0, 43%);
+	}
+	.meshterm .intro-copy {
+		order: 2;
+		align-self: start;
+		padding-top: 2px;
+	}
+	.meshterm .intro-device {
+		order: 1;
+		height: 100%;
+		width: auto;
+		max-width: 92vw;
+		justify-self: center;
+		align-self: center;
+	}
+	.meshterm .intro-head {
+		margin-bottom: 10px;
+	}
+	.meshterm .intro-hint {
+		margin-top: 8px;
+	}
+	.meshterm .intro-cta {
+		margin-top: 12px;
+	}
+	.meshterm .intro-cta button {
+		min-height: 42px;
+		padding: 0 16px;
+	}
+}

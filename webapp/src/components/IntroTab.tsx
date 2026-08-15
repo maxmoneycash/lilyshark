@@ -152,10 +152,21 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
             } as CSSProperties
           }
         >
+          {/* Invisible snap areas, one per section. Absolutely positioned so
+              the sticky stage stays the only in-flow child; mandatory snap +
+              snap-stop turns each flick into exactly one section instead of a
+              free scroll that sails past three. */}
+          {SECTIONS.map((sec, i) => (
+            <div
+              className="intro-snap"
+              key={sec.screen}
+              style={{ top: `${(i * 100) / SECTIONS.length}%` }}
+            />
+          ))}
           <div className="intro-stage">
             <div className="intro-copy" ref={textRef}>
               <AnimatePresence mode="wait">
-                <motion.div key={idx} exit={{ opacity: 0, transition: { duration: 0.12 } }}>
+                <motion.div key={idx} exit={{ opacity: 0, transition: { duration: 0.07 } }}>
                   <h1 className="intro-head" style={{ fontSize: fontPx }} aria-label={s.head}>
                     {(headlines?.[idx] ?? [s.head]).map((line, li) => (
                       <span className="intro-line" key={line + li}>
