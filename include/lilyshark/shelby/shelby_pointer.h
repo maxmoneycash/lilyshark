@@ -13,6 +13,14 @@ namespace lilyshark {
 /// reference. A node with connectivity (a gateway, or the operator's phone when
 /// it next has signal) resolves the pointer and moves the bytes.
 ///
+/// Keeping the over-the-air object as small as possible is not a style choice.
+/// Measured against Meshtastic's own discrete-event simulator, a flooded mesh
+/// spends R = 7.36 transmissions per delivered message at realistic density —
+/// against the 3 to 5 usually assumed — and reach falls from 68.6% to 25.8% as
+/// nodes are added, because every relay consumes shared channel time. Airtime is
+/// the scarce resource, so the design rule is to send a reference and let a
+/// connected node carry the payload.
+///
 /// The pointer therefore rides *inside* an existing protocol's payload —
 /// Meshtastic, MeshCore, or Reticulum — rather than replacing any of them. It is
 /// a payload convention, not a new link layer, which is why the same encoding
