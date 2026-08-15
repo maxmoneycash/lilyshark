@@ -76,16 +76,20 @@ Python 3, standard library only, tested the same way as the firmware
 
 ## Web app (`webapp/`)
 
-Vite + React, deployed on Vercel. See `webapp/README.md` for the full map.
+Vite + React, deployed on Vercel. The interface is a terminal-style app
+ported from meshcore-terminal (MIT) and recolored Lilyshark pink; see
+`webapp/README.md` for the full map.
 
-- **Traffic analyzer** (`src/components/TrafficTab.tsx`) opens `.lscap`
-  captures — from disk, or fetched from Shelby by blob name — and presents
-  them Wireshark-style: frame list, decoded RF metadata, hex dump, capture
-  statistics, and inline decoding of Shelby off-grid pointers.
-- **Network views** read the Shelby network itself — blobs, storage,
-  providers, and the ShelbyUSD economy — served by `services/pulse-api`, a
-  small indexer/API service that syncs the chain's `blobs` and
-  `blob_activities` tables.
+- **TRÁFICO** (`src/mesh/screens/Traffic.tsx`) opens `.lscap` captures —
+  from disk, from the bundled sample, or fetched from Shelby by blob name —
+  and presents them Wireshark-style: frame list, decoded RF metadata, hex
+  dump, capture statistics, and inline decoding of Shelby off-grid pointers.
+- **Mesh client screens** (CHAT, NODOS, MAPA, MALLA, TELEMETRÍA, CONFIG,
+  DEBUG) drive a real radio over Web Serial or BLE — nothing routes through
+  a server.
+- **SHELBY** reads the network itself — blobs, storage, providers, and the
+  ShelbyUSD economy — served by `services/pulse-api`, a small indexer/API
+  service that syncs the chain's `blobs` and `blob_activities` tables.
 
 ## Cross-language wire formats
 

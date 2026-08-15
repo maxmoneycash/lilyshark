@@ -4,17 +4,16 @@ No radio hardware required for any of this.
 
 ## 1. Open the web analyzer (1 minute)
 
-Go to the deployed app and open the **Traffic** tab. Choose *Open .lscap*
-and select `samples/sample-mesh-traffic.lscap` from this repository.
+Go to the deployed app and open the **TRÁFICO** screen. Press **Sample** —
+the bundled capture loads: 24 frames of US LongFast traffic (906.875 MHz,
+SF11/BW250), one CRC failure, one truncated frame — and frame **9 marked
+◆ SHLB**. Select it: the detail panel decodes the Shelby off-grid pointer
+(commitment, owner, size, expiry) beside the hex dump.
 
-You should see 24 frames of US LongFast traffic (906.875 MHz, SF11/BW250),
-one CRC failure, one truncated frame — and frame **9 marked `SHLB`**.
-Select it: the detail pane decodes the Shelby off-grid pointer (commitment,
-owner, size, expiry) above the hex dump.
-
-The same tab fetches captures straight from Shelby by blob name, and the
-other tabs index the live Shelby network — blobs, storage, providers, and
-the ShelbyUSD economy.
+The same screen fetches captures straight from Shelby by blob name, the
+SHELBY screen indexes the live network — blobs, storage, providers, and the
+ShelbyUSD economy — and the CHAT/NODOS/MAPA screens drive a real radio over
+USB or Bluetooth if you have one.
 
 ## 2. Scan the same capture from the CLI (1 minute)
 

@@ -6,6 +6,22 @@ pre-release, so versions are dates, not semver.
 
 ## [2026-08-15]
 
+### Added — web app, rebuilt as a terminal
+
+- The web app is now a terminal-style interface ported from
+  meshcore-terminal (MIT; UI itself ported from perereus/meshtastic-terminal),
+  recolored Lilyshark pink by a one-line theme. It includes a full MeshCore
+  client — chat, nodes, map, mesh graph, telemetry, config, and a debug log —
+  driving a real radio over Web Serial or BLE; nothing routes through a
+  server.
+- The `.lscap` analyzer is the TRÁFICO screen: open from disk, from the
+  bundled sample, or from Shelby by blob name; readouts, frame table with
+  the SHLB marker, RF detail, hex dump, and an inline Shelby-pointer decode.
+- The SHELBY screen indexes the live network, WHITEPAPER embeds the
+  document, and the whole terminal speaks Spanish and English.
+- The ported test suites (theme, i18n, mesh, alerts, battery, fmt) run in
+  `npm test` alongside the lscap suite.
+
 ### Added — firmware
 
 - Shelby off-grid pointer (`SHLB`): an 82-byte record carrying a blob
@@ -18,12 +34,6 @@ pre-release, so versions are dates, not semver.
 
 ### Added — host and cloud
 
-- Web app: Wireshark-style `.lscap` analyzer (frame list, RF metadata, hex
-  dump, statistics) with capture fetch by Shelby blob name, plus live
-  Shelby network views — blobs, storage, providers, and the ShelbyUSD
-  economy.
-- The Traffic tab marks frames carrying a Shelby pointer and decodes the
-  pointer inline.
 - `scripts/shelby_pointer.py`: reference tooling for the connected side —
   emit, parse, scan captures, and verify blobs against pointers.
 - `samples/sample-mesh-traffic.lscap`: a deterministic 24-frame demo
