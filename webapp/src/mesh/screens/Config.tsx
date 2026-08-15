@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { type AlertCfg, getAlertCfg, setAlertCfg } from "../alerts";
 import {
 	dbStats,
@@ -165,13 +165,31 @@ export default function Config() {
 		if (device) refreshChannels().catch(() => {});
 	}, []);
 
+	// The two 3 s "are you sure?" disarms. Leaving CONFIG while one is armed
+	// used to leave a timer running against an unmounted screen.
+	const purgeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	const rebootTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	useEffect(
+		() => () => {
+			clearTimeout(purgeTimer.current);
+			clearTimeout(rebootTimer.current);
+		},
+		[],
+	);
+
 	const onPurge = async () => {
 		if (!purgeArm) {
 			setPurgeArm(true);
 			setPurgeMsg(t("pulsa otra vez para confirmar"));
-			setTimeout(() => setPurgeArm(false), 3000);
+			clearTimeout(purgeTimer.current);
+			purgeTimer.current = setTimeout(() => setPurgeArm(false), 3000);
 			return;
 		}
+		clearTimeout(purgeTimer.current);
 		setPurgeArm(false);
 		const days = Math.max(1, purgeDays);
 		try {
@@ -348,9 +366,11 @@ export default function Config() {
 		if (!rebootArm) {
 			setRebootArm(true);
 			setMaint(t("pulsa otra vez para confirmar"));
-			setTimeout(() => setRebootArm(false), 3000);
+			clearTimeout(rebootTimer.current);
+			rebootTimer.current = setTimeout(() => setRebootArm(false), 3000);
 			return;
 		}
+		clearTimeout(rebootTimer.current);
 		setRebootArm(false);
 		try {
 			await rebootRadio();
@@ -375,7 +395,7 @@ export default function Config() {
 								<option value="auto">
 									{t("AUTOMÁTICO")} · {getLang().toUpperCase()}
 								</option>
-								<option value="es">ESPAÑOL</option>
+								<option value="es">{t("ESPAÑOL")}</option>
 								<option value="en">ENGLISH</option>
 							</select>
 							<label>{t("HORA")}</label>
@@ -792,7 +812,7 @@ export default function Config() {
 					</Section>
 				</div>
 				<div className="cfg-col">
-					<Section title="MÓDULO // ADVERT">
+					<Section title={t("MÓDULO // ADVERT")}>
 						<div
 							style={{
 								padding: 14,

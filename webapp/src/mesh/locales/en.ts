@@ -35,6 +35,7 @@ const en: Record<string, string> = {
   HOY: "TODAY",
   AYER: "YESTERDAY",
   "buscar en todo el historial_": "search the whole history_",
+  "Ctrl+F · ESC limpia": "Ctrl+F · ESC clears",
   'SIN RESULTADOS PARA "{0}"_': 'NO RESULTS FOR "{0}"_',
   "{0} RESULTADOS · CLIC PARA IR A LA CONVERSACIÓN":
     "{0} RESULTS · CLICK TO JUMP TO THE CONVERSATION",
@@ -81,6 +82,7 @@ const en: Record<string, string> = {
   "[ BORRAR ]": "[ DELETE ]",
   "PANEL // MAPA TÁCTICO": "PANEL // TACTICAL MAP",
   "{0} NODOS": "{0} NODES",
+  "{0} NODOS · {1} PUNTOS": "{0} NODES · {1} POINTS",
   "{0} CON FIX": "{0} WITH FIX",
   "{0} DESCARTADOS (0,0)": "{0} DISCARDED (0,0)",
   "CAPA: OSCURA": "LAYER: DARK",
@@ -242,6 +244,19 @@ const en: Record<string, string> = {
 
   // Debug log (addLog messages, shown in the DEBUG panel and the footer)
   "BD: fallo al guardar {0}: {1}": "DB: failed to save {0}: {1}",
+  // ── what dbFail() names in "DB: failed to save {0}" ──
+  // These are interpolated as {0}, so they are NOT translated by the key
+  // lookup: they must be wrapped in t() at the call site or they ship Spanish.
+  nodo: "node",
+  escucha: "sighting",
+  "cambio de ruta": "route change",
+  ruta: "route",
+  vecinos: "neighbors",
+  mensaje: "message",
+  "estado de mensaje": "message state",
+  telemetría: "telemetry",
+  "Advert (flood) enviado": "Advert (flood) sent",
+  "Advert (zero hop) enviado": "Advert (zero hop) sent",
   "RUTA: {0} pasa de {1} a {2} saltos": "ROUTE: {0} goes from {1} to {2} hops",
   "Estado: {0}": "Status: {0}",
   "WAYPOINT borrado de {0}: {1}": "WAYPOINT deleted from {0}: {1}",
@@ -307,6 +322,7 @@ const en: Record<string, string> = {
   "CONFIG // APLICACIÓN": "CONFIG // APPLICATION",
   IDIOMA: "LANGUAGE",
   AUTOMÁTICO: "AUTOMATIC",
+  ESPAÑOL: "SPANISH",
   HORA: "TIME",
   COLOR: "COLOR",
   "ALTO CONTRASTE": "HIGH CONTRAST",
@@ -506,6 +522,7 @@ const en: Record<string, string> = {
     "An advert announces your node to the mesh. ZERO HOP reaches only direct neighbors; FLOOD is repeated by repeaters and crosses the whole mesh.",
   "Advert enviado ✓": "Advert sent ✓",
   "CONFIG // EQUIPO": "CONFIG // DEVICE",
+  "MÓDULO // ADVERT": "MODULE // ADVERT",
   "MODELO": "MODEL",
   "Config completa del nodo (nombre, radio y canales con clave) a JSON.":
     "Full node config (name, radio and channels with keys) to JSON.",

@@ -3,38 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="theme-color" content="#F2E2EC" />
     <meta name="description" content="Lilyshark — Wireshark for mesh radio. Mesh traffic capture, spectrum, and network analysis, with captures stored on Shelby." />
     <title>Lilyshark — Mesh Radio Analyzer</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/lilyshark-wordmark-pink.svg" />
-    <link rel="apple-touch-icon" href="/lilyshark-wordmark-pink.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Lilyshark — Mesh Radio Analyzer" />
     <meta property="og:description" content="Wireshark for mesh radio. Capture and analyze Meshtastic, MeshCore, and Reticulum traffic — captures stored on Shelby." />
-    <meta property="og:image" content="/lilyshark-wordmark-pink.svg" />
-    <meta property="og:url" content="https://lilyshark.vercel.app" />
+    <meta property="og:image" content="https://lilyshark.com/og-card.png" />
+    <meta property="og:url" content="https://lilyshark.com" />
     <meta property="og:site_name" content="Lilyshark" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Lilyshark — Mesh Radio Analyzer" />
     <meta name="twitter:description" content="Wireshark for mesh radio. Capture and analyze Meshtastic, MeshCore, and Reticulum traffic — captures stored on Shelby." />
-    <meta name="twitter:image" content="/lilyshark-wordmark-pink.svg" />
+    <meta name="twitter:image" content="https://lilyshark.com/og-card.png" />
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400..600;1,400..600&display=swap" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- No font requests: JetBrains Mono is self-hosted via @font-face in
+         meshterm.css, which also wins the cascade — a Google Fonts copy here
+         was two wasted preconnects and a render-blocking stylesheet. -->
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" class="meshterm"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

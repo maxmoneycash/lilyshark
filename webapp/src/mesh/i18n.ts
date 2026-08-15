@@ -19,9 +19,15 @@ export function getLangPref(): Lang | "auto" {
 export function getLang(): Lang {
   const pref = getLangPref();
   if (pref !== "auto") return pref;
-  // WebView2 reports the Windows display language here. Compare the whole
-  // primary subtag: a prefix match would also catch "est" (Estonian).
-  return navigator.language.toLowerCase().split("-")[0] === "es" ? "es" : "en";
+  // English-only product: this app was ported from a Spanish codebase, where
+  // the keys are the Spanish text and en.ts maps them to English. Sniffing
+  // navigator.language used to resolve "auto" to "es" on a Spanish browser,
+  // which shipped a Spanish UI to users who never asked for one — and any key
+  // missing from en.ts silently leaks Spanish on top of that. "auto" therefore
+  // resolves to English regardless of the browser locale. The machinery below
+  // is intact and the selector still honours an explicit choice, so restoring
+  // locale detection is a one-line change if the product ever ships Spanish.
+  return "en";
 }
 
 export function setLang(l: Lang | "auto"): void {

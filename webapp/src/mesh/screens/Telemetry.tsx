@@ -10,7 +10,9 @@ import { accent, fg, isLight, useThemeTick } from "../theme";
 // pseudo-metric: ChUtil + AirUtilTx on the same chart
 const CHANNEL = "__canal";
 
-const METRIC_LABELS: Record<string, string> = {
+// A function, not a constant: at module scope the labels would be translated
+// once, on first import, and a language switch would leave them in the old one.
+const metricLabels = (): Record<string, string> => ({
 	[CHANNEL]: t("CANAL OCUPADO (%)"),
 	batteryLevel: t("NIVEL BATERÍA (%)"),
 	voltage: t("TENSIÓN BATERÍA (V)"),
@@ -19,7 +21,7 @@ const METRIC_LABELS: Record<string, string> = {
 	temperature: t("TEMPERATURA (°C)"),
 	relativeHumidity: t("HUMEDAD (%)"),
 	barometricPressure: t("PRESIÓN (hPa)"),
-};
+});
 
 const RANGES: [string, number][] = [
 	["6 H", 0.25],
@@ -37,6 +39,14 @@ const seriesColors = (): string[] => [
 		? ["#9a6a00", "#0f6f86", "#54459c"]
 		: ["#ffb000", "#5ccfe6", "#b3a5e3"]),
 ];
+
+// uPlot wants pixels, so the box has to be measured. One helper for both the
+// first build and every later resize, so the two can never disagree and fight
+// each other through the ResizeObserver.
+const plotSize = (box: HTMLElement) => ({
+	width: Math.max(100, box.clientWidth - 28),
+	height: Math.max(220, box.clientHeight - 28),
+});
 
 export default function Telemetry() {
 	const s = useSyncExternalStore(subscribe, getSnapshot);
@@ -62,6 +72,9 @@ export default function Telemetry() {
 	// ponytail: periodic refresh instead of reacting to s.version — the mesh
 	// mutates dozens of times/s and rebuilding the chart each time hangs the webview
 	const [tick, setTick] = useState(0);
+	// re-read on every language change, so a switch relabels the axes and the
+	// metric picker without a reload
+	const LABELS = metricLabels();
 
 	useEffect(() => {
 		const id = setInterval(() => setTick((t) => t + 1), 10_000);
@@ -69,7 +82,13 @@ export default function Telemetry() {
 	}, []);
 
 	useEffect(() => {
-		listTelemetryNodes().then((ns) => setWithData(new Set(ns)));
+		let alive = true;
+		listTelemetryNodes().then((ns) => {
+			if (alive) setWithData(new Set(ns));
+		});
+		return () => {
+			alive = false;
+		};
 	}, [tick]);
 
 	const shortName = (num?: number) =>
@@ -167,8 +186,7 @@ export default function Telemetry() {
 			}
 			plotRef.current = new uPlot(
 				{
-					width: Math.max(100, plotDiv.current.clientWidth - 28),
-					height: Math.max(220, plotDiv.current.clientHeight - 28),
+					...plotSize(plotDiv.current),
 					series: [
 						{},
 						{
@@ -176,7 +194,7 @@ export default function Telemetry() {
 								? t("UTIL. CANAL (%)")
 								: compare.length > 0
 									? shortName(effectiveNode)
-									: (METRIC_LABELS[metric] ?? metric),
+									: (LABELS[metric] ?? metric),
 							stroke: fg(),
 							width: 2,
 							points: { show: false },
@@ -222,7 +240,23 @@ export default function Telemetry() {
 		return () => {
 			cancelled = true;
 		};
-	}, [effectiveNode, metric, days, tick, compare, tema, idioma]);
+		// `tick` is deliberately absent: it fires every 10 s and rebuilding the
+		// plot on it threw away the reader's cursor and zoom four times a minute.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [effectiveNode, metric, days, compare, tema, idioma]);
+
+	// The plot is a canvas: it is sized in pixels once and would otherwise keep
+	// its first size through a window resize, an orientation change, or the
+	// panel next to it wrapping away on a phone.
+	useEffect(() => {
+		const box = plotDiv.current;
+		if (!box || typeof ResizeObserver === "undefined") return;
+		const ro = new ResizeObserver(() => {
+			plotRef.current?.setSize(plotSize(box));
+		});
+		ro.observe(box);
+		return () => ro.disconnect();
+	}, []);
 
 	useEffect(() => () => plotRef.current?.destroy(), []);
 
@@ -240,7 +274,7 @@ export default function Telemetry() {
 			const series = await Promise.all(
 				targets.map((n) => loadTelemetry(n, realMetric, since)),
 			);
-			const rows = ["fecha_iso,epoch_ms,nodo,id_nodo,metrica,valor"];
+			const rows = ["iso_date,epoch_ms,node,node_id,metric,value"];
 			targets.forEach((num, i) => {
 				// quote the name: it could contain commas and break the CSV
 				const name = `"${shortName(num).replace(/"/g, '""')}"`;
@@ -300,7 +334,7 @@ export default function Telemetry() {
 					)}
 					{metrics.map((m) => (
 						<option key={m} value={m}>
-							{METRIC_LABELS[m] ?? m.toUpperCase()}
+							{LABELS[m] ?? m.toUpperCase()}
 						</option>
 					))}
 				</select>
@@ -353,7 +387,7 @@ export default function Telemetry() {
 						</button>
 					))}
 				</div>
-				<span style={{ flex: 1 }} />
+				<span className="spacer" />
 				<button
 					style={{ fontSize: 10, padding: "0 6px" }}
 					title={t("Exportar a CSV lo que se ve en la gráfica")}
@@ -370,18 +404,29 @@ export default function Telemetry() {
 				</span>
 			</div>
 
-			<div style={{ flex: 1, display: "flex", gap: 12, minHeight: 0 }}>
-				<div className="panel" style={{ flex: 1 }}>
+			{/* wraps on a phone: a 200 px stats column beside the chart leaves the
+			    chart a sliver, and neither is readable */}
+			<div
+				style={{
+					flex: 1,
+					display: "flex",
+					gap: 12,
+					minHeight: 0,
+					flexWrap: "wrap",
+				}}
+			>
+				{/* the chart absorbs all the free width, so the stats column stays at
+				    its 200 px basis on desktop and only widens once it has wrapped */}
+				<div className="panel" style={{ flex: "999 1 320px", minWidth: 0 }}>
 					<div className="panel-title">
 						{t("GRÁFICA")} // {nodeLabel}
 						{compare.length > 0 && ` + ${compare.map(shortName).join(" + ")}`} ·{" "}
-						{METRIC_LABELS[metric] ?? (metric || "—")}
+						{LABELS[metric] ?? (metric || "—")}
 					</div>
 					<div
+						className="scroll-y"
 						style={{
-							flex: 1,
 							padding: 14,
-							overflow: "hidden",
 							position: "relative",
 						}}
 					>
@@ -393,18 +438,25 @@ export default function Telemetry() {
 							</p>
 						)}
 						{/* ponytail: div dedicado a uPlot, SIN hijos de React — si React
-                y uPlot comparten contenedor, removeChild casca y tumba la app */}
-						<div ref={plotDiv} style={{ width: "100%", height: "100%" }} />
+                y uPlot comparten contenedor, removeChild casca y tumba la app.
+                minHeight: once the panes have stacked on a phone the parent's
+                height comes from its content, so a bare height:100% would
+                resolve to whatever the canvas already is and the observer
+                would walk the plot down to nothing. */}
+						<div
+							ref={plotDiv}
+							style={{ width: "100%", height: "100%", minHeight: 248 }}
+						/>
 					</div>
 				</div>
 
 				<div
 					style={{
-						width: 200,
+						flex: "1 1 200px",
+						minWidth: 200,
 						display: "flex",
 						flexDirection: "column",
 						gap: 12,
-						flexShrink: 0,
 					}}
 				>
 					{compare.length > 0 && (

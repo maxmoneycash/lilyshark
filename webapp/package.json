@@ -15,26 +15,18 @@
     "shelby:migrate": "tsx scripts/shelby-migrate-images.ts"
   },
   "dependencies": {
-    "@aptos-labs/ts-sdk": "^5.1.6",
-    "@aptos-labs/wallet-adapter-ant-design": "^5.3.3",
-    "@aptos-labs/wallet-adapter-react": "^7.2.3",
     "@liamcottle/meshcore.js": "^1.14.0",
-    "@shelby-protocol/sdk": "^0.0.9",
-    "@tanstack/react-query": "^5.62.3",
-    "framer-motion": "^12.23.24",
     "leaflet": "^1.9.4",
-    "p5": "^1.11.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.15.0",
-    "uplot": "^1.6.32",
-    "zustand": "^5.0.2"
+    "uplot": "^1.6.32"
   },
   "devDependencies": {
+    "@aptos-labs/ts-sdk": "^7.3.0",
     "@biomejs/biome": "2.0.6",
+    "@shelby-protocol/sdk": "^0.7.1",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.15.0",
-    "@types/p5": "^1.7.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vercel/node": "^5.5.9",

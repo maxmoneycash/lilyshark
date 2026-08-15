@@ -86,22 +86,32 @@ stub("es-ES");
 
 const { getLang, getLangPref } = await import("./i18n.ts");
 
+// English-only product: "auto" resolves to English whatever the browser says.
+// A Spanish locale used to flip the whole UI to Spanish, which is precisely
+// what must never happen now, so every locale below has to come back "en".
 assert.equal(getLangPref(), "auto", "sin nada guardado, automático");
-assert.equal(getLang(), "es");
-stub("es"); // without a region
-assert.equal(getLang(), "es");
-stub("ES-MX"); // capitals: Windows sometimes reports them
-assert.equal(getLang(), "es");
-// "est" is Estonian: a prefix match would take it for Spanish
-for (const otro of ["en-US", "ca-ES", "fr", "de-DE", "est-EE", "eu-ES"]) {
-	stub(otro);
-	assert.equal(getLang(), "en", `${otro} no es español, toca inglés`);
+for (const loc of [
+	"es-ES",
+	"es",
+	"ES-MX", // capitals: Windows sometimes reports them
+	"en-US",
+	"ca-ES",
+	"fr",
+	"de-DE",
+	"est-EE",
+	"eu-ES",
+]) {
+	stub(loc);
+	assert.equal(getLang(), "en", `${loc} debe resolver a inglés`);
 }
-// a manual choice wins over the system
+// the selector still works: an explicit choice wins over the default
 guardado.set("lang", "es");
 assert.equal(getLangPref(), "es");
-assert.equal(getLang(), "es", "en-US de sistema pero español elegido a mano");
+assert.equal(getLang(), "es", "español elegido a mano sigue mandando");
+guardado.set("lang", "en");
+assert.equal(getLang(), "en");
 guardado.set("lang", "basura");
 assert.equal(getLangPref(), "auto", "un valor corrupto vuelve a automático");
+assert.equal(getLang(), "en", "y automático es inglés");
 
 console.log(`i18n.test.ts OK · ${usadas.size} claves usadas, todas traducidas`);

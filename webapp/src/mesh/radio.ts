@@ -176,7 +176,7 @@ function upsertNode(num: number, patch: Partial<NodeEntry>): void {
     const merged = { ...prev, ...patch };
     s.nodes = new Map(s.nodes).set(num, merged);
     // ponytail: one write per event; IndexedDB handles this rate easily
-    saveNode(merged).catch(dbFail("nodo"));
+    saveNode(merged).catch(dbFail(t("nodo")));
     // Only counts as a sighting once we're configured: during the initial dump
     // the radio re-sends its whole contact list and we'd mark every contact as
     // "heard now" on every startup. The patch's lastHeard (epoch s) is used
@@ -186,7 +186,7 @@ function upsertNode(num: number, patch: Partial<NodeEntry>): void {
       patch.lastHeard > prev.lastHeard &&
       s.status === DeviceStatus.Configured
     ) {
-      marcarEscucha(num, patch.lastHeard * 1000).catch(dbFail("escucha"));
+      marcarEscucha(num, patch.lastHeard * 1000).catch(dbFail(t("escucha")));
     }
 
     // Distance change: a contact going from direct to 2 hops usually means a
@@ -209,7 +209,7 @@ const rutaAvisada = new Map<number, number>();
 
 function avisarCambioRuta(n: NodeEntry, antes: number): void {
   const ahora = n.hopsAway as number;
-  saveHopChange(n.num, ahora, antes).catch(dbFail("cambio de ruta"));
+  saveHopChange(n.num, ahora, antes).catch(dbFail(t("cambio de ruta")));
   const quien = n.longName || n.shortName;
   addLog("RUTA: {0} pasa de {1} a {2} saltos", quien, antes, ahora);
   if (!n.fav || !getAlertCfg().on) return;
@@ -298,7 +298,7 @@ function ingestContact(c: MeshCoreContact): number {
       routeBack: [],
       snrBack: [],
       ts: Date.now(),
-    }).catch(dbFail("ruta"));
+    }).catch(dbFail(t("ruta")));
   }
   return num;
 }
@@ -323,7 +323,7 @@ async function refreshContacts(): Promise<void> {
           const num = numFromKeyBytes(x.publicKey);
           return { num, snr: nodes.get(num)?.snr ?? 0 };
         });
-      saveNeighbors(myNodeNum, direct, Date.now()).catch(dbFail("vecinos"));
+      saveNeighbors(myNodeNum, direct, Date.now()).catch(dbFail(t("vecinos")));
     }
   } finally {
     contactsBusy = false;
@@ -353,7 +353,7 @@ function ingestMessage(msg: Message): void {
     s.messages = [...s.messages, msg];
   });
   markUnread(msg.convo);
-  saveMessage(msg).catch(dbFail("mensaje"));
+  saveMessage(msg).catch(dbFail(t("mensaje")));
   const { nodes, channels } = getSnapshot();
   const who =
     msg.from !== 0
@@ -449,7 +449,7 @@ function setMsgState(id: number, ts: number, state: Message["state"]): void {
       m.id === id && m.ts === ts ? { ...m, state } : m,
     );
   });
-  updateMessageState(id, state).catch(dbFail("estado de mensaje"));
+  updateMessageState(id, state).catch(dbFail(t("estado de mensaje")));
 }
 
 function onSendConfirmed(p: { ackCode: number; roundTrip: number }): void {
@@ -584,7 +584,7 @@ function ingestLpp(from: number, lpp: Uint8Array): void {
       const base = LPP_METRICS[entry.type] ?? `lpp${entry.type}`;
       // channel 1 is the conventional "the device itself" channel
       const metric = entry.channel <= 1 ? base : `${base}_ch${entry.channel}`;
-      saveTelemetry(from, metric, entry.value, ts).catch(dbFail("telemetría"));
+      saveTelemetry(from, metric, entry.value, ts).catch(dbFail(t("telemetría")));
       if (metric === "voltage") {
         upsertNode(from, {
           voltage: entry.value,
@@ -629,8 +629,8 @@ async function pollSelfTelemetry(): Promise<void> {
     });
     const volts = bat.batteryMilliVolts / 1000;
     const pct = liPoPercent(bat.batteryMilliVolts);
-    saveTelemetry(myNodeNum, "voltage", volts, ts).catch(dbFail("telemetría"));
-    saveTelemetry(myNodeNum, "batteryLevel", pct, ts).catch(dbFail("telemetría"));
+    saveTelemetry(myNodeNum, "voltage", volts, ts).catch(dbFail(t("telemetría")));
+    saveTelemetry(myNodeNum, "batteryLevel", pct, ts).catch(dbFail(t("telemetría")));
     upsertNode(myNodeNum, {
       voltage: volts,
       batteryLevel: pct,
@@ -650,21 +650,21 @@ async function pollSelfTelemetry(): Promise<void> {
     const r = radio as { noiseFloor: number; lastRssi: number; lastSnr: number; txAirSecs: number; rxAirSecs: number };
     const k = core as { uptimeSecs: number; queueLen: number };
     const q = pkts as { recv: number; sent: number };
-    saveTelemetry(myNodeNum, "noiseFloor", r.noiseFloor, ts).catch(dbFail("telemetría"));
+    saveTelemetry(myNodeNum, "noiseFloor", r.noiseFloor, ts).catch(dbFail(t("telemetría")));
     if (prevStats) {
       const dt = (ts - prevStats.ts) / 1000;
       if (dt > 0) {
         // air-seconds deltas → duty-cycle %, the closest MeshCore gets to
         // Meshtastic's channel utilization charts
-        saveTelemetry(myNodeNum, "airUtilTx", ((r.txAirSecs - prevStats.txAirSecs) / dt) * 100, ts).catch(dbFail("telemetría"));
-        saveTelemetry(myNodeNum, "channelUtilization", ((r.rxAirSecs - prevStats.rxAirSecs) / dt) * 100, ts).catch(dbFail("telemetría"));
-        saveTelemetry(myNodeNum, "packetsRx", q.recv - prevStats.recv, ts).catch(dbFail("telemetría"));
-        saveTelemetry(myNodeNum, "packetsTx", q.sent - prevStats.sent, ts).catch(dbFail("telemetría"));
+        saveTelemetry(myNodeNum, "airUtilTx", ((r.txAirSecs - prevStats.txAirSecs) / dt) * 100, ts).catch(dbFail(t("telemetría")));
+        saveTelemetry(myNodeNum, "channelUtilization", ((r.rxAirSecs - prevStats.rxAirSecs) / dt) * 100, ts).catch(dbFail(t("telemetría")));
+        saveTelemetry(myNodeNum, "packetsRx", q.recv - prevStats.recv, ts).catch(dbFail(t("telemetría")));
+        saveTelemetry(myNodeNum, "packetsTx", q.sent - prevStats.sent, ts).catch(dbFail(t("telemetría")));
       }
     }
     prevStats = { txAirSecs: r.txAirSecs, rxAirSecs: r.rxAirSecs, recv: q.recv, sent: q.sent, ts };
-    saveTelemetry(myNodeNum, "uptime", k.uptimeSecs, ts).catch(dbFail("telemetría"));
-    saveTelemetry(myNodeNum, "txQueue", k.queueLen, ts).catch(dbFail("telemetría"));
+    saveTelemetry(myNodeNum, "uptime", k.uptimeSecs, ts).catch(dbFail(t("telemetría")));
+    saveTelemetry(myNodeNum, "txQueue", k.queueLen, ts).catch(dbFail(t("telemetría")));
   } catch {
     // older firmware without GetStats: stop asking
     statsSupported = false;
@@ -1349,7 +1349,7 @@ export async function sendText(
     msg.from = s.myNodeNum ?? 0;
     s.messages = [...s.messages, msg];
   });
-  saveMessage(msg).catch(dbFail("mensaje"));
+  saveMessage(msg).catch(dbFail(t("mensaje")));
 
   try {
     await transmit(msg);

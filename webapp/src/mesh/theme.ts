@@ -14,12 +14,16 @@ import { useEffect, useState } from "react";
  *  costs luminance, and the point of the mode is to gain it. theme.test.ts
  *  checks every one really contrasts more. */
 export const THEMES = {
+	/* Light paper, pink ink. The brand pink (#FF4F9D) only reaches 2.8:1 against
+	   a near-white page, so text runs at a deeper tone of the same hue and the
+	   bright pink is kept for fills and the wordmark, where the type is large
+	   enough for the 3:1 rule. */
 	lilyshark: {
-		fg: "#FF4F9D",
-		hc: "#FF6BAD",
-		bg: "#171019",
-		panel: "#1D1520",
-		hcBg: "#000000",
+		fg: "#C00068",
+		hc: "#8A0049",
+		bg: "#F2E2EC",
+		panel: "#FBF3F7",
+		hcBg: "#FFFFFF",
 		tint: "hue-rotate(281deg) saturate(1.8)",
 	},
 	verde: {
@@ -90,7 +94,7 @@ export const THEME_LABELS: Record<Theme, string> = {
 
 /** Light-background themes: the map filter chain and the second color flip.
  *  Everything else derives from --fg/--bg and needs no special case. */
-const CLAROS = new Set<Theme>(["huesoinv"]);
+const CLAROS = new Set<Theme>(["lilyshark", "huesoinv"]);
 
 export function isLight(): boolean {
 	return CLAROS.has(getTheme());

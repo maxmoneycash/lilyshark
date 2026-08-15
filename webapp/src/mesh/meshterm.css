@@ -60,6 +60,43 @@
 	--warn: #9a6a00;
 	--err: #b3261e;
 	--glow: transparent;
+	/* The dark themes fade secondary text by dropping it toward black, which a
+	   light page cannot do: 55% of the ink over paper lands near 2.5:1. Both
+	   mixes are pulled back so labels and hairlines stay legible. */
+	--fg-dim: color-mix(in srgb, var(--fg) 88%, transparent);
+	--border: color-mix(in srgb, var(--fg) 42%, transparent);
+	--ink: #1a0f15;
+}
+
+/* On black, pink text is the highest-contrast thing on screen and setting the
+   whole interface in it reads as an instrument. On paper it inverts: every
+   value, every hex byte and every message becomes a pale wash that has to be
+   squinted at. So the light theme splits the two jobs — pink stays the chrome
+   (rules, titles, labels, active states, the wordmark) and the data itself is
+   set in ink. Same aesthetic, and actually readable. */
+:root.light .meshterm {
+	color: var(--ink);
+}
+:root.light .meshterm .kv .v,
+:root.light .meshterm .grid td,
+:root.light .meshterm pre,
+:root.light .meshterm code,
+:root.light .meshterm input,
+:root.light .meshterm select,
+:root.light .meshterm textarea,
+:root.light .meshterm .msg,
+:root.light .meshterm .msg-text,
+:root.light .meshterm .log-line {
+	color: var(--ink);
+}
+:root.light .meshterm input::placeholder,
+:root.light .meshterm textarea::placeholder {
+	color: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+/* Selected rows and active tabs fill with pink, so their text flips to paper. */
+:root.light .meshterm .grid tr.primary td,
+:root.light .meshterm .grid tr.primary td * {
+	color: var(--bg);
 }
 :root.light.hc .meshterm {
 	--warn: #7a5200;
@@ -827,74 +864,566 @@
 	flex-shrink: 0;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Small screens.
+/* ═════════════════════════════════════════════════════════════════════════
+   Lilyshark overrides.
 
-   The terminal layout is built for a wide window: a fixed-width sidebar beside
-   a main pane, a header that runs nav, transport, connect and clock on one
-   line, and label columns sized in pixels. None of that survives a phone, and
-   the base stylesheet carries no breakpoints at all — so everything below is
-   additive and changes nothing above 860px.
-   ───────────────────────────────────────────────────────────────────────── */
+   Everything below this line is additive to the port above: identity, the
+   light-paper contrast model, comfort sizing, the desktop app-window fit, and
+   the phone layout. One section, one order — earlier attempts left several
+   generations of overrides fighting each other, and every rule here replaced
+   that archaeology.
+   ═════════════════════════════════════════════════════════════════════════ */
 
-@media (max-width: 860px) {
-	/* Header stacks: identity on its own line, then a nav strip that scrolls
-	   sideways rather than wrapping into a ragged block. */
+/* ── Document ground ──────────────────────────────────────────────────────
+   The port styled only .meshterm and left the UA's 8px body margin alive, so
+   the whole terminal floated in an unthemed gutter and the 100dvh shell was
+   16px taller than the window. The clamp on sideways overflow lives here too:
+   overflow-x on .meshterm itself would turn #root into a scroll container and
+   break the phone's sticky header, while `clip` on the document does not. */
+html,
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--bg, #f2e2ec);
+	overflow-x: clip;
+}
+
+/* ── Identity ─────────────────────────────────────────────────────────────
+   Mark and wordmark on one line. "lily" takes the neutral extreme the theme
+   is not using; "shark" holds the brand pink. The selectors carry `.logo`
+   because the port's `.meshterm .logo span` (one element heavier) would
+   otherwise re-style both halves down to its 9px subtitle. */
+.meshterm .logo {
+	flex-direction: row;
+	align-items: center;
+	gap: 9px;
+	flex-shrink: 0;
+}
+.meshterm .logo span {
+	white-space: nowrap;
+}
+.meshterm .logo .logo-mark {
+	height: 26px;
+	width: auto;
+	display: block;
+	flex-shrink: 0;
+}
+.meshterm .logo .wordmark {
+	font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+	font-weight: 700;
+	font-size: 20px;
+	letter-spacing: -0.035em;
+	line-height: 1;
+	/* Brand pink nudged just dark enough to clear 3:1 on the paper. */
+	color: #fa2e88;
+	-webkit-user-select: none;
+	user-select: none;
+}
+.meshterm .logo .wordmark .lily {
+	font-size: inherit;
+	letter-spacing: inherit;
+	color: #fff;
+}
+:root.light .meshterm .logo .wordmark .lily {
+	color: #16090f;
+}
+
+/* ── Light-paper contrast ─────────────────────────────────────────────────
+   Additions to the light-theme block near the top of the file. The dimmed
+   ramp was a transparency of the pink, which under 12px lands below 4.5:1 on
+   paper — it becomes a solid deeper pink instead. Selection, state colours
+   and the link LED each need a value that still reads once the glow and the
+   dark ground they were designed against are gone. */
+:root.light .meshterm {
+	--fg-dim: #9c0055;
+	--ok: #0c6b3d;
+}
+.meshterm .ok {
+	color: var(--ok, var(--fg));
+}
+:root.light .meshterm .dim {
+	color: color-mix(in srgb, var(--ink) 72%, transparent);
+}
+/* A row filled with the pink selection colour flips its text to paper —
+   `tr.sel` and hover, not only `tr.primary`. */
+:root.light .meshterm table.grid tbody tr:hover td,
+:root.light .meshterm table.grid tbody tr.sel td,
+:root.light .meshterm table.grid tbody tr:hover td *,
+:root.light .meshterm table.grid tbody tr.sel td * {
+	color: var(--bg);
+}
+:root.light .meshterm .titlebar-ver {
+	opacity: 0.8;
+}
+:root.light .meshterm .flow-n {
+	opacity: 1;
+	color: var(--fg-dim);
+}
+:root.light .meshterm .node-menu-title {
+	opacity: 0.85;
+}
+:root.light .meshterm .map-hud {
+	color: var(--ink);
+	background: color-mix(in srgb, #fff 82%, transparent);
+}
+/* With --glow transparent the LED's on/off states differed only in alpha. */
+:root.light .meshterm .led.on {
+	background: var(--ok);
+	box-shadow: none;
+}
+
+/* ── Comfort ──────────────────────────────────────────────────────────────
+   The original packed a terminal into the corner of a big monitor; here each
+   screen owns the window, so the type goes up a step and panels get room. */
+.meshterm {
+	font-size: 13.5px;
+}
+.meshterm main {
+	gap: 14px;
+	padding: 14px 18px;
+}
+.meshterm .panel-title {
+	font-size: 11px;
+	letter-spacing: 1.4px;
+	padding: 11px 14px;
+	gap: 10px;
+}
+.meshterm .kv {
+	grid-template-columns: 118px minmax(0, 1fr);
+	gap: 10px 16px;
+	padding: 14px;
+	font-size: 12.5px;
+}
+.meshterm table.grid th {
+	padding: 9px 14px;
+	letter-spacing: 1.2px;
+}
+.meshterm table.grid td {
+	padding: 8px 14px;
+}
+.meshterm .panel-foot {
+	padding: 10px 14px;
+}
+
+/* The flex spacer, as a class: `span[style*="flex"]` also matched inline
+   `display: flex` and was hiding whole control groups on phones. */
+.meshterm .spacer {
+	flex: 1;
+}
+
+/* No value hangs past its panel; hashes and blob names have no spaces. */
+.meshterm .kv .v {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.meshterm .panel {
+	min-width: 0;
+}
+.meshterm pre {
+	white-space: pre;
+	overflow-x: auto;
+	max-width: 100%;
+}
+
+/* A pane that scrolls on its own on desktop and hands scrolling back to the
+   page once panes have stacked on a phone (see the mobile section). */
+.meshterm .scroll-y {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: auto;
+}
+/* A wide table gets its own sideways scroller so it never widens the page. */
+.meshterm .scroll-x {
+	overflow-x: auto;
+	max-width: 100%;
+}
+
+/* ── Desktop fit ──────────────────────────────────────────────────────────
+   The shell owns the viewport: header and footer size to content, the screen
+   between them takes exactly what is left and scrolls inside itself. */
+.meshterm .app {
+	height: 100dvh;
+	max-width: 100vw;
+	overflow: hidden;
+}
+.meshterm main {
+	min-height: 0;
+	overflow: hidden;
+}
+.meshterm main > * {
+	min-height: 0;
+	min-width: 0;
+}
+.meshterm main.fill {
+	padding: 0;
+	gap: 0;
+}
+
+/* ── Paper ────────────────────────────────────────────────────────────────
+   Pre-rendered pages in a plain scrolling column; the column is the reading
+   surface, so it centers the sheets and takes the page background. */
+.meshterm .pdf-scroll {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 14px;
+	padding: 14px 0 40px;
+}
+.meshterm .pdf-page {
+	width: min(100%, 860px);
+	height: auto;
+	background: #fff;
+	box-shadow: 0 1px 8px rgba(40, 0, 22, 0.18);
+	flex-shrink: 0;
+}
+.meshterm .pdf-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: min(100%, 860px);
+	font-size: 10.5px;
+	letter-spacing: 1.4px;
+	color: var(--fg-dim);
+	padding: 2px 2px 0;
+}
+.meshterm .pdf-toolbar a {
+	color: var(--fg);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+/* ── Prose and flow (SHELBY) ──────────────────────────────────────────────
+   The one screen that makes an argument gets a readable measure. */
+.meshterm .prose {
+	padding: 16px 18px 4px;
+	max-width: 68ch;
+	font-size: 13px;
+	line-height: 1.7;
+}
+.meshterm .prose p {
+	margin: 0 0 12px;
+}
+.meshterm .prose code {
+	border: 1px solid var(--border);
+	padding: 1px 5px;
+}
+.meshterm .flow {
+	display: grid;
+	gap: 1px;
+	background: var(--border);
+	border-bottom: 1px solid var(--border);
+}
+.meshterm .flow-step {
+	display: grid;
+	grid-template-columns: 3ch 11ch minmax(0, 1fr);
+	gap: 14px;
+	align-items: baseline;
+	padding: 12px 18px;
+	background: var(--panel);
+	font-size: 12.5px;
+	line-height: 1.6;
+}
+.meshterm .flow-n {
+	color: var(--fg);
+	opacity: 0.5;
+}
+.meshterm .flow-k {
+	color: var(--fg);
+	letter-spacing: 1.2px;
+	font-size: 11px;
+}
+:root.light .meshterm .flow-v,
+:root.light .meshterm .prose {
+	color: var(--ink);
+}
+
+/* ── Header at desktop widths ─────────────────────────────────────────────
+   The nav never compresses its tabs and never slides them off an edge. */
+.meshterm header nav {
+	min-width: 0;
+}
+.meshterm header nav > * {
+	flex-shrink: 0;
+}
+.meshterm header > select,
+.meshterm header > button {
+	flex-shrink: 0;
+}
+.meshterm .menu-btn {
+	display: none;
+}
+
+/* Between the single desktop row and the phone hamburger, the tabs take
+   their own row and wrap — a sliding strip hides half the destinations. */
+@media (min-width: 861px) and (max-width: 1200px) {
 	.meshterm header {
 		flex-wrap: wrap;
-		gap: 6px 10px;
-		padding: 6px 8px;
+		row-gap: 6px;
 	}
 	.meshterm header nav {
 		order: 3;
 		width: 100%;
-		overflow-x: auto;
-		overflow-y: hidden;
-		scrollbar-width: none;
-		scroll-snap-type: x proximity;
-		padding-bottom: 2px;
+		flex-wrap: wrap;
+		gap: 6px;
 	}
-	.meshterm header nav::-webkit-scrollbar { display: none; }
-	.meshterm header nav > * { flex: 0 0 auto; scroll-snap-align: start; }
+}
 
-	/* The clock is the first thing worth losing on a narrow screen. */
-	.meshterm .clock .uptime { display: none; }
-	.meshterm .titlebar-ver { display: none; }
-
-	/* Sidebar over main instead of beside it. */
-	.meshterm .app { flex-direction: column; }
-	.meshterm .app > aside,
-	.meshterm .app > .sidebar {
+/* ── Phone ────────────────────────────────────────────────────────────────
+   One model: the document scrolls, full stop. The desktop app-window (fixed
+   shell, panes scrolling inside) is exactly what iOS Safari is worst at —
+   nested scrollers behind a clipped shell read as "the page is stuck". Here
+   the shell unclips, every inner scroller lets go, panes stack full-width at
+   their natural height, and the header stays put by being sticky. */
+@media (max-width: 860px) {
+	.meshterm {
+		font-size: 14px;
+	}
+	.meshterm .app {
+		height: auto;
+		min-height: 100dvh;
+		overflow: visible;
+		flex-direction: column;
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+	.meshterm main,
+	.meshterm main.fill {
+		flex: 1 0 auto;
+		overflow: visible;
+	}
+	.meshterm main:not(.fill) {
+		flex-direction: column;
+		padding: 10px;
+		gap: 10px;
+	}
+	/* Inline pixel widths and `flex: 1` are desktop measurements set on the
+	   elements themselves; without !important a pane keeps `flex: 1 1 0%`,
+	   resolves its basis to zero, and disappears. */
+	.meshterm main:not(.fill) > * {
 		width: 100% !important;
 		max-width: none !important;
-		max-height: 34vh;
-		overflow-y: auto;
+		flex: 0 0 auto !important;
+	}
+	.meshterm .scroll-y {
+		flex: none;
+		overflow: visible;
+		max-height: none !important;
+	}
+	.meshterm .pdf-scroll {
+		flex: none;
+		overflow: visible;
+		gap: 8px;
+		padding: 8px 0 32px;
+	}
+	.meshterm .pdf-toolbar {
+		padding: 4px 10px 0;
+		flex-wrap: wrap;
+		row-gap: 2px;
 	}
 
-	/* Label columns in px force a horizontal scroll; let them size to content. */
-	.meshterm .kv { grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 6px 10px; padding: 10px; }
-	.meshterm .form-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; }
+	/* The titlebar is a desktop-window affectation; the header is sticky and
+	   carries the identity, so the strip above it has nothing left to say. */
+	.meshterm .titlebar {
+		display: none;
+	}
+	.meshterm header {
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		background: var(--bg);
+		flex-wrap: wrap;
+		column-gap: 8px;
+		row-gap: 6px;
+		padding: max(5px, env(safe-area-inset-top)) 8px 5px;
+	}
+	/* The spacer that pushes controls right on desktop claims an entire
+	   wrapped row here. */
+	.meshterm header > .spacer {
+		display: none;
+	}
+	.meshterm .logo > span:not(.wordmark),
+	.meshterm .logo small {
+		display: none;
+	}
+	.meshterm .logo .logo-mark {
+		height: 21px;
+	}
+	.meshterm .logo .wordmark {
+		font-size: 17px;
+	}
 
-	/* Wide tables scroll inside their panel rather than widening the page. */
-	.meshterm .panel { overflow-x: auto; }
-	.meshterm table { min-width: max-content; }
+	/* Label columns sized in px force sideways scroll; size to content. */
+	.meshterm .kv {
+		grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+		gap: 9px 14px;
+		padding: 12px;
+		font-size: 13px;
+	}
+	.meshterm .form-grid {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 6px;
+		padding: 10px;
+	}
+	.meshterm .panel-title {
+		flex-wrap: wrap;
+		row-gap: 6px;
+		padding: 10px 12px;
+		font-size: 10.5px;
+		letter-spacing: 1.2px;
+	}
+	.meshterm .panel-title > .spacer {
+		display: none;
+	}
+	.meshterm .panel-title input {
+		width: auto !important;
+		flex: 1 1 8ch;
+		min-width: 0;
+	}
 
-	/* Touch targets. The desktop build sizes controls for a mouse. */
-	.meshterm :where(button, .tb-btn, select, input) { min-height: 40px; }
-	.meshterm .chat-input input { min-height: 44px; }
+	/* Only panels that actually hold a table scroll sideways — overflow on
+	   every panel was also clipping the corner brackets drawn at -1px. */
+	.meshterm .panel:has(table) {
+		overflow-x: auto;
+	}
+	.meshterm table {
+		min-width: max-content;
+	}
 
-	/* Respect the notch and the home indicator. */
-	.meshterm .titlebar { padding-top: max(4px, env(safe-area-inset-top)); }
-	.meshterm .app { padding-bottom: env(safe-area-inset-bottom); }
+	/* Touch targets, not mouse targets. */
+	.meshterm :where(button, .tb-btn, select, input) {
+		min-height: 40px;
+	}
+	.meshterm .chat-input input {
+		min-height: 44px;
+	}
+
+	/* ── Hamburger ────────────────────────────────────────────────────────
+	   Three bars fold into a cross; the tabs come up as a full-screen sheet
+	   with a slight per-item rise. */
+	.meshterm header nav {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: center;
+		gap: 10px;
+		padding: 72px 26px 34px;
+		overflow: hidden auto;
+		overscroll-behavior: contain;
+		background: color-mix(in srgb, var(--bg) 94%, var(--fg));
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.18s ease-out;
+	}
+	.meshterm .app.menu-open header nav {
+		opacity: 1;
+		pointer-events: auto;
+	}
+	.meshterm header nav > .tab {
+		width: 100%;
+		font-size: 17px;
+		letter-spacing: 2px;
+		padding: 13px 16px;
+		text-align: center;
+		opacity: 0;
+		transform: translateY(10px);
+		transition:
+			opacity 0.22s ease-out,
+			transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+	.meshterm .app.menu-open header nav > .tab {
+		opacity: 1;
+		transform: none;
+		transition-delay: calc(var(--i, 0) * 28ms);
+	}
+	.meshterm .menu-btn {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 5px;
+		width: 46px;
+		min-height: 40px;
+		padding: 0 12px;
+		margin-left: auto;
+		position: relative;
+		z-index: 61;
+		background: transparent;
+	}
+	.meshterm .menu-btn span {
+		display: block;
+		height: 2px;
+		width: 100%;
+		background: var(--fg);
+		transition:
+			transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+			opacity 0.15s ease-out;
+	}
+	.meshterm .app.menu-open .menu-btn span:nth-child(1) {
+		transform: translateY(7px) rotate(45deg);
+	}
+	.meshterm .app.menu-open .menu-btn span:nth-child(2) {
+		opacity: 0;
+	}
+	.meshterm .app.menu-open .menu-btn span:nth-child(3) {
+		transform: translateY(-7px) rotate(-45deg);
+	}
+
+	/* Prose and flow: the label sits above its sentence, not beside it. */
+	.meshterm .flow-step {
+		grid-template-columns: 3ch minmax(0, 1fr);
+		gap: 4px 12px;
+		padding: 12px 14px;
+	}
+	.meshterm .flow-v {
+		grid-column: 2;
+	}
+	.meshterm .prose {
+		padding: 14px;
+		font-size: 13.5px;
+	}
+}
+
+/* Sheet open: freeze the document behind it without resizing the shell —
+   shrinking .app to 100dvh was zeroing the scroll position on every open. */
+body:has(.meshterm .app.menu-open) {
+	overflow: hidden;
+}
+
+@media (max-width: 560px) {
+	/* The link state is carried by the LED alone at this width. */
+	.meshterm .conn-pill span:not(.led) {
+		display: none;
+	}
+	.meshterm .conn-pill {
+		padding: 0 10px;
+	}
+	.meshterm header select,
+	.meshterm header .primary {
+		font-size: 11px;
+		padding: 0 10px;
+	}
 }
 
 @media (max-width: 480px) {
-	.meshterm { font-size: 12px; }
-	.meshterm .logo span { display: none; }   /* keep the wordmark, drop the tagline */
-	.meshterm .panel-actions { flex-wrap: wrap; gap: 4px; }
-	.meshterm .app > aside,
-	.meshterm .app > .sidebar { max-height: 28vh; }
+	.meshterm footer {
+		font-size: 10px;
+		gap: 10px;
+	}
+	.meshterm .panel-actions {
+		flex-wrap: wrap;
+		gap: 4px;
+	}
 }
 
-/* The page itself never scrolls sideways, whatever a panel does inside it. */
-.meshterm { overflow-x: hidden; }
+@media (prefers-reduced-motion: reduce) {
+	.meshterm header nav,
+	.meshterm header nav > .tab,
+	.meshterm .menu-btn span {
+		transition: none;
+	}
+}

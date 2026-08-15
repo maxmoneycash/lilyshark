@@ -32,6 +32,10 @@ import {
 // and the copied value can differ (coords show 4 decimals, copy full precision).
 function Copy({ text, children }: { text: string; children: React.ReactNode }) {
 	const [done, setDone] = useState(false);
+	// the flash outlives a fast unmount otherwise, and setState on a gone
+	// component is a leak the console will not let you forget
+	const flash = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	useEffect(() => () => clearTimeout(flash.current), []);
 	return (
 		<span
 			title={t("Clic para copiar")}
@@ -40,7 +44,8 @@ function Copy({ text, children }: { text: string; children: React.ReactNode }) {
 				navigator.clipboard?.writeText(text).then(
 					() => {
 						setDone(true);
-						setTimeout(() => setDone(false), 1200);
+						clearTimeout(flash.current);
+						flash.current = setTimeout(() => setDone(false), 1200);
 					},
 					() => {},
 				);
@@ -209,6 +214,8 @@ function Detail(props: {
 	// "" | "waiting" | "ok" | "timeout" | error message
 	const [posState, setPosState] = useState("");
 	const [confirmDel, setConfirmDel] = useState(false);
+	// the 3 s disarm, so a close while armed doesn't setState on a dead panel
+	const delTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	// result line of the last contact action (reset path / share)
 	const [adminMsg, setAdminMsg] = useState("");
 	const posTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -260,6 +267,7 @@ function Detail(props: {
 		() => () => {
 			clearTimeout(timer.current);
 			clearTimeout(posTimer.current);
+			clearTimeout(delTimer.current);
 		},
 		[],
 	);
@@ -284,6 +292,7 @@ function Detail(props: {
 		setShowHistory(false);
 		clearTimeout(timer.current);
 		clearTimeout(posTimer.current);
+		clearTimeout(delTimer.current);
 	}, [n.num]);
 
 	const onResetPath = () => {
@@ -628,7 +637,11 @@ function Detail(props: {
 								props.onClose();
 							} else {
 								setConfirmDel(true);
-								setTimeout(() => setConfirmDel(false), 3000);
+								clearTimeout(delTimer.current);
+								delTimer.current = setTimeout(
+									() => setConfirmDel(false),
+									3000,
+								);
 							}
 						}}
 					>
@@ -721,11 +734,18 @@ export default function Nodes({
 }) {
 	const s = useSyncExternalStore(subscribe, getSnapshot);
 	const [selected, setSelected] = useState<number | undefined>(initialSelected);
+	const rootRef = useRef<HTMLElement>(null);
 
-	// When arriving from the map with a preselected node, scroll its row into view
+	// When arriving from the map with a preselected node, scroll its row into
+	// view. Scoped to this screen's own table — a document-wide query would find
+	// whatever other screen happened to be mounted — and only when there is
+	// something to scroll to, so a plain visit to NODOS never moves the page.
 	useEffect(() => {
-		document.querySelector("tbody tr.sel")?.scrollIntoView({ block: "center" });
-	}, []);
+		if (initialSelected === undefined) return;
+		rootRef.current
+			?.querySelector("tbody tr.sel")
+			?.scrollIntoView({ block: "nearest" });
+	}, [initialSelected]);
 	const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({
 		key: "visto",
 		dir: -1,
@@ -755,7 +775,7 @@ export default function Nodes({
 		s.nodes.get(num)?.shortName ?? `!${num.toString(16)}`;
 
 	return (
-		<main>
+		<main ref={rootRef}>
 			<div className="panel" style={{ flex: 1, minWidth: 0 }}>
 				<div className="panel-title">
 					<span>
@@ -769,7 +789,7 @@ export default function Nodes({
 						style={{ width: 180, fontSize: 11 }}
 					/>
 				</div>
-				<div style={{ overflowY: "auto", flex: 1 }}>
+				<div className="scroll-y">
 					<table className="grid">
 						<thead>
 							<tr>
@@ -806,7 +826,16 @@ export default function Nodes({
 										setSelected(selected === n.num ? undefined : n.num)
 									}
 								>
-									<td style={n.ignored ? { opacity: 0.4 } : undefined}>
+									{/* ignored: struck through as well as dimmed. Opacity alone
+									    was both unreadable on the light theme and the only thing
+									    carrying the state. */}
+									<td
+										style={
+											n.ignored
+												? { opacity: 0.55, textDecoration: "line-through" }
+												: undefined
+										}
+									>
 										{n.fav && <span className="warn">★ </span>}!
 										{n.num.toString(16)} · {n.longName}
 										{n.num === s.myNodeNum && ` (${t("YO")})`}
@@ -859,7 +888,7 @@ export default function Nodes({
 				</div>
 				<div className="panel-foot">
 					<span>{t("{0} NODOS EN BD", all.length)}</span>
-					<span style={{ flex: 1 }} />
+					<span className="spacer" />
 					<span>
 						SNR: <span className="ok">≥5 dB OK</span> ·{" "}
 						<span className="warn">{t("0–5 dB REG")}</span> ·{" "}

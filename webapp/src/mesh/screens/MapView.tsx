@@ -1,10 +1,11 @@
 import L from "leaflet";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import "leaflet/dist/leaflet.css";
+import { DEMO_CENTER } from "../demo";
 import { ago, asciiBattery, fechaHora, useHourTick } from "../fmt";
 import { t, useLangTick } from "../i18n";
 import { deleteWaypoint, sendWaypoint } from "../radio";
-import { addLog, getSnapshot, subscribe } from "../store";
+import { getSnapshot, subscribe } from "../store";
 import { accent, fg, useThemeTick } from "../theme";
 
 interface Draft {
@@ -33,17 +34,23 @@ export default function MapView({
 	const mapRef = useRef<L.Map | null>(null);
 	const layerRef = useRef<L.LayerGroup | null>(null);
 	const fittedRef = useRef(false);
-	const loggedRef = useRef(-1);
 	const focusedRef = useRef<number | undefined>(undefined);
 	const [draft, setDraft] = useState<Draft>();
 	const [wpMsg, setWpMsg] = useState("");
 	const [filter, setFilter] = useState<"all" | "fav" | "active">("all");
+	// The parent passes a fresh arrow on every render; going through a ref keeps
+	// it out of the marker effect's deps without ever calling a stale one.
+	const openNodeRef = useRef(onOpenNode);
+	openNodeRef.current = onOpenNode;
 
 	useEffect(() => {
 		if (!divRef.current || mapRef.current) return;
+		// Opens on Palo Alto, where the demo mesh lives. Real nodes override this
+		// immediately via the fitBounds pass below, so this only decides what an
+		// empty map looks like.
 		const map = L.map(divRef.current, { zoomControl: true }).setView(
-			[40.4, -3.7],
-			5,
+			[DEMO_CENTER.lat, DEMO_CENTER.lon],
+			12,
 		);
 		L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 			attribution: "© OpenStreetMap",
@@ -102,14 +109,14 @@ export default function MapView({
 
 		const nodeRows = (n: (typeof positioned)[number]) =>
 			`<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 2px;">` +
-			`<span style="font-size:10px;letter-spacing:2px;opacity:.6;">${t("NODO")} // ${n.shortName}</span>` +
+			`<span style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("NODO")} // ${n.shortName}</span>` +
 			`<button data-num="${n.num}" style="font-size:10px;padding:0 6px;">[ +INFO ]</button>` +
 			`</div>` +
 			`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;">` +
-			`<span style="opacity:.6;">ID</span><span>!${n.num.toString(16)}</span>` +
-			`<span style="opacity:.6;">SNR</span><span>${n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : "—"}</span>` +
-			`<span style="opacity:.6;">BAT</span><span>${asciiBattery(n.batteryLevel)}</span>` +
-			`<span style="opacity:.6;">${t("VISTO")}</span><span title="${fechaHora(n.lastHeard * 1000)}">${t("hace {0}", ago(n.lastHeard))}</span>` +
+			`<span style="opacity:.85;">ID</span><span>!${n.num.toString(16)}</span>` +
+			`<span style="opacity:.85;">SNR</span><span>${n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : "—"}</span>` +
+			`<span style="opacity:.85;">BAT</span><span>${asciiBattery(n.batteryLevel)}</span>` +
+			`<span style="opacity:.85;">${t("VISTO")}</span><span title="${fechaHora(n.lastHeard * 1000)}">${t("hace {0}", ago(n.lastHeard))}</span>` +
 			`</div>`;
 
 		for (const group of byCoord.values()) {
@@ -124,12 +131,12 @@ export default function MapView({
 			// Popup built in the DOM (not a string) so the [+INFO] onclick can be attached
 			const box = document.createElement("div");
 			box.innerHTML =
-				`<div style="font-size:10px;letter-spacing:2px;opacity:.6;">POS ${lat.toFixed(4)}N ${lon.toFixed(4)}E · ${group.length} ${t("NODO")}${group.length > 1 ? "S" : ""}</div>` +
+				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">POS ${lat.toFixed(4)}N ${lon.toFixed(4)}E · ${group.length} ${t("NODO")}${group.length > 1 ? "S" : ""}</div>` +
 				group.map(nodeRows).join("");
 			for (const btn of box.querySelectorAll<HTMLButtonElement>(
 				"button[data-num]",
 			)) {
-				btn.onclick = () => onOpenNode(Number(btn.dataset.num));
+				btn.onclick = () => openNodeRef.current(Number(btn.dataset.num));
 			}
 			const marker = L.circleMarker([lat, lon], {
 				radius: group.length > 1 ? 8 : 6,
@@ -168,12 +175,12 @@ export default function MapView({
 			const emoji = w.icon ? String.fromCodePoint(w.icon) : "📍";
 			const box = document.createElement("div");
 			box.innerHTML =
-				`<div style="font-size:10px;letter-spacing:2px;opacity:.6;">WAYPOINT · ${w.lat.toFixed(4)}N ${w.lon.toFixed(4)}E</div>` +
+				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">WAYPOINT · ${w.lat.toFixed(4)}N ${w.lon.toFixed(4)}E</div>` +
 				`<div style="font-weight:700;margin:4px 0;">${emoji} ${w.name || t("(sin nombre)")}</div>` +
 				(w.description
 					? `<div style="margin-bottom:4px;">${w.description}</div>`
 					: "") +
-				`<div style="opacity:.6;font-size:11px;">${t("de {0}", getSnapshot().nodes.get(w.from)?.shortName ?? w.from.toString(16))}` +
+				`<div style="opacity:.85;font-size:11px;">${t("de {0}", getSnapshot().nodes.get(w.from)?.shortName ?? w.from.toString(16))}` +
 				(w.expire
 					? ` · ${t("caduca {0}", fechaHora(w.expire * 1000))}`
 					: ` · ${t("sin caducidad")}`) +
@@ -225,17 +232,21 @@ export default function MapView({
 			);
 			fittedRef.current = true;
 		}
-
-		// Diagnostics: what the map is drawing (only when the count changes)
-		if (positioned.length !== loggedRef.current) {
-			loggedRef.current = positioned.length;
-			addLog(
-				"MAPA: {0} nodos en {1} puntos (coords compartidas por precisión reducida)",
-				positioned.length,
-				byCoord.size,
-			);
-		}
-	}, [s, tema, horaFmt, idioma, filter, focusNode]);
+		// What the map is drawing is stated in the HUD below rather than logged:
+		// writing to the store from inside a commit re-entered this same effect.
+		// Only the slices this effect actually reads: keying it on the whole
+		// snapshot rebuilt every marker on every packet, which closed any popup
+		// the reader had open.
+	}, [
+		s.nodes,
+		s.waypoints,
+		s.myNodeNum,
+		tema,
+		horaFmt,
+		idioma,
+		filter,
+		focusNode,
+	]);
 
 	// A focused node must be visible: drop any active filter when one arrives
 	useEffect(() => {
@@ -256,6 +267,21 @@ export default function MapView({
 			Math.abs(n.lat) <= 0.1 &&
 			Math.abs(n.lon) <= 0.1,
 	).length;
+
+	// What the marker pass just drew, stated on the map itself. The firmware
+	// reduces position precision, so several nodes routinely land on one point;
+	// showing both numbers is the only way to read a thin map correctly.
+	const nowS = Date.now() / 1000;
+	const drawn = all.filter(
+		(n) =>
+			n.lat !== undefined &&
+			n.lon !== undefined &&
+			(Math.abs(n.lat) > 0.1 || Math.abs(n.lon) > 0.1) &&
+			(filter === "all" ||
+				(filter === "fav" && n.fav) ||
+				(filter === "active" && nowS - n.lastHeard < 3600)),
+	);
+	const puntos = new Set(drawn.map((n) => `${n.lat},${n.lon}`)).size;
 
 	return (
 		<main>
@@ -290,7 +316,7 @@ export default function MapView({
 				<div className="map-wrap">
 					<div ref={divRef} style={{ height: "100%" }} />
 					<div className="map-hud" style={{ right: 10, top: 8 }}>
-						TILES © OSM
+						{t("{0} NODOS · {1} PUNTOS", drawn.length, puntos)} · TILES © OSM
 					</div>
 					<div className="map-hud" style={{ left: 10, bottom: 10 }}>
 						{wpMsg || t("CLIC DERECHO = NUEVO WAYPOINT")}

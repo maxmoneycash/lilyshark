@@ -170,12 +170,15 @@ export default function Mesh() {
 	const long = (num: number) =>
 		s.nodes.get(num)?.longName ?? `!${num.toString(16)}`;
 
-	// width/opacity by SNR: a strong link is a bolder line
+	// Width and opacity by SNR: a strong link is a bolder line. The floor is
+	// 0.5 — below that a hairline over the pale theme's background is simply
+	// not there, so the weak links read as missing rather than weak. Width is
+	// what still separates the four bands.
 	const edgeStyle = (snr?: number) => {
-		if (snr === undefined) return { w: 1, o: 0.25 };
+		if (snr === undefined) return { w: 1, o: 0.5 };
 		if (snr >= 5) return { w: 2, o: 0.85 };
-		if (snr >= 0) return { w: 1.5, o: 0.55 };
-		return { w: 1, o: 0.35 };
+		if (snr >= 0) return { w: 1.5, o: 0.75 };
+		return { w: 1, o: 0.7 };
 	};
 
 	const selEdges =
@@ -422,8 +425,15 @@ export default function Mesh() {
 						)}
 					</p>
 				) : (
-					<div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-						<div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+					<div className="scroll-y" style={{ display: "flex", flexWrap: "wrap" }}>
+						<div
+							style={{
+								flex: "999 1 320px",
+								minWidth: 0,
+								minHeight: 260,
+								overflow: "hidden",
+							}}
+						>
 							<svg
 								viewBox={`0 0 ${W} ${H}`}
 								style={{ width: "100%", height: "100%" }}
@@ -498,7 +508,7 @@ export default function Mesh() {
 						{sel !== undefined && (
 							<div
 								className="panel hot"
-								style={{ width: 260, flexShrink: 0, fontSize: 12 }}
+								style={{ flex: "1 1 260px", minWidth: 240, fontSize: 12 }}
 							>
 								<div className="panel-title">
 									<span>{short(sel)}</span>
@@ -558,7 +568,7 @@ export default function Mesh() {
 
 				<div className="panel-foot">
 					<span>{t("LÍNEA CONTINUA = VECINO DIRECTO")}</span>
-					<span style={{ flex: 1 }} />
+					<span className="spacer" />
 					{ids.length > 45 && (
 						<span className="dim">
 							{t("CLIC EN UN NODO PARA VER NOMBRES")} ·{" "}

@@ -32,9 +32,28 @@ Lilyshark is firmware plus a web analyzer that reads what the firmware records.
 | | Where | What it does |
 | --- | --- | --- |
 | **Firmware** | `src/`, `include/` | Captures LoRa frames off the SX1262 with their radio measurements. Writes `.lscap` and LoRaTap PCAP to microSD. |
-| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.vercel.app](https://lilyshark.vercel.app)** | A terminal-style web app (ported from [meshcore-terminal](https://github.com/maxmoneycash/meshcore-terminal), MIT, recolored Lilyshark pink): the **TRÁFICO** screen opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, capture statistics, inline Shelby-pointer decode — and CHAT/NODOS/MAPA/MALLA/TELEMETRÍA drive a real radio over USB or Bluetooth. Also indexes the Shelby network and ships the whitepaper. |
+| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app (ported from [meshcore-terminal](https://github.com/maxmoneycash/meshcore-terminal), MIT, recolored Lilyshark pink): the **TRAFFIC** screen opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, capture statistics, inline Shelby-pointer decode — the **SHELBY** screen shows the off-grid storage design with airtime math measured from the sample capture, and CHAT/NODES/MAP/MESH/TELEMETRY drive a real radio over USB or Bluetooth. Without a radio attached, the app seeds a demo mesh around Palo Alto so every screen shows live-shaped data. |
 
-Try it without a radio: open the app, press **Sample** on the TRÁFICO screen, and select frame 9 — it carries a Shelby pointer.
+Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAMPLE** on the TRAFFIC screen, and select frame 9 — it carries a Shelby pointer, decoded inline.
+
+<table>
+  <tr>
+    <td width="50%"><img src="design/previews/webapp-traffic.png" alt="TRAFFIC screen: .lscap frame list with RF metadata and a decoded Shelby pointer"></td>
+    <td width="50%"><img src="design/previews/webapp-shelby.png" alt="SHELBY screen: the off-grid pointer design with measured airtime math"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>TRAFFIC — the analyzer, frame 9 carrying a Shelby pointer</sub></td>
+    <td align="center"><sub>SHELBY — why an 82-byte pointer, with airtime measured from the capture</sub></td>
+  </tr>
+  <tr>
+    <td><img src="design/previews/webapp-map.png" alt="MAP screen: mesh nodes across Palo Alto"></td>
+    <td><img src="design/previews/webapp-mobile.png" alt="The analyzer on a phone with the hamburger nav"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>MAP — the demo mesh across Palo Alto</sub></td>
+    <td align="center"><sub>The same instrument on a phone</sub></td>
+  </tr>
+</table>
 
 ## Shelby: storage for captures, and a pointer that fits one LoRa frame
 
@@ -447,7 +466,7 @@ src/shelby/                   Shelby pointer encode, decode, and in-frame detect
 webapp/                       Terminal-style web app: analyzer, mesh client, Shelby explorer (Vite + React)
 webapp/src/lib/lscap.ts       .lscap and Shelby-pointer readers, matching the firmware
 webapp/src/mesh/              meshcore-terminal port: radio link, store, screens, theme
-webapp/src/mesh/screens/      Terminal screens: TRÁFICO (analyzer), SHELBY, WHITEPAPER, mesh client
+webapp/src/mesh/screens/      Terminal screens: TRAFFIC (analyzer), SHELBY, PAPER, mesh client
 samples/                      Deterministic demo capture with a Shelby pointer at sequence 9
 src/ui/                       Shared packet labels and UI admission rules
 src/sim_main.cpp              Shared LVGL screens plus simulator and T-Deck shells

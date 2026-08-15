@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   findShelbyPointer,
   hasField,
@@ -12,15 +12,19 @@ import {
 } from '../lib/lscap';
 
 /**
- * Traffic — the analyzer. Opens a .lscap capture written by the T-Deck firmware,
- * locally or by Shelby blob name, and reads it the way a protocol analyzer does:
- * frames on top, the selected frame's radio measurements and bytes below.
+ * TRAFFIC — the analyzer. Opens a .lscap capture written by the T-Deck
+ * firmware, either from disk or by Shelby blob name.
+ *
+ * Laid out the way the rest of the terminal is: a `main` holding a list pane
+ * and a detail pane, each scrolling inside itself on desktop and stacking into
+ * one scrolling column on a phone. `main` is the element the shell gives its
+ * spare height to, so it has to be the root here.
  */
 
 const fmtFreq = (hz: number) =>
   hz >= 1_000_000 ? `${(hz / 1_000_000).toFixed(3)} MHz` : `${(hz / 1000).toFixed(1)} kHz`;
 
-const crcClass = (c: LscapFrame['crc']) => (c === 'valid' ? 'ok' : c === 'invalid' ? 'bad' : 'dim');
+const crcClass = (c: LscapFrame['crc']) => (c === 'valid' ? 'ok' : c === 'invalid' ? 'err' : 'dim');
 
 export function TrafficTab() {
   const [capture, setCapture] = useState<LscapCapture | null>(null);
@@ -34,152 +38,198 @@ export function TrafficTab() {
   const load = (buf: ArrayBuffer, from: string) => {
     try {
       const c = parseLscap(buf);
-      setCapture(c); setName(from); setSelected(0);
-      setError(c.trailingBytes > 0
-        ? `${c.trailingBytes} trailing byte(s) were not a complete record — the capture may have been cut mid-flush.`
-        : null);
+      setCapture(c);
+      setName(from);
+      // Land on the most interesting frame: the first one carrying a Shelby
+      // pointer, so the decoded pointer detail is on screen from the start.
+      const ptrIdx = c.frames.findIndex((fr) => findShelbyPointer(fr.bytes));
+      setSelected(ptrIdx >= 0 ? ptrIdx : 0);
+      setError(
+        c.trailingBytes > 0
+          ? `${c.trailingBytes} trailing byte(s) were not a complete record`
+          : null,
+      );
     } catch (e) {
       setCapture(null);
-      setError(e instanceof LscapParseError ? e.message : 'That file is not a .lscap capture');
+      setError(e instanceof LscapParseError ? e.message : 'not a .lscap capture');
     }
   };
 
   const openFile = async (f: File) => {
     setBusy(true);
-    try { load(await f.arrayBuffer(), f.name); } finally { setBusy(false); }
+    try {
+      load(await f.arrayBuffer(), f.name);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const fetchBlob = async () => {
-    const n = blob.trim(); if (!n) return;
-    setBusy(true); setError(null);
+    const n = blob.trim();
+    if (!n) return;
+    setBusy(true);
+    setError(null);
     try {
       const res = await fetch(`/api/share/view/${encodeURIComponent(n)}`);
-      if (!res.ok) throw new Error(`Shelby returned HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`SHELBY HTTP ${res.status}`);
       load(await res.arrayBuffer(), n);
     } catch (e) {
       setCapture(null);
-      setError(e instanceof Error ? e.message : 'Could not fetch that blob');
-    } finally { setBusy(false); }
+      setError(e instanceof Error ? e.message : 'fetch failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  /** The bundled demo capture: 24 frames of LongFast traffic with a Shelby
-      pointer at sequence 9. No device, no upload — always works. */
+  /** Bundled demo capture: 24 frames with a Shelby pointer at sequence 9. */
   const openSample = async () => {
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       const res = await fetch('/sample-mesh-traffic.lscap');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       load(await res.arrayBuffer(), 'sample-mesh-traffic.lscap');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load the sample capture');
-    } finally { setBusy(false); }
+      setError(e instanceof Error ? e.message : 'sample unavailable');
+    } finally {
+      setBusy(false);
+    }
   };
+
+  // The bundled capture opens itself: an analyzer that lands on an empty panel
+  // shows nothing about what it does, and the sample costs one small fetch.
+  // Anything the user opens afterwards replaces it as usual.
+  useEffect(() => {
+    void openSample();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const frames = capture?.frames ?? [];
   const stats = useMemo(() => summarize(frames), [frames]);
-  // Scan every payload once: a pointer rides behind whatever protocol header
-  // enclosed it, so any frame may carry one.
+  // A pointer rides behind whatever protocol header enclosed it, so every
+  // payload is scanned once rather than only at a fixed offset.
   const pointers = useMemo(() => frames.map((f) => findShelbyPointer(f.bytes)), [frames]);
   const t0 = frames.length ? frames[0].timestampUs : 0n;
   const f = frames[selected];
   const ptr = f ? pointers[selected] : null;
 
   return (
-    <div className="ls-stack">
-      {/* ── Source ─────────────────────────────────────────────────── */}
-      <div box-="round">
-        <div className="ls-bar">
-          <span is-="badge" variant-="background2">CAPTURE</span>
-          <button variant-="accent" onClick={() => fileRef.current?.click()} disabled={busy}>
-            Open .lscap
+    <main>
+      <div className="panel" style={{ flex: 1 }}>
+        <div className="panel-title">
+          PANEL // TRAFFIC{name ? ` · ${name}` : ''}
+          <span className="spacer" />
+          <button onClick={() => fileRef.current?.click()} disabled={busy}>
+            OPEN
           </button>
-          <button variant-="background1" onClick={() => void openSample()} disabled={busy}>
-            Sample
+          <button onClick={() => void openSample()} disabled={busy}>
+            SAMPLE
           </button>
-          <input ref={fileRef} type="file" accept=".lscap,application/octet-stream" hidden
-            onChange={(e) => { const x = e.target.files?.[0]; if (x) void openFile(x); }} />
-          <input is-="input" placeholder="…or a Shelby blob name" value={blob}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".lscap,application/octet-stream"
+            hidden
+            onChange={(e) => {
+              const x = e.target.files?.[0];
+              if (x) void openFile(x);
+            }}
+          />
+          <input
+            placeholder="shelby blob name_"
+            value={blob}
+            style={{ width: 160 }}
             onChange={(e) => setBlob(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void fetchBlob()} />
-          <button variant-="background1" onClick={() => void fetchBlob()} disabled={busy || !blob.trim()}>
-            Fetch
+            onKeyDown={(e) => e.key === 'Enter' && void fetchBlob()}
+          />
+          <button onClick={() => void fetchBlob()} disabled={busy || !blob.trim()}>
+            FETCH
           </button>
-          {name && <span className="ls-muted">{name}</span>}
         </div>
 
-        {error && (
-          <div className="ls-pad">
-            <span className="bad">{error}</span>
+        {error && <div className="panel-foot err">{error}</div>}
+
+        {!capture && (
+          <div className="kv">
+            <span className="k">CAPTURE</span>
+            <span className="v dim">
+              {busy
+                ? 'reading…'
+                : 'none open. The T-Deck writes .lscap to microSD — load the bundled sample to read 24 frames of LongFast traffic, one of them carrying a Shelby pointer.'}
+            </span>
           </div>
         )}
 
-        {!capture && !busy && !error && (
-          <div className="ls-hero">
-            <img className="ls-device" src="/lilyshark-device.png"
-                 alt="A LILYGO T-Deck running Lilyshark, showing a live frame feed" />
-            <div>
-              <h1>Read what is on the air</h1>
-              <p>
-                Lilyshark turns a LILYGO T-Deck into a handheld LoRa analyzer. It captures
-                Meshtastic, MeshCore, and Reticulum frames with their radio measurements and
-                writes them to microSD as <code>.lscap</code>.
-              </p>
-              <div className="ls-actions">
-                <button variant-="accent" onClick={() => void openSample()} disabled={busy}>
-                  Open a sample capture
-                </button>
-                <button variant-="background1" onClick={() => fileRef.current?.click()} disabled={busy}>
-                  Open your own
-                </button>
-              </div>
+        {capture && (
+          <>
+            <div className="kv">
+              <span className="k">FRAMES</span>
+              <span className="v">{stats.frames}</span>
+              <span className="k">PAYLOAD</span>
+              <span className="v">{stats.bytes.toLocaleString()} B</span>
+              <span className="k">CRC</span>
+              <span className="v">
+                <span className="ok">{stats.crcValid} OK</span>
+                {' · '}
+                <span className={stats.crcInvalid ? 'err' : 'dim'}>{stats.crcInvalid} BAD</span>
+              </span>
+              <span className="k">BEST SNR</span>
+              <span className="v">{stats.bestSnrDb?.toFixed(1) ?? '—'} dB</span>
+              <span className="k">MEDIAN RSSI</span>
+              <span className="v">{stats.medianRssiDbm?.toFixed(1) ?? '—'} dBm</span>
+              <span className="k">AIRTIME</span>
+              <span className="v">{stats.airtimeMs.toFixed(0)} ms</span>
+              <span className="k">SHELBY PTRS</span>
+              <span className={pointers.some(Boolean) ? 'v ok' : 'v dim'}>
+                {pointers.filter(Boolean).length}
+              </span>
             </div>
-          </div>
-        )}
-      </div>
 
-      {capture && (
-        <>
-          {/* ── Readouts ─────────────────────────────────────────── */}
-          <dl className="ls-readouts">
-            <div className="ls-readout"><dt>Frames</dt><dd>{stats.frames.toLocaleString()}</dd></div>
-            <div className="ls-readout"><dt>Payload</dt><dd>{stats.bytes.toLocaleString()}<span> B</span></dd></div>
-            <div className="ls-readout"><dt>CRC</dt>
-              <dd>
-                <span className="ok">{stats.crcValid}</span>
-                <span className="dim"> / </span>
-                <span className={stats.crcInvalid ? 'bad' : 'dim'}>{stats.crcInvalid}</span>
-              </dd>
-            </div>
-            <div className="ls-readout"><dt>Best SNR</dt><dd>{stats.bestSnrDb?.toFixed(1) ?? '—'}<span> dB</span></dd></div>
-            <div className="ls-readout"><dt>Median RSSI</dt><dd>{stats.medianRssiDbm?.toFixed(1) ?? '—'}<span> dBm</span></dd></div>
-            <div className="ls-readout"><dt>Airtime</dt><dd>{stats.airtimeMs.toFixed(0)}<span> ms</span></dd></div>
-            <div className="ls-readout"><dt>Shelby pointers</dt>
-              <dd className={pointers.some(Boolean) ? 'ok' : undefined}>{pointers.filter(Boolean).length}</dd></div>
-          </dl>
-
-          {/* ── Frames ───────────────────────────────────────────── */}
-          <div box-="round">
-            <div className="ls-tablewrap ls-scroll">
-              <table>
+            <div className="scroll-y">
+              <div className="scroll-x">
+              <table className="grid">
                 <thead>
                   <tr>
-                    <th>#</th><th>Time</th><th>Dir</th><th>Len</th>
-                    <th>Frequency</th><th>SF/CR</th><th>RSSI</th><th>SNR</th><th>CRC</th>
+                    <th>#</th>
+                    <th>TIME</th>
+                    <th>DIR</th>
+                    <th>LEN</th>
+                    <th>FREQUENCY</th>
+                    <th>SF/CR</th>
+                    <th>RSSI</th>
+                    <th>SNR</th>
+                    <th>CRC</th>
                   </tr>
                 </thead>
                 <tbody>
                   {frames.map((fr, i) => (
-                    <tr key={i} aria-selected={i === selected} onClick={() => setSelected(i)}
-                        tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setSelected(i)}>
+                    <tr
+                      key={i}
+                      className={i === selected ? 'sel' : undefined}
+                      onClick={() => setSelected(i)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <td>
                         {Number(fr.sequence)}
-                        {pointers[i] && <span className="ok" title="Carries a Shelby pointer"> ◆</span>}
+                        {pointers[i] && (
+                          <span className="ok" title="carries a Shelby pointer">
+                            {' '}
+                            ◆
+                          </span>
+                        )}
                       </td>
                       <td>{(Number(fr.timestampUs - t0) / 1e6).toFixed(3)}</td>
                       <td>{fr.direction.toUpperCase()}</td>
-                      <td>{fr.capturedLength}{fr.truncated && <span className="warn">*</span>}</td>
-                      <td>{hasField(fr, RF_FIELD.frequency) ? fmtFreq(fr.centerFrequencyHz) : '—'}</td>
-                      <td>{fr.spreadingFactor}/{fr.codingRateDenominator}</td>
+                      <td>
+                        {fr.capturedLength}
+                        {fr.truncated && <span className="warn">*</span>}
+                      </td>
+                      <td>
+                        {hasField(fr, RF_FIELD.frequency) ? fmtFreq(fr.centerFrequencyHz) : '—'}
+                      </td>
+                      <td>
+                        {fr.spreadingFactor}/{fr.codingRateDenominator}
+                      </td>
                       <td>{hasField(fr, RF_FIELD.rssi) ? fr.rssiDbm.toFixed(1) : '—'}</td>
                       <td>{hasField(fr, RF_FIELD.snr) ? fr.snrDb.toFixed(1) : '—'}</td>
                       <td className={crcClass(fr.crc)}>{fr.crc}</td>
@@ -187,54 +237,83 @@ export function TrafficTab() {
                   ))}
                 </tbody>
               </table>
+              </div>
+            </div>
+
+            <div className="panel-foot">
+              {frames.length} FRAMES · {pointers.filter(Boolean).length} SHELBY POINTER(S)
+            </div>
+          </>
+        )}
+      </div>
+
+      {f && (
+        <div className="panel" style={{ width: 360, flexShrink: 0 }}>
+          <div className="panel-title">FRAME {Number(f.sequence)}</div>
+
+          <div className="scroll-y">
+            <div className="kv">
+              <span className="k">MODULATION</span>
+              <span className="v">{f.modulation.toUpperCase()}</span>
+              <span className="k">CAPTURED</span>
+              <span className="v">
+                {f.capturedLength} / {f.originalLength} B
+              </span>
+              <span className="k">FREQUENCY</span>
+              <span className="v">
+                {hasField(f, RF_FIELD.frequency) ? fmtFreq(f.centerFrequencyHz) : 'n/r'}
+              </span>
+              <span className="k">BANDWIDTH</span>
+              <span className="v">
+                {hasField(f, RF_FIELD.bandwidth) ? fmtFreq(f.bandwidthHz) : 'n/r'}
+              </span>
+              <span className="k">SF / CR</span>
+              <span className="v">
+                SF{f.spreadingFactor} · 4/{f.codingRateDenominator}
+              </span>
+              <span className="k">RSSI</span>
+              <span className="v">
+                {hasField(f, RF_FIELD.rssi) ? `${f.rssiDbm.toFixed(1)} dBm` : 'n/r'}
+              </span>
+              <span className="k">SNR</span>
+              <span className="v">
+                {hasField(f, RF_FIELD.snr) ? `${f.snrDb.toFixed(1)} dB` : 'n/r'}
+              </span>
+              <span className="k">AIRTIME</span>
+              <span className="v">
+                {hasField(f, RF_FIELD.airtime) ? `${(f.airtimeUs / 1000).toFixed(1)} ms` : 'n/r'}
+              </span>
+              <span className="k">INTEGRITY</span>
+              <span className={`v ${crcClass(f.crc)}`}>{f.crc}</span>
+            </div>
+
+            {ptr && (
+              <>
+                <div className="panel-title">SHELBY POINTER · OFFSET {ptr.offset}</div>
+                <div className="kv">
+                  <span className="k">COMMITMENT</span>
+                  <span className="v">{ptr.pointer.commitment}</span>
+                  <span className="k">OWNER</span>
+                  <span className="v">{ptr.pointer.owner}</span>
+                  <span className="k">BLOB SIZE</span>
+                  <span className="v">{ptr.pointer.sizeBytes.toLocaleString()} B</span>
+                  <span className="k">CHUNK</span>
+                  <span className="v">
+                    {ptr.pointer.chunkIndex + 1} / {ptr.pointer.chunkCount}
+                  </span>
+                </div>
+              </>
+            )}
+
+            <div className="panel-title">RAW BYTES</div>
+            <div style={{ padding: '8px 12px', overflowX: 'auto' }}>
+              <pre style={{ margin: 0 }}>
+                {f.capturedLength ? hexDump(f.bytes) : 'no payload captured'}
+              </pre>
             </div>
           </div>
-
-          {/* ── Selected frame ───────────────────────────────────── */}
-          {f && (
-            <div>
-              <div box-="round">
-                <div className="ls-bar"><span is-="badge" variant-="background2">FRAME {Number(f.sequence)}</span></div>
-                <div className="ls-pad">
-                  <dl className="ls-kv">
-                    <dt>Modulation</dt><dd>{f.modulation.toUpperCase()}</dd>
-                    <dt>Captured</dt><dd>{f.capturedLength} / {f.originalLength} B</dd>
-                    <dt>Frequency</dt><dd>{hasField(f, RF_FIELD.frequency) ? fmtFreq(f.centerFrequencyHz) : 'n/r'}</dd>
-                    <dt>Bandwidth</dt><dd>{hasField(f, RF_FIELD.bandwidth) ? fmtFreq(f.bandwidthHz) : 'n/r'}</dd>
-                    <dt>Spreading</dt><dd>SF{f.spreadingFactor}</dd>
-                    <dt>Coding rate</dt><dd>4/{f.codingRateDenominator}</dd>
-                    <dt>RSSI</dt><dd>{hasField(f, RF_FIELD.rssi) ? `${f.rssiDbm.toFixed(1)} dBm` : 'n/r'}</dd>
-                    <dt>SNR</dt><dd>{hasField(f, RF_FIELD.snr) ? `${f.snrDb.toFixed(1)} dB` : 'n/r'}</dd>
-                    <dt>Airtime</dt><dd>{hasField(f, RF_FIELD.airtime) ? `${(f.airtimeUs / 1000).toFixed(1)} ms` : 'n/r'}</dd>
-                    <dt>Sync word</dt><dd>{hasField(f, RF_FIELD.syncWord) ? `0x${f.syncWord.toString(16).toUpperCase()}` : 'n/r'}</dd>
-                    <dt>Integrity</dt><dd className={crcClass(f.crc)}>{f.crc}</dd>
-                  </dl>
-                </div>
-              </div>
-
-              <div box-="round">
-                <div className="ls-bar">
-                  <span is-="badge" variant-="background2">{ptr ? 'SHELBY POINTER' : 'RAW BYTES'}</span>
-                  {ptr && <span className="ls-muted">at offset {ptr.offset}</span>}
-                </div>
-                <div className="ls-panel-b ls-scroll">
-                  {ptr ? (
-                    <dl className="ls-kv">
-                      <dt>Commitment</dt><dd>{ptr.pointer.commitment}</dd>
-                      <dt>Owner</dt><dd>{ptr.pointer.owner}</dd>
-                      <dt>Blob size</dt><dd>{ptr.pointer.sizeBytes.toLocaleString()} B</dd>
-                      <dt>Chunk</dt><dd>{ptr.pointer.chunkIndex + 1} / {ptr.pointer.chunkCount}</dd>
-                      <dt>Encrypted</dt><dd className={ptr.pointer.encrypted ? 'ok' : 'dim'}>{ptr.pointer.encrypted ? 'yes' : 'no'}</dd>
-                    </dl>
-                  ) : (
-                    <pre className="ls-hex">{f.capturedLength ? hexDump(f.bytes) : 'no payload captured'}</pre>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
-    </div>
+    </main>
   );
 }
