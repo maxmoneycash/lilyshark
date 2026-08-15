@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { backendApi } from "../../api/backend";
+import { DEMO_BLOB, SHELBY_RPC_BLOBS } from "../../lib/shelby";
 import {
   findShelbyPointer,
   parseLscap,
@@ -237,6 +238,23 @@ export function ShelbyScreen() {
               <div className="kv">
                 <span className="k">FOUND AT</span>
                 <span className="v">byte {live.offset} of the payload</span>
+                {live.ptr.commitment === DEMO_BLOB.commitment && (
+                  <>
+                    <span className="k ok">STATUS</span>
+                    <span className="v ok">
+                      live on shelbynet —{' '}
+                      <a
+                        href={`${SHELBY_RPC_BLOBS}/${DEMO_BLOB.owner}/${DEMO_BLOB.name}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        fetch the bytes yourself
+                      </a>
+                    </span>
+                    <span className="k">OBJECT</span>
+                    <span className="v">{DEMO_BLOB.name}</span>
+                  </>
+                )}
                 <span className="k">COMMITMENT</span>
                 <span className="v">{live.ptr.commitment}</span>
                 <span className="k">OWNER</span>

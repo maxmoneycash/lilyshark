@@ -47,18 +47,31 @@ PRESENT = (
 )
 
 US_LONGFAST_HZ = 906_875_000
-OWNER = bytes(((i * 3 + 1) & 0xFF) for i in range(32))  # demo account
+
+# The pointer at sequence 9 references a REAL blob on shelbynet: an earlier
+# field capture uploaded via scripts/shelby-put.ts (webapp). Resolving this
+# commitment through the indexer and fetching the bytes from the Shelby RPC
+# is exactly what the analyzer's RESOLVE button does.
+#   object: @3494…8728/captures/field-capture-0847.lscap
+#   expires: 2026-11-13T21:34:07Z
+OWNER = bytes.fromhex(
+    "34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728"
+)
+REAL_COMMITMENT = bytes.fromhex(
+    "acae433ef0821bee7e99a9c1687473fc9f3a432fc06a97fb908cbf8f35596d4b"
+)
+REAL_SIZE = 4689
+REAL_EXPIRY_UNIX = 1_794_605_647
 
 
 def demo_pointer() -> bytes:
     """The pointer embedded at sequence 9: an .lscap capture stored on Shelby."""
-    referenced = b"lilyshark field capture, gateway-uploaded earlier\n" * 384
     return shelby_pointer.encode_pointer(
         flags=shelby_pointer.FLAG_CAPTURE,
-        commitment=hashlib.sha256(referenced).digest(),
+        commitment=REAL_COMMITMENT,
         owner=OWNER,
-        size_bytes=len(referenced),
-        expires_at_unix=1_893_456_000,  # 2030-01-01T00:00:00Z
+        size_bytes=REAL_SIZE,
+        expires_at_unix=REAL_EXPIRY_UNIX,
     )
 
 

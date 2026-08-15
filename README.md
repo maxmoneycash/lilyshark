@@ -261,10 +261,25 @@ transmissions per delivered message at realistic density, and reach falls from 6
 to 25.8% as nodes are added. Airtime is the scarce resource, so send a reference and
 let a connected node carry the payload.
 
-> **Status:** the pointer codec, the cross-protocol decoder, the capture format, and
-> the analyzer are built and tested under AddressSanitizer and UndefinedBehaviorSanitizer.
-> The gateway that resolves a pointer to and from Shelby over IP is the next piece,
-> not a shipped one.
+The loop is live, not planned. A field capture is stored on shelbynet right now —
+object `captures/field-capture-0847.lscap`, owner
+`0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728`, commitment
+`0xacae433ef0821bee7e99a9c1687473fc9f3a432fc06a97fb908cbf8f35596d4b` — uploaded with
+`webapp/scripts/shelby-put.ts` through the official Shelby SDK (commitment
+generation, on-chain registration, chunkset upload, commit ack). The bundled
+sample's frame 9 carries that blob's real coordinates, and the analyzer's
+**RESOLVE** button walks the whole path in the browser with no Lilyshark server in
+between: commitment → object name on the shelbynet indexer → bytes from the Shelby
+RPC → the capture opens. Fetch it yourself:
+
+```
+curl https://shelby.shelbynet.shelby.xyz/shelby/v1/blobs/0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728/captures/field-capture-0847.lscap
+```
+
+> **Status:** the pointer codec, the cross-protocol decoder, the capture format,
+> upload via the Shelby SDK, and in-browser resolution are built, tested (ASan/UBSan
+> on the C++ side), and running against shelbynet. The remaining piece is on-device:
+> firmware invoking the upload directly from the T-Deck's companion gateway.
 
 ## Download
 
@@ -623,10 +638,11 @@ Run the automatic presentation tour for a screen recording:
 ./scripts/run_ui_demo.sh
 ```
 
-On macOS, `./scripts/run_ui_demo.sh --record` opens the system screen recorder
-and holds on the pink splash until you confirm that recording has begun. It then
-drives one complete pass through the real UI navigation while the deterministic
-synthetic telemetry continues to move. See the
+On macOS, `./scripts/run_ui_demo.sh --record` binds the system recorder to the
+dedicated Lilyshark simulator window automatically, holds on the pink splash
+until capture is active, then drives one complete pass through the real UI
+navigation while deterministic synthetic telemetry continues to move. Use
+`--record-manual` only when automatic window capture is unavailable. See the
 [recording guide](docs/RECORDING_UI.md) for the full shot list and output options.
 
 Regenerate the exact README screenshots and the deterministic live GIF after an intentional UI change:

@@ -12,6 +12,11 @@ import {
   summarize,
 } from '../lib/lscap';
 import { demoNextFrame, isDemo } from '../mesh/demo';
+import {
+  DEMO_BLOB,
+  fetchBlob as fetchBlobBytes,
+  resolveByCommitment,
+} from '../lib/shelby';
 
 /** The live table stops growing here; old frames age out on the left. */
 const LIVE_CAP = 250;
@@ -79,20 +84,49 @@ export function TrafficTab() {
     }
   };
 
+  /**
+   * Fetch a capture straight from the Shelby RPC. Accepts "owner/blob/name"
+   * or a bare blob name, which reads from the demo blob's account.
+   */
   const fetchBlob = async () => {
     const n = blob.trim();
     if (!n) return;
     setBusy(true);
     setError(null);
+    setLive(false);
     try {
-      const res = await fetch(`/api/share/view/${encodeURIComponent(n)}`);
-      if (!res.ok) throw new Error(`SHELBY HTTP ${res.status}`);
-      load(await res.arrayBuffer(), n);
+      const [owner, name] = n.startsWith('0x')
+        ? [n.slice(0, n.indexOf('/')), n.slice(n.indexOf('/') + 1)]
+        : [DEMO_BLOB.owner, n];
+      load(await fetchBlobBytes(owner, name), name);
     } catch (e) {
       setCapture(null);
       setError(e instanceof Error ? e.message : 'fetch failed');
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * The full off-grid loop, in one click: the decoded pointer's commitment is
+   * looked up on the shelbynet indexer, the returned object name is fetched
+   * from the Shelby RPC, and the bytes open as the current capture.
+   */
+  const [resolving, setResolving] = useState<string | null>(null);
+  const resolvePointer = async () => {
+    if (!ptr) return;
+    setResolving('resolving commitment on the indexer…');
+    setLive(false);
+    try {
+      const found = await resolveByCommitment(ptr.pointer.owner, ptr.pointer.commitment);
+      if (!found) throw new Error('no blob with this commitment under that owner');
+      setResolving(`fetching ${found.name} from the Shelby RPC…`);
+      const bytes = await fetchBlobBytes(ptr.pointer.owner, found.name);
+      load(bytes, found.name);
+      setResolving(null);
+    } catch (e) {
+      setResolving(null);
+      setError(e instanceof Error ? e.message : 'resolve failed');
     }
   };
 
@@ -370,7 +404,14 @@ export function TrafficTab() {
 
             {ptr && (
               <>
-                <div className="panel-title">SHELBY POINTER · OFFSET {ptr.offset}</div>
+                <div className="panel-title">
+                  SHELBY POINTER · OFFSET {ptr.offset}
+                  <span className="spacer" />
+                  <button onClick={() => void resolvePointer()} disabled={!!resolving}>
+                    {resolving ? 'RESOLVING…' : '⇓ RESOLVE'}
+                  </button>
+                </div>
+                {resolving && <div className="panel-foot dim">{resolving}</div>}
                 <div className="kv">
                   <span className="k">COMMITMENT</span>
                   <span className="v">{ptr.pointer.commitment}</span>

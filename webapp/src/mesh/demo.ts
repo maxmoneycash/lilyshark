@@ -20,6 +20,7 @@
  */
 
 import { type LscapFrame, RF_FIELD, SHELBY_POINTER_SIZE } from "../lib/lscap";
+import { DEMO_BLOB } from "../lib/shelby";
 import {
   ContactType,
   DeviceStatus,
@@ -212,17 +213,30 @@ function demoBytes(seed: number, len: number): Uint8Array {
   return out;
 }
 
-/** An encoded pointer the decoder accepts: capture flag, one chunk of one. */
-function demoPointerBytes(seed: number): Uint8Array {
+/** Hex string (with or without 0x) into a fixed-length byte array. */
+function hexBytes(hex: string, length: number): Uint8Array {
+  const clean = hex.replace(/^0x/, "");
+  const out = new Uint8Array(length);
+  for (let i = 0; i < length; i++)
+    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+/**
+ * An encoded pointer carrying the coordinates of the REAL demo blob on
+ * shelbynet, so any live ◆ frame resolves end to end: capture flag, one
+ * chunk of one, commitment and owner of captures/field-capture-0847.lscap.
+ */
+function demoPointerBytes(_seed: number): Uint8Array {
   const b = new Uint8Array(SHELBY_POINTER_SIZE);
   b.set([0x53, 0x48, 0x4c, 0x42]); // "SHLB"
   b[4] = 1; // version
   b[5] = 1 << 2; // capture flag
-  b.set(demoBytes(seed * 3 + 1, 32), 6); // commitment
-  b.set(demoBytes(seed * 5 + 2, 32), 38); // owner
+  b.set(hexBytes(DEMO_BLOB.commitment, 32), 6);
+  b.set(hexBytes(DEMO_BLOB.owner, 32), 38);
   const view = new DataView(b.buffer);
-  view.setUint32(70, 16_384 + (seed % 7) * 4_096, true); // size
-  view.setUint32(74, Math.floor(Date.now() / 1000) + 90 * 86_400, true); // expiry
+  view.setUint32(70, DEMO_BLOB.sizeBytes, true);
+  view.setUint32(74, DEMO_BLOB.expiresAtUnix, true);
   view.setUint16(78, 0, true); // chunk index
   view.setUint16(80, 1, true); // chunk count
   return b;
