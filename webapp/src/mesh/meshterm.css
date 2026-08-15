@@ -1449,3 +1449,69 @@ body:has(.meshterm .app.menu-open) {
 		transition: none;
 	}
 }
+
+/* ── Live-audit fixes ─────────────────────────────────────────────────────
+   Each rule below answers a defect found by driving the deployed site. */
+
+/* Disabled controls sat at 2:1 over the paper and read as decoration. */
+.meshterm button:disabled,
+.meshterm select:disabled,
+.meshterm input:disabled {
+	opacity: 0.55;
+}
+
+/* The map hint describes a mouse gesture; a thumb can't take it. */
+@media (pointer: coarse) {
+	.meshterm .map-hint,
+	.meshterm .map-wrap .hint {
+		display: none;
+	}
+}
+
+@media (max-width: 860px) {
+	/* The map's height:100% chain resolves to zero once the page (not the
+	   pane) is the scroller — the panel collapsed to its header and the map
+	   never painted. A viewport-tied height restores the box. */
+	.meshterm .map-wrap,
+	.meshterm .map-wrap .leaflet-container {
+		min-height: 58vh;
+	}
+
+	/* PAPER: main.fill is a row flex, and on mobile the page column has
+	   `flex: none`, whose auto basis is content width — the 1400px image
+	   attribute — so the whole document laid out past the right edge with no
+	   way to scroll to it. A column direction makes the width the viewport's. */
+	.meshterm main.fill {
+		flex-direction: column;
+	}
+	.meshterm .pdf-scroll {
+		width: 100%;
+	}
+
+	/* The closed nav sheet kept its ten buttons in the tab order — opacity
+	   hides pixels, not focus. Visibility leaves the fade intact and drops
+	   the sheet out of both tab order and accessibility tree while closed. */
+	.meshterm header nav {
+		visibility: hidden;
+		transition:
+			opacity 0.18s ease-out,
+			visibility 0s linear 0.18s;
+	}
+	.meshterm .app.menu-open header nav {
+		visibility: visible;
+		transition: opacity 0.18s ease-out;
+	}
+
+	/* Selects were collapsing to bare chevrons in the telemetry toolbar. */
+	.meshterm select {
+		min-width: 11ch;
+	}
+}
+
+@media (max-width: 560px) {
+	/* The last log line is diagnostics, not status; clipped mid-word on a
+	   phone it read as a rendering bug. DEBUG still has the full log. */
+	.meshterm footer > span:last-child {
+		display: none;
+	}
+}

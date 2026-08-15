@@ -612,14 +612,14 @@ export default function Config() {
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 								<label>LAT</label>
 								<input
-									placeholder={self?.advLat ? String(self.advLat) : "39.5696"}
+									placeholder={self?.advLat ? String(self.advLat) : "37.4419"}
 									value={posLat}
 									style={{ width: 120 }}
 									onChange={(e) => setPosLat(e.target.value)}
 								/>
 								<label>LON</label>
 								<input
-									placeholder={self?.advLon ? String(self.advLon) : "2.6502"}
+									placeholder={self?.advLon ? String(self.advLon) : "-122.1430"}
 									value={posLon}
 									style={{ width: 120 }}
 									onChange={(e) => setPosLon(e.target.value)}

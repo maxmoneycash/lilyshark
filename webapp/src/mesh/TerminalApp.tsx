@@ -59,6 +59,18 @@ class ScreenBoundary extends Component<
 > {
   state: { err?: Error } = {};
   static getDerivedStateFromError(err: Error) {
+    // A deploy rotates the chunk hashes under any session that is already
+    // open, so the first lazy screen visited afterwards 404s. That is not a
+    // crash, it is a stale page — reload once to pick up the new build, and
+    // only fall through to the error panel if the reload didn't cure it.
+    if (/dynamically imported module|Loading chunk|import\(\)/i.test(String(err))) {
+      const KEY = "chunk-reload";
+      if (sessionStorage.getItem(KEY) !== "1") {
+        sessionStorage.setItem(KEY, "1");
+        window.location.reload();
+        return {};
+      }
+    }
     return { err };
   }
   render() {

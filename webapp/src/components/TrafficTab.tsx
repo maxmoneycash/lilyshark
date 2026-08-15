@@ -308,7 +308,9 @@ export function TrafficTab() {
             <div className="panel-title">RAW BYTES</div>
             <div style={{ padding: '8px 12px', overflowX: 'auto' }}>
               <pre style={{ margin: 0 }}>
-                {f.capturedLength ? hexDump(f.bytes) : 'no payload captured'}
+                {/* 8 bytes per row: the 360px detail pane fits it without a
+                    horizontal scrollbar, where the classic 16 did not. */}
+                {f.capturedLength ? hexDump(f.bytes, 8) : 'no payload captured'}
               </pre>
             </div>
           </div>
