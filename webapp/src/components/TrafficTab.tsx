@@ -11,6 +11,10 @@ import {
   RF_FIELD,
   summarize,
 } from '../lib/lscap';
+import { demoNextFrame, isDemo } from '../mesh/demo';
+
+/** The live table stops growing here; old frames age out on the left. */
+const LIVE_CAP = 250;
 
 /**
  * TRAFFIC — the analyzer. Opens a .lscap capture written by the T-Deck
@@ -34,7 +38,13 @@ export function TrafficTab() {
   const [error, setError] = useState<string | null>(null);
   const [blob, setBlob] = useState('');
   const [busy, setBusy] = useState(false);
+  // Live mode: synthetic frames keep arriving, the way they would with a
+  // radio listening. On by default while the demo mesh is up, so the screen
+  // is moving from the first second; opening a file of your own pauses it.
+  const [live, setLive] = useState(() => isDemo());
+  const liveSeq = useRef(1000);
   const fileRef = useRef<HTMLInputElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const load = (buf: ArrayBuffer, from: string) => {
     try {
@@ -58,6 +68,7 @@ export function TrafficTab() {
 
   const openFile = async (f: File) => {
     setBusy(true);
+    setLive(false); // the user's own capture is a document, not a stream
     try {
       load(await f.arrayBuffer(), f.name);
     } finally {
@@ -105,6 +116,32 @@ export function TrafficTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Live air: a frame lands every few seconds, timed like a LongFast channel.
+  // The table follows the newest frame unless the user has scrolled back up
+  // to study something — the same follow rule every log viewer uses.
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => {
+      setCapture((c) => {
+        if (!c) return c;
+        const last = c.frames[c.frames.length - 1];
+        const seq = liveSeq.current++;
+        const f = demoNextFrame(
+          seq,
+          Number(last ? last.timestampUs : 0n) + 2_400_000 + (seq % 5) * 640_000,
+        );
+        return { ...c, frames: [...c.frames.slice(-(LIVE_CAP - 1)), f] };
+      });
+      const el = tableRef.current;
+      if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 120) {
+        requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight;
+        });
+      }
+    }, 2600);
+    return () => clearInterval(id);
+  }, [live]);
+
   const frames = capture?.frames ?? [];
   const stats = useMemo(() => summarize(frames), [frames]);
   // A pointer rides behind whatever protocol header enclosed it, so every
@@ -125,6 +162,14 @@ export function TrafficTab() {
           </button>
           <button onClick={() => void openSample()} disabled={busy}>
             SAMPLE
+          </button>
+          <button
+            className={live ? 'primary' : ''}
+            title="synthetic LongFast air, timed like the real channel"
+            onClick={() => setLive((v) => !v)}
+          >
+            {/* Glyphs the bundled mono actually has — ⏸ fell back to tofu. */}
+            {live ? '● LIVE' : '▶ LIVE'}
           </button>
           <input
             ref={fileRef}
@@ -198,7 +243,7 @@ export function TrafficTab() {
               ))}
             </div>
 
-            <div className="scroll-y">
+            <div className="scroll-y" ref={tableRef}>
               <div className="scroll-x">
               <table className="grid">
                 <thead>

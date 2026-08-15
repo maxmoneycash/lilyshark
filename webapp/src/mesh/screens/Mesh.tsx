@@ -434,6 +434,12 @@ export default function Mesh() {
 								flex: "999 1 320px",
 								minWidth: 0,
 								minHeight: 260,
+								// Definite height on desktop so the svg's height:100% resolves
+								// and the viewBox scales to FIT the pane — without it the svg
+								// falls back to its intrinsic 3:2 aspect, renders taller than
+								// the pane, and the graph is half below a scrollbar. On the
+								// phone the pane is auto-height and the % is simply ignored.
+								height: "100%",
 								overflow: "hidden",
 							}}
 						>

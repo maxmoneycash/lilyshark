@@ -20,16 +20,15 @@ import Nodes from "./screens/Nodes";
 import Mesh from "./screens/Mesh";
 import Config from "./screens/Config";
 import { TrafficTab } from "../components/TrafficTab";
+import { WhitepaperTab } from "../components/WhitepaperTab";
 import { ShelbyScreen } from "./screens/Shelby";
 
 // The heavy screens load on first visit rather than riding in the main chunk:
-// pdf.js (PAPER), Leaflet (MAP) and uPlot (TELEMETRY) together outweigh the
-// whole rest of the app, and none of them is the screen the app opens on.
+// Leaflet (MAP) and uPlot (TELEMETRY) together outweigh most of the app.
+// PAPER is eager — it is the landing screen, and since the pages became
+// pre-rendered images its code is a few kilobytes.
 const MapView = lazy(() => import("./screens/MapView"));
 const Telemetry = lazy(() => import("./screens/Telemetry"));
-const WhitepaperTab = lazy(() =>
-  import("../components/WhitepaperTab").then((m) => ({ default: m.WhitepaperTab })),
-);
 import { fmtFreq, useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
@@ -38,9 +37,9 @@ import "./meshterm.css";
 const VERSION = "0.1.0";
 
 const TABS = [
+  "PAPER",
   "TRAFFIC",
   "SHELBY",
-  "PAPER",
   "CHAT",
   "NODOS",
   "MAPA",
@@ -186,7 +185,8 @@ function App() {
   useHourTick();
   useLangTick();
   const hostBat = useHostBattery();
-  const [tab, setTab] = useState<Tab>("TRAFFIC");
+  // The paper opens first: it is the argument the rest of the app demonstrates.
+  const [tab, setTab] = useState<Tab>("PAPER");
   // Phone nav: the ten tabs live behind a hamburger instead of a side-scroll.
   const [menuOpen, setMenuOpen] = useState(false);
   const [chatConvo, setChatConvo] = useState("ch:0");

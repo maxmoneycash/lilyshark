@@ -19,7 +19,15 @@
  * other, which is what makes the screens readable.
  */
 
-import { ContactType, DeviceStatus, mutate, type Message, type NodeEntry } from "./store";
+import { type LscapFrame, RF_FIELD, SHELBY_POINTER_SIZE } from "../lib/lscap";
+import {
+  ContactType,
+  DeviceStatus,
+  markUnread,
+  mutate,
+  type Message,
+  type NodeEntry,
+} from "./store";
 
 /** Our own position: downtown Palo Alto, near the Caltrain station. */
 export const DEMO_CENTER = { lat: 37.4419, lon: -122.143 };
@@ -174,6 +182,102 @@ export function demoNeighbors(): { node: number; neighbor: number; snr: number }
   return out;
 }
 
+/* ── Live air ─────────────────────────────────────────────────────────────
+   Synthetic frames for the analyzer's live mode: the same LongFast radio
+   parameters as the bundled capture, deterministic per sequence number, and
+   every ninth frame carries a well-formed Shelby pointer — so a recording of
+   the screen shows a pointer actually arriving over the air and being decoded
+   the moment it lands. */
+
+const DEMO_RF_FIELDS =
+  RF_FIELD.timestamp |
+  RF_FIELD.frequency |
+  RF_FIELD.bandwidth |
+  RF_FIELD.airtime |
+  RF_FIELD.rssi |
+  RF_FIELD.snr |
+  RF_FIELD.spreadingFactor |
+  RF_FIELD.codingRate;
+
+/** Deterministic bytes, so a given sequence number always looks the same. */
+function demoBytes(seed: number, len: number): Uint8Array {
+  const out = new Uint8Array(len);
+  let x = seed * 2654435761;
+  for (let i = 0; i < len; i++) {
+    x ^= x << 13;
+    x ^= x >>> 17;
+    x ^= x << 5;
+    out[i] = x & 0xff;
+  }
+  return out;
+}
+
+/** An encoded pointer the decoder accepts: capture flag, one chunk of one. */
+function demoPointerBytes(seed: number): Uint8Array {
+  const b = new Uint8Array(SHELBY_POINTER_SIZE);
+  b.set([0x53, 0x48, 0x4c, 0x42]); // "SHLB"
+  b[4] = 1; // version
+  b[5] = 1 << 2; // capture flag
+  b.set(demoBytes(seed * 3 + 1, 32), 6); // commitment
+  b.set(demoBytes(seed * 5 + 2, 32), 38); // owner
+  const view = new DataView(b.buffer);
+  view.setUint32(70, 16_384 + (seed % 7) * 4_096, true); // size
+  view.setUint32(74, Math.floor(Date.now() / 1000) + 90 * 86_400, true); // expiry
+  view.setUint16(78, 0, true); // chunk index
+  view.setUint16(80, 1, true); // chunk count
+  return b;
+}
+
+/**
+ * The next frame heard on the demo air. Timing and airtime follow LongFast
+ * (SF11 · BW250 · CR4/5 at ~987 bit/s, the figure measured from the sample).
+ */
+export function demoNextFrame(seq: number, timestampUs: number): LscapFrame {
+  const pointer = seq % 9 === 4;
+  const len = pointer
+    ? 16 + SHELBY_POINTER_SIZE
+    : 24 + Math.round(Math.abs(jitter(seq * 3 + 2, 1)) * 150);
+  const bytes = pointer
+    ? (() => {
+        const b = new Uint8Array(16 + SHELBY_POINTER_SIZE);
+        b.set(demoBytes(seq * 7 + 3, 16)); // protocol header in front
+        b.set(demoPointerBytes(seq), 16);
+        return b;
+      })()
+    : demoBytes(seq * 7 + 3, len);
+
+  const rssi = Math.round(-88 - Math.abs(jitter(seq + 1, 1)) * 28);
+  return {
+    sequence: BigInt(seq),
+    timestampUs: BigInt(timestampUs),
+    capturedLength: len,
+    originalLength: len,
+    truncated: false,
+    presentFields: DEMO_RF_FIELDS,
+    centerFrequencyHz: 906_875_000,
+    bandwidthHz: 250_000,
+    bitRateBps: 0,
+    frequencyDeviationHz: 0,
+    airtimeUs: Math.round(((len * 8) / 987) * 1e6),
+    frequencyErrorHz: 0,
+    rssiDbm: rssi,
+    snrDb: Math.round(((rssi + 92) * 0.55 + jitter(seq + 5, 2)) * 10) / 10,
+    preambleSymbols: 0,
+    syncWord: 0,
+    profileId: 0,
+    radioStatus: 0,
+    txPowerDbm: 0,
+    spreadingFactor: 11,
+    codingRateDenominator: 5,
+    channelIndex: 0,
+    radioIndex: 0,
+    modulation: "lora",
+    direction: "rx",
+    crc: seq % 13 === 7 ? "invalid" : "valid",
+    bytes,
+  };
+}
+
 /* ── Telemetry ─────────────────────────────────────────────────────────────
    The TELEMETRY screen reads series from IndexedDB, where a real radio's
    packets accumulate. The demo computes its series on demand instead of
@@ -317,6 +421,115 @@ function buildMessages(nodes: NodeEntry[], now: number): Message[] {
  * caller checks that, but the guard is kept here too so a stray call can never
  * mix invented nodes into a real capture.
  */
+/* ── Live ticker ──────────────────────────────────────────────────────────
+   A seeded mesh that never changes reads as a screenshot of itself. While the
+   demo is up, a slow heartbeat keeps the screens honest about what the real
+   instrument does all day: chatter arrives on the channel, nodes are heard
+   again with fresh signal readings, and the Baylands walker actually walks —
+   so the map, the tables, the unread badge and the footer all move. */
+
+let liveTimer: ReturnType<typeof setInterval> | undefined;
+let liveN = 0;
+
+/** Rotating chatter: [SPECS index, text]. Written to loop cleanly. */
+const LIVE_POOL: [number, string][] = [
+  [12, "levee checkpoint — path via HVR holding at 2 hops"],
+  [5, "reading the last pointer now, commitment matches"],
+  [9, "Caltrain platform, RSSI to HVR up 4 dB since morning"],
+  [3, "Hoover relaying 18 pkt/min, all CRC clean"],
+  [0, "Skyline wx: fog rolling over the ridge, antennas dry"],
+  [26, "creek gauge 02: 0.44 m, +2 cm on the hour"],
+  [21, "Woodside store porch node back on solar"],
+  [12, "reached the tide station, TID direct at -87 dBm"],
+  [16, "Cubberley test tx done — who copied?"],
+  [7, "copied Cubberley at 1 hop via Arastradero"],
+  [24, "EPA roof node steady, best SNR of the week"],
+  [31, "builders: bring SD cards Thursday, we rotate captures"],
+  [12, "heading back, dropping a capture to Shelby at the car"],
+  [1, "Windy Hill sees all three portola nodes direct tonight"],
+  [28, "fire watch cam battery cycled fine overnight"],
+  [5, "new .lscap up — pointer on Primary in a minute"],
+];
+
+/** The Baylands walker: a small loop along the levee, one step per tick. */
+const WALKER = 12; // Baylands-Trail
+const WALK_R = 0.006;
+
+function liveTick(): void {
+  if (!seeded) return;
+  liveN++;
+  const now = Date.now();
+
+  mutate((s) => {
+    // A couple of nodes are heard again, with believable new readings.
+    const nodes = new Map(s.nodes);
+    for (let k = 0; k < 3; k++) {
+      const i = (liveN * 7 + k * 11) % SPECS.length;
+      const num = DEMO_NODE_FLOOR + i + 1;
+      const n = nodes.get(num);
+      if (!n) continue;
+      nodes.set(num, {
+        ...n,
+        lastHeard: Math.round(now / 1000),
+        snr: Math.round((n.snr ?? 0) + jitter(liveN * 3 + k, 1.5)),
+        rssi: Math.round((n.rssi ?? -100) + jitter(liveN * 5 + k, 2)),
+      });
+    }
+
+    // The walker moves one step around the levee loop.
+    const wNum = DEMO_NODE_FLOOR + WALKER + 1;
+    const w = nodes.get(wNum);
+    if (w) {
+      const a = (liveN / 14) * 2 * Math.PI;
+      nodes.set(wNum, {
+        ...w,
+        lat: SPECS[WALKER].lat + WALK_R * Math.sin(a),
+        lon: SPECS[WALKER].lon + WALK_R * 1.2 * Math.cos(a),
+        lastHeard: Math.round(now / 1000),
+      });
+      s.posUpdates = new Map(s.posUpdates).set(wNum, now);
+    }
+    s.nodes = nodes;
+
+    // Every other tick, a message lands on the channel.
+    if (liveN % 2 === 0) {
+      const [idx, text] = LIVE_POOL[(liveN / 2) % LIVE_POOL.length];
+      const from = DEMO_NODE_FLOOR + idx + 1;
+      const sender = nodes.get(from);
+      s.messages = [
+        ...s.messages,
+        {
+          id: 920_000 + liveN,
+          convo: "ch:0",
+          from,
+          to: 0xffffffff,
+          channel: 0,
+          text,
+          ts: now,
+          mine: false,
+          state: "delivered",
+          hops: sender?.hopsAway,
+          snr: sender?.snr,
+          rssi: sender?.rssi,
+        } satisfies Message,
+      ];
+    }
+  });
+  if (liveN % 2 === 0) markUnread("ch:0");
+}
+
+function startDemoLive(): void {
+  if (liveTimer !== undefined) return;
+  liveTimer = setInterval(liveTick, 7000);
+}
+
+function stopDemoLive(): void {
+  if (liveTimer !== undefined) {
+    clearInterval(liveTimer);
+    liveTimer = undefined;
+  }
+}
+
 export function seedDemo(): void {
   if (seeded) return;
   const now = Date.now();
@@ -345,6 +558,7 @@ export function seedDemo(): void {
     }
     s.posUpdates = new Map(nodes.map((n) => [n.num, now - Math.abs(jitter(n.num, 1)) * 900_000]));
   });
+  if (seeded) startDemoLive();
 }
 
 /** Drop everything seeded, so a real radio never shares the screen with it.
@@ -353,6 +567,7 @@ export function seedDemo(): void {
 export function clearDemo(): void {
   if (!seeded) return;
   seeded = false;
+  stopDemoLive();
   mutate((s) => {
     const keep = new Map<number, NodeEntry>();
     for (const [num, n] of s.nodes) if (num < DEMO_NODE_FLOOR) keep.set(num, n);

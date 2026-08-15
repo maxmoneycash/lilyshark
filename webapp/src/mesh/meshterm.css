@@ -1246,26 +1246,21 @@ body {
 		display: none;
 	}
 
-	/* Two deliberate rows: identity and the menu button up top, the transport
-	   controls beneath. Left to the wrap algorithm, the select landed exactly
-	   under the z-raised hamburger and was unreachable. */
-	.meshterm header::after {
-		content: "";
-		width: 100%;
-		order: 1;
-	}
-	.meshterm .menu-btn {
-		order: 0;
-	}
-	.meshterm header > select {
-		order: 2;
+	/* One sleek row: wordmark, CONNECT, hamburger. The transport select is a
+	   desktop affordance (no phone browser speaks WebSerial anyway) and the
+	   LED pill duplicated what the CONNECT button's own label already says —
+	   both cost a whole second header row. */
+	.meshterm header > select,
+	.meshterm header > .conn-pill {
+		display: none;
 	}
 	.meshterm header > button.primary {
-		order: 3;
-	}
-	.meshterm header > .conn-pill {
-		order: 4;
+		order: 1;
 		margin-left: auto;
+	}
+	.meshterm .menu-btn {
+		order: 2;
+		margin-left: 0;
 	}
 	.meshterm .logo > span:not(.wordmark),
 	.meshterm .logo small {
@@ -1560,4 +1555,47 @@ body:has(.meshterm .app.menu-open) {
 .meshterm .stat-tile {
 	flex: 1 1 110px;
 	max-width: 200px;
+}
+
+/* ── iOS paper window ─────────────────────────────────────────────────────
+   On the phone the document-scroll model is right for panel screens, but for
+   the paper it let 63 pages run underneath the sticky header and behind the
+   status bar. When PAPER is the mounted screen the shell goes back to the
+   app-window model: header pinned by layout (not stickiness), the pages
+   scrolling inside their own box between header and footer. Scrolling a
+   plain div of images is something iOS does natively — it was only the PDF
+   inside an iframe it refused. */
+@media (max-width: 860px) {
+	.meshterm .app:has(main.fill) {
+		height: 100dvh;
+		min-height: 0;
+		overflow: hidden;
+	}
+	.meshterm .app:has(main.fill) header {
+		position: static;
+	}
+	.meshterm main.fill {
+		flex: 1 1 0 !important;
+		min-height: 0;
+		overflow: hidden;
+	}
+	.meshterm main.fill .pdf-scroll {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	/* The nav sheet must cover the *dynamic* viewport — inset: 0 resolves
+	   against a stale height on iOS while the toolbar collapses, leaving a
+	   strip of page showing through at the bottom. */
+	.meshterm header nav {
+		inset: auto;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 100dvh;
+		padding-top: max(72px, env(safe-area-inset-top) + 60px);
+		padding-bottom: max(34px, env(safe-area-inset-bottom) + 20px);
+	}
 }
