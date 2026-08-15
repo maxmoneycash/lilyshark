@@ -1,0 +1,828 @@
+/* meshterm.css — scoped port of meshcore-terminal's App.css (MIT).
+   Every rule lives under a .meshterm wrapper so nothing leaks into the rest of
+   the lilyshark app; the lilyshark theme is the default set of vars and
+   theme.ts:applyTheme() overrides them inline on the wrapper. */
+
+/* JetBrains Mono empaquetada (OFL, ver assets/fonts/OFL.txt). La versión de
+   Google Fonts / fontsource recorta U+2580–259F y descuadra las barras ASCII;
+   este woff2 es el release completo. font-display: block evita el parpadeo
+   con la fuente de respaldo, que tiene otro avance. */
+@font-face {
+	font-family: "JetBrains Mono";
+	src: url("./assets/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: block;
+}
+@font-face {
+	font-family: "JetBrains Mono";
+	src: url("./assets/fonts/JetBrainsMono-Bold.woff2") format("woff2");
+	font-weight: 700;
+	font-style: normal;
+	font-display: block;
+}
+
+/* Tema terminal — por defecto el rosa Lilyshark; theme.ts lo sobrescribe. */
+.meshterm {
+	--bg: #171019;
+	--panel: #1d1520;
+	--fg: #ff4f9d;
+	/* tinte de las teselas del mapa; lo sobrescribe theme.ts */
+	--map-tint: hue-rotate(281deg) saturate(1.8);
+	--fg-dim: color-mix(in srgb, var(--fg) 55%, transparent);
+	--border: color-mix(in srgb, var(--fg) 25%, transparent);
+	--glow: color-mix(in srgb, var(--fg) 40%, transparent);
+	--warn: #ffb000;
+	--err: #ff3b30;
+	color-scheme: dark;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+	font-size: 13px;
+	line-height: 1.45;
+	position: relative;
+}
+
+/* Alto contraste: theme.ts pone --fg vivo y el fondo negro puro; aquí suben
+   las mezclas derivadas, que es de donde sale casi toda la legibilidad. */
+:root.hc .meshterm {
+	--fg-dim: color-mix(in srgb, var(--fg) 80%, transparent);
+	--border: color-mix(in srgb, var(--fg) 55%, transparent);
+	--glow: color-mix(in srgb, var(--fg) 55%, transparent);
+	--warn: #ffc933;
+	--err: #ff6b61;
+}
+
+/* Tema claro: el aviso y el error tienen que oscurecerse para leerse sobre el
+   papel, y el glow (halo del mismo color que el texto) sobra sobre fondo claro. */
+:root.light .meshterm {
+	color-scheme: light;
+	--warn: #9a6a00;
+	--err: #b3261e;
+	--glow: transparent;
+}
+:root.light.hc .meshterm {
+	--warn: #7a5200;
+	--err: #8c1d18;
+}
+
+.meshterm,
+.meshterm *,
+.meshterm *::before,
+.meshterm *::after {
+	box-sizing: border-box;
+}
+
+.meshterm ::selection {
+	background: var(--fg);
+	color: var(--bg);
+}
+
+.meshterm ::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+.meshterm ::-webkit-scrollbar-track {
+	background: var(--bg);
+}
+.meshterm ::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border: 2px solid var(--bg);
+}
+.meshterm ::-webkit-scrollbar-thumb:hover {
+	background: var(--fg-dim);
+}
+
+@keyframes meshterm-blink {
+	0%,
+	49% {
+		opacity: 1;
+	}
+	50%,
+	100% {
+		opacity: 0;
+	}
+}
+@keyframes meshterm-ledblink {
+	0%,
+	49% {
+		opacity: 1;
+	}
+	50%,
+	100% {
+		opacity: 0.15;
+	}
+}
+@keyframes meshterm-ping {
+	0% {
+		transform: scale(0.5);
+		opacity: 0.8;
+	}
+	100% {
+		transform: scale(2.4);
+		opacity: 0;
+	}
+}
+
+/* ── layout raíz ── */
+.meshterm .app {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	position: relative;
+}
+
+.meshterm .app::after {
+	/* CRT: scanlines + viñeta */
+	content: "";
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: 50;
+	background:
+		repeating-linear-gradient(
+			0deg,
+			rgba(0, 0, 0, 0.16) 0 1px,
+			transparent 1px 3px
+		),
+		radial-gradient(
+			ellipse at center,
+			transparent 62%,
+			rgba(0, 0, 0, 0.32) 100%
+		);
+}
+
+/* las scanlines apagan un 16 % de las filas y la viñeta oscurece los bordes:
+   lo primero que sobra en alto contraste */
+:root.hc .meshterm .app::after {
+	display: none;
+}
+
+/* sobre fondo claro ese mismo 16 % ensucia el papel: quedan como trama tenue */
+:root.light .meshterm .app::after {
+	background:
+		repeating-linear-gradient(
+			0deg,
+			rgba(0, 0, 0, 0.05) 0 1px,
+			transparent 1px 3px
+		),
+		radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.1) 100%);
+}
+
+/* ── titlebar personalizada (decorations:false) ── */
+.meshterm .titlebar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 30px;
+	flex-shrink: 0;
+	border-bottom: 1px solid var(--border);
+	background: var(--panel);
+	padding-left: 12px;
+	user-select: none;
+}
+.meshterm .titlebar-label {
+	font-size: 10px;
+	letter-spacing: 3px;
+	color: var(--fg-dim);
+}
+.meshterm .titlebar-ver {
+	margin-left: 8px;
+	letter-spacing: 1px;
+	opacity: 0.4;
+}
+.meshterm .titlebar-btns {
+	display: flex;
+	align-self: stretch;
+}
+.meshterm .tb-btn {
+	width: 46px;
+	border: none;
+	border-left: 1px solid var(--border);
+	background: transparent;
+	color: var(--fg-dim);
+	border-radius: 0;
+	font-size: 12px;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.meshterm .tb-btn:hover:not(:disabled) {
+	background: var(--fg);
+	color: var(--bg);
+	border-color: var(--border);
+}
+.meshterm .tb-close:hover:not(:disabled) {
+	background: var(--err);
+	color: var(--bg);
+}
+
+/* ── cabecera ── */
+.meshterm header {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--border);
+	flex-shrink: 0;
+}
+
+.meshterm .logo {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.1;
+}
+.meshterm .logo strong {
+	font-size: 16px;
+	font-weight: 700;
+	letter-spacing: 4px;
+	text-shadow: 0 0 8px var(--glow);
+}
+.meshterm .logo span {
+	font-size: 9px;
+	letter-spacing: 2px;
+	color: var(--fg-dim);
+}
+
+.meshterm header nav {
+	display: flex;
+	gap: 6px;
+}
+
+.meshterm .clock {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	line-height: 1.2;
+	font-size: 12px;
+}
+.meshterm .clock .time {
+	text-shadow: 0 0 6px var(--glow);
+}
+.meshterm .clock .uptime {
+	color: var(--fg-dim);
+	font-size: 10px;
+}
+
+/* ── controles base ── */
+.meshterm button,
+.meshterm select,
+.meshterm input {
+	font-family: inherit;
+	background: var(--bg);
+	color: var(--fg);
+	border: 1px solid var(--border);
+	padding: 5px 10px;
+	font-size: 12px;
+	border-radius: 0;
+	/* sin esto un input con flex:1 no baja de su ancho por defecto (~177px)
+     y se sale del panel en vez de encogerse */
+	min-width: 0;
+}
+.meshterm button {
+	cursor: pointer;
+	letter-spacing: 1px;
+}
+.meshterm button:hover:not(:disabled) {
+	background: var(--fg);
+	color: var(--bg);
+	border-color: var(--fg);
+}
+.meshterm button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.meshterm input:focus,
+.meshterm select:focus,
+.meshterm textarea:focus {
+	outline: 1px solid var(--fg);
+	outline-offset: -1px;
+}
+.meshterm select option {
+	background: var(--bg);
+	color: var(--fg);
+}
+
+.meshterm button.tab {
+	background: transparent;
+	color: var(--fg-dim);
+}
+.meshterm button.tab.active {
+	background: var(--fg);
+	color: var(--bg);
+	border-color: var(--fg);
+	font-weight: 700;
+}
+.meshterm button.tab:hover:not(.active) {
+	background: transparent;
+	color: var(--fg);
+	border-color: var(--fg);
+	text-shadow: 0 0 6px var(--glow);
+}
+
+.meshterm button.primary {
+	border-color: var(--fg);
+	font-weight: 700;
+}
+.meshterm button.danger {
+	border-color: var(--err);
+	color: var(--err);
+}
+.meshterm button.danger:hover:not(:disabled) {
+	background: var(--err);
+	color: var(--bg);
+	border-color: var(--err);
+}
+
+/* ── LED de conexión ── */
+.meshterm .conn-pill {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	border: 1px solid var(--border);
+	padding: 5px 10px;
+	font-size: 11px;
+	letter-spacing: 1px;
+}
+.meshterm .led {
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	display: inline-block;
+	/* apagado = tenue sobre el fondo, sea cual sea: un gris fijo se leía como
+     punto oscuro (encendido) en el tema claro */
+	background: color-mix(in srgb, var(--fg) 22%, transparent);
+}
+.meshterm .led.on {
+	background: var(--fg);
+	box-shadow: 0 0 8px var(--glow);
+}
+.meshterm .led.connecting {
+	background: var(--warn);
+	box-shadow: 0 0 8px color-mix(in srgb, var(--warn) 50%, transparent);
+	animation: meshterm-ledblink 0.7s step-end infinite;
+}
+.meshterm .conn-pill .txt-connecting {
+	color: var(--warn);
+}
+.meshterm .conn-pill .txt-off {
+	color: var(--fg-dim);
+}
+
+/* ── paneles con muescas ── */
+.meshterm .panel {
+	position: relative;
+	border: 1px solid var(--border);
+	background: var(--panel);
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+.meshterm .panel::before,
+.meshterm .panel::after {
+	content: "";
+	position: absolute;
+	width: 9px;
+	height: 9px;
+	z-index: 5;
+}
+.meshterm .panel::before {
+	top: -1px;
+	left: -1px;
+	border-top: 1px solid var(--fg);
+	border-left: 1px solid var(--fg);
+}
+.meshterm .panel::after {
+	bottom: -1px;
+	right: -1px;
+	border-bottom: 1px solid var(--fg);
+	border-right: 1px solid var(--fg);
+}
+.meshterm .panel.hot {
+	border-color: var(--fg);
+	box-shadow: 0 0 14px color-mix(in srgb, var(--fg) 15%, transparent);
+}
+
+.meshterm .panel-title {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 10px;
+	letter-spacing: 2px;
+	color: var(--fg-dim);
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--border);
+	flex-shrink: 0;
+}
+
+.meshterm .panel-foot {
+	display: flex;
+	gap: 24px;
+	font-size: 11px;
+	color: var(--fg-dim);
+	padding: 8px 12px;
+	border-top: 1px solid var(--border);
+	flex-shrink: 0;
+}
+
+/* ── contenido principal ── */
+.meshterm main {
+	flex: 1;
+	display: flex;
+	gap: 12px;
+	padding: 12px 16px;
+	min-height: 0;
+}
+
+/* ── tabla densa ── */
+.meshterm table.grid {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12.5px;
+}
+.meshterm table.grid th {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--border);
+	font-weight: 400;
+	color: var(--fg-dim);
+	font-size: 10px;
+	letter-spacing: 1px;
+	text-align: left;
+}
+.meshterm table.grid td {
+	padding: 7px 12px;
+	border-bottom: 1px solid var(--border);
+}
+.meshterm table.grid tbody tr {
+	cursor: pointer;
+}
+.meshterm table.grid tbody tr:hover,
+.meshterm table.grid tbody tr.sel {
+	background: var(--fg);
+	color: var(--bg);
+}
+.meshterm table.grid tbody tr:hover .ok,
+.meshterm table.grid tbody tr:hover .warn,
+.meshterm table.grid tbody tr:hover .err,
+.meshterm table.grid tbody tr.sel .ok,
+.meshterm table.grid tbody tr.sel .warn,
+.meshterm table.grid tbody tr.sel .err {
+	color: var(--bg);
+}
+
+.meshterm .ok {
+	color: var(--fg);
+}
+.meshterm .warn {
+	color: var(--warn);
+}
+.meshterm .err {
+	color: var(--err);
+}
+.meshterm .dim {
+	color: var(--fg-dim);
+}
+
+/* ── chat ── */
+.meshterm .convo-item {
+	display: flex;
+	justify-content: space-between;
+	padding: 6px 12px;
+	cursor: pointer;
+}
+.meshterm .convo-item:hover,
+.meshterm .convo-item.active {
+	background: var(--fg);
+	color: var(--bg);
+	font-weight: 700;
+}
+
+.meshterm .unread-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	margin-left: 6px;
+	font-size: 10px;
+	font-weight: 700;
+	line-height: 1;
+	color: var(--bg);
+	background: var(--warn);
+	box-shadow: 0 0 6px color-mix(in srgb, var(--warn) 50%, transparent);
+}
+.meshterm .convo-item.active .unread-badge {
+	background: var(--bg);
+	color: var(--warn);
+}
+
+.meshterm .msg-mine {
+	background: color-mix(in srgb, var(--fg) 8%, transparent);
+	border-left: 2px solid var(--fg);
+	padding-left: 8px;
+	margin-left: -10px;
+}
+.meshterm .msg-mine.failed {
+	border-left-color: var(--err);
+}
+
+/* quote/forward button: dim, revealed on hovering the message */
+.meshterm .quote-btn {
+	font-size: 10px;
+	padding: 0 5px;
+	margin-left: 6px;
+	opacity: 0;
+	transition: opacity 0.1s;
+}
+.meshterm div:hover > .quote-btn {
+	opacity: 0.45;
+}
+.meshterm .quote-btn:hover {
+	opacity: 1;
+}
+
+/* clickable sender name in a message */
+.meshterm .nodelink {
+	cursor: pointer;
+}
+.meshterm .nodelink:hover {
+	text-decoration: underline;
+}
+
+/* node actions context menu */
+.meshterm .menu-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 2000;
+}
+.meshterm .node-menu {
+	position: fixed;
+	z-index: 2001;
+	background: var(--bg);
+	border: 1px solid var(--fg);
+	box-shadow: 0 0 12px var(--glow);
+	display: flex;
+	flex-direction: column;
+	min-width: 150px;
+}
+.meshterm .node-menu-title {
+	font-size: 10px;
+	letter-spacing: 2px;
+	opacity: 0.6;
+	padding: 5px 10px;
+	border-bottom: 1px solid var(--border);
+}
+.meshterm .node-menu button {
+	text-align: left;
+	border: 0;
+	padding: 7px 10px;
+	font-size: 12px;
+}
+.meshterm .node-menu button:hover {
+	background: color-mix(in srgb, var(--fg) 15%, transparent);
+}
+
+/* reference to the message being replied to, shown above the reply */
+.meshterm .reply-ref {
+	font-size: 10px;
+	border-left: 2px solid var(--border);
+	padding-left: 6px;
+	margin-bottom: 1px;
+	max-width: 60ch;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* active reply target, above the input */
+.meshterm .reply-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 3px 14px;
+	border-top: 1px solid var(--border);
+	border-left: 2px solid var(--fg);
+}
+.meshterm .reply-bar span {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* day separator between chat messages */
+.meshterm .chat-daysep {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 8px 0 4px;
+	font-size: 10px;
+	letter-spacing: 2px;
+	text-transform: uppercase;
+	color: var(--fg-dim);
+}
+.meshterm .chat-daysep::before,
+.meshterm .chat-daysep::after {
+	content: "";
+	flex: 1;
+	border-top: 1px solid var(--border);
+}
+
+.meshterm .chat-input {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	border-top: 1px solid var(--border);
+	padding: 10px 14px;
+}
+.meshterm .chat-input .prompt {
+	font-weight: 700;
+	text-shadow: 0 0 6px var(--glow);
+}
+.meshterm .chat-input input {
+	flex: 1;
+	background: transparent;
+	border: none;
+	font-size: 13px;
+	caret-color: var(--fg);
+}
+.meshterm .chat-input input:focus {
+	outline: none;
+}
+.meshterm .cursor {
+	animation: meshterm-blink 1.1s step-end infinite;
+}
+
+/* ── detalle de nodo ── */
+.meshterm .kv {
+	display: grid;
+	grid-template-columns: 100px 1fr;
+	gap: 8px 12px;
+	font-size: 12px;
+	align-content: start;
+	padding: 12px;
+}
+.meshterm .kv .k {
+	color: var(--fg-dim);
+}
+
+/* ── config ── */
+.meshterm .cfg-grid {
+	/* 3 columnas explícitas (no masonry CSS): el orden por columna se
+     controla en el JSX de Config, cada panel con su altura natural */
+	display: flex;
+	align-items: flex-start;
+	flex-wrap: wrap; /* pantallas estrechas: las columnas caen debajo */
+	gap: 12px;
+	max-width: 1650px;
+	width: 100%;
+}
+.meshterm .cfg-col {
+	flex: 1 1 340px;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.meshterm .form-grid {
+	padding: 14px;
+	display: grid;
+	grid-template-columns: 130px minmax(0, 1fr);
+	gap: 10px 12px;
+	align-items: center;
+	font-size: 12px;
+}
+/* los campos sin ancho explícito ocupan su columna en vez de cortarse */
+.meshterm .form-grid input,
+.meshterm .form-grid select {
+	width: 100%;
+}
+.meshterm .form-grid label {
+	color: var(--fg-dim);
+}
+.meshterm .panel-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 10px 14px;
+	border-top: 1px solid var(--border);
+}
+
+/* ── telemetría ── */
+.meshterm .stat-tile {
+	padding: 12px;
+}
+.meshterm .stat-tile .label {
+	font-size: 10px;
+	letter-spacing: 2px;
+	color: var(--fg-dim);
+}
+.meshterm .stat-tile .value {
+	font-size: 22px;
+	font-weight: 700;
+	text-shadow: 0 0 8px var(--glow);
+}
+.meshterm .stat-tile .value small {
+	font-size: 12px;
+	font-weight: 400;
+	color: var(--fg-dim);
+}
+
+/* ── debug ── */
+.meshterm .debuglog {
+	flex: 1;
+	overflow-y: auto;
+	margin: 0;
+	padding: 10px 14px;
+	font-size: 12px;
+	line-height: 1.55;
+	font-family: inherit;
+	white-space: pre-wrap;
+}
+
+/* ── mapa ── */
+.meshterm .map-wrap {
+	flex: 1;
+	position: relative;
+	min-height: 0;
+}
+.meshterm .map-wrap .leaflet-container {
+	height: 100%;
+	background: var(--bg);
+	font-family: inherit;
+}
+.meshterm .map-wrap .leaflet-tile {
+	filter: grayscale(1) invert(1) sepia(1) var(--map-tint) brightness(0.5)
+		contrast(1.15);
+}
+/* la cadena de arriba invierte para que el mapa case con un fondo oscuro; en el
+   tema claro no se invierte: papel claro con el trazo en gris */
+:root.light .meshterm .map-wrap .leaflet-tile {
+	filter: grayscale(1) sepia(0.3) var(--map-tint) brightness(1.05) contrast(0.9);
+}
+.meshterm .map-wrap .leaflet-control-zoom a {
+	background: var(--bg);
+	color: var(--fg);
+	border: 1px solid var(--fg);
+	border-radius: 0;
+}
+.meshterm .map-wrap .leaflet-control-zoom a:hover {
+	background: var(--fg);
+	color: var(--bg);
+}
+.meshterm .map-wrap .leaflet-popup-content-wrapper,
+.meshterm .map-wrap .leaflet-popup-tip {
+	background: var(--bg);
+	color: var(--fg);
+	border: 1px solid var(--fg);
+	border-radius: 0;
+	box-shadow: 0 0 14px color-mix(in srgb, var(--fg) 18%, transparent);
+}
+.meshterm .map-wrap .leaflet-popup-content {
+	font-family: inherit;
+	font-size: 12px;
+	margin: 10px 12px;
+}
+.meshterm .map-wrap .leaflet-tooltip {
+	background: var(--bg);
+	color: var(--fg);
+	border: 1px solid var(--border);
+	border-radius: 0;
+	font-family: inherit;
+	font-size: 11px;
+	padding: 1px 6px;
+}
+.meshterm .map-wrap .leaflet-tooltip::before {
+	display: none;
+}
+.meshterm .map-hud {
+	position: absolute;
+	font-size: 11px;
+	color: var(--fg-dim);
+	z-index: 400;
+	pointer-events: none;
+	background: color-mix(in srgb, var(--bg) 80%, transparent);
+	padding: 1px 6px;
+}
+
+/* ── pie ── */
+.meshterm footer {
+	display: flex;
+	gap: 24px;
+	font-size: 11px;
+	color: var(--fg-dim);
+	padding: 6px 16px;
+	border-top: 1px solid var(--border);
+	flex-shrink: 0;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.meshterm .error {
+	color: var(--err);
+	margin: 4px 16px;
+	font-size: 12px;
+	flex-shrink: 0;
+}

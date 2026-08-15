@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { getSnapshot, subscribe, DeviceStatus, type Message, type NodeEntry } from '../mesh/store';
 import { connectSerial, connectBle, disconnect, sendText } from '../mesh/radio';
+import { t } from '../mesh/i18n';
+import { applyTheme } from '../mesh/theme';
+import Nodes from '../mesh/screens/Nodes';
+import MapView from '../mesh/screens/MapView';
+import Mesh from '../mesh/screens/Mesh';
+import Telemetry from '../mesh/screens/Telemetry';
+import Config from '../mesh/screens/Config';
+import '../mesh/meshterm.css';
 
 /**
  * Mesh — connect a radio, then read and send messages on it.
@@ -19,6 +27,11 @@ const clock = (ms: number) =>
 
 const nodeName = (n: NodeEntry | undefined, num: number) =>
   n?.longName?.trim() || n?.shortName?.trim() || `node ${num.toString(16).slice(-4)}`;
+
+// Sub-views of the ported meshcore-terminal UI, shown once a radio is connected.
+// CHAT is the lilyshark-native thread below; the rest are the ported screens.
+const MESH_VIEWS = ['CHAT', 'NODOS', 'MAPA', 'MALLA', 'TELEMETRÍA', 'CONFIG'] as const;
+type MeshView = (typeof MESH_VIEWS)[number];
 
 function Connect({ onError }: { onError: (m: string) => void }) {
   const [busy, setBusy] = useState<'serial' | 'ble' | null>(null);
@@ -69,9 +82,15 @@ export function MeshTab() {
   const [convo, setConvo] = useState('ch:0');
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<MeshView>('CHAT');
+  const [nodeFocus, setNodeFocus] = useState<number | undefined>(undefined);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const connected = snap.self?.status === DeviceStatus.Connected || snap.nodes.size > 0;
+  // The ported terminal UI reads its palette from CSS vars; apply the saved
+  // theme (lilyshark pink by default) to every .meshterm wrapper on mount.
+  useEffect(() => { applyTheme(); }, []);
+
+  const connected = snap.status === DeviceStatus.Connected || snap.nodes.size > 0;
 
   const contacts = useMemo(() => {
     const list: Array<{ key: string; label: string; sub: string }> = [
@@ -110,6 +129,51 @@ export function MeshTab() {
         <div className="ls-panel"><div className="ls-panel-b"><span className="bad" style={{ fontSize: '0.85rem' }}>{error}</span></div></div>
       )}
 
+      {/* Sub-navigation for the ported terminal views (terminal-styled). */}
+      <div className="meshterm" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '8px 10px', background: 'var(--panel)', border: '1px solid var(--border)' }}>
+        {MESH_VIEWS.map((v) => (
+          <button key={v} type="button" className={`tab${view === v ? ' active' : ''}`} onClick={() => setView(v)}>
+            {t(v)}
+          </button>
+        ))}
+      </div>
+
+      {view !== 'CHAT' && (
+        /* The ported screens expect a full viewport; confine them to the tab's
+           panel area so the lilyshark header/nav stay usable. */
+        <div
+          className="meshterm"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            ...(view === 'MAPA' ? { height: '65vh' } : { maxHeight: '65vh' }),
+            overflowY: 'auto',
+          }}
+        >
+          {view === 'NODOS' && (
+            <Nodes
+              initialSelected={nodeFocus}
+              onOpenDm={(num) => {
+                setConvo(`dm:${num}`);
+                setView('CHAT');
+              }}
+            />
+          )}
+          {view === 'MAPA' && (
+            <MapView
+              onOpenNode={(num) => {
+                setNodeFocus(num);
+                setView('NODOS');
+              }}
+            />
+          )}
+          {view === 'MALLA' && <Mesh />}
+          {view === 'TELEMETRÍA' && <Telemetry />}
+          {view === 'CONFIG' && <Config />}
+        </div>
+      )}
+
+      {view === 'CHAT' && (
       <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'minmax(0, 15rem) minmax(0, 1fr)' }} className="ls-mesh-grid">
         {/* Contacts */}
         <div className="ls-panel" style={{ alignSelf: 'start' }}>
@@ -163,6 +227,7 @@ export function MeshTab() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -330,6 +330,7 @@ const en: Record<string, string> = {
   h: "h",
   "Solo avisa de los nodos marcados con ★ en NODOS, y como mucho una vez cada 6 h por nodo y motivo.":
     "Only warns about nodes marked ★ in NODES, and at most once every 6 h per node and reason.",
+  LILYSHARK: "LILYSHARK",
   "VERDE FÓSFORO": "PHOSPHOR GREEN",
   ÁMBAR: "AMBER",
   CIAN: "CYAN",
