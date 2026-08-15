@@ -130,7 +130,7 @@ Shelby, built on Aptos, provides the storage side: persistent, paid, verifiable 
 
 ![Open stack from LILYGO T-Deck hardware through open radio protocols, Lilyshark firmware, the Shelby pointer convention, and Shelby storage on Aptos to the Lilyshark webapp](design/diagrams/stack.svg)
 
-An interactive 3D walkthrough of this flow — the T-Deck, the mesh, the pointer in flight, and the Shelby resolution — is deployed at [maxmoneycash.github.io/lilyshark](https://maxmoneycash.github.io/lilyshark/) from [site/](site/). It includes a scripted record mode; [docs/DEMO.md](docs/DEMO.md) is the matching video production guide.
+An interactive 3D walkthrough of this flow — the T-Deck, the mesh, the pointer in flight, and the Shelby resolution — ships with the webapp and is served at `/demo` on its deployment, from [webapp/public/demo](webapp/public/demo). It includes a scripted record mode; [docs/DEMO.md](docs/DEMO.md) is the matching video production guide.
 
 ## Radio capture and spectrum scanning
 

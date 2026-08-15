@@ -29,8 +29,8 @@ read the narration over the cut, or record the narration first and cut to it.
 
 | # | Time | Source | On screen | Narration (see full script below) |
 | - | --- | --- | --- | --- |
-| 1 | 0:00–0:08 | `site/` 3D demo, record mode | Cold open: T-Deck standing in a dark field, mesh nodes scattered across terrain, translucent radio rings expanding and overlapping. Caption overlays from record mode are on. | "A flooded LoRa mesh spends most of its airtime repeating itself…" |
-| 2 | 0:08–0:20 | `site/` 3D demo, record mode | The scripted sequence continues: a small glowing packet hops node to node; the camera follows it to the gateway; the gateway beams up to the Shelby lattice and the blob resolves back down. | "…7.36 transmissions per delivered message… reach falls from 68.6 to 25.8 percent…" |
+| 1 | 0:00–0:08 | `/demo` 3D walkthrough, record mode | Cold open: T-Deck standing in a dark field, mesh nodes scattered across terrain, translucent radio rings expanding and overlapping. Caption overlays from record mode are on. | "A flooded LoRa mesh spends most of its airtime repeating itself…" |
+| 2 | 0:08–0:20 | `/demo` 3D walkthrough, record mode | The scripted sequence continues: a small glowing packet hops node to node; the camera follows it to the gateway; the gateway beams up to the Shelby lattice and the blob resolves back down. | "…7.36 transmissions per delivered message… reach falls from 68.6 to 25.8 percent…" |
 | 3 | 0:20–0:28 | LVGL simulator | Traffic view (`.pio/build/simulator/program 1`): dense green-on-black frame feed, one row focused. | "This is Lilyshark: Wireshark for mesh radio…" |
 | 4 | 0:28–0:34 | LVGL simulator | Spectrum view (`program 2`): the SX1262 power-histogram sweep rendering in color. | "…captures Meshtastic, MeshCore, and Reticulum frames straight off the SX1262…" |
 | 5 | 0:34–0:48 | LVGL simulator | Packet detail (`program 5`) on a frame carrying a Shelby pointer: decoded fields — magic `SHLB`, version, flags, 32-byte commitment, owner address, size, expiry — above the raw hex view. Hold this shot; it is the core of the demo. | "Here it decodes something new: a Shelby pointer. Eighty-two bytes…" |
@@ -79,7 +79,7 @@ read the narration over the cut, or record the narration first and cut to it.
 - Do not resize any window mid-shot. Kill notifications (macOS Focus mode).
 - Record narration separately with any USB mic or AirPods in a quiet room;
   one continuous take is easier to cut against than per-shot lines.
-- The `site/` record mode auto-plays its scripted sequence with captions —
+- The `/demo` record mode auto-plays its scripted sequence with captions —
   start the recording, trigger record mode, and do not touch the mouse until
   it finishes.
 - Export: H.264, 1080p, 30 fps is enough. Check audio level peaks around
