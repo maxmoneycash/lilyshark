@@ -20,7 +20,10 @@ The design rule follows directly: **send a reference, let a connected node
 carry the bytes.** The scaling math behind that rule — pointer capacity at
 each architecture step, capture accumulation on Shelby, and the
 reference-vs-payload airtime gap — is modeled with tested invariants in
-`analysis/` (`analysis/results.md`).
+`analysis/` (`analysis/results.md`), the failure-mode counterfactuals are in
+`analysis/results_counterfactuals.md`, and the measured case from the live
+network is in `analysis/results_evidence.md`. For the alternatives question —
+why not the card, S3, IPFS, or Arweave — see `docs/why-shelby.md`.
 
 ## The pointer
 

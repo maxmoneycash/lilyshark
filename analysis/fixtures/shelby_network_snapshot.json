@@ -1,0 +1,531 @@
+{
+  "fetched_at": "2026-08-15T21:37:25Z",
+  "stats": {
+    "totalBlobs": 393000,
+    "totalStorage": 108201321130,
+    "totalStorageFormatted": "100.77 GB",
+    "uploadRate": 0,
+    "timestamp": 1786829842544
+  },
+  "analytics": {
+    "fileTypes": [
+      {
+        "extension": "image",
+        "count": 129751,
+        "totalSize": 33205315752,
+        "totalSizeFormatted": "30.92 GB",
+        "percentage": 33.01552162849873,
+        "color": "#7F8C8D"
+      },
+      {
+        "extension": "other",
+        "count": 66805,
+        "totalSize": 17394809210,
+        "totalSizeFormatted": "16.20 GB",
+        "percentage": 16.998727735368956,
+        "color": "#7F8C8D"
+      },
+      {
+        "extension": "text",
+        "count": 65618,
+        "totalSize": 16634798406,
+        "totalSizeFormatted": "15.49 GB",
+        "percentage": 16.696692111959287,
+        "color": "#7F8C8D"
+      },
+      {
+        "extension": "document",
+        "count": 65510,
+        "totalSize": 16664418707,
+        "totalSizeFormatted": "15.52 GB",
+        "percentage": 16.669211195928753,
+        "color": "#7F8C8D"
+      },
+      {
+        "extension": "json",
+        "count": 65305,
+        "totalSize": 24301565050,
+        "totalSizeFormatted": "22.63 GB",
+        "percentage": 16.61704834605598,
+        "color": "#7F8C8D"
+      },
+      {
+        "extension": "archive",
+        "count": 11,
+        "totalSize": 414005,
+        "totalSizeFormatted": "404.30 KB",
+        "percentage": 0.0027989821882951657,
+        "color": "#7F8C8D"
+      }
+    ],
+    "storageLeaders": [
+      {
+        "address": "0x052e57361f025404fd5c9556e531c1fbb7d3c6e849fb4e4881f7551389ff3739",
+        "addressShort": "0x052e...f3739",
+        "blobCount": 422,
+        "totalSize": 400710506,
+        "totalSizeFormatted": "382.15 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0x141a8b5da194f039af93bdb7df81824a506fe73cade01138d2309aa7d497fddd",
+        "addressShort": "0x141a...7fddd",
+        "blobCount": 9,
+        "totalSize": 80536068,
+        "totalSizeFormatted": "76.81 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0x1074b867e3d759f150e76c940af07e6d0cc2e9d8d7df3db5083042ad7b9de363",
+        "addressShort": "0x1074...de363",
+        "blobCount": 145,
+        "totalSize": 39133215,
+        "totalSizeFormatted": "37.32 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0xb6cf3dd5e92032689f94c9a721c3924c3f64502772de12d80c76d39e228f4048",
+        "addressShort": "0xb6cf...f4048",
+        "blobCount": 147,
+        "totalSize": 36608542,
+        "totalSizeFormatted": "34.91 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0xfab908546420fe1c1a3a0b4d2d39da202b529bf68db5c1a71226d08c46e1d4e6",
+        "addressShort": "0xfab9...1d4e6",
+        "blobCount": 119,
+        "totalSize": 34543695,
+        "totalSizeFormatted": "32.94 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0x54a1a6ffbc62ed147327ea5e6de69fd32f38e18a8f818737ae122d926e8bf770",
+        "addressShort": "0x54a1...bf770",
+        "blobCount": 122,
+        "totalSize": 34513824,
+        "totalSizeFormatted": "32.91 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0x5b72c70649cabb40b6b5f0650dcdf2145d6cc9163f78608d5f7f647201687fb1",
+        "addressShort": "0x5b72...87fb1",
+        "blobCount": 124,
+        "totalSize": 33036761,
+        "totalSizeFormatted": "31.51 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0xca429c5884a9626c1a2533b114624931476e5aa65d2cab2eca6c2b316f65bbcd",
+        "addressShort": "0xca42...5bbcd",
+        "blobCount": 122,
+        "totalSize": 31207821,
+        "totalSizeFormatted": "29.76 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0x5eb39bda94cdc9b7736565cb588988882153e07abed4d4b4113ce2e5a6f119c3",
+        "addressShort": "0x5eb3...119c3",
+        "blobCount": 116,
+        "totalSize": 30956901,
+        "totalSizeFormatted": "29.52 MB",
+        "fileTypes": []
+      },
+      {
+        "address": "0x6fd6d992f1bf63454fc47e701a169e553c6c90f93b114fc06976be9ebb4950e2",
+        "addressShort": "0x6fd6...950e2",
+        "blobCount": 125,
+        "totalSize": 30834859,
+        "totalSizeFormatted": "29.41 MB",
+        "fileTypes": []
+      }
+    ],
+    "totalBlobs": 393000,
+    "totalSize": 108201321130,
+    "totalSizeFormatted": "100.77 GB",
+    "avgBlobSize": 275321.4278117048,
+    "avgBlobSizeFormatted": "268.87 KB",
+    "uniqueOwners": 48272,
+    "blobsPerHour": 0,
+    "bytesPerHour": 0,
+    "bytesPerHourFormatted": "0 B/hr",
+    "timestamp": 1786829848252
+  },
+  "economy": {
+    "leaderboard": [],
+    "volume": {
+      "volume24h": 64767809994,
+      "transferCount24h": 26851,
+      "velocity": 1118.7916666666667
+    },
+    "allTimeStats": {
+      "totalSupply": 0,
+      "totalHolders": 0,
+      "totalTransactions": 8087316,
+      "totalVolume": 25154073100782,
+      "averageTransactionSize": 3110311.6411899817,
+      "firstTransactionVersion": "0",
+      "lastTransactionVersion": "47264581"
+    },
+    "mostActive": [
+      {
+        "address": "0x85fdb9a176ab8ef1d9d9c1b60d60b3924f0800ac1de1cc2085fb0b8bb4988e6a",
+        "txCount": 1475718,
+        "barWidth": 20
+      },
+      {
+        "address": "0x0da46127cf6f09b7595a25547c4cc17b733cdffa40a2caeae8344b12a878cdcd",
+        "txCount": 1475691,
+        "barWidth": 19
+      },
+      {
+        "address": "0x1ae7275148bf6ef742b658fd9cbcc2e094201606f4a7bc707bab0201da8043ee",
+        "txCount": 22645,
+        "barWidth": 1
+      },
+      {
+        "address": "0x06b1210701fa1f05cd4ea85f1711018b32e28023aa245ce19434f55d7b7f74cb",
+        "txCount": 18433,
+        "barWidth": 1
+      },
+      {
+        "address": "0xb66159d270c3d29604a554d2906e0c193d2d0e4cdd8af9c67d4cd3f25ae4d05d",
+        "txCount": 5583,
+        "barWidth": 1
+      },
+      {
+        "address": "0xacd53768ba5c5625f8ccfd9fcab933c9a7cb7e4c7f42bc85076b6f4f5f75373e",
+        "txCount": 2310,
+        "barWidth": 1
+      },
+      {
+        "address": "0x2f4a45123752e718afb99e7fde5683c06bd20229861ede48cfb4fc129080717b",
+        "txCount": 1788,
+        "barWidth": 1
+      },
+      {
+        "address": "0xe8699287ae054121a17a008537521da02c62dfc9a71024b16a8ff074a59e1a81",
+        "txCount": 1774,
+        "barWidth": 1
+      },
+      {
+        "address": "0x0586005fc080fd5628361c885ecfbe3562e780d416dcd6d65e6ee8862f115b80",
+        "txCount": 1773,
+        "barWidth": 1
+      },
+      {
+        "address": "0x8e406660c37e01e1f2d27c4bbb1685ba4c3bb104dafd804782739162441f2972",
+        "txCount": 1771,
+        "barWidth": 1
+      }
+    ],
+    "topSpenders": [
+      {
+        "address": "0xffffffffff5db607152e4a80a86d2953c413be3ed427f9cdfdd05b2e404524c4",
+        "totalSpent": 202400000000,
+        "barWidth": 20
+      },
+      {
+        "address": "0xf3145bde22ae3a721648112f3c83b4b1e9270e966959acc71b620f13d80ce293",
+        "totalSpent": 23800000000,
+        "barWidth": 2
+      },
+      {
+        "address": "0x51f94fd49d9043042cc3ff70d744f5f0aa11d8c772f5c372a9190c4b6064f5a5",
+        "totalSpent": 3500000000,
+        "barWidth": 1
+      },
+      {
+        "address": "0xb66159d270c3d29604a554d2906e0c193d2d0e4cdd8af9c67d4cd3f25ae4d05d",
+        "totalSpent": 2620000000,
+        "barWidth": 1
+      },
+      {
+        "address": "0x01ef6bdbed09115bb5f18d4aad0c75465af78df4f4d4d34856d3d5562b967545",
+        "totalSpent": 1500000000,
+        "barWidth": 1
+      },
+      {
+        "address": "0x7b0c0a8fe6877e2b02918571c1030f0f693bc1da892ecb416798ac97f3562d51",
+        "totalSpent": 550416640,
+        "barWidth": 1
+      },
+      {
+        "address": "0xacd53768ba5c5625f8ccfd9fcab933c9a7cb7e4c7f42bc85076b6f4f5f75373e",
+        "totalSpent": 279088992,
+        "barWidth": 1
+      },
+      {
+        "address": "0x5322ac25e855378909b517008c4a16137fc9dbd6c6ff8c5e762ab887002442e5",
+        "totalSpent": 210000000,
+        "barWidth": 1
+      },
+      {
+        "address": "0x06b1210701fa1f05cd4ea85f1711018b32e28023aa245ce19434f55d7b7f74cb",
+        "totalSpent": 185760000,
+        "barWidth": 1
+      },
+      {
+        "address": "0x1ae7275148bf6ef742b658fd9cbcc2e094201606f4a7bc707bab0201da8043ee",
+        "totalSpent": 185375246,
+        "barWidth": 1
+      }
+    ],
+    "recentTransactions": [
+      {
+        "address": "0xd6e048c1c26236466054937eefbe05e5392f08fa07d792828805b50770583078",
+        "type": "withdraw",
+        "amount": 1488,
+        "version": 47264581
+      },
+      {
+        "address": "0xcbfc3162472d867104033e8801f02d477a45adb7ae349923462d6b9cecf04d01",
+        "type": "withdraw",
+        "amount": 816,
+        "version": 47264570
+      },
+      {
+        "address": "0xc8ae007f8c8886ad3f983e0aa2a0f462ba93ca1b802cc1aba3cea8fa50431265",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264537
+      },
+      {
+        "address": "0x4ea59a98e748253dfd3fe171007b6691e5f1a2db5bb6132771f5d71b11dd1a4d",
+        "type": "withdraw",
+        "amount": 1488,
+        "version": 47264508
+      },
+      {
+        "address": "0xc7a8f5036d8d7a1e030e152b1d1022ac50291a327241b4ec9d7c011ee982cb5c",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264501
+      },
+      {
+        "address": "0xfe9e9c5bb6072fb87e931d322a4d69e6c78a4605400c0936ea96fac6ee1512c3",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264479
+      },
+      {
+        "address": "0x8b0774c68b73740acf8b277f660553564c71c519592a97fb153def1d6d4ad233",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264458
+      },
+      {
+        "address": "0x7c0207fbf55195af84663a4e3781e90290710ab357ee659ca61a18d4f951c73f",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264444
+      },
+      {
+        "address": "0x60989fbe8bc60ec7f5d88dc33320cff65f191920ecf6d5b2550b18fd9c380d14",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264416
+      },
+      {
+        "address": "0xcbfc3162472d867104033e8801f02d477a45adb7ae349923462d6b9cecf04d01",
+        "type": "withdraw",
+        "amount": 384,
+        "version": 47264407
+      },
+      {
+        "address": "0x16249e9b966036ba9a9f85d42f448ae968158043fe8533486ebfd5c2289e95de",
+        "type": "withdraw",
+        "amount": 1248,
+        "version": 47264365
+      },
+      {
+        "address": "0xe54b58d7e3acca2506eaff15d428c3dfb5b26f219d3f5387b6c4ab6533be3488",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264358
+      },
+      {
+        "address": "0xc9278052887a68667e0af3763c66bc58b53b68314fa5f44e1a16bd80530b4436",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264342
+      },
+      {
+        "address": "0x0f44f60376826bb8dea3c4831c26e4d634adb7ed515466a0b970565fec49ff29",
+        "type": "withdraw",
+        "amount": 1488,
+        "version": 47264328
+      },
+      {
+        "address": "0x2f5593de79523ac166e8cb011d664b19ce65dbabeab551778f058ca2b26832f3",
+        "type": "withdraw",
+        "amount": 1488,
+        "version": 47264310
+      },
+      {
+        "address": "0x0d2e3808d14c213cdebae149180ede586da41505d4dfae7f56b68ee0c9093337",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264286
+      },
+      {
+        "address": "0xfb99ed6b982c6084651ea871dc9fe65a3767aec304246584e669bb365971b9cd",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264276
+      },
+      {
+        "address": "0xcb0cc32e9d0d5500e7dd8cae1649857119cc09d05a8b088990ee316ec653b6d8",
+        "type": "deposit",
+        "amount": 10000000,
+        "version": 47264267
+      },
+      {
+        "address": "0x28227109949a9c02041396579eaf8f2c34141eee496c46e4a6dc01d6e04481c8",
+        "type": "withdraw",
+        "amount": 480,
+        "version": 47264260
+      },
+      {
+        "address": "0xbda53fd7f723d1a0a7349809fa4fbd820b8fcc6d965d3035ed67d2bc3f9c2642",
+        "type": "withdraw",
+        "amount": 1488,
+        "version": 47264245
+      }
+    ],
+    "networkActivity": {
+      "activityBreakdown": {
+        "deposits": 2027187,
+        "withdrawals": 1502723,
+        "mints": 0,
+        "burns": 0,
+        "total": 3529910
+      },
+      "activity24h": {
+        "uniqueWallets": 10242,
+        "transactionCount": 26849,
+        "totalVolume": 64767793434,
+        "avgTxSize": 2412298.165071325
+      },
+      "storage24h": {
+        "blobCount": 0,
+        "totalBytes": 0,
+        "uniqueUploaders": 0,
+        "avgBlobSize": 0
+      },
+      "topUploaders": [
+        {
+          "address": "0x052e57361f025404fd5c9556e531c1fbb7d3c6e849fb4e4881f7551389ff3739",
+          "blobCount": 422,
+          "totalBytes": 400710506,
+          "avgBlobSize": 949550.962085308,
+          "topFileType": "other",
+          "addressShort": "0x052e...f3739",
+          "totalBytesFormatted": "382.15 MB"
+        },
+        {
+          "address": "0x141a8b5da194f039af93bdb7df81824a506fe73cade01138d2309aa7d497fddd",
+          "blobCount": 9,
+          "totalBytes": 80536068,
+          "avgBlobSize": 8948452,
+          "topFileType": "other",
+          "addressShort": "0x141a...7fddd",
+          "totalBytesFormatted": "76.81 MB"
+        },
+        {
+          "address": "0x1074b867e3d759f150e76c940af07e6d0cc2e9d8d7df3db5083042ad7b9de363",
+          "blobCount": 145,
+          "totalBytes": 39133215,
+          "avgBlobSize": 269884.2413793103,
+          "topFileType": "other",
+          "addressShort": "0x1074...de363",
+          "totalBytesFormatted": "37.32 MB"
+        },
+        {
+          "address": "0xb6cf3dd5e92032689f94c9a721c3924c3f64502772de12d80c76d39e228f4048",
+          "blobCount": 147,
+          "totalBytes": 36608542,
+          "avgBlobSize": 249037.7006802721,
+          "topFileType": "other",
+          "addressShort": "0xb6cf...f4048",
+          "totalBytesFormatted": "34.91 MB"
+        },
+        {
+          "address": "0xfab908546420fe1c1a3a0b4d2d39da202b529bf68db5c1a71226d08c46e1d4e6",
+          "blobCount": 119,
+          "totalBytes": 34543695,
+          "avgBlobSize": 290283.1512605042,
+          "topFileType": "other",
+          "addressShort": "0xfab9...1d4e6",
+          "totalBytesFormatted": "32.94 MB"
+        },
+        {
+          "address": "0x54a1a6ffbc62ed147327ea5e6de69fd32f38e18a8f818737ae122d926e8bf770",
+          "blobCount": 122,
+          "totalBytes": 34513824,
+          "avgBlobSize": 282900.1967213115,
+          "topFileType": "other",
+          "addressShort": "0x54a1...bf770",
+          "totalBytesFormatted": "32.91 MB"
+        },
+        {
+          "address": "0x5b72c70649cabb40b6b5f0650dcdf2145d6cc9163f78608d5f7f647201687fb1",
+          "blobCount": 124,
+          "totalBytes": 33036761,
+          "avgBlobSize": 266425.4919354839,
+          "topFileType": "image",
+          "addressShort": "0x5b72...87fb1",
+          "totalBytesFormatted": "31.51 MB"
+        },
+        {
+          "address": "0xca429c5884a9626c1a2533b114624931476e5aa65d2cab2eca6c2b316f65bbcd",
+          "blobCount": 122,
+          "totalBytes": 31207821,
+          "avgBlobSize": 255801.81147540984,
+          "topFileType": "image",
+          "addressShort": "0xca42...5bbcd",
+          "totalBytesFormatted": "29.76 MB"
+        },
+        {
+          "address": "0x5eb39bda94cdc9b7736565cb588988882153e07abed4d4b4113ce2e5a6f119c3",
+          "blobCount": 116,
+          "totalBytes": 30956901,
+          "avgBlobSize": 266869.8362068966,
+          "topFileType": "other",
+          "addressShort": "0x5eb3...119c3",
+          "totalBytesFormatted": "29.52 MB"
+        },
+        {
+          "address": "0x6fd6d992f1bf63454fc47e701a169e553c6c90f93b114fc06976be9ebb4950e2",
+          "blobCount": 125,
+          "totalBytes": 30834859,
+          "avgBlobSize": 246678.872,
+          "topFileType": "image",
+          "addressShort": "0x6fd6...950e2",
+          "totalBytesFormatted": "29.41 MB"
+        }
+      ]
+    },
+    "timestamp": 1786829852625
+  },
+  "sync": {
+    "initialSyncComplete": true,
+    "syncInProgress": true,
+    "dbStats": {
+      "activityCount": 3529910,
+      "addressCount": 538296,
+      "lastSyncedVersion": 47264581,
+      "dbSizeBytes": 1128812544
+    },
+    "blobSync": {
+      "syncInProgress": false,
+      "initialSyncComplete": true,
+      "stats": {
+        "totalBlobs": 393000,
+        "totalStorage": 108201321130,
+        "uniqueOwners": 48272,
+        "lastVersion": 13788356
+      }
+    }
+  }
+}

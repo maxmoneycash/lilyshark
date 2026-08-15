@@ -7,6 +7,7 @@
 | [quickstart.md](quickstart.md) | Evaluate the project in ten minutes — no radio required |
 | [architecture.md](architecture.md) | The whole system on one page: firmware, tooling, web app, wire formats |
 | [shelby-off-grid.md](shelby-off-grid.md) | The off-grid design: blobs over a 200-byte pipe, end to end |
+| [why-shelby.md](why-shelby.md) | Why Shelby and not the SD card, S3, IPFS, or Arweave — the honest matrix |
 
 ## Specifications
 
@@ -20,10 +21,12 @@ implementation (C++, TypeScript, Python) accepts exactly the same bytes.
 
 ## Analysis
 
-`analysis/` (repository root) — a parameterized Shelby × LoRa scaling model
-(pointer capacity, capture storage, the reference-vs-payload asymmetry) with
-generated charts and tested invariants. See `analysis/README.md` and
-`analysis/results.md`.
+`analysis/` (repository root) — the quantitative case: a scaling model
+(pointer capacity, capture storage, the reference-vs-payload asymmetry),
+counterfactual failure models (card survival, gateway resolution), and
+**measured evidence from the live Shelby network**. See `analysis/README.md`,
+`analysis/results.md`, `analysis/results_counterfactuals.md`, and
+`analysis/results_evidence.md`.
 
 ## Operating
 
