@@ -12,10 +12,10 @@ import {
  * SHELBY — what the firmware actually does with the storage network, and why.
  *
  * The argument this screen has to land is narrow and physical: a mesh radio
- * cannot carry a capture, but it can carry a receipt for one. Everything here
- * is either the wire format of that receipt, a number derived from the sample
- * capture's own measurements, or a live reading from the indexer — nothing is
- * asserted that the app can't show.
+ * cannot carry a capture, but it can carry a receipt for one. The wire-format
+ * table matches the implemented receipt. The rate model uses
+ * metadata from the bundled synthetic fixture. Network totals come from the
+ * live indexer.
  */
 
 /** Byte layout of the pointer, mirroring include/lilyshark/shelby/shelby_pointer.h. */
@@ -52,11 +52,11 @@ const hhmm = (s: number) => {
 export function ShelbyScreen() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  /** The pointer decoded out of the bundled capture — proof, not an example. */
+  /** Pointer coordinates decoded from the bundled synthetic fixture. */
   const [live, setLive] = useState<{ ptr: ShelbyPointer; offset: number; captureBytes: number } | null>(
     null,
   );
-  /** Effective LoRa throughput, measured from the sample rather than assumed. */
+  /** Effective demo throughput derived from the synthetic sample metadata. */
   const [bps, setBps] = useState<number | null>(null);
 
   useEffect(() => {
@@ -80,8 +80,9 @@ export function ShelbyScreen() {
     };
   }, []);
 
-  // Read the bundled capture once: it carries a real pointer at sequence 9, and
-  // its per-frame airtime is where the throughput figure below comes from.
+  // Read the bundled synthetic fixture once. Its pointer coordinates reference
+  // a real Shelby object, while its generated airtime metadata drives the demo
+  // rate model below.
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -207,10 +208,10 @@ export function ShelbyScreen() {
           <div className="kv">
             <span className="k">RADIO</span>
             <span className="v">{PRESET}</span>
-            <span className="k">MEASURED</span>
+            <span className="k warn">DEMO RATE</span>
             <span className="v">
               {bps ? `${bps.toFixed(0)} bit/s` : "—"}
-              <span className="dim"> from the sample capture</span>
+              <span className="dim"> from synthetic sample metadata</span>
             </span>
             {airtime && live && (
               <>
@@ -234,7 +235,7 @@ export function ShelbyScreen() {
 
           {live && (
             <>
-              <div className="panel-title">DECODED FROM THE SAMPLE</div>
+              <div className="panel-title">DECODED FROM SYNTHETIC SAMPLE</div>
               <div className="kv">
                 <span className="k">FOUND AT</span>
                 <span className="v">byte {live.offset} of the payload</span>

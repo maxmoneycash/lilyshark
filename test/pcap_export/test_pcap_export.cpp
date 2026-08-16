@@ -65,9 +65,31 @@ RawFrame makeFrame()
     frame.rf.snr_db_x10 = -70;
     frame.rf.sync_word = 0x2b;
     frame.rf.direction = FrameDirection::Receive;
+    frame.rf.origin = FrameOrigin::Radio;
     frame.rf.present_fields = RfFieldTimestamp | RfFieldFrequency | RfFieldBandwidth |
                               RfFieldSpreadingFactor | RfFieldRssi | RfFieldSnr | RfFieldSyncWord;
     return frame;
+}
+
+void testSyntheticFrameWritesNothingAndWriterRecovers()
+{
+    FixedSink sink{};
+    PcapLoraTapWriter writer(sink);
+    assert(writer.begin() == PcapWriteResult::Ok);
+    const std::size_t header_size = sink.size();
+    const std::size_t header_writes = sink.writeCount();
+
+    RawFrame frame = makeFrame();
+    frame.rf.origin = FrameOrigin::Synthetic;
+    assert(writer.write(frame) == PcapWriteResult::SyntheticFrame);
+    assert(sink.size() == header_size);
+    assert(sink.writeCount() == header_writes);
+    assert(!writer.failed());
+
+    frame.rf.origin = FrameOrigin::Radio;
+    assert(writer.write(frame) == PcapWriteResult::Ok);
+    assert(sink.size() > header_size);
+    assert(sink.writeCount() == header_writes + 1U);
 }
 
 void testExactGlobalHeaderAndPacketBytes()
@@ -216,6 +238,7 @@ void testFailedRecordWriteLeavesOnlyGlobalHeader()
 int main()
 {
     testExactGlobalHeaderAndPacketBytes();
+    testSyntheticFrameWritesNothingAndWriterRecovers();
     testFrameRecordAndOriginalLength();
     testUnknownRssiNormalizedSyncAndSnrClamping();
     testMalformedBandwidthWritesNothing();

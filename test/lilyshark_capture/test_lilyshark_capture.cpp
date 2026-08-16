@@ -86,7 +86,7 @@ void expectBytes(const FixedSink &sink, const std::uint8_t *expected, std::size_
     assert(std::memcmp(sink.data(), expected, length) == 0);
 }
 
-void testExactVersionOneBytesAnd62500HzBandwidth()
+void testExactVersionOneOneBytesAnd62500HzBandwidth()
 {
     FixedSink sink{};
     LilysharkCaptureWriter writer(sink);
@@ -98,7 +98,7 @@ void testExactVersionOneBytesAnd62500HzBandwidth()
 
     const std::uint8_t expected[] = {
         // File header.
-        0x4c, 0x53, 0x43, 0x50, 0x01, 0x00, 0x00, 0x00,
+        0x4c, 0x53, 0x43, 0x50, 0x01, 0x00, 0x01, 0x00,
         0x18, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x40, 0x42, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00,
         // Record identity, lengths, and sequence.
@@ -122,6 +122,21 @@ void testExactVersionOneBytesAnd62500HzBandwidth()
         0xde, 0xad, 0xbe,
     };
     expectBytes(sink, expected, sizeof(expected));
+}
+
+void testSyntheticOriginSetsMetadataFlag()
+{
+    FixedSink sink{};
+    LilysharkCaptureWriter writer(sink);
+    assert(writer.begin() == LilysharkCaptureWriteResult::Ok);
+
+    RawFrame frame = makeRecord().raw;
+    frame.rf.origin = FrameOrigin::Synthetic;
+    assert(writer.write(frame) == LilysharkCaptureWriteResult::Ok);
+
+    constexpr std::size_t kMetadataFlagsOffset =
+        kLilysharkCaptureFileHeaderSize + 76U;
+    assert(sink.data()[kMetadataFlagsOffset] == 0x07U);
 }
 
 void testBareFrameUsesZeroSequence()
@@ -186,7 +201,8 @@ void testFailedRecordWriteLeavesOnlyFileHeader()
 
 int main()
 {
-    testExactVersionOneBytesAnd62500HzBandwidth();
+    testExactVersionOneOneBytesAnd62500HzBandwidth();
+    testSyntheticOriginSetsMetadataFlag();
     testBareFrameUsesZeroSequence();
     testInvalidFrameDoesNotWritePartialRecord();
     testFailedRecordWriteLeavesOnlyFileHeader();

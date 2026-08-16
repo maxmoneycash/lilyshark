@@ -45,6 +45,13 @@ export const RF_FIELD = {
   frequencyDeviation: 1 << 16,
 } as const;
 
+/** Bit positions in the record header's metadata_flags byte. */
+export const LSCAP_METADATA_FLAG = {
+  implicitHeader: 1 << 0,
+  invertedIq: 1 << 1,
+  synthetic: 1 << 2,
+} as const;
+
 export interface LscapFileHeader {
   majorVersion: number;
   minorVersion: number;
@@ -83,6 +90,9 @@ export interface LscapFrame {
   modulation: Modulation;
   direction: FrameDirection;
   crc: CrcStatus;
+  metadataFlags: number;
+  /** True when the frame was generated rather than received over the air. */
+  synthetic: boolean;
   bytes: Uint8Array;
 }
 
@@ -133,6 +143,7 @@ export function parseLscap(buffer: ArrayBuffer): LscapCapture {
   }
 
   const frames: LscapFrame[] = [];
+  const syntheticSupported = header.minorVersion >= 1;
   // Honour the sizes declared in the file rather than the compile-time constants,
   // so a forward-compatible writer with a larger header still reads correctly.
   let offset = header.fileHeaderSize || LSCAP_FILE_HEADER_SIZE;
@@ -148,6 +159,7 @@ export function parseLscap(buffer: ArrayBuffer): LscapCapture {
     if (payloadStart + capturedLength > buffer.byteLength) {
       break; // final record was cut off mid-flush
     }
+    const metadataFlags = view.getUint8(offset + 76);
 
     frames.push({
       sequence: view.getBigUint64(offset + 12, true),
@@ -178,6 +190,9 @@ export function parseLscap(buffer: ArrayBuffer): LscapCapture {
       modulation: MODULATION[view.getUint8(offset + 73)] ?? 'unknown',
       direction: DIRECTION[view.getUint8(offset + 74)] ?? 'unknown',
       crc: CRC[view.getUint8(offset + 75)] ?? 'unknown',
+      metadataFlags,
+      synthetic:
+        syntheticSupported && (metadataFlags & LSCAP_METADATA_FLAG.synthetic) !== 0,
       bytes: new Uint8Array(buffer, payloadStart, capturedLength),
     });
 

@@ -109,6 +109,7 @@ void testConfigureInterruptReadAndRearm()
     assert(capture.frame.bytes[0] == 0x11U);
     assert(capture.frame.bytes[3] == 0x44U);
     assert(capture.frame.rf.timestamp_us == 123456U);
+    assert(capture.frame.rf.origin == FrameOrigin::Radio);
     assert(capture.frame.rf.coding_rate_denominator == 8U);
     assert(capture.frame.rf.crc == CrcStatus::Invalid);
     assert(capture.frame.rf.radio_status == RADIOLIB_ERR_CRC_MISMATCH);

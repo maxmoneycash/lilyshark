@@ -12,6 +12,7 @@ import {
   summarize,
 } from '../lib/lscap';
 import { demoNextFrame, isDemo } from '../mesh/demo';
+import { startTrafficDemoInterval } from './trafficDemo';
 import {
   DEMO_BLOB,
   fetchBlob as fetchBlobBytes,
@@ -36,20 +37,32 @@ const fmtFreq = (hz: number) =>
 
 const crcClass = (c: LscapFrame['crc']) => (c === 'valid' ? 'ok' : c === 'invalid' ? 'err' : 'dim');
 
-export function TrafficTab() {
+interface TrafficTabProps {
+  /** True only while TerminalApp is showing its synthetic demo state. */
+  demoActive: boolean;
+}
+
+export function TrafficTab({ demoActive }: TrafficTabProps) {
   const [capture, setCapture] = useState<LscapCapture | null>(null);
   const [name, setName] = useState('');
   const [selected, setSelected] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [blob, setBlob] = useState('');
   const [busy, setBusy] = useState(false);
-  // Live mode: synthetic frames keep arriving, the way they would with a
-  // radio listening. On by default while the demo mesh is up, so the screen
-  // is moving from the first second; opening a file of your own pauses it.
-  const [live, setLive] = useState(() => isDemo());
+  // Live demo mode adds synthetic frames at a configured cadence. It is
+  // available only while TerminalApp is showing the demo mesh. Opening a file
+  // pauses it.
+  const [live, setLive] = useState(() => demoActive && isDemo());
   const liveSeq = useRef(1000);
   const fileRef = useRef<HTMLInputElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const demoActiveRef = useRef(demoActive);
+  demoActiveRef.current = demoActive;
+  const simulatedLive = live && demoActive;
+
+  useEffect(() => {
+    if (!demoActive) setLive(false);
+  }, [demoActive]);
 
   const load = (buf: ArrayBuffer, from: string) => {
     try {
@@ -190,7 +203,7 @@ export function TrafficTab() {
     setTrace(null);
   }, [selected, capture]);
 
-  /** Bundled demo capture: 24 frames with a Shelby pointer at sequence 9. */
+  /** Bundled synthetic capture: 24 frames with a Shelby pointer at sequence 9. */
   const openSample = async () => {
     setBusy(true);
     setError(null);
@@ -213,7 +226,7 @@ export function TrafficTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live air: a frame lands every few seconds, timed like a LongFast channel.
+  // Synthetic demo traffic: a frame lands every few seconds.
   // The table follows the newest frame unless the user has scrolled back up
   // to study something — the same follow rule every log viewer uses.
   // Follow from the start — but only once the capture exists; scrolling the
@@ -221,7 +234,7 @@ export function TrafficTab() {
   // with every arrival landing below the fold.
   const followInit = useRef(false);
   useEffect(() => {
-    if (!live) {
+    if (!simulatedLive) {
       followInit.current = false;
       return;
     }
@@ -231,30 +244,32 @@ export function TrafficTab() {
       const el = tableRef.current;
       if (el) el.scrollTop = el.scrollHeight;
     });
-  }, [live, capture]);
+  }, [simulatedLive, capture]);
 
   useEffect(() => {
-    if (!live) return;
-    const id = setInterval(() => {
-      setCapture((c) => {
-        if (!c) return c;
-        const last = c.frames[c.frames.length - 1];
-        const seq = liveSeq.current++;
-        const f = demoNextFrame(
-          seq,
-          Number(last ? last.timestampUs : 0n) + 2_400_000 + (seq % 5) * 640_000,
-        );
-        return { ...c, frames: [...c.frames.slice(-(LIVE_CAP - 1)), f] };
-      });
-      const el = tableRef.current;
-      if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 120) {
-        requestAnimationFrame(() => {
-          el.scrollTop = el.scrollHeight;
+    return startTrafficDemoInterval(
+      simulatedLive,
+      () => demoActiveRef.current,
+      () => {
+        setCapture((c) => {
+          if (!c) return c;
+          const last = c.frames[c.frames.length - 1];
+          const seq = liveSeq.current++;
+          const f = demoNextFrame(
+            seq,
+            Number(last ? last.timestampUs : 0n) + 2_400_000 + (seq % 5) * 640_000,
+          );
+          return { ...c, frames: [...c.frames.slice(-(LIVE_CAP - 1)), f] };
         });
-      }
-    }, 2600);
-    return () => clearInterval(id);
-  }, [live]);
+        const el = tableRef.current;
+        if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 120) {
+          requestAnimationFrame(() => {
+            el.scrollTop = el.scrollHeight;
+          });
+        }
+      },
+    );
+  }, [simulatedLive]);
 
   const frames = capture?.frames ?? [];
   const stats = useMemo(() => summarize(frames), [frames]);
@@ -278,12 +293,17 @@ export function TrafficTab() {
             SAMPLE
           </button>
           <button
-            className={live ? 'primary' : ''}
-            title="synthetic LongFast air, timed like the real channel"
+            className={simulatedLive ? 'primary' : ''}
+            title={
+              demoActive
+                ? 'synthetic LongFast demo, timed like the configured channel'
+                : 'synthetic Traffic demo is disabled while a device is connected'
+            }
+            disabled={!demoActive}
             onClick={() => setLive((v) => !v)}
           >
-            {/* Glyphs the bundled mono actually has — ⏸ fell back to tofu. */}
-            {live ? '● LIVE' : '▶ LIVE'}
+            {/* Glyphs the bundled mono actually has. The pause glyph rendered as tofu. */}
+            {!demoActive ? 'SIM DISABLED' : simulatedLive ? '● SIM LIVE' : '▶ SIM LIVE'}
           </button>
           <input
             ref={fileRef}
@@ -315,7 +335,7 @@ export function TrafficTab() {
             <span className="v dim">
               {busy
                 ? 'reading…'
-                : 'none open. The T-Deck writes .lscap to microSD — load the bundled sample to read 24 frames of LongFast traffic, one of them carrying a Shelby pointer.'}
+                : 'none open. The T-Deck writes .lscap to microSD. Load the bundled sample to inspect 24 synthetic LongFast frames, including one Shelby pointer.'}
             </span>
           </div>
         )}
@@ -370,6 +390,7 @@ export function TrafficTab() {
                     <th>SF/CR</th>
                     <th>RSSI</th>
                     <th>SNR</th>
+                    <th>ORIGIN</th>
                     <th>CRC</th>
                   </tr>
                 </thead>
@@ -404,6 +425,9 @@ export function TrafficTab() {
                       </td>
                       <td>{hasField(fr, RF_FIELD.rssi) ? fr.rssiDbm.toFixed(1) : '—'}</td>
                       <td>{hasField(fr, RF_FIELD.snr) ? fr.snrDb.toFixed(1) : '—'}</td>
+                      <td className={fr.synthetic ? 'warn' : 'dim'}>
+                        {fr.synthetic ? 'SIM' : 'UNMARKED'}
+                      </td>
                       <td className={crcClass(fr.crc)}>{fr.crc}</td>
                     </tr>
                   ))}
@@ -414,6 +438,11 @@ export function TrafficTab() {
 
             <div className="panel-foot">
               {frames.length} FRAMES · {pointers.filter(Boolean).length} SHELBY POINTER(S)
+              {frames.some((fr) => fr.synthetic) && (
+                <span className="warn">
+                  {frames.filter((fr) => fr.synthetic).length} SYNTHETIC · NOT OTA
+                </span>
+              )}
               {frames.some((fr) => fr.truncated) && (
                 <span className="dim">* = FRAME TRUNCATED AT CAPTURE</span>
               )}
@@ -460,6 +489,10 @@ export function TrafficTab() {
               </span>
               <span className="k">INTEGRITY</span>
               <span className={`v ${crcClass(f.crc)}`}>{f.crc}</span>
+              <span className="k">ORIGIN</span>
+              <span className={`v ${f.synthetic ? 'warn' : 'dim'}`}>
+                {f.synthetic ? 'SYNTHETIC · NOT OTA' : 'UNMARKED'}
+              </span>
             </div>
 
             {ptr && (

@@ -16,6 +16,9 @@ static_assert(static_cast<std::uint8_t>(CrcStatus::Unknown) == 0);
 static_assert(static_cast<std::uint8_t>(CrcStatus::NotPresent) == 1);
 static_assert(static_cast<std::uint8_t>(CrcStatus::Valid) == 2);
 static_assert(static_cast<std::uint8_t>(CrcStatus::Invalid) == 3);
+static_assert(static_cast<std::uint8_t>(FrameOrigin::Unknown) == 0);
+static_assert(static_cast<std::uint8_t>(FrameOrigin::Radio) == 1);
+static_assert(static_cast<std::uint8_t>(FrameOrigin::Synthetic) == 2);
 static_assert(RfFieldTimestamp == (1U << 0));
 static_assert(RfFieldFrequency == (1U << 1));
 static_assert(RfFieldBandwidth == (1U << 2));
@@ -61,8 +64,10 @@ std::uint8_t metadataFlags(const RfMetadata &metadata) noexcept
 {
     constexpr std::uint8_t kImplicitHeader = 1U << 0;
     constexpr std::uint8_t kInvertedIq = 1U << 1;
+    constexpr std::uint8_t kSynthetic = 1U << 2;
     return static_cast<std::uint8_t>((metadata.implicit_header ? kImplicitHeader : 0U) |
-                                     (metadata.inverted_iq ? kInvertedIq : 0U));
+                                     (metadata.inverted_iq ? kInvertedIq : 0U) |
+                                     (metadata.origin == FrameOrigin::Synthetic ? kSynthetic : 0U));
 }
 
 } // namespace
@@ -82,7 +87,7 @@ LilysharkCaptureWriteResult LilysharkCaptureWriter::begin() noexcept
     header[2] = 'C';
     header[3] = 'P';
     putLe16(header + 4, 1); // Format major version.
-    putLe16(header + 6, 0); // Format minor version.
+    putLe16(header + 6, 1); // Format minor version.
     putLe16(header + 8, static_cast<std::uint16_t>(kLilysharkCaptureFileHeaderSize));
     putLe16(header + 10, static_cast<std::uint16_t>(kLilysharkCaptureRecordHeaderSize));
     putLe32(header + 12, 0);       // File flags, reserved for v1 extensions.

@@ -19,7 +19,12 @@
  * other, which is what makes the screens readable.
  */
 
-import { type LscapFrame, RF_FIELD, SHELBY_POINTER_SIZE } from "../lib/lscap";
+import {
+  type LscapFrame,
+  LSCAP_METADATA_FLAG,
+  RF_FIELD,
+  SHELBY_POINTER_SIZE,
+} from "../lib/lscap";
 import { DEMO_BLOB } from "../lib/shelby";
 import {
   ContactType,
@@ -244,7 +249,7 @@ function demoPointerBytes(_seed: number): Uint8Array {
 
 /**
  * The next frame heard on the demo air. Timing and airtime follow LongFast
- * (SF11 · BW250 · CR4/5 at ~987 bit/s, the figure measured from the sample).
+ * (SF11 · BW250 · CR4/5 at ~987 bit/s, derived from synthetic sample metadata).
  */
 export function demoNextFrame(seq: number, timestampUs: number): LscapFrame {
   const pointer = seq % 9 === 4;
@@ -288,6 +293,8 @@ export function demoNextFrame(seq: number, timestampUs: number): LscapFrame {
     modulation: "lora",
     direction: "rx",
     crc: seq % 13 === 7 ? "invalid" : "valid",
+    metadataFlags: LSCAP_METADATA_FLAG.synthetic,
+    synthetic: true,
     bytes,
   };
 }

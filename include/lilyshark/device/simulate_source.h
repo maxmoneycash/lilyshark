@@ -5,10 +5,10 @@
 // A LoRa analyzer with no mesh around it shows empty tables, which makes the
 // interface impossible to exercise on the bench and impossible to show anyone.
 // Simulate mode fabricates frames that look like a plausible LongFast channel
-// and hands them to the same ingest path a real SX1262 frame takes, so every
-// screen, every decoder, every capture writer behaves exactly as it does on
-// the air. Nothing about the rendering, storage, or decode path is special
-// cased for it.
+// and hands them to the same ingest path a real SX1262 frame takes. Screens and
+// decoders therefore exercise the production path. Native .lscap records carry
+// an explicit synthetic flag, while the LoRaTap writer rejects synthetic
+// frames because that format has no compatible provenance field.
 //
 // It is off by default, persists across reboots, and is announced in the UI
 // whenever it is on: a capture produced in simulate mode must never be

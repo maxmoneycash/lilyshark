@@ -38,5 +38,5 @@ counterfactual failure models (card survival, gateway resolution), and
 ## Sample data
 
 `samples/sample-mesh-traffic.lscap` (repository root) — a deterministic
-24-frame capture carrying a Shelby pointer at sequence 9. See
+synthetic 24-frame capture carrying a Shelby pointer at sequence 9. See
 `samples/README.md`.

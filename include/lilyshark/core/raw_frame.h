@@ -27,6 +27,12 @@ enum class CrcStatus : std::uint8_t {
     Invalid,
 };
 
+enum class FrameOrigin : std::uint8_t {
+    Unknown = 0,
+    Radio,
+    Synthetic,
+};
+
 enum RfField : std::uint32_t {
     RfFieldNone = 0,
     RfFieldTimestamp = 1U << 0,
@@ -74,6 +80,7 @@ struct RfMetadata {
     Modulation modulation = Modulation::Unknown;
     FrameDirection direction = FrameDirection::Unknown;
     CrcStatus crc = CrcStatus::Unknown;
+    FrameOrigin origin = FrameOrigin::Unknown;
     bool implicit_header = false;
     bool inverted_iq = false;
 

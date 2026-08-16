@@ -169,9 +169,9 @@ ReticulumDecoder reticulum_decoder{};
 ShelbyPointerDecoder shelby_pointer_decoder{};
 TDeckRadioService radio_service{};
 TDeckHardwareStatus hardware_status{};
-// Simulate mode's synthetic frame source. It feeds on_radio_frame() exactly as
-// the SX1262 does, so no screen, decoder, or capture writer knows the
-// difference — which is the point: simulate mode exercises the real pipeline.
+// Simulate mode exercises the real decoder and analyzer path. Its frames carry
+// explicit provenance in native captures, stay out of LoRaTap PCAP, and cannot
+// mix with live SX1262 traffic because receive is paused while the mode is on.
 lilyshark::device::SimulateSource simulate_source{};
 TDeckTouch touch_service{};
 TDeckSdByteSink pcap_sink{};
@@ -195,6 +195,7 @@ bool first_frame_event_recorded = false;
 bool observed_radio_initialized = false;
 bool observed_radio_receiving = false;
 bool pcap_bandwidth_warning_recorded = false;
+bool pcap_synthetic_warning_recorded = false;
 std::uint32_t last_ui_refresh_ms = 0;
 std::uint32_t last_hardware_ui_refresh_ms = 0;
 std::uint32_t last_dynamic_ui_refresh_ms = 0;
@@ -715,9 +716,15 @@ lv_obj_t * put_clipped_label(lv_obj_t * parent, const char * value, lv_coord_t x
 void add_status_bar(lv_obj_t * parent, const char * title, const char * left_value = "BAT 100%",
                     const char * middle_value = "GPS LOCK", const char * right_value = "18 pkt/min")
 {
+    lv_color_t middle_color = theme::text();
 #if defined(LILYSHARK_DEVICE)
     left_value = live_battery_label;
-    middle_value = live_gps_label;
+    if(app_settings.simulate_mode) {
+        middle_value = "SIM MODE";
+        middle_color = theme::amber();
+    } else {
+        middle_value = live_gps_label;
+    }
     right_value = live_radio_label;
 #endif
     lv_obj_t * bar = theme::rect(parent, 0, 0, theme::screen_width, theme::status_height, theme::surface());
@@ -731,7 +738,7 @@ void add_status_bar(lv_obj_t * parent, const char * title, const char * left_val
 
     put_label(bar, left_value, 8, 4, theme::text(), &font_mono_semibold_12);
     theme::rule_line(bar, 78, 3, 1, 15, theme::rule());
-    put_label(bar, middle_value, 88, 4, theme::text(), &font_mono_semibold_12);
+    put_label(bar, middle_value, 88, 4, middle_color, &font_mono_semibold_12);
 
     if(title_left >= 245) {
         theme::rule_line(bar, 164, 3, 1, 15, theme::rule());
@@ -1252,7 +1259,10 @@ void build_traffic(lv_obj_t * parent)
     const auto &store = capture_runtime.frames();
 
     if(store.empty()) {
-        put_label(parent, "LISTENING FOR FRAMES", 8, 48, theme::lime(), &font_condensed_bold_16);
+        put_label(parent, app_settings.simulate_mode ? "GENERATING SYNTHETIC FRAMES" :
+                                                       "LISTENING FOR FRAMES",
+                  8, 48, app_settings.simulate_mode ? theme::amber() : theme::lime(),
+                  &font_condensed_bold_16);
         const RadioProfile &profile = radio_service.activeProfile();
         char line[64]{};
         std::snprintf(line, sizeof(line), "%s", profile.name);
@@ -1315,6 +1325,10 @@ void build_traffic(lv_obj_t * parent)
         std::snprintf(snr, sizeof(snr), "%+.1f", static_cast<double>(record->raw.rf.snr_db_x10) / 10.0);
 
         put_label(parent, time, 5, y, row_color, &font_mono_10);
+        if(record->raw.rf.origin == FrameOrigin::Synthetic) {
+            put_label(parent, "S", 50, y,
+                      selected ? theme::text() : theme::pink(), &font_mono_10);
+        }
         put_label(parent, source, 59, y, row_color, &font_mono_10);
         put_label(parent, ">", 122, y, row_color, &font_mono_10);
         put_label(parent, destination, 133, y, row_color, &font_mono_10);
@@ -1528,6 +1542,18 @@ void build_spectrum(lv_obj_t * parent)
 #if defined(LILYSHARK_DEVICE)
     {
     add_status_bar(parent, spectrum_title);
+    if(app_settings.simulate_mode) {
+        put_centered_label(parent, "LIVE RF SPECTRUM PAUSED", 68,
+                           theme::amber(), &font_condensed_bold_16);
+        put_centered_label(parent, "Simulate mode generates packet traffic only.", 101,
+                           theme::text(), &font_mono_10);
+        put_centered_label(parent, "Turn it off for an SX1262 spectral sweep.", 119,
+                           theme::text_muted(), &font_mono_10);
+        theme::rule_line(parent, 0, 198, 320);
+        put_centered_label(parent, "SIMULATED / NOT AN RF MEASUREMENT", 207,
+                           theme::amber(), &font_mono_semibold_12);
+        return;
+    }
     const SpectrumSweepStatus &status = radio_service.spectrumStatus();
     const SpectrumSweepResult &result = radio_service.spectrumResult();
     const SpectrumSweepRequest planned_request = spectrum_request_for_profile(
@@ -2018,9 +2044,10 @@ void build_packet_detail(lv_obj_t * parent)
     format_node(destination, sizeof(destination), record->decoded, FieldDestination);
     std::snprintf(line, sizeof(line), "%s  >  %s", source, destination);
     put_label(parent, line, 49, 29, theme::text(), &font_mono_semibold_12);
-    std::snprintf(line, sizeof(line), "%s  %s  %s  %u B", protocolName(record->decoded.protocol),
+    std::snprintf(line, sizeof(line), "%s  %s  %s  %u B%s", protocolName(record->decoded.protocol),
                   packetKindLabel(record->decoded), decodeStateLabel(record->decoded.state),
-                  record->raw.captured_length);
+                  record->raw.captured_length,
+                  record->raw.rf.origin == FrameOrigin::Synthetic ? "  SIM" : "");
     put_label(parent, line, 49, 50,
               record->decoded.state == DecodeState::Malformed ? theme::fault() : theme::amber(),
               &font_mono_10);
@@ -2199,12 +2226,21 @@ void build_packet_detail(lv_obj_t * parent)
                       record->raw.wasTruncated() ? "TRUNCATED" : "COMPLETE");
         put_label(parent, line, 49, 155,
                   record->raw.wasTruncated() ? theme::amber() : theme::lime(), &font_mono_10);
-        std::snprintf(line, sizeof(line), "RF FIELDS 0x%08lX",
-                      static_cast<unsigned long>(record->raw.rf.present_fields));
+        const char *origin = record->raw.rf.origin == FrameOrigin::Synthetic ? "SYNTHETIC" :
+                             (record->raw.rf.origin == FrameOrigin::Radio ? "RADIO" : "UNKNOWN");
+        std::snprintf(line, sizeof(line), "ORIGIN %s%s", origin,
+                      record->raw.rf.origin == FrameOrigin::Synthetic ? " / NOT OTA" : "");
         put_label(parent, line, 49, 174, theme::text(), &font_mono_10);
-        std::snprintf(line, sizeof(line), "FNV32 %08lX   NOW LSCAP %s  PCAP %s",
-                      static_cast<unsigned long>(fingerprint),
-                      native_capture_recording ? "ON" : "OFF", pcap_recording ? "ON" : "OFF");
+        if(record->raw.rf.origin == FrameOrigin::Synthetic) {
+            std::snprintf(line, sizeof(line), "FNV32 %08lX   LSCAP %s  PCAP SKIP",
+                          static_cast<unsigned long>(fingerprint),
+                          native_capture_recording ? "SIM" : "OFF");
+        } else {
+            std::snprintf(line, sizeof(line), "FNV32 %08lX   LSCAP %s  PCAP %s",
+                          static_cast<unsigned long>(fingerprint),
+                          native_capture_recording ? "ON" : "OFF",
+                          pcap_recording ? "ON" : "OFF");
+        }
         put_label(parent, line, 49, 193, theme::cyan(), &font_mono_10);
     }
     put_label(parent, "LEFT / RIGHT  SECTION", 83, 216, theme::cyan(), &font_mono_10);
@@ -3530,6 +3566,7 @@ bool capture_session_active() noexcept
 bool capture_data_recording() noexcept
 {
 #if defined(LILYSHARK_DEVICE)
+    if(app_settings.simulate_mode) return native_capture_recording;
     const bool compatible_pcap = pcap_recording &&
                                  last_pcap_result != PcapWriteResult::InvalidBandwidth;
     return native_capture_recording || compatible_pcap;
@@ -3541,6 +3578,10 @@ bool capture_data_recording() noexcept
 const char *capture_summary_value() noexcept
 {
 #if defined(LILYSHARK_DEVICE)
+    if(app_settings.simulate_mode) {
+        if(native_capture_recording) return "SIM LSCAP";
+        return app_settings.capture_enabled ? "SIM RETRY" : "OFF";
+    }
     const bool compatible_pcap = pcap_recording &&
                                  last_pcap_result != PcapWriteResult::InvalidBandwidth;
     if(native_capture_recording && compatible_pcap) return "LSCAP + PCAP";
@@ -3556,6 +3597,10 @@ const char *capture_summary_value() noexcept
 lv_color_t capture_summary_color() noexcept
 {
 #if defined(LILYSHARK_DEVICE)
+    if(app_settings.simulate_mode) {
+        return native_capture_recording ? theme::lime() :
+               (app_settings.capture_enabled ? theme::amber() : theme::text_muted());
+    }
     const bool compatible_pcap = pcap_recording &&
                                  last_pcap_result != PcapWriteResult::InvalidBandwidth;
     if(native_capture_recording && compatible_pcap) return theme::lime();
@@ -3761,15 +3806,17 @@ void build_onboarding_readiness(lv_obj_t * parent)
     const char *sd_state = sd_io_error ? "I/O ERROR" : (sd_mounted ? "READY" : "NO CARD");
     const char *gps_state = hardware.gps.state == GpsState::Fix ? "FIX" :
                             (hardware.gps.state == GpsState::Searching ? "SEARCHING" : "OPTIONAL / N/A");
-    const char *radio_state = radio.receiving ? "LISTENING" :
-                              (radio.initialized ? "RECOVERING" : "OFFLINE");
+    const char *radio_state = app_settings.simulate_mode ? "SIMULATED" :
+                              (radio.receiving ? "LISTENING" :
+                               (radio.initialized ? "RECOVERING" : "OFFLINE"));
     const char *capture_state = capture_summary_value();
     const std::array<StatusRow, 6> rows = {{
         {"PROFILE", profile.name, theme::cyan()},
         {"INPUT", input_state, keyboard_ready ? theme::lime() : theme::amber()},
         {"MICROSD", sd_state, sd_mounted && !sd_io_error ? theme::lime() : theme::amber()},
         {"GPS", gps_state, hardware.gps.state == GpsState::Fix ? theme::lime() : theme::text_muted()},
-        {"RADIO", radio_state, radio.receiving ? theme::lime() : theme::fault()},
+        {"RADIO", radio_state, app_settings.simulate_mode ? theme::amber() :
+                                (radio.receiving ? theme::lime() : theme::fault())},
         {"CAPTURE", capture_state, capture_summary_color()},
     }};
 #else
@@ -3811,8 +3858,10 @@ void build_home(lv_obj_t * parent)
     const RadioProfile &profile = shell_active_profile();
     char line[48]{};
 #if defined(LILYSHARK_DEVICE)
-    put_label(parent, radio_service.status().receiving ? "LISTENING" : "RADIO OFFLINE", 112, 29,
-              radio_service.status().receiving ? theme::lime() : theme::fault(),
+    put_label(parent, app_settings.simulate_mode ? "SIMULATED TRAFFIC" :
+                  (radio_service.status().receiving ? "LISTENING" : "RADIO OFFLINE"), 112, 29,
+              app_settings.simulate_mode ? theme::amber() :
+                  (radio_service.status().receiving ? theme::lime() : theme::fault()),
               &font_mono_semibold_12);
 #else
     put_label(parent, "LISTENING", 112, 29, theme::lime(), &font_mono_semibold_12);
@@ -3887,7 +3936,8 @@ void build_settings(lv_obj_t * parent)
         if(index == 0) value = shell_active_profile().name;
 #if defined(LILYSHARK_DEVICE)
         else if(index == 1) value = capture_summary_value();
-        else if(index == 2) value = radio_service.status().receiving ? "READY" : "CHECK";
+        else if(index == 2) value = app_settings.simulate_mode ? "SIM" :
+                                    (radio_service.status().receiving ? "READY" : "CHECK");
 #else
         else if(index == 1) value = capture_summary_value();
         else if(index == 2) value = "READY";
@@ -3904,28 +3954,46 @@ void build_storage(lv_obj_t * parent)
     add_shell_header(parent, "CAPTURE & STORAGE");
 #if defined(LILYSHARK_DEVICE)
     const char *sd_value = sd_io_error ? "I/O ERROR" : (sd_mounted ? "READY" : "NO CARD");
-    const char *native_value = native_capture_recording ? "RECORDING" : "OFF";
+    const char *native_value = app_settings.simulate_mode
+        ? (native_capture_recording ? "SIM RECORDING" : "OFF")
+        : (native_capture_recording ? "RECORDING" : "OFF");
     const bool pcap_limit = last_pcap_result == PcapWriteResult::InvalidBandwidth;
-    const char *pcap_value = pcap_limit ? "UNSUPPORTED BW" :
-                             (pcap_recording ? "RECORDING" : "OFF");
+    const char *pcap_value = app_settings.simulate_mode
+        ? (pcap_recording ? "SKIPS SIM" : "OFF") :
+                             (pcap_limit ? "UNSUPPORTED BW" :
+                              (pcap_recording ? "RECORDING" : "OFF"));
+    const lv_color_t native_color = native_capture_recording ? theme::lime() : theme::amber();
 #else
     const char *sd_value = "READY";
     const char *native_value = app_settings.capture_enabled ? "RECORDING" : "OFF";
     const char *pcap_value = app_settings.capture_enabled ? "RECORDING" : "OFF";
+    const lv_color_t native_color = app_settings.capture_enabled
+        ? theme::lime() : theme::amber();
 #endif
     const bool capture_active = capture_data_recording();
     const bool capture_open = capture_session_active();
+#if defined(LILYSHARK_DEVICE)
+    const bool capture_action_active = app_settings.simulate_mode
+        ? native_capture_recording : capture_open;
+    const char *mode_value = app_settings.simulate_mode
+        ? (native_capture_recording ? "SYNTHETIC" :
+           (app_settings.capture_enabled ? "RETRY NEEDED" : "OFF")) :
+                             (capture_active ? "RECORDING" :
+                             (capture_open ? "NOT RECORDING" :
+                              (app_settings.capture_enabled ? "RETRY NEEDED" : "OFF")));
+#else
+    const bool capture_action_active = capture_open;
     const char *mode_value = capture_active ? "RECORDING" :
                              (capture_open ? "NOT RECORDING" :
                               (app_settings.capture_enabled ? "RETRY NEEDED" : "OFF"));
+#endif
     struct Row { const char *label; const char *value; lv_color_t color; bool selected; };
     const std::array<Row, 4> rows = {{
         {"CAPTURE MODE", mode_value,
          capture_active ? theme::lime() :
          (app_settings.capture_enabled ? theme::amber() : theme::text_muted()), true},
         {"MICROSD", sd_value, std::strcmp(sd_value, "READY") == 0 ? theme::lime() : theme::amber()},
-        {"LILYSHARK CAPTURE", native_value,
-         std::strcmp(native_value, "RECORDING") == 0 ? theme::lime() : theme::amber(), false},
+        {"LILYSHARK CAPTURE", native_value, native_color, false},
         {"WIRESHARK PCAP", pcap_value,
          std::strcmp(pcap_value, "RECORDING") == 0 ? theme::lime() : theme::amber(), false},
     }};
@@ -3936,10 +4004,15 @@ void build_storage(lv_obj_t * parent)
     }
 #if defined(LILYSHARK_DEVICE)
     put_label(parent, "LSCAP", 8, 148, theme::text_muted(), &font_mono_10);
-    put_label(parent, native_capture_path[0] ? native_capture_path : "No writable capture file",
+    put_label(parent, native_capture_recording && native_capture_path[0]
+                  ? native_capture_path : "No active Lilyshark capture file",
               51, 148, theme::text(), &font_mono_10);
     put_label(parent, "PCAP", 8, 164, theme::text_muted(), &font_mono_10);
-    put_label(parent, pcap_path[0] ? pcap_path : "No Wireshark capture file",
+    put_label(parent, app_settings.simulate_mode
+                  ? (pcap_recording ? "Header only - synthetic frames excluded"
+                                    : "No active Wireshark capture file")
+                  : (pcap_recording && pcap_path[0]
+                         ? pcap_path : "No active Wireshark capture file"),
               51, 164, theme::text(), &font_mono_10);
 #else
     put_label(parent, app_settings.capture_enabled
@@ -3949,11 +4022,25 @@ void build_storage(lv_obj_t * parent)
                           ? "PCAP   /lilyshark/capture-0001.pcap" : "PCAP   No active file",
               8, 164, theme::text(), &font_mono_10);
 #endif
-    put_label(parent, "LSCAP keeps full RF metadata at every bandwidth.", 8, 183,
+    const char *capture_note = "LSCAP keeps full RF metadata at every bandwidth.";
+    if(app_settings.simulate_mode) {
+#if defined(LILYSHARK_DEVICE)
+        capture_note = native_capture_recording
+            ? "LSCAP marks simulation; PCAP remains OTA-only."
+            : (app_settings.capture_enabled
+                   ? "LSCAP unavailable; PCAP cannot store simulation."
+                   : "Capture is off; analysis stays in memory.");
+#else
+        capture_note = app_settings.capture_enabled
+            ? "LSCAP marks simulation; PCAP remains OTA-only."
+            : "Capture is off; analysis stays in memory.";
+#endif
+    }
+    put_label(parent, capture_note, 8, 183,
               theme::text_muted(), &font_mono_10);
-    const char *capture_action = capture_open ? "ENTER  STOP CAPTURE" :
-                                 (app_settings.capture_enabled ? "ENTER  RETRY CAPTURE"
-                                                               : "ENTER  START CAPTURE");
+    const char *capture_action = capture_action_active ? "ENTER  STOP CAPTURE" :
+                                  (app_settings.capture_enabled ? "ENTER  RETRY CAPTURE"
+                                                                : "ENTER  START CAPTURE");
 #if defined(LILYSHARK_DEVICE)
     constexpr const char *screenshot_action = "S  SCREENSHOT";
 #else
@@ -3979,8 +4066,11 @@ void build_device_status(lv_obj_t * parent)
         ? (touch_ready ? "KB / BALL / TOUCH" : "KB / BALL")
         : (touch_ready ? "BALL / TOUCH" : "BALL ONLY");
     const std::array<Row, 7> rows = {{
-        {"SX1262", radio.receiving ? "LISTENING" : (radio.initialized ? "RECOVERING" : "OFFLINE"),
-         radio.receiving ? theme::lime() : theme::fault()},
+        {"SX1262", app_settings.simulate_mode ? "PAUSED / SIM" :
+                    (radio.receiving ? "LISTENING" :
+                     (radio.initialized ? "RECOVERING" : "OFFLINE")),
+         app_settings.simulate_mode ? theme::amber() :
+             (radio.receiving ? theme::lime() : theme::fault())},
         {"MICROSD", sd_io_error ? "I/O ERROR" : (sd_mounted ? "READY" : "NOT FOUND"),
          sd_mounted && !sd_io_error ? theme::lime() : theme::amber()},
         {"PSRAM SPECTRUM", spectrum_buffer != nullptr ? "READY" : "UNAVAILABLE",
@@ -4006,9 +4096,11 @@ void build_device_status(lv_obj_t * parent)
     }
 #if defined(LILYSHARK_DEVICE)
     add_action_strip(parent, "BACK",
-                     radio_service.status().receiving ? "STATUS UPDATES LIVE"
-                                                      : "ENTER  RETRY RADIO",
-                     radio_service.status().receiving ? theme::text_muted() : theme::amber());
+                     app_settings.simulate_mode ? "SIM MODE / RADIO PAUSED" :
+                     (radio_service.status().receiving ? "STATUS UPDATES LIVE"
+                                                       : "ENTER  RETRY RADIO"),
+                     app_settings.simulate_mode ? theme::amber() :
+                     (radio_service.status().receiving ? theme::text_muted() : theme::amber()));
 #else
     add_action_strip(parent, "BACK", "STATUS UPDATES LIVE", theme::text_muted());
 #endif
@@ -4232,7 +4324,10 @@ bool update_live_radio_label() noexcept
 {
     char next_label[sizeof(live_radio_label)]{};
     const RadioStatus &status = radio_service.status();
-    if(!status.initialized) {
+    if(app_settings.simulate_mode) {
+        std::snprintf(next_label, sizeof(next_label), "SIM %lu",
+                      static_cast<unsigned long>(simulate_source.emitted()));
+    } else if(!status.initialized) {
         std::snprintf(next_label, sizeof(next_label), "RF ERR %d", status.last_error);
     } else if(!status.receiving) {
         std::snprintf(next_label, sizeof(next_label), "RX STOP %d", status.last_error);
@@ -4246,14 +4341,16 @@ bool update_live_radio_label() noexcept
     return changed;
 }
 
-void on_radio_frame(const RawFrame &frame, const RadioProfile &profile, void *) noexcept
+void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
+                           bool allow_capture) noexcept
 {
+    const bool synthetic = frame.rf.origin == FrameOrigin::Synthetic;
     const FrameRecord *previous_newest = newestMatchingFrame(
         capture_runtime.frames(), traffic_filter, 0U);
     const bool follow_newest = traffic_selected_sequence == 0 ||
                                (previous_newest != nullptr &&
                                 traffic_selected_sequence == previous_newest->sequence);
-    const IngestResult ingest = capture_runtime.ingest(frame, profile);
+    (void)capture_runtime.ingest(frame, profile);
     if(follow_newest) {
         const FrameRecord *newest_filtered = newestMatchingFrame(
             capture_runtime.frames(), traffic_filter, 0U);
@@ -4264,15 +4361,19 @@ void on_radio_frame(const RawFrame &frame, const RadioProfile &profile, void *) 
     if(stored != nullptr) (void)rolling_diagnostics.ingest(*stored);
     if(!first_frame_event_recorded) {
         char message[80]{};
-        std::snprintf(message, sizeof(message), "First %s frame  RSSI %.1f  SNR %.1f",
+        std::snprintf(message, sizeof(message), "First %s%s frame  RSSI %.1f  SNR %.1f",
+                      synthetic ? "simulated " : "",
                       protocol_abbreviation(profile.protocol_hint),
                       static_cast<double>(frame.rf.rssi_dbm_x10) / 10.0,
                       static_cast<double>(frame.rf.snr_db_x10) / 10.0);
-        record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Radio, message);
+        record_runtime_event(synthetic ? RuntimeEventSeverity::Warning
+                                       : RuntimeEventSeverity::Success,
+                             synthetic ? RuntimeEventType::System : RuntimeEventType::Radio,
+                             message);
         first_frame_event_recorded = true;
     }
     if(survey_running && stored != nullptr) survey_accumulator.ingest(*stored);
-    if(native_capture_recording) {
+    if(allow_capture && native_capture_recording) {
         last_native_capture_result = stored != nullptr
             ? native_capture_writer.write(*stored)
             : LilysharkCaptureWriteResult::InvalidFrame;
@@ -4284,9 +4385,18 @@ void on_radio_frame(const RawFrame &frame, const RadioProfile &profile, void *) 
                                  "Native capture write failed; recording stopped");
         }
     }
-    if(pcap_recording) {
+    if(allow_capture && pcap_recording) {
         last_pcap_result = pcap_writer.write(frame);
-        if(last_pcap_result == PcapWriteResult::InvalidBandwidth &&
+        if(last_pcap_result == PcapWriteResult::SyntheticFrame &&
+           !pcap_synthetic_warning_recorded) {
+            record_runtime_event(native_capture_recording ? RuntimeEventSeverity::Info
+                                                          : RuntimeEventSeverity::Error,
+                                 RuntimeEventType::Capture,
+                                 native_capture_recording
+                                     ? "PCAP excludes simulated frames; marked LSCAP remains complete"
+                                     : "PCAP excludes simulated frames; no native capture is active");
+            pcap_synthetic_warning_recorded = true;
+        } else if(last_pcap_result == PcapWriteResult::InvalidBandwidth &&
            !pcap_bandwidth_warning_recorded) {
             record_runtime_event(native_capture_recording ? RuntimeEventSeverity::Warning
                                                           : RuntimeEventSeverity::Error,
@@ -4297,6 +4407,7 @@ void on_radio_frame(const RawFrame &frame, const RadioProfile &profile, void *) 
             pcap_bandwidth_warning_recorded = true;
         } else if(last_pcap_result == PcapWriteResult::Ok) {
             pcap_bandwidth_warning_recorded = false;
+            pcap_synthetic_warning_recorded = false;
         }
         if(last_pcap_result == PcapWriteResult::SinkError) {
             pcap_recording = false;
@@ -4307,6 +4418,72 @@ void on_radio_frame(const RawFrame &frame, const RadioProfile &profile, void *) 
         }
     }
     live_data_dirty = true;
+    update_live_radio_label();
+}
+
+void on_radio_frame(const RawFrame &frame, const RadioProfile &profile, void *) noexcept
+{
+    if(app_settings.simulate_mode) return;
+    ingest_analyzer_frame(frame, profile, true);
+}
+
+void reset_analysis_for_source_change() noexcept
+{
+    capture_runtime.frames().clear();
+    rolling_diagnostics.reset();
+    survey_accumulator.reset();
+    survey_running = false;
+    survey_has_result = false;
+    survey_elapsed_ms = 0U;
+    survey_last_accounted_ms = 0U;
+    traffic_selected_sequence = 0U;
+    packet_detail_sequence = 0U;
+    packet_detail_byte_offset = 0U;
+    packet_detail_tab = 0U;
+    node_selection_valid = false;
+    node_detail_selection_valid = false;
+    first_frame_event_recorded = false;
+    live_data_dirty = true;
+}
+
+void apply_simulate_mode_runtime(bool enabled) noexcept
+{
+    const RadioProfile profile = radio_service.activeProfile();
+    simulate_source.reset();
+    reset_analysis_for_source_change();
+    if(capture_session_active()) stop_capture_session();
+
+    bool radio_ready = radio_service.status().receiving;
+    if(enabled) {
+        radio_service.stop();
+        radio_service.clearSpectrumResult();
+        radio_ready = true;
+    } else {
+        radio_ready = radio_service.begin(profile, on_radio_frame, nullptr);
+    }
+
+    const bool capture_requested = app_settings.capture_enabled;
+    const bool capture_ready = !capture_requested ||
+        (start_capture_session() && (!enabled || native_capture_recording));
+    const char *capture_event = !capture_requested
+        ? (enabled ? "Simulate mode active; capture remains off"
+                   : "Simulate mode off; capture remains off")
+        : (enabled
+               ? (capture_ready
+                      ? "Synthetic LSCAP started; PCAP excludes simulated frames"
+                      : "Simulate mode active, but synthetic LSCAP could not start")
+               : (capture_ready
+                      ? "Radio-only capture restored after Simulate mode"
+                      : "Simulate mode off, but capture could not restart"));
+    record_runtime_event(capture_ready ? RuntimeEventSeverity::Info
+                                       : RuntimeEventSeverity::Error,
+                         RuntimeEventType::Capture, capture_event);
+    if(!enabled && !radio_ready) {
+        record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Radio,
+                             "Simulate mode off; SX1262 receive is recovering");
+    }
+    observed_radio_initialized = radio_service.status().initialized;
+    observed_radio_receiving = radio_service.status().receiving;
     update_live_radio_label();
 }
 
@@ -4399,6 +4576,12 @@ bool apply_builtin_profile(std::size_t candidate_index) noexcept
     if(count == 0U) return false;
     candidate_index %= count;
     const RadioProfile &next = builtinProfiles()[candidate_index];
+    if(app_settings.simulate_mode) {
+        std::snprintf(shell_notice, sizeof(shell_notice), "TURN OFF SIM / PROFILE UNCHANGED");
+        record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Profile,
+                             "Radio profile changes require Simulate mode off");
+        return false;
+    }
     const bool ready = radio_service.setProfile(next);
     if(ready) {
         active_profile_index = candidate_index;
@@ -4447,6 +4630,12 @@ void cycle_active_profile() noexcept
 
 void apply_tuned_profile(const RadioProfile &candidate, const char *action) noexcept
 {
+    if(app_settings.simulate_mode) {
+        Serial.printf("Lilyshark profile tune blocked in Simulate mode: %s\n", action);
+        record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Profile,
+                             "Radio tuning requires Simulate mode off");
+        return;
+    }
     const RadioProfile &current = radio_service.activeProfile();
     if(candidate.center_frequency_hz == current.center_frequency_hz &&
        candidate.bandwidth_hz == current.bandwidth_hz &&
@@ -4730,7 +4919,7 @@ bool handle_shell_navigation_key(std::uint32_t key)
             }
             case ShellRoute::DeviceStatus:
 #if defined(LILYSHARK_DEVICE)
-                if(!radio_service.status().receiving) {
+                if(!app_settings.simulate_mode && !radio_service.status().receiving) {
                     radio_service.setProfile(radio_service.activeProfile());
                     update_live_radio_label();
                 }
@@ -4757,7 +4946,11 @@ bool handle_shell_navigation_key(std::uint32_t key)
                 spectrum_confirmation_selection = spectrum_scan_mode == SpectrumScanMode::FastNarrow
                     ? 1U : 2U;
 #if defined(LILYSHARK_DEVICE)
-                if(survey_running) {
+                if(app_settings.simulate_mode) {
+                    record_runtime_event(RuntimeEventSeverity::Warning,
+                                         RuntimeEventType::Spectrum,
+                                         "Spectrum requires live RF; turn off Simulate mode");
+                } else if(survey_running) {
                     record_runtime_event(RuntimeEventSeverity::Warning,
                                          RuntimeEventType::Spectrum,
                                          "Spectrum scan blocked while survey is running");
@@ -4808,7 +5001,11 @@ bool handle_shell_navigation_key(std::uint32_t key)
                     set_backlight(app_settings.display_brightness);
                     keyboard_ready = set_keyboard_brightness(app_settings.keyboard_brightness);
                     hardware_status.begin(app_settings.gps_enabled);
-                    if(!capture_session_active()) (void)start_capture_session();
+                    if(previous.simulate_mode) {
+                        apply_simulate_mode_runtime(false);
+                    } else if(!capture_session_active()) {
+                        (void)start_capture_session();
+                    }
                     record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::System,
                                          "First-run setup preferences reset");
 #endif
@@ -4822,8 +5019,24 @@ bool handle_shell_navigation_key(std::uint32_t key)
             case ShellRoute::Storage:
 #if defined(LILYSHARK_DEVICE)
             {
+                if(app_settings.simulate_mode && app_settings.capture_enabled &&
+                   !native_capture_recording) {
+                    stop_capture_session();
+                    const bool restarted = start_capture_session();
+                    capture_settings_save_failed = false;
+                    record_runtime_event(restarted && native_capture_recording
+                                             ? RuntimeEventSeverity::Success
+                                             : RuntimeEventSeverity::Error,
+                                         RuntimeEventType::Capture,
+                                         restarted && native_capture_recording
+                                             ? "Synthetic LSCAP capture restarted"
+                                             : "Synthetic LSCAP capture could not restart");
+                    build_current_screen();
+                    break;
+                }
                 const AppSettings previous = app_settings;
-                const bool was_active = capture_session_active();
+                const bool was_active = app_settings.simulate_mode
+                    ? native_capture_recording : capture_session_active();
                 if(was_active) {
                     stop_capture_session();
                     app_settings.capture_enabled = false;
@@ -4963,9 +5176,6 @@ bool handle_shell_navigation_key(std::uint32_t key)
                 app_settings.resume_last_view = !app_settings.resume_last_view;
             } else {
                 app_settings.simulate_mode = !app_settings.simulate_mode;
-#if defined(LILYSHARK_DEVICE)
-                simulate_source.reset();
-#endif
             }
 #if defined(LILYSHARK_DEVICE)
             if(!write_app_settings()) {
@@ -4993,9 +5203,10 @@ bool handle_shell_navigation_key(std::uint32_t key)
                                              ? "Startup will resume the last live view"
                                              : "Startup will open Home");
                 } else if(display_input_selection == 4U) {
+                    apply_simulate_mode_runtime(app_settings.simulate_mode);
                     record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::System,
                                          app_settings.simulate_mode
-                                             ? "Simulate mode ON - frames are synthetic, not received"
+                                             ? "Simulate mode ON - live RF ignored; frames are synthetic"
                                              : "Simulate mode off - showing radio traffic only");
                 }
             }
@@ -5368,7 +5579,11 @@ void handle_navigation_key(uint32_t key)
 #if defined(LILYSHARK_DEVICE)
         if(current_screen == Screen::spectrum) {
             if(spectrum_buffer == nullptr) return;
-            if(radio_service.spectrumStatus().active()) {
+            if(app_settings.simulate_mode) {
+                record_runtime_event(RuntimeEventSeverity::Warning,
+                                     RuntimeEventType::Spectrum,
+                                     "Spectrum requires live RF; turn off Simulate mode");
+            } else if(radio_service.spectrumStatus().active()) {
                 radio_service.cancelSpectrumSweep();
                 record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Spectrum,
                                      "Spectrum scan cancelled; restoring packet receive");
@@ -5411,7 +5626,7 @@ void handle_navigation_key(uint32_t key)
             } else if(radio_service.spectrumStatus().active()) {
                 record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Survey,
                                      "Survey blocked while spectrum scan is running");
-            } else if(!radio_service.status().receiving) {
+            } else if(!app_settings.simulate_mode && !radio_service.status().receiving) {
                 record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Survey,
                                      "Survey unavailable while packet receive is offline");
             } else {
@@ -5421,7 +5636,9 @@ void handle_navigation_key(uint32_t key)
                 survey_elapsed_ms = 0U;
                 survey_last_accounted_ms = millis();
                 record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::Survey,
-                                     "60-second field survey started");
+                                     app_settings.simulate_mode
+                                         ? "60-second simulated survey started"
+                                         : "60-second field survey started");
             }
             build_current_screen();
         }
@@ -7421,6 +7638,8 @@ void stop_capture_session() noexcept
     native_capture_recording = false;
     last_pcap_result = PcapWriteResult::NotStarted;
     last_native_capture_result = LilysharkCaptureWriteResult::NotStarted;
+    pcap_bandwidth_warning_recorded = false;
+    pcap_synthetic_warning_recorded = false;
     if(!flushed) {
         sd_io_error = true;
         record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Storage,
@@ -7448,6 +7667,7 @@ bool start_capture_session() noexcept
     pcap_writer.reset();
     native_capture_writer.reset();
     pcap_bandwidth_warning_recorded = false;
+    pcap_synthetic_warning_recorded = false;
     pcap_path[0] = '\0';
     native_capture_path[0] = '\0';
     if(pcap_sink.openNextCapture(pcap_path, sizeof(pcap_path))) {
@@ -7461,6 +7681,22 @@ bool start_capture_session() noexcept
         native_capture_recording =
             last_native_capture_result == LilysharkCaptureWriteResult::Ok;
         if(!native_capture_recording) native_capture_sink.close();
+    }
+
+    if(app_settings.simulate_mode) {
+        if(native_capture_recording) {
+            sd_io_error = false;
+            record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Capture,
+                                 pcap_recording
+                                     ? "Synthetic LSCAP started; PCAP will skip simulated frames"
+                                     : "Synthetic LSCAP session started");
+        } else {
+            record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Capture,
+                                 pcap_recording
+                                     ? "PCAP cannot store simulation; native LSCAP unavailable"
+                                     : "Synthetic capture files could not be opened on SD");
+        }
+        return native_capture_recording;
     }
 
     if(native_capture_recording && pcap_recording) {
@@ -7708,25 +7944,36 @@ void setup()
             Serial.println("Lilyshark fallback profile settings were not saved");
         }
     }
+    if(app_settings.simulate_mode) {
+        radio_service.stop();
+        radio_service.clearSpectrumResult();
+        simulate_source.reset();
+        reset_analysis_for_source_change();
+    }
     update_live_radio_label();
-    const char *radio_state = radio_ready ? "listening" :
-        (radio_service.status().initialized ? "recovering" : "failed");
+    const char *radio_state = app_settings.simulate_mode ? "simulate mode / SX1262 paused" :
+        (radio_ready ? "listening" :
+         (radio_service.status().initialized ? "recovering" : "failed"));
     Serial.printf("Lilyshark radio: %s%s (%s, error %d)\n", initial_profile.name,
                   restored_profile ? " [saved settings]" : "",
                   radio_state, radio_service.status().last_error);
     observed_radio_initialized = radio_service.status().initialized;
     observed_radio_receiving = radio_service.status().receiving;
     char radio_event[88]{};
-    if(fallback_profile_save_failed) {
+    if(app_settings.simulate_mode) {
+        std::snprintf(radio_event, sizeof(radio_event),
+                      "Simulate mode restored; SX1262 receive paused");
+    } else if(fallback_profile_save_failed) {
         std::snprintf(radio_event, sizeof(radio_event), "%s: listening, fallback save failed",
                       initial_profile.name);
     } else {
         std::snprintf(radio_event, sizeof(radio_event), "%s: %s, error %d", initial_profile.name,
                       radio_state, radio_service.status().last_error);
     }
-    record_runtime_event(fallback_profile_save_failed ? RuntimeEventSeverity::Warning :
+    record_runtime_event(app_settings.simulate_mode ? RuntimeEventSeverity::Warning :
+                         (fallback_profile_save_failed ? RuntimeEventSeverity::Warning :
                          (radio_service.status().receiving ? RuntimeEventSeverity::Success
-                                                           : RuntimeEventSeverity::Warning),
+                                                           : RuntimeEventSeverity::Warning)),
                          RuntimeEventType::Radio, radio_event);
 
     startup_services_complete = true;
@@ -7754,13 +8001,13 @@ void loop()
     poll_keyboard();
     poll_touch();
     hardware_status.poll();
-    radio_service.poll();
+    if(!app_settings.simulate_mode) radio_service.poll();
 
     const uint32_t now = millis();
     bool redraw = false;
-    // Simulate mode: hand a fabricated frame to the very same callback the
-    // radio driver calls, so ingest, decode, capture and every screen behave
-    // identically to a real reception.
+    // Synthetic traffic exercises the real decoder, analyzer and native
+    // capture path. The live radio is stopped, and PCAP explicitly excludes
+    // synthetic frames because LoRaTap v0 has no provenance field.
     if(app_settings.simulate_mode && simulate_source.due(now)) {
         const RadioProfile &profile = radio_service.activeProfile();
         const RawFrame frame = simulate_source.next(now,
@@ -7769,7 +8016,7 @@ void loop()
                                                     profile.spreading_factor,
                                                     profile.coding_rate_denominator,
                                                     profile.id);
-        on_radio_frame(frame, profile, nullptr);
+        ingest_analyzer_frame(frame, profile, true);
         redraw = true;
     }
 
@@ -7820,7 +8067,8 @@ void loop()
         // Count only time in which the receiver is genuinely listening. Radio
         // recovery and spectrum standby must not make a 60-second survey claim
         // observation time that never occurred.
-        if(radio_status.receiving && !spectrum_status.active()) {
+        if((app_settings.simulate_mode || radio_status.receiving) &&
+           !spectrum_status.active()) {
             const std::uint32_t remaining = 60000U - survey_elapsed_ms;
             survey_elapsed_ms += since_last_accounting < remaining
                 ? since_last_accounting : remaining;

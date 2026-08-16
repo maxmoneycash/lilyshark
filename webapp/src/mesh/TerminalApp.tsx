@@ -661,7 +661,9 @@ function App() {
           </main>
         }
       >
-      {tab === "TRAFFIC" && <TrafficTab />}
+      {tab === "TRAFFIC" && (
+        <TrafficTab demoActive={!connected && !everConnectedRef.current} />
+      )}
       {tab === "SHELBY" && <ShelbyScreen />}
       {tab === "INTRO" && <IntroTab onOpen={(next) => setTab(next as Tab)} />}
       {tab === "PAPER" && <WhitepaperTab />}

@@ -43,7 +43,7 @@ Lilyshark is firmware plus a web analyzer that reads what the firmware records.
 | | Where | What it does |
 | --- | --- | --- |
 | **Firmware** | `src/`, `include/` | Captures LoRa frames off the SX1262 with their radio measurements. Writes `.lscap` and LoRaTap PCAP to microSD. |
-| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app (ported from the [bundled meshcore-terminal source](webapp/src/mesh/), MIT, recolored Lilyshark pink): the **TRAFFIC** screen opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, capture statistics, inline Shelby-pointer decode — the **SHELBY** screen shows the off-grid storage design with airtime math measured from the sample capture, and CHAT/NODES/MAP/MESH/TELEMETRY drive a real radio over USB or Bluetooth. Without a radio attached, the app seeds a demo mesh around Palo Alto so every screen shows live-shaped data. |
+| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app (ported from the [bundled meshcore-terminal source](webapp/src/mesh/), MIT, recolored Lilyshark pink): the **TRAFFIC** screen opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, capture statistics, inline Shelby-pointer decode — the **SHELBY** screen shows the off-grid storage design with an airtime model derived from bundled synthetic sample metadata, and CHAT/NODES/MAP/MESH/TELEMETRY drive a real radio over USB or Bluetooth. Without a radio attached, the app seeds an explicitly synthetic demo mesh around Palo Alto so every screen shows useful, moving data. |
 
 Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAMPLE** on the TRAFFIC screen, and select frame 9 — it carries a Shelby pointer, decoded inline.
 
@@ -57,12 +57,12 @@ Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAM
     <td align="center"><sub>PAPER — the 63-page whitepaper, pre-rendered and scrollable</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="design/previews/webapp-traffic.png" alt="TRAFFIC — live frames streaming, frame 9 carrying a Shelby pointer"></td>
-    <td width="50%"><img src="design/previews/webapp-shelby.png" alt="SHELBY — why an 82-byte pointer, with airtime measured from the capture"></td>
+    <td width="50%"><img src="design/previews/webapp-traffic.png" alt="TRAFFIC — synthetic demo frames marked not OTA, with frame 9 carrying a Shelby pointer"></td>
+    <td width="50%"><img src="design/previews/webapp-shelby.png" alt="SHELBY — why an 82-byte pointer, with demo airtime derived from synthetic sample metadata"></td>
   </tr>
   <tr>
-    <td align="center"><sub>TRAFFIC — live frames streaming, frame 9 carrying a Shelby pointer</sub></td>
-    <td align="center"><sub>SHELBY — why an 82-byte pointer, with airtime measured from the capture</sub></td>
+    <td align="center"><sub>TRAFFIC — synthetic demo frames marked NOT OTA; frame 9 carries a Shelby pointer</sub></td>
+    <td align="center"><sub>SHELBY — demo airtime derived from synthetic sample metadata</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="design/previews/webapp-chat.png" alt="CHAT — channel traffic with per-message SNR and hop count"></td>
@@ -438,11 +438,17 @@ Insert a writable microSD card before boot. Lilyshark mounts it, creates `/lilys
 
 | Output | Path | Use |
 | --- | --- | --- |
-| Lilyshark capture | `/lilyshark/capture-####.lscap` | Protocol-neutral format that preserves every recorded RF field and supports settings such as 62.5 kHz bandwidth. The version 1 layout is documented in [docs/lilyshark-capture-format.md](docs/lilyshark-capture-format.md). |
-| LoRaTap PCAP | `/lilyshark/capture-####.pcap` | Standard PCAP with DLT 270 LoRaTap records for Wireshark and compatible tools. |
+| Lilyshark capture | `/lilyshark/capture-####.lscap` | Protocol-neutral format that preserves every recorded RF field and supports settings such as 62.5 kHz bandwidth. Version 1.1 marks each synthetic frame in metadata bit 2. The layout is documented in [docs/lilyshark-capture-format.md](docs/lilyshark-capture-format.md). |
+| LoRaTap PCAP | `/lilyshark/capture-####.pcap` | Standard PCAP with DLT 270 LoRaTap records for Wireshark and compatible tools. Synthetic frames are skipped because LoRaTap v0 cannot carry their provenance. |
 | Screenshot | `/lilyshark/screenshot-####.bmp` | Pixel-exact 320x240, uncompressed 24-bit BMP captured from the device display when `S` is pressed. |
 
 LoRaTap v0 cannot represent every bandwidth exactly. The included MeshCore 62.5 kHz profile therefore continues recording `.lscap` while the Events view reports the PCAP bandwidth limit. Profiles at 125 kHz or exact multiples can produce LoRaTap records. Capture sinks flush every five seconds during normal operation. A short write or a post-flush size mismatch closes that file and latches a storage error. After restoring writable storage, open **Settings → Capture & Storage** and retry capture to create new unique files; reboot if the card itself was reinserted after the SPI stack reported a mount failure.
+
+Native captures keep per-frame provenance. Metadata flag bit 2 means the frame
+was generated by simulate mode. A clear bit in a legacy version 1.0 file does
+not prove over-the-air origin. The LoRaTap writer returns a distinct
+`SyntheticFrame` result without writing a packet, which prevents generated
+traffic from entering a PCAP that could be mistaken for an RF capture.
 
 Capture timestamps are monotonic microseconds since boot. That preserves order
 and intervals, but the original T-Deck has no dependable real-time clock, so

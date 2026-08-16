@@ -74,8 +74,8 @@ RawFrame SimulateSource::next(std::uint32_t now_ms,
 
     std::size_t length = 0;
     if (carriesPointer(sequence)) {
-        // A pointer riding behind an enclosing protocol header, exactly as it
-        // arrives off the air.
+        // A pointer riding behind an enclosing protocol header, matching the
+        // placement used by an on-air payload.
         std::uint8_t header[kEnclosingHeaderBytes]{};
         fillPayload(header, sizeof(header), sequence * 7U + 3U);
 
@@ -107,6 +107,7 @@ RawFrame SimulateSource::next(std::uint32_t now_ms,
     }
 
     RfMetadata &rf = frame.rf;
+    rf.origin = FrameOrigin::Synthetic;
     rf.timestamp_us = static_cast<std::uint64_t>(now_ms) * 1000ULL;
     rf.center_frequency_hz = center_frequency_hz;
     rf.bandwidth_hz = bandwidth_hz;
