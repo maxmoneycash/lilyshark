@@ -1215,6 +1215,109 @@ bool persistedSimulateModeScenario()
     return true;
 }
 
+bool captureDisabledSimulateModeScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+
+    lilyshark::AppSettings settings = lilyshark::defaultAppSettings();
+    settings.onboarding_version = lilyshark::kAppSettingsOnboardingVersion;
+    settings.onboarding_complete = true;
+    settings.capture_enabled = false;
+    if(!require(seedAppSettings(settings),
+                "capture-disabled app settings could not be encoded")) return false;
+
+    setup();
+
+    auto &radio = radiolib_fake::state();
+    lilyshark::AppSettings persisted{};
+    if(!require(state().files.empty() && radio.dio1_action != nullptr &&
+                    loadSavedAppSettings(persisted) && !persisted.capture_enabled &&
+                    !persisted.simulate_mode,
+                "capture-disabled startup did not remain live and file-free")) return false;
+
+    sendKeyboard('8');
+    for(std::size_t index = 0U; index < 3U; ++index) {
+        sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    }
+    sendKeyboard('\r');
+    for(std::size_t index = 0U; index < 4U; ++index) {
+        sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    }
+    if(!require(hasLabel(lv_screen_active(), "DISPLAY & INPUT") &&
+                    hasLabel(lv_screen_active(), "SIMULATE MODE") &&
+                    hasLabel(lv_screen_active(), "OFF"),
+                "capture-disabled transition did not reach Simulate mode control")) return false;
+
+    const std::vector<std::uint8_t> disabled_settings = state().saved_app_settings;
+    const std::size_t begin_calls_before_failed_enable = radio.begin_calls;
+    const std::size_t receive_calls_before_failed_enable = radio.start_receive_calls;
+    state().fail_app_settings_put = true;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "OFF") &&
+                    hasLabel(lv_screen_active(), "SAVE FAILED - VALUE RESTORED") &&
+                    state().saved_app_settings == disabled_settings &&
+                    loadSavedAppSettings(persisted) && !persisted.capture_enabled &&
+                    !persisted.simulate_mode,
+                "failed capture-disabled Simulate save did not restore settings")) return false;
+    if(!require(state().files.empty() && radio.dio1_action != nullptr &&
+                    radio.begin_calls == begin_calls_before_failed_enable &&
+                    radio.start_receive_calls == receive_calls_before_failed_enable,
+                "failed capture-disabled Simulate save changed runtime state")) return false;
+
+    state().fail_app_settings_put = false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "ON - SYNTHETIC") &&
+                    loadSavedAppSettings(persisted) && !persisted.capture_enabled &&
+                    persisted.simulate_mode && state().files.empty() &&
+                    radio.dio1_action == nullptr,
+                "capture-disabled Simulate enable opened capture or left radio live")) return false;
+
+    sendKeyboard('7');
+    if(!require(hasLabel(lv_screen_active(), "Simulate mode active; capture remains off") &&
+                    !hasLabel(lv_screen_active(),
+                              "Synthetic LSCAP started; PCAP excludes simulated frames"),
+                "capture-disabled Simulate enable reported a false capture session")) return false;
+
+    sendKeyboard('8');
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_UP));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_UP));
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "CAPTURE & STORAGE") &&
+                    labelCount(lv_screen_active(), "OFF") == 3U &&
+                    hasLabel(lv_screen_active(), "No active Lilyshark capture file") &&
+                    hasLabel(lv_screen_active(), "No active Wireshark capture file") &&
+                    hasLabel(lv_screen_active(), "Capture is off; analysis stays in memory.") &&
+                    hasLabel(lv_screen_active(), "ENTER  START CAPTURE") &&
+                    !hasLabel(lv_screen_active(),
+                              "Header only - synthetic frames excluded"),
+                "capture-disabled Simulate storage UI implied an active session")) return false;
+
+    sendKeyboard('8');
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard('\r');
+    const std::size_t begin_calls_before_disable = radio.begin_calls;
+    const std::size_t receive_calls_before_disable = radio.start_receive_calls;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "OFF") &&
+                    loadSavedAppSettings(persisted) && !persisted.capture_enabled &&
+                    !persisted.simulate_mode && state().files.empty(),
+                "capture-disabled Simulate disable changed capture preference or files")) return false;
+    if(!require(radio.dio1_action != nullptr &&
+                    radio.begin_calls == begin_calls_before_disable + 1U &&
+                    radio.start_receive_calls == receive_calls_before_disable + 1U,
+                "capture-disabled Simulate disable did not restore packet receive")) return false;
+
+    sendKeyboard('7');
+    if(!require(hasLabel(lv_screen_active(), "Simulate mode off; capture remains off") &&
+                    !hasLabel(lv_screen_active(),
+                              "Radio-only capture restored after Simulate mode"),
+                "capture-disabled Simulate disable reported a false capture session")) return false;
+    return true;
+}
+
 bool capturePreferenceSaveFailureScenario()
 {
     device_shell_fake::reset();
@@ -1400,6 +1503,8 @@ void testDeviceShellEntryPath()
                                   "display-input-save-failure device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(persistedSimulateModeScenario),
                                   "persisted-simulate-mode device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(captureDisabledSimulateModeScenario),
+                                  "capture-disabled-simulate-mode device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(capturePreferenceSaveFailureScenario),
                                   "capture-preference-save-failure device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(corruptSettingsScenario),

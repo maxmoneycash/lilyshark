@@ -4004,11 +4004,15 @@ void build_storage(lv_obj_t * parent)
     }
 #if defined(LILYSHARK_DEVICE)
     put_label(parent, "LSCAP", 8, 148, theme::text_muted(), &font_mono_10);
-    put_label(parent, native_capture_path[0] ? native_capture_path : "No writable capture file",
+    put_label(parent, native_capture_recording && native_capture_path[0]
+                  ? native_capture_path : "No active Lilyshark capture file",
               51, 148, theme::text(), &font_mono_10);
     put_label(parent, "PCAP", 8, 164, theme::text_muted(), &font_mono_10);
-    put_label(parent, app_settings.simulate_mode ? "Header only - synthetic frames excluded" :
-                  (pcap_path[0] ? pcap_path : "No Wireshark capture file"),
+    put_label(parent, app_settings.simulate_mode
+                  ? (pcap_recording ? "Header only - synthetic frames excluded"
+                                    : "No active Wireshark capture file")
+                  : (pcap_recording && pcap_path[0]
+                         ? pcap_path : "No active Wireshark capture file"),
               51, 164, theme::text(), &font_mono_10);
 #else
     put_label(parent, app_settings.capture_enabled
@@ -4018,9 +4022,21 @@ void build_storage(lv_obj_t * parent)
                           ? "PCAP   /lilyshark/capture-0001.pcap" : "PCAP   No active file",
               8, 164, theme::text(), &font_mono_10);
 #endif
-    put_label(parent, app_settings.simulate_mode
-                          ? "LSCAP marks simulation; PCAP remains OTA-only."
-                          : "LSCAP keeps full RF metadata at every bandwidth.", 8, 183,
+    const char *capture_note = "LSCAP keeps full RF metadata at every bandwidth.";
+    if(app_settings.simulate_mode) {
+#if defined(LILYSHARK_DEVICE)
+        capture_note = native_capture_recording
+            ? "LSCAP marks simulation; PCAP remains OTA-only."
+            : (app_settings.capture_enabled
+                   ? "LSCAP unavailable; PCAP cannot store simulation."
+                   : "Capture is off; analysis stays in memory.");
+#else
+        capture_note = app_settings.capture_enabled
+            ? "LSCAP marks simulation; PCAP remains OTA-only."
+            : "Capture is off; analysis stays in memory.";
+#endif
+    }
+    put_label(parent, capture_note, 8, 183,
               theme::text_muted(), &font_mono_10);
     const char *capture_action = capture_action_active ? "ENTER  STOP CAPTURE" :
                                   (app_settings.capture_enabled ? "ENTER  RETRY CAPTURE"
@@ -4446,18 +4462,22 @@ void apply_simulate_mode_runtime(bool enabled) noexcept
         radio_ready = radio_service.begin(profile, on_radio_frame, nullptr);
     }
 
-    const bool capture_ready = !app_settings.capture_enabled ||
+    const bool capture_requested = app_settings.capture_enabled;
+    const bool capture_ready = !capture_requested ||
         (start_capture_session() && (!enabled || native_capture_recording));
+    const char *capture_event = !capture_requested
+        ? (enabled ? "Simulate mode active; capture remains off"
+                   : "Simulate mode off; capture remains off")
+        : (enabled
+               ? (capture_ready
+                      ? "Synthetic LSCAP started; PCAP excludes simulated frames"
+                      : "Simulate mode active, but synthetic LSCAP could not start")
+               : (capture_ready
+                      ? "Radio-only capture restored after Simulate mode"
+                      : "Simulate mode off, but capture could not restart"));
     record_runtime_event(capture_ready ? RuntimeEventSeverity::Info
                                        : RuntimeEventSeverity::Error,
-                         RuntimeEventType::Capture,
-                         enabled
-                             ? (capture_ready
-                                    ? "Synthetic LSCAP started; PCAP excludes simulated frames"
-                                    : "Simulate mode active, but synthetic LSCAP could not start")
-                             : (capture_ready
-                                    ? "Radio-only capture restored after Simulate mode"
-                                    : "Simulate mode off, but capture could not restart"));
+                         RuntimeEventType::Capture, capture_event);
     if(!enabled && !radio_ready) {
         record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Radio,
                              "Simulate mode off; SX1262 receive is recovering");
