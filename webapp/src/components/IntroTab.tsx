@@ -32,11 +32,13 @@ interface Section {
 const fw = (name: string) => `/intro/fw/${name}.png`;
 
 /**
- * The argument, in eight beats. Every number here is from the whitepaper the
+ * The argument, in twelve beats. Every number here is from the whitepaper the
  * PAPER tab ships — measured or sourced there, not invented for a landing
  * page. The screens are the firmware's own render-test output: all 38 of the
  * simulator's pixel-locked frames, distributed across the beats they belong
- * to and cycled on the device's display while a section is up.
+ * to and cycled on the device's display while a section is up. No beat packs
+ * more than a handful of screens — a swipe should reveal a new screen and a
+ * new claim, not park the reader in front of a slideshow.
  */
 const SECTIONS: Section[] = [
   {
@@ -60,42 +62,39 @@ const SECTIONS: Section[] = [
     body: 'A LongFast channel moves about 987 bit/s and flood routing repeats everything: we measured 7.36 transmissions per delivered message, reach collapsing from 68.6% to 25.8% as the mesh grows, saturation near 6,721 nodes. Growth is exactly what breaks it.',
   },
   {
-    screens: ['spectrum', 'spectrum-warning', 'events', 'event-detail'].map(fw),
+    screens: ['spectrum', 'spectrum-warning'].map(fw),
     head: 'The firmware measures everything the radio hears.',
     body: 'So we built the instrument: a live spectrum waterfall with noise floor and channel occupancy, node rosters with SNR, RSSI and hop-count history, survey mode for coverage runs, and every frame kept with its radio physics.',
   },
   {
-    screens: [
-      'packet-detail',
-      'packet-pkt',
-      'packet-rf',
-      'packet-dec',
-      'packet-hex',
-      'packet-hex-2',
-      'packet-hex-3',
-      'packet-raw',
-    ].map(fw),
-    head: 'Three mesh protocols, one capture engine.',
-    body: 'Meshtastic, MeshCore and Reticulum share one capture engine. Each decoder claims only what it can prove from the frame; the rest stays as raw hex with frequency, bandwidth, SF, CR, CRC state and airtime. Captures write to microSD as .lscap and export as LoRaTap PCAP — desktop Wireshark opens them.',
+    screens: ['events', 'event-detail'].map(fw),
+    head: 'Every anomaly becomes a logged event.',
+    body: 'CRC failures, profile changes, storage faults, capture starts and stops — the firmware keeps a running event log with one-line causes, and each entry opens into its own detail screen. When something went wrong in the field, you can read back exactly when and why.',
   },
   {
-    screens: [
-      'setup-welcome',
-      'setup-capabilities',
-      'setup-network',
-      'setup-profile',
-      'setup-controls',
-      'setup-ready',
-      'settings',
-      'radio-profile',
-      'display-input',
-      'device-status',
-      'help',
-      'about',
-      'reset-setup',
-    ].map(fw),
-    head: 'A complete on-device interface, not a debug menu.',
-    body: 'A complete LVGL device shell — guided first run, Home, live diagnostics, Help — instead of a debug menu. T-Deck Plus first, and portable to Meshtastic-class radios with a screen.',
+    screens: ['packet-detail', 'packet-pkt', 'packet-rf', 'packet-dec'].map(fw),
+    head: 'Three mesh protocols, one capture engine.',
+    body: 'Meshtastic, MeshCore and Reticulum share one capture engine. Each decoder claims only what it can prove from the frame: packet fields, RF measurements and decode state are separate tabs on the same packet, so interpretation never overwrites measurement.',
+  },
+  {
+    screens: ['packet-hex', 'packet-hex-2', 'packet-hex-3', 'packet-raw'].map(fw),
+    head: 'Down to the last byte.',
+    body: 'What a decoder cannot prove stays as raw hex with frequency, bandwidth, SF, CR, CRC state and airtime. Captures write to microSD as .lscap and export as LoRaTap PCAP — desktop Wireshark opens them.',
+  },
+  {
+    screens: ['setup-welcome', 'setup-capabilities', 'setup-network', 'setup-profile'].map(fw),
+    head: 'A guided first run, not a config file.',
+    body: 'The device explains its tools, checks what hardware it is running on, and walks a first-time user through network and radio-profile selection before the Home screen ever appears. No companion app, no serial console, no YAML.',
+  },
+  {
+    screens: ['setup-controls', 'setup-ready', 'device-status', 'help'].map(fw),
+    head: 'It teaches its own controls.',
+    body: 'The trackball, keyboard and shortcuts are taught on the device, the hardware check reports radio, storage, GPS and battery, and Help stays one keypress away. A field tool has to work where the manual is whatever the screen says.',
+  },
+  {
+    screens: ['settings', 'radio-profile', 'display-input', 'about', 'reset-setup'].map(fw),
+    head: 'Every control lives on the device.',
+    body: 'Radio profiles, display and input, capture and storage, setup reset — all of it adjustable from the T-Deck itself. Change a spreading factor at the trailhead without opening a laptop.',
   },
   {
     screens: ['storage'].map(fw),

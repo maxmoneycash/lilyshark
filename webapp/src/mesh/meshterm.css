@@ -320,15 +320,40 @@
 .meshterm button {
 	cursor: pointer;
 	letter-spacing: 1px;
+	/* A control never wraps — a two-line button reads as a box, not a key. */
+	white-space: nowrap;
+	transition:
+		background-color 120ms ease-out,
+		color 120ms ease-out,
+		box-shadow 120ms ease-out,
+		transform 120ms ease-out;
+}
+/* Raised key: a fill one step off the ground and a hard 2px ledge below.
+   This is what separates "clickable" from "printed" at a glance — the flat
+   outlined rectangle was indistinguishable from a readout. Tabs keep their
+   own flat grammar. */
+.meshterm button:not(.tab) {
+	background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+	box-shadow: 0 2px 0 var(--border);
 }
 .meshterm button:hover:not(:disabled) {
 	background: var(--fg);
 	color: var(--bg);
 	border-color: var(--fg);
 }
+.meshterm button:not(.tab):hover:not(:disabled) {
+	box-shadow: 0 2px 0 color-mix(in srgb, var(--fg) 55%, transparent);
+}
+/* The key presses down: the ledge collapses under the travel. */
+.meshterm button:not(.tab):active:not(:disabled) {
+	transform: translateY(2px);
+	box-shadow: 0 0 0 transparent;
+}
 .meshterm button:disabled {
 	opacity: 0.4;
 	cursor: default;
+	/* Inert controls sit flush with the ground. */
+	box-shadow: none;
 }
 .meshterm input:focus,
 .meshterm select:focus,
@@ -451,6 +476,21 @@
 	padding: 8px 12px;
 	border-bottom: 1px solid var(--border);
 	flex-shrink: 0;
+}
+
+/* Toolbar controls share one footprint: one height whatever the label, and
+   the buttons hold their size while the text input is the part that gives
+   way. (On phones the 40px touch-target min-height below still wins.) */
+.meshterm .panel-title button,
+.meshterm .panel-title select,
+.meshterm .panel-title input {
+	height: 28px;
+	padding-top: 0;
+	padding-bottom: 0;
+}
+.meshterm .panel-title button {
+	flex-shrink: 0;
+	min-width: 72px;
 }
 
 .meshterm .panel-foot {
@@ -1442,6 +1482,12 @@ body:has(.meshterm .app.menu-open) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+	.meshterm button {
+		transition: none;
+	}
+	.meshterm button:not(.tab):active:not(:disabled) {
+		transform: none;
+	}
 	.meshterm header nav,
 	.meshterm header nav > .tab,
 	.meshterm .menu-btn span {
