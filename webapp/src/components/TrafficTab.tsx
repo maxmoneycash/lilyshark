@@ -19,7 +19,7 @@ import {
   fetchBlob as fetchBlobBytes,
   resolveByCommitment,
 } from '../lib/shelby';
-import { useDeviceLink } from '../lib/deviceLink';
+import { connectDeviceLink, useDeviceLink } from '../lib/deviceLink';
 
 /** The live table stops growing here; old frames age out on the left. */
 const LIVE_CAP = 250;
@@ -371,14 +371,27 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 
         {error && <div className="panel-foot err">{error}</div>}
 
-        {link.status === 'linked' && (
+        {link.status !== 'off' && (
           <div className="kv">
             <span className="k">T-DECK LINK</span>
-            <span className="v ok">
-              Lilyshark {link.firmware} over USB
-              {link.telemetry?.sim ? ' · SIMULATE MODE (SYNTHETIC)' : ''}
-            </span>
-            {link.telemetry && (
+            {link.status === 'connecting' && (
+              <span className="v dim">
+                connecting… (a reboot on first contact is normal; this waits it out)
+              </span>
+            )}
+            {link.status === 'error' && (
+              <span className="v err">
+                {link.error}{' '}
+                <button onClick={() => void connectDeviceLink()}>RETRY</button>
+              </span>
+            )}
+            {link.status === 'linked' && (
+              <span className="v ok">
+                Lilyshark {link.firmware} over USB
+                {link.telemetry?.sim ? ' · SIMULATE MODE (SYNTHETIC)' : ''}
+              </span>
+            )}
+            {link.status === 'linked' && link.telemetry && (
               <>
                 <span className="k">DEVICE</span>
                 <span className="v">
@@ -388,7 +401,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 </span>
               </>
             )}
-            {link.pointer && (
+            {link.status === 'linked' && link.pointer && (
               <>
                 <span className="k">POINTER RX</span>
                 <span className="v">
