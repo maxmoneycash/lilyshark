@@ -8168,7 +8168,8 @@ void loop()
                                                     profile.bandwidth_hz,
                                                     profile.spreading_factor,
                                                     profile.coding_rate_denominator,
-                                                    profile.id);
+                                                    profile.id,
+                                                    profile.protocol_hint);
         ingest_analyzer_frame(frame, profile, true);
         redraw = true;
     }

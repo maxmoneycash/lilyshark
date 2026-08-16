@@ -16,6 +16,7 @@
 
 #include <cstdint>
 
+#include "lilyshark/core/protocol.h"
 #include "lilyshark/core/raw_frame.h"
 
 namespace lilyshark {
@@ -47,7 +48,8 @@ public:
                         std::uint32_t bandwidth_hz,
                         std::uint8_t spreading_factor,
                         std::uint8_t coding_rate_denominator,
-                        std::uint16_t profile_id) noexcept;
+                        std::uint16_t profile_id,
+                        ProtocolId protocol_hint = ProtocolId::Meshtastic) noexcept;
 
     /// Every ninth frame carries a Shelby pointer, so the off-grid path can be
     /// demonstrated and tested without waiting for a real one.

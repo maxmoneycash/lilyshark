@@ -37,11 +37,27 @@ class DocsSyncTest(unittest.TestCase):
                 f"{dest_rel} is stale; run scripts/sync_docs_to_webapp.py",
             )
 
-    def test_chart_assets_are_published(self):
+    def test_assets_are_published_and_readable(self):
+        """Every published asset exists and really is the format its name claims.
+
+        The set is no longer only charts: the hardware page embeds photos, so
+        each type is checked by its own signature rather than assuming SVG.
+        """
         for _src_rel, dest_rel in sync.ASSETS:
             dest = DEST / dest_rel
             self.assertTrue(dest.exists(), f"missing {dest_rel}")
-            self.assertIn("<svg", dest.read_text()[:300])
+            head = dest.read_bytes()[:300]
+            if dest_rel.endswith(".svg"):
+                self.assertIn(b"<svg", head, f"{dest_rel} is not an SVG")
+            elif dest_rel.endswith(".png"):
+                self.assertTrue(head.startswith(b"\x89PNG\r\n"), f"{dest_rel} is not a PNG")
+            else:
+                self.fail(f"{dest_rel}: no signature check for this asset type")
+            self.assertEqual(
+                (REPO_ROOT / _src_rel).read_bytes(),
+                dest.read_bytes(),
+                f"{dest_rel} is stale; run scripts/sync_docs_to_webapp.py",
+            )
 
     def test_titles_come_from_headings(self):
         manifest = {e["id"]: e for e in json.loads((DEST / "manifest.json").read_text())}

@@ -45,9 +45,69 @@ constexpr std::uint8_t kDemoCommitment[ShelbyPointer::kCommitmentSize] = {
 constexpr std::uint32_t kDemoBlobBytes = 4495U;
 constexpr std::uint32_t kDemoExpiryUnix = 1794606691U;
 
-/// Header bytes an enclosing protocol would put in front of the pointer, so
-/// the decoder has to find it at an offset rather than at byte zero.
+/// Meshtastic's outer header: to[0..3], from[4..7], id[8..11], flags[12],
+/// channel hash[13], next hop[14], relay[15]. Synthetic frames carry a real
+/// one so the decoder, the roster and the packet inspector see the same
+/// structure they see off the air — a table of random bytes would only prove
+/// the screen can draw noise.
 constexpr std::size_t kEnclosingHeaderBytes = 16;
+
+/// One simulated neighbourhood. Stable node numbers and per-node signal
+/// baselines are what make the roster and the signal history look like a
+/// place rather than a random number generator: the node two ridges over is
+/// always weak and two hops out, the one on the desk is always strong.
+struct SimulatedNode {
+    std::uint32_t number;
+    std::int16_t rssi_dbm_x10;
+    std::uint8_t hops;
+};
+
+constexpr SimulatedNode kNodes[] = {
+    {0xda5c7f21U, -612, 0},  // bench node, line of sight
+    {0x7b13a4e0U, -734, 0},
+    {0x4e91c2b8U, -812, 1},
+    {0x2ac05d16U, -857, 1},
+    {0x93f7e04aU, -889, 2},
+    {0xc18b3927U, -921, 2},
+    {0x60d4a8f3U, -948, 3},
+    {0x0f2e6b5cU, -973, 3},  // far edge of the mesh
+};
+constexpr std::size_t kNodeCount = sizeof(kNodes) / sizeof(kNodes[0]);
+
+/// LongFast primary channel hash, the default every stock radio uses.
+constexpr std::uint8_t kChannelHash = 0x08;
+
+void writeLittleEndian32(std::uint8_t *out, std::uint32_t value) noexcept
+{
+    out[0] = static_cast<std::uint8_t>(value & 0xffU);
+    out[1] = static_cast<std::uint8_t>((value >> 8U) & 0xffU);
+    out[2] = static_cast<std::uint8_t>((value >> 16U) & 0xffU);
+    out[3] = static_cast<std::uint8_t>((value >> 24U) & 0xffU);
+}
+
+/// Build the outer header for one sender. Most traffic on a mesh is
+/// broadcast; a direct message every so often gives the destination column
+/// something to say.
+void writeMeshtasticHeader(std::uint8_t *out, const SimulatedNode &sender, std::uint32_t sequence)
+{
+    const bool direct = (sequence % 7U) == 3U;
+    const SimulatedNode &peer = kNodes[(sequence / 7U + 1U) % kNodeCount];
+    writeLittleEndian32(out, direct ? peer.number : 0xffffffffU);
+    writeLittleEndian32(out + 4, sender.number);
+    writeLittleEndian32(out + 8, 0x51a00000U + sequence);
+
+    const std::uint8_t hop_start = static_cast<std::uint8_t>(sender.hops == 0U ? 3U : 3U);
+    const std::uint8_t hop_limit = static_cast<std::uint8_t>(hop_start - sender.hops);
+    const bool want_ack = direct;
+    out[12] = static_cast<std::uint8_t>((hop_limit & 0x07U) |
+                                        (want_ack ? 0x08U : 0x00U) |
+                                        static_cast<std::uint8_t>((hop_start & 0x07U) << 5U));
+    out[13] = kChannelHash;
+    // Relayed traffic names the neighbour it came through; direct arrivals
+    // leave these zero, exactly as the firmware transmits them.
+    out[14] = sender.hops == 0U ? 0x00U : static_cast<std::uint8_t>(peer.number & 0xffU);
+    out[15] = sender.hops == 0U ? 0x00U : static_cast<std::uint8_t>(kNodes[0].number & 0xffU);
+}
 
 }  // namespace
 
@@ -56,28 +116,40 @@ RawFrame SimulateSource::next(std::uint32_t now_ms,
                               std::uint32_t bandwidth_hz,
                               std::uint8_t spreading_factor,
                               std::uint8_t coding_rate_denominator,
-                              std::uint16_t profile_id) noexcept
+                              std::uint16_t profile_id,
+                              ProtocolId protocol_hint) noexcept
 {
     const std::uint32_t sequence = emitted_++;
     last_emit_ms_ = now_ms;
 
     RawFrame frame{};
 
-    // Signal quality wanders across a believable band instead of sitting on
-    // one value, so the roster sparklines and SNR plots have something to draw.
+    // Each frame comes from a specific neighbour, so its signal sits around
+    // that node's own baseline and only wanders a few dB — which is what
+    // makes the roster read as a place with near and far radios in it.
+    const SimulatedNode &sender = kNodes[sequence % kNodeCount];
     const std::uint32_t noise = mix(sequence * 2654435761U + 7U);
-    const std::int16_t rssi_x10 =
-        static_cast<std::int16_t>(-880 - static_cast<std::int16_t>(noise % 280U));
+    const std::int16_t rssi_x10 = static_cast<std::int16_t>(
+        sender.rssi_dbm_x10 + static_cast<std::int16_t>(noise % 45U) - 22);
     const std::int16_t snr_x10 =
         static_cast<std::int16_t>(((rssi_x10 + 920) * 55) / 100 +
                                   static_cast<std::int16_t>((noise >> 8) % 21U) - 10);
 
+    // Only shape frames as Meshtastic when the radio is tuned to a Meshtastic
+    // profile: its decoder keys off the profile hint, and inventing that
+    // structure under another profile would be a lie the UI then repeats.
+    const bool meshtastic_shape = protocol_hint == ProtocolId::Meshtastic;
+
     std::size_t length = 0;
     if (carriesPointer(sequence)) {
-        // A pointer riding behind an enclosing protocol header, matching the
-        // placement used by an on-air payload.
+        // A pointer riding inside a mesh payload, exactly where a real one
+        // sits: behind the enclosing protocol's header, found by scanning.
         std::uint8_t header[kEnclosingHeaderBytes]{};
-        fillPayload(header, sizeof(header), sequence * 7U + 3U);
+        if (meshtastic_shape) {
+            writeMeshtasticHeader(header, sender, sequence);
+        } else {
+            fillPayload(header, sizeof(header), sequence * 7U + 3U);
+        }
 
         ShelbyPointer pointer{};
         pointer.version = ShelbyPointer::kVersion;
@@ -100,9 +172,19 @@ RawFrame SimulateSource::next(std::uint32_t now_ms,
     }
 
     if (length == 0) {
-        length = 24U + (mix(sequence * 40503U + 11U) % 150U);
         std::uint8_t payload[kMaxFrameBytes]{};
-        fillPayload(payload, length, sequence * 7U + 3U);
+        if (meshtastic_shape) {
+            // Header, then opaque bytes: a Meshtastic payload really is
+            // encrypted on the air, so random content here is honest — the
+            // decoder is expected to report structure, not meaning.
+            writeMeshtasticHeader(payload, sender, sequence);
+            const std::size_t payload_bytes = 14U + (mix(sequence * 40503U + 11U) % 78U);
+            fillPayload(payload + kEnclosingHeaderBytes, payload_bytes, sequence * 7U + 3U);
+            length = kEnclosingHeaderBytes + payload_bytes;
+        } else {
+            length = 24U + (mix(sequence * 40503U + 11U) % 150U);
+            fillPayload(payload, length, sequence * 7U + 3U);
+        }
         (void)frame.assignPayload(payload, length);
     }
 
