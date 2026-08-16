@@ -47,7 +47,7 @@ const SECTIONS: Section[] = [
     body: 'Lilyshark is C++ firmware that turns the LILYGO T-Deck Plus — a $60 handheld with a LoRa radio, QWERTY keyboard and GPS — into a packet sniffer and RF analyzer for off-grid mesh networks.',
   },
   {
-    screens: ['traffic', 'protocols', 'protocol-detail', 'nodes'].map(fw),
+    screens: ['traffic-live', 'protocols', 'protocol-detail', 'nodes'].map(fw),
     head: 'Mesh networks already carry hundreds of thousands of users.',
     body: 'Meshtastic passed 40,000 GitHub stars and an 80,000-member subreddit, with 100+ supported boards, sub-$50 entry devices, and active meshes in most major US cities. When India ordered a mesh app off GitHub during the Delhi protests, it was carrying 430,000 daily users — and stayed up.',
   },
@@ -57,12 +57,12 @@ const SECTIONS: Section[] = [
     body: "Bluetooth mesh dies at 30–300 m — it works at a protest because a protest is a crowd. LoRa carries 2–15 km per hop, across a city, a county, a disaster zone; MeshCore's source routing now spans 64 hops with deterministic delivery receipts.",
   },
   {
-    screens: ['utilization', 'timeline', 'traffic-filter'].map(fw),
+    screens: ['utilization', 'timeline-live', 'traffic-filter'].map(fw),
     head: 'Flooded meshes deliver less as they grow. We measured it.',
     body: 'A LongFast channel moves about 987 bit/s and flood routing repeats everything: we measured 7.36 transmissions per delivered message, reach collapsing from 68.6% to 25.8% as the mesh grows, saturation near 6,721 nodes. Growth is exactly what breaks it.',
   },
   {
-    screens: ['spectrum', 'spectrum-warning'].map(fw),
+    screens: ['spectrum-live', 'spectrum-warning'].map(fw),
     head: 'The firmware measures everything the radio hears.',
     body: 'So we built the instrument: a live spectrum waterfall with noise floor and channel occupancy, node rosters with SNR, RSSI and hop-count history, survey mode for coverage runs, and every frame kept with its radio physics.',
   },
@@ -72,7 +72,7 @@ const SECTIONS: Section[] = [
     body: 'CRC failures, profile changes, storage faults, capture starts and stops — the firmware keeps a running event log with one-line causes, and each entry opens into its own detail screen. When something went wrong in the field, you can read back exactly when and why.',
   },
   {
-    screens: ['packet-detail', 'packet-pkt', 'packet-rf', 'packet-dec'].map(fw),
+    screens: ['packet-live', 'packet-pkt', 'packet-rf', 'packet-dec'].map(fw),
     head: 'Three mesh protocols, one capture engine.',
     body: 'Meshtastic, MeshCore and Reticulum share one capture engine. Each decoder claims only what it can prove from the frame: packet fields, RF measurements and decode state are separate tabs on the same packet, so interpretation never overwrites measurement.',
   },
