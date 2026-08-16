@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { backendApi } from "../../api/backend";
-import { DEMO_BLOB, SHELBY_RPC_BLOBS } from "../../lib/shelby";
+import {
+  CAPTURE_REGISTRY,
+  DEMO_BLOB,
+  fetchRegistry,
+  SHELBY_FULLNODE,
+  SHELBY_RPC_BLOBS,
+  type RegistryEntry,
+} from "../../lib/shelby";
 import {
   findShelbyPointer,
   parseLscap,
@@ -15,7 +22,8 @@ import {
  * cannot carry a capture, but it can carry a receipt for one. The wire-format
  * table matches the implemented receipt. The rate model uses
  * metadata from the bundled synthetic fixture. Network totals come from the
- * live indexer.
+ * live indexer, and the capture registry is read straight from the shelbynet
+ * fullnode.
  */
 
 /** Byte layout of the pointer, mirroring include/lilyshark/shelby/shelby_pointer.h. */
@@ -49,6 +57,12 @@ const hhmm = (s: number) => {
   return `${(s / 86400).toFixed(1)} days`;
 };
 
+/** UTC calendar day, because chain timestamps have no local timezone. */
+const utcDay = (unix: number) => new Date(unix * 1000).toISOString().slice(0, 10);
+
+/** "0x6ab9…32c9" — the full 32 bytes would drown the table. */
+const shortHex = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
+
 export function ShelbyScreen() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -58,6 +72,9 @@ export function ShelbyScreen() {
   );
   /** Effective demo throughput derived from the synthetic sample metadata. */
   const [bps, setBps] = useState<number | null>(null);
+  /** The on-chain capture registry; null while the fullnode read is in flight. */
+  const [registry, setRegistry] = useState<RegistryEntry[] | null>(null);
+  const [regErr, setRegErr] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -111,6 +128,26 @@ export function ShelbyScreen() {
         }
       } catch {
         /* the screen still stands without it; the format table is static */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Read the capture registry from the shelbynet fullnode once. A dead
+  // fullnode only dims this one section; the rest of the screen stands.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const rows = await fetchRegistry(DEMO_BLOB.owner);
+        if (alive) {
+          setRegistry(rows);
+          setRegErr(null);
+        }
+      } catch (e) {
+        if (alive) setRegErr(e instanceof Error ? e.message : "fullnode unreachable");
       }
     })();
     return () => {
@@ -198,6 +235,63 @@ export function ShelbyScreen() {
           <div className="panel-foot dim">
             The firmware encoder and this decoder are separate implementations of
             the same 82 bytes, and are checked against each other byte for byte.
+          </div>
+
+          <div className="panel-title">
+            ON-CHAIN REGISTRY
+            {registry ? ` · ${registry.length} ANCHORED` : ""}
+          </div>
+          <div className="prose">
+            <p>
+              This is the <code>capture_registry</code> contract on shelbynet,
+              read live in this browser straight from the fullnode — it records
+              who vouched for each capture, and when.
+            </p>
+          </div>
+          {regErr ? (
+            <div className="panel-foot">
+              <span className="err">fullnode unreachable — {regErr}</span>
+            </div>
+          ) : registry === null ? (
+            <div className="panel-foot dim">reading the chain…</div>
+          ) : registry.length === 0 ? (
+            <div className="panel-foot dim">no captures anchored yet</div>
+          ) : (
+            <div className="scroll-x">
+              <table className="grid">
+                <thead>
+                  <tr>
+                    <th>OBJECT</th>
+                    <th>SIZE</th>
+                    <th>REGISTERED</th>
+                    <th>EXPIRES</th>
+                    <th>COMMITMENT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registry.map((r) => (
+                    <tr key={r.commitment}>
+                      <td>{r.blobName}</td>
+                      <td>{r.sizeBytes.toLocaleString()} B</td>
+                      <td>{utcDay(r.registeredAtUnix)}</td>
+                      <td>{utcDay(r.expiresAtUnix)}</td>
+                      <td>{shortHex(r.commitment)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="panel-foot dim">
+            MODULE{" "}
+            <a
+              href={`${SHELBY_FULLNODE}/accounts/${DEMO_BLOB.owner}/resource/${CAPTURE_REGISTRY}::Registry`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ wordBreak: "break-all" }}
+            >
+              {CAPTURE_REGISTRY}
+            </a>
           </div>
         </div>
       </div>

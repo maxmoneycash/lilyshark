@@ -41,20 +41,23 @@ export interface CaptureAnchor {
   registeredAtUnix: number;
 }
 
+/** One registry row, with the commitment it anchors. */
+export interface RegistryEntry extends CaptureAnchor {
+  commitment: string;
+}
+
 /**
- * On-chain anchor lookup: did `publisher` vouch for `commitment` in the
- * capture registry? Read straight from the fullnode's resource API — the
- * same bytes any wallet or explorer would see. Returns null when the
- * publisher has no registry or never anchored this commitment.
+ * The whole registry: every capture `publisher` has vouched for, read
+ * straight from the fullnode's resource API — the same bytes any wallet or
+ * explorer would see. The Move VM serialises u64 as JSON strings, so the
+ * numeric fields are converted here. Returns an empty list when the
+ * publisher has never created a registry.
  */
-export async function fetchAnchor(
-  publisher: string,
-  commitment: string,
-): Promise<CaptureAnchor | null> {
+export async function fetchRegistry(publisher: string): Promise<RegistryEntry[]> {
   const res = await fetch(
     `${SHELBY_FULLNODE}/accounts/${publisher}/resource/${CAPTURE_REGISTRY}::Registry`,
   );
-  if (res.status === 404) return null;
+  if (res.status === 404) return [];
   if (!res.ok) throw new Error(`fullnode HTTP ${res.status}`);
   const body = (await res.json()) as {
     data?: {
@@ -67,16 +70,28 @@ export async function fetchAnchor(
       }[];
     };
   };
-  const row = body.data?.captures?.find(
-    (c) => c.commitment.toLowerCase() === commitment.toLowerCase(),
+  return (body.data?.captures ?? []).map((c) => ({
+    blobName: c.blob_name,
+    commitment: c.commitment,
+    sizeBytes: Number(c.size_bytes),
+    expiresAtUnix: Number(c.expires_at_unix),
+    registeredAtUnix: Number(c.registered_at_unix),
+  }));
+}
+
+/**
+ * On-chain anchor lookup: did `publisher` vouch for `commitment` in the
+ * capture registry? Returns null when the publisher has no registry or
+ * never anchored this commitment.
+ */
+export async function fetchAnchor(
+  publisher: string,
+  commitment: string,
+): Promise<CaptureAnchor | null> {
+  const rows = await fetchRegistry(publisher);
+  return (
+    rows.find((r) => r.commitment.toLowerCase() === commitment.toLowerCase()) ?? null
   );
-  if (!row) return null;
-  return {
-    blobName: row.blob_name,
-    sizeBytes: Number(row.size_bytes),
-    expiresAtUnix: Number(row.expires_at_unix),
-    registeredAtUnix: Number(row.registered_at_unix),
-  };
 }
 
 export interface ResolvedBlob {

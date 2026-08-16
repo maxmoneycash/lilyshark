@@ -55,6 +55,19 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number];
 
+// Deep links: a shared URL can land straight on a screen instead of the intro.
+// #resolve opens TRAFFIC, where TrafficTab reads the same hash and plays the
+// Shelby resolve demo unattended; the rest are plain entry points. The hash is
+// read once at mount — this is an entry point, not a router, so tab changes
+// afterwards never write it back.
+const HASH_TAB: Partial<Record<string, Tab>> = {
+  "#resolve": "TRAFFIC",
+  "#traffic": "TRAFFIC",
+  "#shelby": "SHELBY",
+  "#docs": "DOCS",
+  "#paper": "PAPER",
+};
+
 // ponytail: an error boundary for a single screen must not take down the app.
 // key={tab} remounts it when switching tabs, clearing the error state.
 class ScreenBoundary extends Component<
@@ -190,8 +203,11 @@ function App() {
   useHourTick();
   useLangTick();
   const hostBat = useHostBattery();
-  // The intro opens first: the device, its screens, and why it exists.
-  const [tab, setTab] = useState<Tab>("INTRO");
+  // The intro opens first: the device, its screens, and why it exists —
+  // unless a deep link asked for a specific screen.
+  const [tab, setTab] = useState<Tab>(
+    () => HASH_TAB[window.location.hash.toLowerCase()] ?? "INTRO",
+  );
   // Phone nav: the ten tabs live behind a hamburger instead of a side-scroll.
   const [menuOpen, setMenuOpen] = useState(false);
   // CONNECT opens a sheet with the steps and both transports; the header

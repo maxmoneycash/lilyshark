@@ -257,6 +257,22 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
     setTrace(null);
   }, [selected, capture]);
 
+  // The #resolve deep link plays the whole loop unattended: TerminalApp opened
+  // this tab for it, the sample opens itself below, and the first capture to
+  // land gets its pointer frame resolved as if the user had pressed SAMPLE and
+  // then RESOLVE. Armed by a ref rather than state because it must fire exactly
+  // once: StrictMode runs mount effects twice in dev, and the resolve's own
+  // load() makes this capture effect fire again. Declared after the trace
+  // reset above so that the reset cannot wipe the trace's opening steps.
+  const autoResolveRef = useRef(window.location.hash.toLowerCase() === '#resolve');
+  useEffect(() => {
+    if (!autoResolveRef.current || !capture) return;
+    autoResolveRef.current = false;
+    const hit = capture.frames.map((fr) => findShelbyPointer(fr.bytes)).find(Boolean);
+    if (hit) void runResolve(hit.pointer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capture]);
+
   /** Bundled synthetic capture: 24 frames with a Shelby pointer at sequence 9. */
   const openSample = async () => {
     setBusy(true);

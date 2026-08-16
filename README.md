@@ -548,7 +548,9 @@ generation, on-chain registration, chunkset upload, commit ack). The bundled
 sample's frame 9 carries that blob's real coordinates, and the analyzer's
 **RESOLVE** button walks the whole path in the browser with no Lilyshark server in
 between: commitment → object name on the shelbynet indexer → bytes from the Shelby
-RPC → the capture opens. Fetch it yourself:
+RPC → the capture opens — or click <https://lilyshark.com/#resolve> to watch it
+run: the link opens the analyzer, loads the sample, and resolves the pointer by
+itself. Fetch it yourself:
 
 ```
 curl https://shelby.shelbynet.shelby.xyz/shelby/v1/blobs/0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728/captures/field-capture-0846.lscap
