@@ -22,7 +22,8 @@ import { useSyncExternalStore } from 'react';
  *  USB (the T-Deck), then the CH34x / CP210x / FTDI bridges other boards use.
  *  Bluetooth and console ports report no USB vendor at all, so this alone
  *  clears the noise off the picker. */
-const KNOWN_USB_VENDORS = [0x303a, 0x1a86, 0x10c4, 0x0403];
+const ESPRESSIF_USB_VENDOR = 0x303a;
+const KNOWN_USB_VENDORS = [ESPRESSIF_USB_VENDOR, 0x1a86, 0x10c4, 0x0403];
 const PORT_FILTERS = KNOWN_USB_VENDORS.map((usbVendorId) => ({ usbVendorId }));
 
 /** How long a port gets to answer LSK HELLO before we move on. Generous: the
@@ -247,11 +248,11 @@ async function attemptPort(candidate: SerialPort, attempt = 0): Promise<boolean>
   return answered;
 }
 
-async function grantedCandidates(): Promise<SerialPort[]> {
+async function grantedCandidates(vendors: number[] = KNOWN_USB_VENDORS): Promise<SerialPort[]> {
   const ports = await navigator.serial.getPorts();
   return ports.filter((p) => {
     const vendor = p.getInfo().usbVendorId;
-    return vendor !== undefined && KNOWN_USB_VENDORS.includes(vendor);
+    return vendor !== undefined && vendors.includes(vendor);
   });
 }
 
@@ -304,7 +305,11 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
  */
 export async function autoLinkDeviceLink(): Promise<void> {
   if (!('serial' in navigator) || state.status !== 'off') return;
-  const candidates = await grantedCandidates();
+  // Unprompted, only the T-Deck's own USB controller is fair game. The wider
+  // bridge-chip list belongs to the deliberate path: writing HELLO into
+  // whatever Arduino or CNC controller this origin was once granted is not
+  // something a page should do on its own.
+  const candidates = await grantedCandidates([ESPRESSIF_USB_VENDOR]);
   if (candidates.length === 0) return;
   set({ status: 'connecting', error: undefined });
   for (const candidate of candidates) {

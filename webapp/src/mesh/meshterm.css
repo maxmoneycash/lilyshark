@@ -1821,12 +1821,35 @@ body:has(.meshterm .app.menu-open) {
 	display: flex;
 	gap: 10px;
 	flex-wrap: wrap;
+	align-items: center;
 	margin-top: 26px;
 }
 .meshterm .intro-cta button {
 	min-height: 46px;
 	padding: 0 22px;
 	letter-spacing: 1.5px;
+}
+/* Two actions carry the ending — open the analyzer, or flash a radio. The
+   paper is a third destination, not a third decision, so it reads as a link:
+   three equally weighted buttons made the choice look harder than it is, and
+   on a phone the row wrapped its last two past the bottom of the stage. */
+.meshterm .intro-cta .cta-link {
+	min-height: 0;
+	padding: 0 2px;
+	background: none;
+	border: none;
+	box-shadow: none;
+	color: var(--fg);
+	text-decoration: underline;
+	text-underline-offset: 5px;
+}
+.meshterm .intro-cta .cta-link:hover:not(:disabled) {
+	background: none;
+	color: var(--ink, var(--fg));
+	border: none;
+}
+.meshterm .intro-cta .cta-link:active:not(:disabled) {
+	transform: none;
 }
 .meshterm .intro-hint {
 	position: absolute;
@@ -2002,9 +2025,12 @@ body:has(.meshterm .app.menu-open) {
 
 @media (max-width: 860px) {
 	/* The radio leads and gets the larger share; all the copy sits under it.
-	   Later block wins over the earlier copy-first rows. */
+	   Later block wins over the earlier copy-first rows. The copy's half is
+	   sized so the closing beat's actions land inside the clipped band —
+	   at a larger device share they fell below the fold and could not be
+	   tapped at all. */
 	.meshterm .intro-stage {
-		grid-template-rows: minmax(0, 57%) minmax(0, 43%);
+		grid-template-rows: minmax(0, 50%) minmax(0, 50%);
 	}
 	.meshterm .intro-copy {
 		order: 2;
@@ -2025,12 +2051,26 @@ body:has(.meshterm .app.menu-open) {
 	.meshterm .intro-hint {
 		margin-top: 8px;
 	}
+	/* The copy band is a fixed share of a clipped stage, so anything past its
+	   height is simply invisible — which is where the closing actions were
+	   landing on a phone. The last beat's spacing is tightened and the
+	   buttons compacted until both sit inside the band. */
 	.meshterm .intro-cta {
-		margin-top: 12px;
+		margin-top: 6px;
+		gap: 6px;
 	}
 	.meshterm .intro-cta button {
-		min-height: 42px;
-		padding: 0 16px;
+		min-height: 38px;
+		padding: 0 12px;
+		font-size: 11px;
+		letter-spacing: 1px;
+	}
+	.meshterm .intro-cta .cta-link {
+		min-height: 0;
+		padding: 0;
+	}
+	.meshterm .intro-head {
+		margin-bottom: 6px;
 	}
 }
 
