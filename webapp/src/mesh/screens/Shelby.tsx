@@ -12,8 +12,8 @@ import {
  * SHELBY — what the firmware actually does with the storage network, and why.
  *
  * The argument this screen has to land is narrow and physical: a mesh radio
- * cannot carry a capture, but it can carry a receipt for one. Everything here
- * The wire-format table matches the implemented receipt. The rate model uses
+ * cannot carry a capture, but it can carry a receipt for one. The wire-format
+ * table matches the implemented receipt. The rate model uses
  * metadata from the bundled synthetic fixture. Network totals come from the
  * live indexer.
  */
