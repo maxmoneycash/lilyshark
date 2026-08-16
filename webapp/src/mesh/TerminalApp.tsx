@@ -615,27 +615,6 @@ function App() {
             <button
               className="primary"
               disabled={!hasSerial}
-              onClick={() => {
-                setMode("serie");
-                setConnectOpen(false);
-                void onConnect("serie");
-              }}
-            >
-              USB SERIAL
-            </button>
-            <button
-              className="primary"
-              disabled={!hasBle}
-              onClick={() => {
-                setMode("ble");
-                setConnectOpen(false);
-                void onConnect("ble");
-              }}
-            >
-              BLUETOOTH
-            </button>
-            <button
-              disabled={!hasSerial}
               title="For a T-Deck running Lilyshark firmware: live device telemetry and Shelby pointer hand-off on the TRAFFIC screen"
               onClick={() => {
                 setConnectOpen(false);
@@ -643,14 +622,35 @@ function App() {
                 void connectDeviceLink();
               }}
             >
-              LILYSHARK USB
+              LILYSHARK T-DECK · USB
+            </button>
+            <button
+              disabled={!hasSerial}
+              onClick={() => {
+                setMode("serie");
+                setConnectOpen(false);
+                void onConnect("serie");
+              }}
+            >
+              MESHCORE · USB
+            </button>
+            <button
+              disabled={!hasBle}
+              onClick={() => {
+                setMode("ble");
+                setConnectOpen(false);
+                void onConnect("ble");
+              }}
+            >
+              MESHCORE · BLUETOOTH
             </button>
           </div>
           <p className="sheet-note">
-            Radio running Lilyshark instead of MeshCore? LILYSHARK USB links
-            the analyzer itself: the device announces the link in its event
-            log and streams live telemetry — and any Shelby pointer it decodes
-            — to the TRAFFIC screen.
+            Pick by firmware, not by cable. A T-Deck running Lilyshark links
+            with the first button — its status appears on the TRAFFIC screen
+            and in the device's own event log. The MeshCore buttons speak the
+            companion protocol and will sit at ESTABLISHING LINK forever
+            against a Lilyshark radio.
           </p>
           {!hasSerial && !hasBle && (
             <p className="sheet-note">
