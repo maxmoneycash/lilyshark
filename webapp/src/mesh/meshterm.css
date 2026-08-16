@@ -1083,6 +1083,7 @@ body {
    The shell owns the viewport: header and footer size to content, the screen
    between them takes exactly what is left and scrolls inside itself. */
 .meshterm .app {
+	height: 100vh; /* fallback where dvh misbehaves */
 	height: 100dvh;
 	max-width: 100vw;
 	overflow: hidden;
@@ -1216,6 +1217,7 @@ body {
 	}
 	.meshterm .app {
 		height: auto;
+		min-height: 100vh; /* fallback where dvh misbehaves */
 		min-height: 100dvh;
 		overflow: visible;
 		flex-direction: column;
@@ -1617,6 +1619,7 @@ body:has(.meshterm .app.menu-open) {
    inside an iframe it refused. */
 @media (max-width: 860px) {
 	.meshterm .app:has(main.fill) {
+		height: 100vh; /* fallback where dvh misbehaves */
 		height: 100dvh;
 		min-height: 0;
 		overflow: hidden;
@@ -1644,6 +1647,7 @@ body:has(.meshterm .app.menu-open) {
 		top: 0;
 		left: 0;
 		right: 0;
+		height: 100vh; /* fallback where dvh misbehaves */
 		height: 100dvh;
 		padding-top: max(72px, env(safe-area-inset-top) + 60px);
 		padding-bottom: max(34px, env(safe-area-inset-bottom) + 20px);
@@ -1678,6 +1682,7 @@ body:has(.meshterm .app.menu-open) {
 	top: 0;
 	left: 0;
 	right: 0;
+	height: 100vh; /* fallback where dvh misbehaves */
 	height: 100dvh;
 	z-index: 70;
 	display: flex;
@@ -1924,6 +1929,7 @@ body:has(.meshterm .app.menu-open) {
    there to leave by. */
 @media (max-width: 860px) {
 	.meshterm .app:has(.map-main) {
+		height: 100vh; /* fallback where dvh misbehaves */
 		height: 100dvh;
 		min-height: 0;
 		overflow: hidden;
