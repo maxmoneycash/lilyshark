@@ -1,7 +1,7 @@
 # Lilyshark web app
 
-The cloud half of Lilyshark: a terminal-style web app — ported from
-[meshcore-terminal](https://github.com/maxmoneycash/meshcore-terminal) (MIT)
+The cloud half of Lilyshark: a terminal-style web app — ported from the
+[bundled meshcore-terminal source](src/mesh/) (MIT)
 and recolored Lilyshark pink — that reads the `.lscap` captures the T-Deck
 firmware writes, drives a real radio over USB or Bluetooth, and explores the
 Shelby network live. Deployed on Vercel.
