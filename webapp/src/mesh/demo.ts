@@ -628,3 +628,67 @@ export function clearDemo(): void {
 export function isDemo(): boolean {
   return seeded;
 }
+
+/* ── Demo send ────────────────────────────────────────────────────────────
+   Typing into the channel with no radio attached joins the same fiction as
+   the rest of the demo mesh: the message lands locally as delivered, and a
+   nearby demo node answers a few seconds later. Nothing transmits — the
+   whole surface is already labeled synthetic by virtue of being the demo. */
+
+const REPLY_POOL: [number, string][] = [
+  [3, "copy that — Hoover relaying you clean"],
+  [12, "rgr, seeing you 2 hops out via HVR"],
+  [9, "good copy from the platform, -92 dBm"],
+  [5, "copied. pointer traffic still matching on this end"],
+  [0, "copy from the ridge, you're readable through the fog"],
+];
+let demoSendN = 0;
+
+export function demoSendText(text: string, convo: string, replyId?: number): void {
+  const now = Date.now();
+  mutate((s) => {
+    s.messages = [
+      ...s.messages,
+      {
+        id: 940_000 + demoSendN,
+        convo,
+        from: 0,
+        to: 0xffffffff,
+        channel: 0,
+        text,
+        ts: now,
+        mine: true,
+        state: "delivered",
+        replyId,
+      } satisfies Message,
+    ];
+  });
+  const [idx, reply] = REPLY_POOL[demoSendN % REPLY_POOL.length];
+  demoSendN += 1;
+  const replyDelayMs = 3500 + (demoSendN % 3) * 1200;
+  setTimeout(() => {
+    if (!seeded) return;
+    const from = DEMO_NODE_FLOOR + idx + 1;
+    mutate((s) => {
+      const sender = s.nodes.get(from);
+      s.messages = [
+        ...s.messages,
+        {
+          id: 941_000 + demoSendN,
+          convo,
+          from,
+          to: 0xffffffff,
+          channel: 0,
+          text: reply,
+          ts: Date.now(),
+          mine: false,
+          state: "delivered",
+          hops: sender?.hopsAway,
+          snr: sender?.snr,
+          rssi: sender?.rssi,
+        } satisfies Message,
+      ];
+    });
+    markUnread(convo);
+  }, replyDelayMs);
+}

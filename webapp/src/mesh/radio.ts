@@ -4,7 +4,7 @@ import type Connection from "@liamcottle/meshcore.js/src/connection/connection.j
 import Constants from "@liamcottle/meshcore.js/src/constants.js";
 import CayenneLpp from "@liamcottle/meshcore.js/src/cayenne_lpp.js";
 import { COOLDOWN_MS, getAlertCfg } from "./alerts";
-import { DEMO_NODE_FLOOR, isDemo } from "./demo";
+import { DEMO_NODE_FLOOR, demoSendText, isDemo } from "./demo";
 import { t } from "./i18n";
 import {
   addLog,
@@ -1340,6 +1340,12 @@ export async function sendText(
   convo: string,
   replyId?: number,
 ): Promise<void> {
+  // In the demo mesh, sending joins the fiction instead of failing: the
+  // message posts locally and a demo node answers. See demoSendText.
+  if (!device && isDemo()) {
+    demoSendText(text, convo, replyId);
+    return;
+  }
   if (!device) throw new Error(t("Sin conexión"));
   const isDm = convo.startsWith("dm:");
   const destination = isDm ? Number(convo.slice(3)) : 0xffffffff;
