@@ -34,6 +34,7 @@ const Docs = lazy(() => import("./screens/Docs"));
 import { fmtFreq, useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
+import { connectDeviceLink } from "../lib/deviceLink";
 import "./meshterm.css";
 
 const VERSION = "0.1.0";
@@ -633,7 +634,24 @@ function App() {
             >
               BLUETOOTH
             </button>
+            <button
+              disabled={!hasSerial}
+              title="For a T-Deck running Lilyshark firmware: live device telemetry and Shelby pointer hand-off on the TRAFFIC screen"
+              onClick={() => {
+                setConnectOpen(false);
+                setTab("TRAFFIC");
+                void connectDeviceLink();
+              }}
+            >
+              LILYSHARK USB
+            </button>
           </div>
+          <p className="sheet-note">
+            Radio running Lilyshark instead of MeshCore? LILYSHARK USB links
+            the analyzer itself: the device announces the link in its event
+            log and streams live telemetry — and any Shelby pointer it decodes
+            — to the TRAFFIC screen.
+          </p>
           {!hasSerial && !hasBle && (
             <p className="sheet-note">
               This browser exposes neither Web Serial nor Web Bluetooth — open

@@ -196,6 +196,15 @@ bool first_frame_event_recorded = false;
 void format_unix_date(std::uint32_t unix_seconds, char *out, std::size_t capacity) noexcept;
 bool decode_frame_shelby_pointer(const FrameRecord &record, ShelbyPointer &out) noexcept;
 
+// Web-analyzer USB link: lilyshark.com handshakes over the CDC serial with
+// "LSK HELLO"; while linked, the device loop streams newline-delimited
+// telemetry lines the analyzer renders live. Plain text on purpose — a human
+// with a serial monitor reads the same protocol the web app does.
+bool analyzer_link_active = false;
+std::uint32_t analyzer_link_last_telemetry_ms = 0;
+char analyzer_link_line[96]{};
+std::size_t analyzer_link_line_length = 0;
+
 bool observed_radio_initialized = false;
 bool observed_radio_receiving = false;
 bool pcap_bandwidth_warning_recorded = false;
@@ -4438,6 +4447,24 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                           pointer.commitment[0], pointer.commitment[1],
                           pointer.commitment[30], pointer.commitment[31]);
             record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Radio, message);
+#if defined(LILYSHARK_DEVICE)
+            // Full coordinates over the link: enough for the analyzer to
+            // resolve the blob from the storage network on its own.
+            if(analyzer_link_active) {
+                char owner_hex[2U * ShelbyPointer::kOwnerSize + 1U]{};
+                char commit_hex[2U * ShelbyPointer::kCommitmentSize + 1U]{};
+                for(unsigned index = 0; index < ShelbyPointer::kOwnerSize; ++index) {
+                    std::snprintf(owner_hex + index * 2U, 3U, "%02x", pointer.owner[index]);
+                }
+                for(unsigned index = 0; index < ShelbyPointer::kCommitmentSize; ++index) {
+                    std::snprintf(commit_hex + index * 2U, 3U, "%02x", pointer.commitment[index]);
+                }
+                Serial.printf("LSK P {\"size\":%lu,\"expires\":%lu,\"owner\":\"0x%s\",\"commit\":\"0x%s\"}\n",
+                              static_cast<unsigned long>(pointer.size_bytes),
+                              static_cast<unsigned long>(pointer.expires_at_unix),
+                              owner_hex, commit_hex);
+            }
+#endif
         }
     }
     if(allow_capture && native_capture_recording) {
@@ -8062,6 +8089,27 @@ void setup()
                          (app_settings.resume_last_view ? "Last live view ready" : "Home ready"));
 }
 
+void handle_analyzer_link_command(const char *line) noexcept
+{
+    if(std::strcmp(line, "LSK HELLO") == 0) {
+        const bool first_link = !analyzer_link_active;
+        analyzer_link_active = true;
+        analyzer_link_last_telemetry_ms = 0;
+        Serial.printf("LSK ID {\"app\":\"lilyshark\",\"fw\":\"%s\",\"board\":\"t-deck\"}\n",
+                      firmware_version);
+        if(first_link) {
+            record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
+                                 "Web analyzer linked over USB");
+        }
+    } else if(std::strcmp(line, "LSK BYE") == 0) {
+        if(analyzer_link_active) {
+            record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::System,
+                                 "Web analyzer link closed");
+        }
+        analyzer_link_active = false;
+    }
+}
+
 void loop()
 {
     poll_trackball();
@@ -8070,8 +8118,38 @@ void loop()
     hardware_status.poll();
     if(!app_settings.simulate_mode) radio_service.poll();
 
+    // Web-analyzer link: consume newline-delimited commands from USB CDC.
+    while(Serial.available() > 0) {
+        const char received = static_cast<char>(Serial.read());
+        if(received == '\n' || received == '\r') {
+            analyzer_link_line[analyzer_link_line_length] = '\0';
+            if(analyzer_link_line_length > 0U) handle_analyzer_link_command(analyzer_link_line);
+            analyzer_link_line_length = 0;
+        } else if(analyzer_link_line_length + 1U < sizeof(analyzer_link_line)) {
+            analyzer_link_line[analyzer_link_line_length++] = received;
+        } else {
+            analyzer_link_line_length = 0;
+        }
+    }
+
     const uint32_t now = millis();
     bool redraw = false;
+
+    if(analyzer_link_active &&
+       static_cast<std::uint32_t>(now - analyzer_link_last_telemetry_ms) >= 2000U) {
+        analyzer_link_last_telemetry_ms = now;
+        const HardwareStatusSnapshot &hardware = hardware_status.snapshot();
+        const FrameRecord *newest = capture_runtime.frames().newest();
+        const RadioProfile &link_profile = radio_service.activeProfile();
+        Serial.printf(
+            "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
+            "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s}\n",
+            hardware.battery_label, hardware.gps_label, link_profile.name,
+            static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
+            newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
+            newest != nullptr ? static_cast<int>(newest->raw.rf.snr_db_x10) : 0,
+            app_settings.simulate_mode ? "true" : "false");
+    }
     // Synthetic traffic exercises the real decoder, analyzer and native
     // capture path. The live radio is stopped, and PCAP explicitly excludes
     // synthetic frames because LoRaTap v0 has no provenance field.

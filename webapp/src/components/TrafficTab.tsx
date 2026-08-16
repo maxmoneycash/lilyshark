@@ -19,6 +19,7 @@ import {
   fetchBlob as fetchBlobBytes,
   resolveByCommitment,
 } from '../lib/shelby';
+import { useDeviceLink } from '../lib/deviceLink';
 
 /** The live table stops growing here; old frames age out on the left. */
 const LIVE_CAP = 250;
@@ -137,11 +138,12 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   }
   const [trace, setTrace] = useState<TraceStep[] | null>(null);
   const resolving = trace?.some((t) => t.state === 'run') ?? false;
+  const link = useDeviceLink();
 
-  const resolvePointer = async () => {
-    if (!ptr) return;
+  // Shared by the selected frame's RESOLVE and the device link's pointer
+  // hand-off: both are the same walk from coordinates to opened capture.
+  const runResolve = async (p: { owner: string; commitment: string; sizeBytes: number }) => {
     setLive(false);
-    const p = ptr.pointer;
     const steps: TraceStep[] = [
       { label: 'POINTER', detail: `82 B decoded from the frame`, state: 'ok' },
       { label: 'INDEXER', detail: 'commitment → object name…', state: 'run' },
@@ -224,6 +226,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
         };
       show();
     }
+  };
+
+  const resolvePointer = () => {
+    if (!ptr) return;
+    void runResolve(ptr.pointer);
   };
 
   // A new frame selection is a new story; the old trace would misattribute —
@@ -363,6 +370,49 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
         </div>
 
         {error && <div className="panel-foot err">{error}</div>}
+
+        {link.status === 'linked' && (
+          <div className="kv">
+            <span className="k">T-DECK LINK</span>
+            <span className="v ok">
+              Lilyshark {link.firmware} over USB
+              {link.telemetry?.sim ? ' · SIMULATE MODE (SYNTHETIC)' : ''}
+            </span>
+            {link.telemetry && (
+              <>
+                <span className="k">DEVICE</span>
+                <span className="v">
+                  {link.telemetry.bat} · {link.telemetry.gps} · {link.telemetry.profile} · frame
+                  #{link.telemetry.frames} · RSSI {(link.telemetry.rssiX10 / 10).toFixed(1)} dBm ·
+                  SNR {(link.telemetry.snrX10 / 10).toFixed(1)} dB
+                </span>
+              </>
+            )}
+            {link.pointer && (
+              <>
+                <span className="k">POINTER RX</span>
+                <span className="v">
+                  {link.pointer.sizeBytes.toLocaleString()} B blob · commit{' '}
+                  {link.pointer.commitment.slice(0, 10)}…{link.pointer.commitment.slice(-4)}{' '}
+                  <button
+                    disabled={resolving}
+                    onClick={() => {
+                      const p = link.pointer;
+                      if (p)
+                        void runResolve({
+                          owner: p.owner,
+                          commitment: p.commitment,
+                          sizeBytes: p.sizeBytes,
+                        });
+                    }}
+                  >
+                    RESOLVE
+                  </button>
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         {!capture && (
           <div className="kv">
