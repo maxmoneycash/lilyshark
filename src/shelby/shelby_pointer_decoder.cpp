@@ -30,6 +30,7 @@ DecodeResult ShelbyPointerDecoder::decode(const RawFrame &frame, const RadioProf
     output.payload_offset = static_cast<std::uint16_t>(offset);
     output.payload_length = static_cast<std::uint16_t>(ShelbyPointer::kEncodedSize);
     output.protocol_flags = pointer.flags;
+    output.attributes |= AttributeShelbyPointer;
 
     if (pointer.isEncrypted()) {
         output.attributes |= AttributeEncrypted;

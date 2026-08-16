@@ -440,6 +440,17 @@ bool TDeckRadioService::startSpectrumPoint() noexcept
     return true;
 }
 
+void TDeckRadioService::clearSpectrumResult() noexcept
+{
+    if (spectrum_status_.active()) {
+        return;
+    }
+    spectrum_status_ = SpectrumSweepStatus{};
+    spectrum_result_ = SpectrumSweepResult{};
+    spectrum_terminal_state_ = SpectrumSweepState::Idle;
+    spectrum_point_started_ms_ = 0;
+}
+
 void TDeckRadioService::pollSpectrumSweep() noexcept
 {
     if (spectrum_status_.state == SpectrumSweepState::Preparing) {

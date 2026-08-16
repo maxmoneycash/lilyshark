@@ -199,6 +199,7 @@ void decoderFindsPointerRegardlessOfEnclosingProtocol()
             assert(decoder.decode(frame, profile, packet) == DecodeResult::Matched);
             assert(packet.payload_offset == header_bytes);
             assert(packet.payload_length == ShelbyPointer::kEncodedSize);
+            assert(packet.hasAttribute(AttributeShelbyPointer));
             assert(packet.hasAttribute(AttributeEncrypted)); // makePointer sets the flag
 
             ShelbyPointer extracted{};

@@ -20,6 +20,7 @@ inline lv_color_t rule() { return lv_color_hex(0x29413F); }
 inline lv_color_t grid() { return lv_color_hex(0x17302E); }
 inline lv_color_t text() { return lv_color_hex(0xF0F4EF); }
 inline lv_color_t text_muted() { return lv_color_hex(0x8D9C98); }
+inline lv_color_t pink() { return lv_color_hex(0xFF4F9D); }
 inline lv_color_t lime() { return lv_color_hex(0x66F05A); }
 inline lv_color_t cyan() { return lv_color_hex(0x71D8DF); }
 inline lv_color_t amber() { return lv_color_hex(0xF2CE58); }
@@ -44,6 +45,7 @@ inline void reset(lv_obj_t * object)
 {
     lv_obj_remove_style_all(object);
     lv_obj_clear_flag(object, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(object, LV_OBJ_FLAG_CLICKABLE);
 }
 
 inline void fill(lv_obj_t * object, lv_color_t color)

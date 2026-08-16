@@ -1,19 +1,21 @@
-# Lilyshark UI references
+# Lilyshark historical UI references
 
-These ten images are the visual contract for the 320 x 240 T-Deck interface. They define nine primary screens; `02-node-roster.png` and `04-dense-node-roster.png` are alternate density studies for the same roster view.
+These ten images were early 320 x 240 composition studies. They established the dense typography, focus treatment, color roles, and plot-first layout, but they are not the current data or navigation contract. Exact frames from the implemented firmware builders live in [`design/previews`](../previews), including the six-stage setup, Home, tools, Protocols, Timeline, and the five-tab Packet Inspector.
+
+Some sketches include hop, remote-position, channel-frequency, or continuous-waterfall concepts that received frames cannot always prove and a single SX1262 cannot continuously collect. The current UI omits those claims or labels the data unavailable. Spectrum is an explicit fast/deep power-histogram sweep that pauses packet reception; Map shows only the local optional-GPS state.
 
 | File | Screen pattern |
 | --- | --- |
-| `01-node-detail.png` | Node name, current state, and stacked SNR/RSSI/hop plots |
+| `01-node-detail.png` | Density study for node name and stacked history; implemented detail keeps attributable SNR/RSSI activity and omits invented hops/position |
 | `02-node-roster.png` | Five-row roster with battery and per-node sparklines |
-| `03-packet-detail.png` | Packet metadata, route, payload, and hex detail with a left rail |
+| `03-packet-detail.png` | Basis for the implemented PKT/RF/DEC/HEX/RAW inspector rail |
 | `04-dense-node-roster.png` | High-density roster and strong full-row focus state |
-| `05-node-map.png` | Full-canvas spatial/radar view |
+| `05-node-map.png` | Spatial treatment study; implemented Map is the local optional-GPS fix only |
 | `06-survey-capture.png` | Single capture state, progress, live metrics, and contextual action |
-| `07-spectrum-waterfall.png` | Full-width waterfall with noise, busiest, and quietest summaries |
+| `07-spectrum-waterfall.png` | Heat-color study; implemented Spectrum grows a bounded SX1262 scan histogram across measured bins |
 | `08-events.png` | Timestamped semantic event log |
 | `09-live-traffic.png` | Dense packet feed with row focus |
-| `10-channel-utilization.png` | Hero utilization metric, supporting values, and channel histogram |
+| `10-channel-utilization.png` | Basis for the hero Airtime metric and recent time-history bars |
 
 Shared rules:
 

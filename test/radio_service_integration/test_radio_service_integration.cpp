@@ -185,6 +185,8 @@ void testSpectrumSweepRestoresReceiver()
     assert(service.begin(testProfile(), nullptr, nullptr));
     assert(service.startSpectrumSweep(twoPointSweep()));
     assert(service.spectrumStatus().state == SpectrumSweepState::Preparing);
+    service.clearSpectrumResult();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Preparing);
     assert(!service.status().receiving);
     assert(fake.dio1_action == nullptr);
 
@@ -231,6 +233,11 @@ void testSpectrumSweepRestoresReceiver()
     assert(service.status().initialized);
     assert(service.status().receiving);
     assert(fake.dio1_action != nullptr);
+    service.clearSpectrumResult();
+    assert(service.spectrumStatus().state == SpectrumSweepState::Idle);
+    assert(service.spectrumStatus().points_completed == 0U);
+    assert(service.spectrumResult().point_count == 0U);
+    assert(service.status().receiving);
     service.stop();
 }
 

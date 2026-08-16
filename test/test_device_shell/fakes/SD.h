@@ -18,6 +18,12 @@ class SDClass {
         return device_shell_fake::state().sd_present;
     }
 
+    void end()
+    {
+        ++device_shell_fake::state().sd_end_calls;
+        device_shell_fake::record("sd.end");
+    }
+
     bool exists(const char *path) const
     {
         if(path == nullptr) return false;

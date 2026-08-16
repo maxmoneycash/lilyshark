@@ -32,6 +32,8 @@ class LilysharkCaptureWriter
     LilysharkCaptureWriteResult begin() noexcept;
     LilysharkCaptureWriteResult write(const RawFrame &frame) noexcept;
     LilysharkCaptureWriteResult write(const FrameRecord &record) noexcept;
+    // Re-arms a writer after its previous sink has been flushed and closed.
+    void reset() noexcept { started_ = false; failed_ = false; }
 
     bool started() const noexcept { return started_; }
     bool failed() const noexcept { return failed_; }

@@ -39,6 +39,7 @@ class TwoWire {
     {
         if(address_ == 0x55U && tx_.size() == 2U && tx_[0] == 0x01U) {
             device_shell_fake::record("keyboard.brightness." + std::to_string(tx_[1]));
+            if(!device_shell_fake::state().keyboard_present) return 2U;
         }
         if((address_ == 0x5dU || address_ == 0x14U) &&
            !device_shell_fake::state().touch_present) return 2U;
@@ -49,6 +50,7 @@ class TwoWire {
     {
         rx_.clear();
         if(address == 0x55U) {
+            if(!device_shell_fake::state().keyboard_present) return 0U;
             if(!device_shell_fake::state().keyboard_bytes.empty() && length != 0U) {
                 rx_.push_back(device_shell_fake::state().keyboard_bytes.front());
                 device_shell_fake::state().keyboard_bytes.pop_front();

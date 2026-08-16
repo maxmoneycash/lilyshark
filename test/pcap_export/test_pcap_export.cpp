@@ -204,6 +204,11 @@ void testFailedRecordWriteLeavesOnlyGlobalHeader()
     assert(writer.failed());
     assert(writer.write(frame) == PcapWriteResult::SinkError);
     assert(sink.writeCount() == 2);
+
+    writer.reset();
+    assert(!writer.started());
+    assert(!writer.failed());
+    assert(writer.begin() == PcapWriteResult::Ok);
 }
 
 } // namespace

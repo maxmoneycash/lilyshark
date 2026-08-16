@@ -34,6 +34,8 @@ class PcapLoraTapWriter
     PcapWriteResult begin() noexcept;
     PcapWriteResult write(const RawFrame &frame) noexcept;
     PcapWriteResult write(const FrameRecord &record) noexcept { return write(record.raw); }
+    // Re-arms a writer after its previous sink has been flushed and closed.
+    void reset() noexcept { started_ = false; failed_ = false; }
 
     bool started() const noexcept { return started_; }
     bool failed() const noexcept { return failed_; }

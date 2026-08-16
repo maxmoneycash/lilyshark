@@ -54,9 +54,10 @@ uvx --from platformio==6.1.19 platformio run -e simulator
 .pio/build/simulator/program
 ```
 
-The full analyzer UI, with simulated traffic. `--render-test` compares every
-screen's framebuffer against checked-in expectations; `scripts/run_ui_demo.sh`
-drives a scripted tour.
+The full product shell and analyzer run with deterministic moving synthetic RF
+telemetry. `--render-test` compares every screen's framebuffer against checked-in
+expectations, `--animation-test` proves the live data regions move, and
+`scripts/run_ui_demo.sh` drives the complete recording tour.
 
 ## Where to go next
 

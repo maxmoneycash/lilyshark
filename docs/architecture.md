@@ -40,24 +40,30 @@ AddressSanitizer and UndefinedBehaviorSanitizer.
   radio can prove — frequency, bandwidth, spreading factor, coding rate, RSSI,
   SNR, CRC state, frequency error, airtime.
 - **Capture runtime** (`include/lilyshark/core/capture_runtime.h`) ingests each
-  frame: the decoder registry tries decoders in registration order and stops
-  at the first match, then the frame store keeps the ring of recent frames
-  that backs the on-device views. No allocation, no exceptions.
+  frame. The decoder registry keeps the first protocol match as the primary
+  result, then allows later metadata-only decoders to add explicitly safe
+  attributes without replacing that protocol result. The frame store keeps
+  the ring of recent frames that backs the on-device views. No allocation, no
+  exceptions.
 - **Decoders** (`src/core/`, `src/shelby/`) — Meshtastic, MeshCore, and
   Reticulum each add only the meaning they can prove from the frame; anything
   unknown or encrypted stays available as raw bytes. The Shelby pointer
-  decoder is registered last: it only claims frames no protocol decoder
-  recognized, so it surfaces an off-grid pointer without claiming to own the
-  enclosing protocol (see `docs/shelby-pointer-format.md`).
+  decoder is registered last. A standalone pointer is reported as Custom; a
+  valid pointer inside a recognized Meshtastic, MeshCore, or Reticulum frame
+  adds only a Shelby marker while preserving the enclosing protocol and its
+  decoded fields (see `docs/shelby-pointer-format.md`).
 - **Exports** (`src/export/`) write the same frames as native `.lscap`
   (`docs/lilyshark-capture-format.md`) and as standards-compatible PCAP/
   LoRaTap when the active PHY profile fits that format's limits.
-- **Views** — nine on-device screens: live traffic, packet detail, nodes,
-  spectrum (from the SX1262 histogram), a 60-second field survey, airtime
-  utilization, events, plus the product shell and settings.
+- **Views** — 13 analyzer routes cover Traffic, composable filters, rolling
+  protocol health and detail, fast/deep spectrum sweeps, nodes and node detail,
+  a five-tab packet inspector, local GPS, a 60-second survey, airtime, Timeline,
+  and Events. The six-stage first run, Home, Settings, storage, device status,
+  Help, About, and confirmations form the product shell around them.
 - **Simulator** (`src/sim_main.cpp`, `-e simulator`) runs the full UI against
-  SDL on the host, including a framebuffer-exact render test and a scripted
-  demo tour (`scripts/run_ui_demo.sh`).
+  deterministic moving synthetic RF telemetry on the host. It includes exact
+  framebuffer tests, data-region motion tests, deterministic README-media
+  export, and an 87-step recording tour (`scripts/run_ui_demo.sh`).
 
 ## Host tooling (`scripts/`)
 

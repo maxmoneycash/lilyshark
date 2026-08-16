@@ -19,10 +19,10 @@ If this is your only T-Deck, plan the return path before flashing. Export the cu
 Clone the exact release tag, then download only the merged factory image and checksum manifest:
 
 ```sh
-git clone --depth 1 --branch v0.1.0-alpha.6 https://github.com/maxmoneycash/lilyshark.git
+git clone --depth 1 --branch v0.1.0-alpha.7 https://github.com/maxmoneycash/lilyshark.git
 cd lilyshark
 mkdir -p dist
-release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.6'
+release_base='https://github.com/maxmoneycash/lilyshark/releases/download/v0.1.0-alpha.7'
 curl --fail --location "${release_base}/lilyshark-tdeck.factory.bin" \
   --output dist/lilyshark-tdeck.factory.bin
 curl --fail --location "${release_base}/SHA256SUMS" \
@@ -155,7 +155,9 @@ or send serial data. If no startup lines appear after it begins listening,
 press the T-Deck reset button once.
 
 A pass means one boot reached the display, touch, PCAP capture, native capture,
-SX1262 listening, and UI-ready milestones without a fatal message. A missing
+SX1262 listening, and UI-ready milestones without a fatal message. On the panel,
+the expected first-run sequence is the pink wordmark, six setup stages, then Home.
+A missing
 microSD card, failed peripheral, radio recovery state, missing milestone, or
 restart produces a nonzero exit status and names the failed check. Keep the raw
 log with the firmware build being tested.
@@ -170,23 +172,28 @@ uvx --from platformio==6.1.19 platformio device monitor \
 
 The startup log reports separate states for the display shell, touch controller, microSD capture, native capture, active radio profile, and SX1262 initialization. Record the complete log if startup stops or a peripheral reports an error.
 
-With a writable microSD card inserted before boot, Lilyshark creates `/lilyshark` and starts unique `.lscap` and `.pcap` files. Press `S` after the UI appears to test display readback and BMP output. The Events screen shows the current paths or failure states.
+With a writable microSD card inserted before boot, Lilyshark creates `/lilyshark` and starts unique `.lscap` and `.pcap` files when capture is enabled. **Settings → Capture & Storage** shows the desired mode, actual writer state, and current paths, and can stop, start, or retry a session. Press `S` after the UI appears to test display readback and BMP output. The scrollable Events screen records the resulting actions or failures.
 
 ## First hardware smoke test
 
 This is the minimum evidence needed before calling a build hardware-validated:
 
-1. Power-cycle the T-Deck twice and confirm the UI reaches Traffic each time.
-2. Verify the status bar reports battery and the expected GPS state.
-3. Move through all nine views with the trackball, keyboard arrows, number keys, and touch swipes.
-4. Press `P` and confirm all five profiles reconfigure without an RF error.
-5. Receive a known LoRa frame and inspect its packet detail and raw bytes.
-6. Confirm a CRC-mismatch test frame appears with the correct integrity state.
-7. Start, cancel, and complete a spectrum sweep. Confirm capture resumes afterward.
-8. Run a 60-second survey and verify its totals against the traffic view.
-9. Save a screenshot, power down cleanly, and open the BMP from the card.
-10. Validate `.lscap` against the documented version 1 layout and open a supported-bandwidth `.pcap` in Wireshark.
-11. Leave capture running overnight, then check resets, dropped writes, file integrity, and radio recovery.
+1. Power-cycle the T-Deck twice. Confirm the first visible application frame is the smooth pink Lilyshark wordmark, with no bright or corrupted frame before it.
+2. On a fresh install, complete all six onboarding stages: welcome, capabilities, network, profile, controls, and readiness. Confirm Back works, the selected profile is applied, save failures can be retried, and the device reaches Home.
+3. Reboot and confirm onboarding stays complete. Check both startup choices: Home and the last live view.
+4. Verify Home and Settings show the real battery, GPS, radio, microSD, and capture states rather than sample values.
+5. Move through Home, every Settings route, and all 13 analyzer and tool views with the trackball, keyboard, and touch. Verify visible Back/Cancel actions never trigger the action on the right.
+6. Press `P` and confirm all five profiles reconfigure without an RF error. Reboot and confirm the selected profile persists.
+7. Receive a known LoRa frame. Open Packet Detail, visit PKT, RF, DEC, HEX, and RAW, page through more than 80 HEX bytes, and confirm the final page is bounded correctly. From Traffic, apply and reset protocol/decode/CRC filters without changing either capture file.
+8. Confirm a CRC-mismatch test frame appears with the correct integrity state and does not create a false node identity.
+9. Create more than six operational events and verify the Events history scrolls to older rows and back to the newest rows.
+10. Start, cancel, and complete a spectrum sweep. Confirm capture resumes afterward.
+11. Run a 60-second survey and verify its totals against the traffic view.
+12. Stop and restart capture from Settings. Confirm both files close, new unique files open, and the preference survives reboot.
+13. Save a screenshot, power down cleanly, and open the BMP from the card.
+14. Validate `.lscap` against the documented version 1 layout and open a supported-bandwidth `.pcap` in Wireshark.
+15. Toggle optional GPS polling after a fix and confirm stale coordinates do not reappear before a new valid NMEA sentence.
+16. Leave capture running overnight, then check resets, dropped writes, file integrity, event timestamps, and radio recovery.
 
 Until this checklist has evidence from a physical unit, describe the image as developer-alpha firmware.
 
