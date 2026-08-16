@@ -19,7 +19,12 @@ import {
   fetchBlob as fetchBlobBytes,
   resolveByCommitment,
 } from '../lib/shelby';
-import { connectDeviceLink, useDeviceLink } from '../lib/deviceLink';
+import {
+  autoLinkDeviceLink,
+  connectDeviceLink,
+  disconnectDeviceLink,
+  useDeviceLink,
+} from '../lib/deviceLink';
 
 /** The live table stops growing here; old frames age out on the left. */
 const LIVE_CAP = 250;
@@ -139,6 +144,13 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const [trace, setTrace] = useState<TraceStep[] | null>(null);
   const resolving = trace?.some((t) => t.state === 'run') ?? false;
   const link = useDeviceLink();
+
+  // A T-Deck the browser already has permission for links itself when the
+  // analyzer opens: plug in, come here, watch the panel fill. Silent when
+  // there is no such device, so nothing is asked of a visitor without one.
+  useEffect(() => {
+    void autoLinkDeviceLink();
+  }, []);
 
   // Shared by the selected frame's RESOLVE and the device link's pointer
   // hand-off: both are the same walk from coordinates to opened capture.
@@ -382,13 +394,19 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             {link.status === 'error' && (
               <span className="v err">
                 {link.error}{' '}
-                <button onClick={() => void connectDeviceLink()}>RETRY</button>
+                <button onClick={() => void connectDeviceLink()}>RETRY</button>{' '}
+                {link.canPick && (
+                  <button onClick={() => void connectDeviceLink({ picker: true })}>
+                    CHOOSE PORT
+                  </button>
+                )}
               </span>
             )}
             {link.status === 'linked' && (
               <span className="v ok">
                 Lilyshark {link.firmware} over USB
-                {link.telemetry?.sim ? ' · SIMULATE MODE (SYNTHETIC)' : ''}
+                {link.telemetry?.sim ? ' · SIMULATE MODE (SYNTHETIC)' : ''}{' '}
+                <button onClick={() => void disconnectDeviceLink()}>UNLINK</button>
               </span>
             )}
             {link.status === 'linked' && link.telemetry && (

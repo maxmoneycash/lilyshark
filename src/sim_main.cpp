@@ -730,6 +730,7 @@ void add_status_bar(lv_obj_t * parent, const char * title, const char * left_val
                     const char * middle_value = "GPS LOCK", const char * right_value = "18 pkt/min")
 {
     lv_color_t middle_color = theme::text();
+    lv_color_t right_color = theme::text();
 #if defined(LILYSHARK_DEVICE)
     left_value = live_battery_label;
     if(app_settings.simulate_mode) {
@@ -738,7 +739,14 @@ void add_status_bar(lv_obj_t * parent, const char * title, const char * left_val
     } else {
         middle_value = live_gps_label;
     }
-    right_value = live_radio_label;
+    // The web analyzer is attached to this device right now; say so where the
+    // user is already looking, not only in the event log.
+    if(analyzer_link_active) {
+        right_value = "USB LINKED";
+        right_color = theme::cyan();
+    } else {
+        right_value = live_radio_label;
+    }
 #endif
     lv_obj_t * bar = theme::rect(parent, 0, 0, theme::screen_width, theme::status_height, theme::surface());
     theme::rule_line(bar, 0, theme::status_height - 1, theme::screen_width);
@@ -755,7 +763,7 @@ void add_status_bar(lv_obj_t * parent, const char * title, const char * left_val
 
     if(title_left >= 245) {
         theme::rule_line(bar, 164, 3, 1, 15, theme::rule());
-        put_label(bar, right_value, 174, 4, theme::text(), &font_mono_semibold_12);
+        put_label(bar, right_value, 174, 4, right_color, &font_mono_semibold_12);
     }
 }
 
