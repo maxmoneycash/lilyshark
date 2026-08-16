@@ -2130,6 +2130,24 @@ body:has(.meshterm .app.menu-open) {
 		flex: 1 1 0;
 		min-width: 0;
 	}
+
+	/* One control height for the whole row. The tabs and CONNECT zero their
+	   vertical padding above, which collapsed them to text height while the
+	   link pill kept the 5px base padding and loomed over them. Everything
+	   boxed in the header now shares this height and scales with the
+	   viewport like the rest of the row. */
+	.meshterm header nav > .tab,
+	.meshterm header > .primary,
+	.meshterm header > .conn-pill {
+		box-sizing: border-box;
+		height: clamp(20px, 1.9vw, 28px);
+		display: inline-flex;
+		align-items: center;
+	}
+	.meshterm header > .conn-pill {
+		padding: 0 clamp(6px, 0.8vw, 10px);
+		font-size: clamp(8px, 0.72vw, 11px);
+	}
 }
 
 /* The link pill repeats what the CONNECT button's own label already says,
