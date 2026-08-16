@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate samples/sample-mesh-traffic.lscap, a deterministic demo capture.
+"""Generate deterministic synthetic Lilyshark demo captures.
 
 The capture is what an afternoon on a T-Deck might hear on the US LongFast
 slot: a couple dozen frames across the three mesh protocols Lilyshark
@@ -7,7 +7,8 @@ decodes, one CRC failure, one truncated frame — and, at sequence 9, a Shelby
 off-grid pointer riding behind a 16-byte protocol header. The webapp
 analyzer, the Python scanner, and the firmware decoder all find it there.
 
-Deterministic: regenerating always produces the same bytes.
+Every record carries the .lscap synthetic-provenance flag. Regenerating always
+produces the same bytes.
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ import shelby_pointer  # noqa: E402
 OUT_PATH = Path(__file__).resolve().parents[1] / "samples" / "sample-mesh-traffic.lscap"
 
 FILE_HEADER = lscap.FILE_HEADER.pack(
-    lscap.FILE_MAGIC, 1, 0, lscap.FILE_HEADER_SIZE, lscap.RECORD_HEADER_SIZE,
+    lscap.FILE_MAGIC, lscap.FORMAT_MAJOR, lscap.FORMAT_MINOR,
+    lscap.FILE_HEADER_SIZE, lscap.RECORD_HEADER_SIZE,
     0, 1_000_000, 0,
 )
 
@@ -81,7 +83,7 @@ def payloads(plain: bool = False) -> list[tuple[str, bytes]]:
     for index in range(24):
         if index == 9 and not plain:
             # A pointer inside an enclosing protocol's payload: 16 header
-            # bytes first, exactly how it arrives off the air.
+            # bytes first, matching the placement used on the air.
             header = bytes(rng.randrange(256) for _ in range(16))
             frames.append(("meshtastic+shelby-pointer", header + demo_pointer()))
             continue
@@ -130,7 +132,7 @@ def build(plain: bool = False) -> bytes:
             1,                     # modulation: LoRa
             direction,
             crc,
-            0,                     # metadata flags
+            lscap.SYNTHETIC_METADATA_FLAG,
             b"\x00\x00\x00",
         )
         out += captured
@@ -138,9 +140,9 @@ def build(plain: bool = False) -> bytes:
 
 
 def main() -> int:
-    # --plain: the capture the demo pointer references — same shape, no
-    # pointer of its own, so the resolved capture terminates the story
-    # instead of dead-ending on a second RESOLVE.
+    # --plain: a local synthetic companion with the same shape and no pointer
+    # of its own. The published Shelby commitment remains immutable and is not
+    # derived from this regenerated fixture.
     if "--plain" in sys.argv:
         out = Path(__file__).resolve().parents[1] / "samples" / "field-capture-0846.lscap"
         data = build(plain=True)

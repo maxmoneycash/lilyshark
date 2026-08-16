@@ -16,6 +16,9 @@ import lscap  # noqa: E402
 
 
 FILE_HEADER = bytes.fromhex(
+    "4c53435001000100180050000000000040420f0000000000"
+)
+LEGACY_FILE_HEADER = bytes.fromhex(
     "4c53435001000000180050000000000040420f0000000000"
 )
 
@@ -106,6 +109,7 @@ class CaptureReaderTests(unittest.TestCase):
         self.assertEqual(records[0]["direction"], 1)
         self.assertEqual(records[0]["crc_state"], 3)
         self.assertEqual(records[0]["metadata_flags"], 3)
+        self.assertFalse(records[0]["synthetic"])
         self.assertEqual(
             records[0]["metadata_flag_names"], ["implicit_header", "inverted_iq"]
         )
@@ -122,9 +126,31 @@ class CaptureReaderTests(unittest.TestCase):
         self.assertEqual(records[1]["crc_state"], 0xFC)
         self.assertIsNone(records[1]["crc_state_name"])
         self.assertEqual(records[1]["metadata_flags"], 0x85)
-        self.assertEqual(records[1]["metadata_flag_names"], ["implicit_header"])
-        self.assertEqual(records[1]["unknown_metadata_flag_bits"], 0x84)
+        self.assertEqual(
+            records[1]["metadata_flag_names"], ["implicit_header", "synthetic"]
+        )
+        self.assertEqual(records[1]["unknown_metadata_flag_bits"], 0x80)
+        self.assertTrue(records[1]["synthetic"])
         self.assertEqual(records[1]["reserved_hex"], "010203")
+
+    def test_version_one_zero_does_not_assign_the_later_synthetic_flag(self):
+        header, records = read_capture(
+            LEGACY_FILE_HEADER + make_record(metadata_flags=0x04)
+        )
+        self.assertEqual(header["minor_version"], 0)
+        self.assertFalse(records[0]["synthetic"])
+        self.assertEqual(records[0]["metadata_flag_names"], [])
+        self.assertEqual(records[0]["unknown_metadata_flag_bits"], 0x04)
+
+    def test_bundled_samples_are_version_one_one_and_synthetic(self):
+        for name in ("sample-mesh-traffic.lscap", "field-capture-0846.lscap"):
+            with self.subTest(name=name):
+                with (REPO_ROOT / "samples" / name).open("rb") as stream:
+                    header = lscap.read_file_header(stream)
+                    records = list(lscap.iter_records(stream, header))
+                self.assertEqual(header["minor_version"], lscap.FORMAT_MINOR)
+                self.assertEqual(len(records), 24)
+                self.assertTrue(all(record["synthetic"] for record in records))
 
     def test_maximum_length_frame(self):
         payload = bytes(range(255))
@@ -266,6 +292,7 @@ class CaptureCliTests(unittest.TestCase):
             validated = self.run_cli("validate", str(capture))
             self.assertEqual(validated.returncode, 0, validated.stderr)
             self.assertIn("2 records, 9 payload bytes", validated.stdout)
+            self.assertIn("1 synthetic record", validated.stdout)
 
             dumped = self.run_cli("dump", str(capture))
             self.assertEqual(dumped.returncode, 0, dumped.stderr)

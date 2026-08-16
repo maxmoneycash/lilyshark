@@ -122,7 +122,8 @@ b0b1b2b3b4b5b6b7b8b9babbbcbdbebf0104070a0d10
 ## Sample data
 
 `samples/sample-mesh-traffic.lscap` (generated deterministically by
-`scripts/generate_sample_capture.py`) carries a pointer at sequence 9,
+`scripts/generate_sample_capture.py`) is a synthetic `.lscap` 1.1 fixture. All
+records carry the synthetic provenance flag. It carries a pointer at sequence 9,
 behind a 16-byte protocol header. The web analyzer's Traffic tab marks the
 frame `SHLB` and decodes the pointer inline, and
 `python3 scripts/shelby_pointer.py scan samples/sample-mesh-traffic.lscap`

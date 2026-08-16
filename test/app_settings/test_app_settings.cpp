@@ -24,7 +24,8 @@ bool sameSettings(const AppSettings &left, const AppSettings &right) noexcept
            left.last_primary_diagnostic_index ==
                right.last_primary_diagnostic_index &&
            left.spectrum_warning_acknowledged ==
-               right.spectrum_warning_acknowledged;
+               right.spectrum_warning_acknowledged &&
+           left.simulate_mode == right.simulate_mode;
 }
 
 std::uint32_t referenceCrc32(const std::uint8_t *bytes, std::size_t size) noexcept
@@ -60,6 +61,7 @@ AppSettings sentinelSettings() noexcept
     settings.resume_last_view = true;
     settings.last_primary_diagnostic_index = 4U;
     settings.spectrum_warning_acknowledged = true;
+    settings.simulate_mode = true;
     return settings;
 }
 
@@ -85,6 +87,7 @@ void testDefaultsHaveStableGoldenEncoding()
     assert(!settings.resume_last_view);
     assert(settings.last_primary_diagnostic_index == 0U);
     assert(!settings.spectrum_warning_acknowledged);
+    assert(!settings.simulate_mode);
     assert(isValidAppSettings(settings));
 
     constexpr std::array<std::uint8_t, kAppSettingsV1Size> expected = {{
@@ -114,10 +117,11 @@ void testBoundariesRoundTripWithStableEncoding()
     settings.last_primary_diagnostic_index =
         kAppSettingsMaximumPrimaryDiagnosticIndex;
     settings.spectrum_warning_acknowledged = true;
+    settings.simulate_mode = true;
 
     constexpr std::array<std::uint8_t, kAppSettingsV1Size> expected = {{
-        0x4c, 0x53, 0x41, 0x53, 0x01, 0x1f, 0x01, 0x10,
-        0xff, 0x08, 0x00, 0x00, 0xc1, 0x69, 0xd1, 0xb3,
+        0x4c, 0x53, 0x41, 0x53, 0x01, 0x3f, 0x01, 0x10,
+        0xff, 0x08, 0x00, 0x00, 0x5d, 0x50, 0x6c, 0x7c,
     }};
     std::array<std::uint8_t, kAppSettingsV1Size> encoded{};
     assert(encodeAppSettingsV1(settings, encoded.data(), encoded.size()));

@@ -14,10 +14,12 @@ from typing import BinaryIO, Iterator
 FILE_MAGIC = b"LSCP"
 RECORD_MAGIC = b"LSFR"
 FORMAT_MAJOR = 1
+FORMAT_MINOR = 1
 RECORD_LAYOUT_VERSION = 1
 FILE_HEADER_SIZE = 24
 RECORD_HEADER_SIZE = 80
 MAX_CAPTURED_LENGTH = 255
+SYNTHETIC_METADATA_FLAG = 1 << 2
 
 FILE_HEADER = struct.Struct("<4sHHHHIII")
 RECORD_HEADER = struct.Struct("<4sHHHHQQIIIIIIihhHHHhbBBBBBBBB3s")
@@ -44,6 +46,7 @@ PRESENT_FIELDS = (
 METADATA_FLAGS = (
     (0, "implicit_header"),
     (1, "inverted_iq"),
+    (2, "synthetic"),
 )
 MODULATION_NAMES = {0: "unknown", 1: "lora", 2: "fsk"}
 DIRECTION_NAMES = {0: "unknown", 1: "receive", 2: "transmit"}
@@ -92,7 +95,6 @@ def _known_mask(fields: tuple[tuple[int, str], ...]) -> int:
 
 
 PRESENT_FIELDS_MASK = _known_mask(PRESENT_FIELDS)
-METADATA_FLAGS_MASK = _known_mask(METADATA_FLAGS)
 
 
 def read_file_header(stream: BinaryIO) -> dict[str, object]:
@@ -153,6 +155,11 @@ def iter_records(
     stream: BinaryIO, file_header: dict[str, object]
 ) -> Iterator[dict[str, object]]:
     expected_record_header_size = int(file_header["record_header_size"])
+    synthetic_supported = int(file_header["minor_version"]) >= FORMAT_MINOR
+    recognized_metadata_flags = (
+        METADATA_FLAGS if synthetic_supported else METADATA_FLAGS[:2]
+    )
+    recognized_metadata_flags_mask = _known_mask(recognized_metadata_flags)
     index = 0
 
     while True:
@@ -296,8 +303,15 @@ def iter_records(
             "crc_state": crc_state,
             "crc_state_name": CRC_NAMES.get(crc_state),
             "metadata_flags": metadata_flags,
-            "metadata_flag_names": _flag_names(metadata_flags, METADATA_FLAGS),
-            "unknown_metadata_flag_bits": metadata_flags & ~METADATA_FLAGS_MASK,
+            "metadata_flag_names": _flag_names(
+                metadata_flags, recognized_metadata_flags
+            ),
+            "unknown_metadata_flag_bits": (
+                metadata_flags & ~recognized_metadata_flags_mask
+            ),
+            "synthetic": synthetic_supported and bool(
+                metadata_flags & SYNTHETIC_METADATA_FLAG
+            ),
             "reserved_hex": reserved.hex(),
             "header_extension_hex": extension.hex(),
             "payload_hex": payload.hex(),
@@ -314,14 +328,18 @@ def validate(path: Path) -> None:
         file_header = read_file_header(stream)
         record_count = 0
         payload_bytes = 0
+        synthetic_count = 0
         for record in iter_records(stream, file_header):
             record_count += 1
             payload_bytes += int(record["captured_length"])
+            synthetic_count += int(bool(record["synthetic"]))
 
     noun = "record" if record_count == 1 else "records"
+    synthetic_noun = "record" if synthetic_count == 1 else "records"
     print(
         f"valid .lscap {file_header['major_version']}.{file_header['minor_version']}: "
-        f"{record_count} {noun}, {payload_bytes} payload bytes"
+        f"{record_count} {noun}, {payload_bytes} payload bytes, "
+        f"{synthetic_count} synthetic {synthetic_noun}"
     )
 
 

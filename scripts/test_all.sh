@@ -156,6 +156,11 @@ build_and_run pcap_export \
   src/export/pcap_loratap.cpp \
   test/pcap_export/test_pcap_export.cpp
 
+build_and_run simulate_source \
+  src/device/simulate_source.cpp \
+  src/shelby/shelby_pointer.cpp \
+  test/simulate_source/test_simulate_source.cpp
+
 build_and_run shelby_pointer \
   src/shelby/shelby_pointer.cpp \
   src/shelby/shelby_pointer_decoder.cpp \

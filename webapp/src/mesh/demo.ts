@@ -19,7 +19,12 @@
  * other, which is what makes the screens readable.
  */
 
-import { type LscapFrame, RF_FIELD, SHELBY_POINTER_SIZE } from "../lib/lscap";
+import {
+  type LscapFrame,
+  LSCAP_METADATA_FLAG,
+  RF_FIELD,
+  SHELBY_POINTER_SIZE,
+} from "../lib/lscap";
 import { DEMO_BLOB } from "../lib/shelby";
 import {
   ContactType,
@@ -288,6 +293,8 @@ export function demoNextFrame(seq: number, timestampUs: number): LscapFrame {
     modulation: "lora",
     direction: "rx",
     crc: seq % 13 === 7 ? "invalid" : "valid",
+    metadataFlags: LSCAP_METADATA_FLAG.synthetic,
+    synthetic: true,
     bytes,
   };
 }

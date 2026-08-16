@@ -138,6 +138,9 @@ PcapWriteResult PcapLoraTapWriter::write(const RawFrame &frame) noexcept
     if (!started_) {
         return PcapWriteResult::NotStarted;
     }
+    if (frame.rf.origin == FrameOrigin::Synthetic) {
+        return PcapWriteResult::SyntheticFrame;
+    }
     if (frame.captured_length > kMaxFrameBytes || frame.original_length < frame.captured_length) {
         return PcapWriteResult::InvalidFrame;
     }

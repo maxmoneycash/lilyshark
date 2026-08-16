@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   decodeShelbyPointer,
   findShelbyPointer,
+  LSCAP_METADATA_FLAG,
   parseLscap,
   SHELBY_FLAG,
   SHELBY_POINTER_SIZE,
@@ -100,6 +101,14 @@ test('finds the pointer in samples/sample-mesh-traffic.lscap', async () => {
   const buffer = await readFile(sampleUrl);
   const capture = parseLscap(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
 
+  assert.equal(capture.header.minorVersion, 1);
+  assert.ok(capture.frames.every((frame) => frame.synthetic));
+  assert.ok(
+    capture.frames.every(
+      (frame) => (frame.metadataFlags & LSCAP_METADATA_FLAG.synthetic) !== 0,
+    ),
+  );
+
   const hits = capture.frames
     .map((frame, index) => ({ index, found: findShelbyPointer(frame.bytes) }))
     .filter((hit) => hit.found !== null);
@@ -108,4 +117,23 @@ test('finds the pointer in samples/sample-mesh-traffic.lscap', async () => {
   assert.equal(hits[0].index, 9);
   assert.equal(hits[0].found?.offset, 16);
   assert.equal(hits[0].found?.pointer.capture, true);
+});
+
+test('keeps the synthetic bit unassigned in a version 1.0 capture', async () => {
+  const sampleUrl = new URL('../../../samples/sample-mesh-traffic.lscap', import.meta.url);
+  const sample = await readFile(sampleUrl);
+  const legacy = Uint8Array.from(sample);
+  legacy[6] = 0;
+  legacy[7] = 0;
+
+  const capture = parseLscap(
+    legacy.buffer.slice(legacy.byteOffset, legacy.byteOffset + legacy.byteLength),
+  );
+  assert.equal(capture.header.minorVersion, 0);
+  assert.ok(capture.frames.every((frame) => !frame.synthetic));
+  assert.ok(
+    capture.frames.every(
+      (frame) => (frame.metadataFlags & LSCAP_METADATA_FLAG.synthetic) !== 0,
+    ),
+  );
 });

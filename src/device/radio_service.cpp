@@ -318,6 +318,7 @@ void TDeckRadioService::consumeInterrupt() noexcept
         frame.rf.modulation = profile_.modulation;
         frame.rf.direction = FrameDirection::Receive;
         frame.rf.crc = rx_metadata.crc;
+        frame.rf.origin = FrameOrigin::Radio;
         frame.rf.implicit_header = profile_.implicit_header;
         frame.rf.inverted_iq = profile_.inverted_iq;
 
