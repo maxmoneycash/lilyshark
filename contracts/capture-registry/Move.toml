@@ -1,0 +1,12 @@
+[package]
+name = "LilysharkCaptureRegistry"
+version = "1.0.0"
+authors = ["Lilyshark"]
+
+[addresses]
+lilyshark = "_"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "aptos-release-v1.27"
+subdir = "aptos-move/framework/aptos-framework"

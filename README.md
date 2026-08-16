@@ -25,6 +25,17 @@ The diagnostic views change as the radio environment changes. Frames enter the T
 > [!WARNING]
 > The current firmware is a developer alpha. The simulator, sanitizer-backed host tests, T-Deck build, and merged factory image run successfully in the development environment. No physical T-Deck was connected for the current build pass, so display orientation, touch calibration, radio reception, microSD behavior, optional GPS, battery readings, and spectrum-scan recovery still need a hardware smoke test. Treat the generated image as test firmware until those checks pass.
 
+## Contents
+
+- **Overview** — [Two halves: the device and the analyzer](#two-halves-the-device-and-the-analyzer) · [What Lilyshark shows](#what-lilyshark-shows)
+- **The interface** — [Every screen, rendered by the firmware](#every-screen-rendered-by-the-firmware) · [Interface](#interface) · [Device controls](#device-controls)
+- **Radio and protocols** — [Protocol coverage](#protocol-coverage) · [Radio capture and spectrum scanning](#radio-capture-and-spectrum-scanning)
+- **Captures and storage** — [Capture files and screenshots](#capture-files-and-screenshots) · [Shelby off-grid storage](#shelby-storage-for-captures-and-a-pointer-that-fits-one-lora-frame)
+- **Install** — [Download](#download) · [Flash a T-Deck](#flash-a-t-deck)
+- **Develop** — [Build and test](#build-and-test) · [Architecture](#architecture) · [Repository layout](#repository-layout) · [Target hardware](#target-hardware)
+- **Status** — [Project status](#project-status) · [Roadmap](#roadmap-to-a-stable-release)
+- **More** — [Documentation](#documentation) · [License](#license-and-project-names)
+
 ## Two halves: the device and the analyzer
 
 Lilyshark is firmware plus a web analyzer that reads what the firmware records.
@@ -84,6 +95,22 @@ Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAM
     <td align="center"><sub>DEBUG — the serial console</sub></td>
   </tr>
 </table>
+
+## What Lilyshark shows
+
+- A live frame feed with capture time, protocol, source and destination when the protocol exposes them, packet type, route or hop data, and SNR
+- A five-tab packet inspector for route/header facts, RF measurements, decoder state, paged HEX, and capture provenance
+- A composable Traffic Filter for protocol, decoded/opaque/malformed state, and CRC condition; capture files remain complete while the view is filtered
+- Rolling 60-second protocol volume and decode health for Meshtastic, MeshCore, Reticulum/RNode, and unknown LoRa frames
+- Per-protocol detail with activity history, traffic share, CRC validity, mean SNR when attributable, and one-action handoff into filtered Traffic
+- Protocol-aware node activity and short signal histories when a stable node identity is available
+- A color spectrum view built from the SX1262 spectral-scan histogram
+- Channel activity, observed airtime, packet rate, CRC failures, and recent utilization
+- A synchronized 60-second Timeline for packet rate, SNR trend, CRC failures, interference, node changes, high utilization, and survey completion
+- A timed 60-second field survey with frames captured, unique sources, best SNR, and CRC errors
+- Local GPS state and position when a compatible receiver is attached
+- Operational events for radio state, active profile, capture files, PCAP limits, and screenshots
+- Native `.lscap`, LoRaTap PCAP, and 24-bit BMP output on microSD
 
 ## Every screen, rendered by the firmware
 
@@ -227,79 +254,6 @@ one of them on the device.
     <td align="center"><sub>Event detail</sub></td>
   </tr>
 </table>
-## Shelby: storage for captures, and a pointer that fits one LoRa frame
-
-A capture is only worth something if you can prove it is the same bytes the radio
-heard, so captures belong in content-addressed storage rather than on a card that
-can be edited. Lilyshark uses [Shelby](https://shelby.xyz) for that, and the
-analyzer can fetch a capture by Shelby blob name and parse it in the browser.
-
-Reaching Shelby from off-grid needed a design rather than a wire. **A LoRa node has
-no IP path, so it cannot call Shelby.** It does not need to: the mesh moves ~200
-usable bytes per frame, far too small for a payload and far larger than a blob
-reference. So the radio carries an 82-byte **Shelby pointer** and a node with
-connectivity moves the bytes.
-
-```
-include/lilyshark/shelby/shelby_pointer.h    82-byte wire format, magic "SHLB"
-src/shelby/shelby_pointer.cpp                encode / decode / locate
-src/shelby/shelby_pointer_decoder.cpp        finds pointers inside captured frames
-webapp/src/lib/lscap.ts                      the same format, read in TypeScript
-```
-
-The pointer carries a blob commitment, owner account, size, expiry, and chunk
-position. It is deliberately **not a new link layer** — it is an application payload
-convention, which is why one encoding works inside Meshtastic, MeshCore, and
-Reticulum alike, and why a node running stock firmware relays it without knowing
-what it is. Decoding rejects inconsistent chunk state, so a receiver can never
-mistake one part of a split blob for a complete one. The C++ encoder and the
-TypeScript decoder are cross-checked byte for byte.
-
-Keeping the over-the-air object small is a measured decision, not a stylistic one:
-against Meshtastic's own discrete-event simulator a flooded mesh spends **R = 7.36**
-transmissions per delivered message at realistic density, and reach falls from 68.6%
-to 25.8% as nodes are added. Airtime is the scarce resource, so send a reference and
-let a connected node carry the payload.
-
-The loop is live, not planned. A field capture is stored on shelbynet right now —
-object `captures/field-capture-0846.lscap`, owner
-`0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728`, commitment
-`0x6ab9566563ba70a73965f89a46edf3d49978c5091b8da8786e8cb58a449a32c9` — uploaded with
-`webapp/scripts/shelby-put.ts` through the official Shelby SDK (commitment
-generation, on-chain registration, chunkset upload, commit ack). The bundled
-sample's frame 9 carries that blob's real coordinates, and the analyzer's
-**RESOLVE** button walks the whole path in the browser with no Lilyshark server in
-between: commitment → object name on the shelbynet indexer → bytes from the Shelby
-RPC → the capture opens. Fetch it yourself:
-
-```
-curl https://shelby.shelbynet.shelby.xyz/shelby/v1/blobs/0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728/captures/field-capture-0846.lscap
-```
-
-> **Status:** the pointer codec, the cross-protocol decoder, the capture format,
-> upload via the Shelby SDK, and in-browser resolution are built, tested (ASan/UBSan
-> on the C++ side), and running against shelbynet. The remaining piece is on-device:
-> firmware invoking the upload directly from the T-Deck's companion gateway.
-
-## Download
-
-The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/releases) contains the current T-Deck factory image, application-only image, debug symbols, and SHA-256 checksums. For a fresh install, use the [prebuilt-release steps](docs/FLASHING.md#install-the-prebuilt-developer-alpha); a local firmware build is not required. Do not flash the `.elf` file.
-
-## What Lilyshark shows
-
-- A live frame feed with capture time, protocol, source and destination when the protocol exposes them, packet type, route or hop data, and SNR
-- A five-tab packet inspector for route/header facts, RF measurements, decoder state, paged HEX, and capture provenance
-- A composable Traffic Filter for protocol, decoded/opaque/malformed state, and CRC condition; capture files remain complete while the view is filtered
-- Rolling 60-second protocol volume and decode health for Meshtastic, MeshCore, Reticulum/RNode, and unknown LoRa frames
-- Per-protocol detail with activity history, traffic share, CRC validity, mean SNR when attributable, and one-action handoff into filtered Traffic
-- Protocol-aware node activity and short signal histories when a stable node identity is available
-- A color spectrum view built from the SX1262 spectral-scan histogram
-- Channel activity, observed airtime, packet rate, CRC failures, and recent utilization
-- A synchronized 60-second Timeline for packet rate, SNR trend, CRC failures, interference, node changes, high utilization, and survey completion
-- A timed 60-second field survey with frames captured, unique sources, best SNR, and CRC errors
-- Local GPS state and position when a compatible receiver is attached
-- Operational events for radio state, active profile, capture files, PCAP limits, and screenshots
-- Native `.lscap`, LoRaTap PCAP, and 24-bit BMP output on microSD
 
 ## Interface
 
@@ -398,7 +352,7 @@ On a fresh install, Lilyshark follows this path:
 
 Returning users can start at Home or resume the last live view. Settings exposes the active radio profile, capture and storage state, device status, display brightness, keyboard light, optional GPS polling, startup behavior, Help, About, and a guarded setup reset. Failed persistence rolls the visible value back instead of pretending it was saved.
 
-### Analyzer views
+### Analyzer routes
 
 | Route | View | Current device behavior |
 | ---: | --- | --- |
@@ -419,6 +373,31 @@ Returning users can start at Home or resume the last live view. Settings exposes
 `8` opens Settings. `M` or `0` opens Home. Left and Right move through the primary diagnostic views; reaching either end returns to Home instead of wrapping invisibly.
 
 The simulator drives these views with deterministic synthetic RF telemetry. A fixed seed and simulation clock reproduce the same packet arrivals, progressive spectrum sweeps, signal drift, survey totals, protocol mix, utilization changes, and Timeline markers for demos and tests. Simulator values are synthetic. On a T-Deck, the same interface uses live SX1262 captures and hardware state, or shows an explicit unavailable state when a measurement cannot be collected.
+
+## Device controls
+
+| Control | Action |
+| --- | --- |
+| Left/Right or horizontal touch swipe | Move through primary analyzer views, Packet Detail tabs, or a selected setting where the screen says so |
+| Up/Down or vertical touch swipe | Move menu and table focus; page Packet Detail HEX bytes and the Events history |
+| Trackball press or `Enter` | Open the focused route or record, apply a choice, start a survey, or start/cancel a spectrum sweep |
+| `Backspace` | Go back through the product shell or return from a detail view |
+| `M` or `0` | Open Home; press again to return to the analyzer |
+| `1` through `7` | Open Traffic, Spectrum, Nodes, Map, Survey, Airtime, or Events directly |
+| `8` | Open Settings |
+| `9` | Open Protocols |
+| `T` | Open Timeline |
+| `X` from Traffic | Open Traffic Filter; use Up/Down to choose a predicate, Left/Right to change it, `R` to reset, and Enter to apply |
+| `P` | Open the five-preset radio-profile picker with the active preset focused |
+| `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
+| `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
+| `F` | Cycle spreading factors 7 through 12 |
+| `C` | Cycle coding rates 4/5 through 4/8 |
+| `S` | Save a BMP screenshot to microSD |
+| `?` | Open Help without bypassing unfinished onboarding or destructive confirmations |
+| Touch tap | Select the tapped menu/table row or invoke the exact left/right action shown in the footer |
+
+The touchscreen probes the GT911 at both T-Deck addresses and reports absence instead of blocking startup. The trackball and keyboard remain available when touch is missing.
 
 ## Protocol coverage
 
@@ -495,69 +474,105 @@ reserved bytes, header extensions, and the payload as hexadecimal.
 
 Saving a BMP uses the display and microSD on the shared SPI bus. Reception stays armed, but polling pauses while the image is written, so a busy channel can lose frames. The Events view reports the measured screenshot capture gap.
 
-## Device controls
+## Shelby: storage for captures, and a pointer that fits one LoRa frame
 
-| Control | Action |
-| --- | --- |
-| Left/Right or horizontal touch swipe | Move through primary analyzer views, Packet Detail tabs, or a selected setting where the screen says so |
-| Up/Down or vertical touch swipe | Move menu and table focus; page Packet Detail HEX bytes and the Events history |
-| Trackball press or `Enter` | Open the focused route or record, apply a choice, start a survey, or start/cancel a spectrum sweep |
-| `Backspace` | Go back through the product shell or return from a detail view |
-| `M` or `0` | Open Home; press again to return to the analyzer |
-| `1` through `7` | Open Traffic, Spectrum, Nodes, Map, Survey, Airtime, or Events directly |
-| `8` | Open Settings |
-| `9` | Open Protocols |
-| `T` | Open Timeline |
-| `X` from Traffic | Open Traffic Filter; use Up/Down to choose a predicate, Left/Right to change it, `R` to reset, and Enter to apply |
-| `P` | Open the five-preset radio-profile picker with the active preset focused |
-| `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
-| `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
-| `F` | Cycle spreading factors 7 through 12 |
-| `C` | Cycle coding rates 4/5 through 4/8 |
-| `S` | Save a BMP screenshot to microSD |
-| `?` | Open Help without bypassing unfinished onboarding or destructive confirmations |
-| Touch tap | Select the tapped menu/table row or invoke the exact left/right action shown in the footer |
+A capture is only worth something if you can prove it is the same bytes the radio
+heard, so captures belong in content-addressed storage rather than on a card that
+can be edited. Lilyshark uses [Shelby](https://shelby.xyz) for that, and the
+analyzer can fetch a capture by Shelby blob name and parse it in the browser.
 
-The touchscreen probes the GT911 at both T-Deck addresses and reports absence instead of blocking startup. The trackball and keyboard remain available when touch is missing.
+Reaching Shelby from off-grid needed a design rather than a wire. **A LoRa node has
+no IP path, so it cannot call Shelby.** It does not need to: the mesh moves ~200
+usable bytes per frame, far too small for a payload and far larger than a blob
+reference. So the radio carries an 82-byte **Shelby pointer** and a node with
+connectivity moves the bytes.
 
-## Architecture
-
-The firmware separates raw capture from protocol interpretation. A radio profile defines the LoRa PHY and suggests a decoder. Each received frame enters one protocol-neutral record, passes through the decoder registry, updates the bounded snapshot store, reaches the UI, and is written to the enabled capture sinks.
-
-```mermaid
-flowchart LR
-    A[Active radio profile] --> B[SX1262 receive and scan service]
-    B --> C[Raw frame plus RF metadata]
-    C --> D[Decoder registry]
-    D --> E[Protocol-aware packet]
-    C --> F[LSCAP and LoRaTap writers]
-    E --> G[64-record capture store]
-    G --> H[Product shell and analyzer views]
-    F --> I[microSD]
+```
+include/lilyshark/shelby/shelby_pointer.h    82-byte wire format, magic "SHLB"
+src/shelby/shelby_pointer.cpp                encode / decode / locate
+src/shelby/shelby_pointer_decoder.cpp        finds pointers inside captured frames
+webapp/src/lib/lscap.ts                      the same format, read in TypeScript
 ```
 
-The scan state machine gives the SX1262 exclusive ownership during a sweep. It has bounded point counts, per-frequency and overall timeouts, cancellation, partial results, and a receive-profile restore step on every exit path.
+The pointer carries a blob commitment, owner account, size, expiry, and chunk
+position. It is deliberately **not a new link layer** — it is an application payload
+convention, which is why one encoding works inside Meshtastic, MeshCore, and
+Reticulum alike, and why a node running stock firmware relays it without knowing
+what it is. Decoding rejects inconsistent chunk state, so a receiver can never
+mistake one part of a split blob for a complete one. The C++ encoder and the
+TypeScript decoder are cross-checked byte for byte.
 
-## Project status
+Keeping the over-the-air object small is a measured decision, not a stylistic one:
+against Meshtastic's own discrete-event simulator a flooded mesh spends **R = 7.36**
+transmissions per delivered message at realistic density, and reach falls from 68.6%
+to 25.8% as nodes are added. Airtime is the scarce resource, so send a reference and
+let a connected node carry the payload.
 
-| Area | Evidence in this repository | Physical T-Deck status |
-| --- | --- | --- |
-| Product shell and analyzer UI | Exact 320x240 framebuffer comparisons cover 13 analyzer routes, six onboarding stages, Home, menus, confirmations, all five packet tabs, extra HEX pages, and Event Detail. Interaction tests cover keyboard, trackball-equivalent navigation, mouse/touch hit targets, back-stack behavior, first-run persistence, filtering, and failure rollback. | Pending display and input smoke test |
-| Embedded wordmark | A generated 264x128 A8 mask keeps the SVG's antialiased edge detail, lives in flash, and is recolored Lily Pink at draw time. A source/payload hash test and device-shell framebuffer check protect the asset. | Pending physical panel confirmation |
-| T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts. A host test checks every command, data byte, and delay in the panel initialization sequence against LilyGO T-Deck commit `274ddaa`. TFT_eSPI 2.5.43 is pinned with the upstream one-line SPI2 register fix at [`880ec0e`](https://github.com/maxmoneycash/TFT_eSPI/commit/880ec0e4657c0de56d28cc250bdbbe863386021e), and a compile-time guard rejects an invalid ESP32-S3 register base. The device shell also runs against host peripheral fakes. | Boot and panel output not yet observed on hardware |
-| SX1262 frame capture | The real radio service runs against host fakes covering configure, IRQ/read/rearm order, CRC mismatch, retry, scan, restore, and recovery | Reception and long-run recovery pending |
-| Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Live over-air sample pending |
-| MeshCore decoder | Version 1 structural and malformed-frame tests, including the legal empty `RAW_CUSTOM` form | Live over-air sample pending |
-| Reticulum/RNode decoder | Header-one/header-two, IFAC-marker, split, and malformed-frame tests | Live RNode sample pending |
-| Radio profile tuning | Sanitizer tests cover regional frequency stepping, BW, SF, CR, and persisted-value validation | Keyboard tuning and restart persistence pending |
-| `.lscap` export | Byte-exact writer tests and documented v1 layout | microSD write test pending |
-| LoRaTap PCAP | Byte-exact writer tests for the DLT 270 record layout | microSD and desktop-open test pending |
-| BMP screenshots | RGB565-to-BMP tests and unique-path device writer | Display readback and microSD test pending |
-| Touch, keyboard, and trackball | Input services compile; host tests cover the touch transform and polling deadlines across the 32-bit `millis()` rollover | On-device input, calibration, and interaction tests pending |
-| Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | ADC calibration and serial receiver test pending |
-| Spectrum scan | Request/result tests plus radio restore state machine | Experimental; complete hardware validation pending |
+The loop is live, not planned. A field capture is stored on shelbynet right now —
+object `captures/field-capture-0846.lscap`, owner
+`0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728`, commitment
+`0x6ab9566563ba70a73965f89a46edf3d49978c5091b8da8786e8cb58a449a32c9` — uploaded with
+`webapp/scripts/shelby-put.ts` through the official Shelby SDK (commitment
+generation, on-chain registration, chunkset upload, commit ack). The bundled
+sample's frame 9 carries that blob's real coordinates, and the analyzer's
+**RESOLVE** button walks the whole path in the browser with no Lilyshark server in
+between: commitment → object name on the shelbynet indexer → bytes from the Shelby
+RPC → the capture opens. Fetch it yourself:
 
-The standalone C++ tests compile with warnings as errors and run under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator renders every analyzer and product-shell route into a full 320x240 RGB565 buffer and checks exact pixels, content thresholds, and uniqueness. A separate region-based motion test proves that eleven live diagnostic views change through the production update path; packet selection remains a deliberate snapshot. The telemetry model has sanitizer-backed tests for deterministic replay, bounded state, rolling windows, scan-time capture pause, and changing measurements. The serial checker is fixture-tested and reads without writing to the port. Alpha.7 also executes the real device setup and loop under the sanitizers through host peripheral fakes, including first-frame/backlight ordering, six-stage onboarding persistence, missing-hardware recovery, menu navigation, settings rollback, a radio frame flowing into both capture formats and the UI, five packet tabs, HEX paging, Traffic Filter, Protocol Detail, and event-history detail. These checks do not replace the pending physical display and input smoke tests. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
+```
+curl https://shelby.shelbynet.shelby.xyz/shelby/v1/blobs/0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728/captures/field-capture-0846.lscap
+```
+
+### On-chain anchor: the capture registry
+
+The blob and the pointer answer *where the bytes are*; a Move contract on the same
+network answers *who vouched for them and when*. `contracts/capture-registry/`
+publishes `lilyshark::capture_registry`, deployed at
+
+```
+0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728::capture_registry
+```
+
+Registering a capture records the publisher, the 32-byte blob commitment, the
+claimed size, and the lease expiry, and emits a `CaptureRegistered` event. The
+field capture above is anchored as entry 0 — same commitment on the radio, in the
+blob store, and on the chain — so the chain of custody reads RF capture → Shelby
+blob → on-chain anchor, each step checkable against the last. Query it against the
+live network:
+
+```
+aptos move view \
+  --url https://api.shelbynet.aptoslabs.com/v1 \
+  --function-id 0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728::capture_registry::capture_at \
+  --args address:0x34946d19fb18115046c807b8f48845a515efe107892bb9cc49c6f197a6998728 u64:0
+```
+
+Deployment tx `0x09dab1e8f99df0feed757503c8e89179d80db2bd861ce8d81348c137b81ec904`,
+anchor tx `0x5c56d7bfce7c45a7d16c242a45e9d7f9711511fd4b3fd8f1f152dfaac1a73aee`.
+
+> **Status:** the pointer codec, the cross-protocol decoder, the capture format,
+> upload via the Shelby SDK, in-browser resolution, and the on-chain registry are
+> built, tested (ASan/UBSan on the C++ side), and running against shelbynet. The
+> remaining piece is on-device: firmware invoking the upload directly from the
+> T-Deck's companion gateway.
+
+## Download
+
+The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/releases) contains the current T-Deck factory image, application-only image, debug symbols, and SHA-256 checksums. For a fresh install, use the [prebuilt-release steps](docs/FLASHING.md#install-the-prebuilt-developer-alpha); a local firmware build is not required. Do not flash the `.elf` file.
+
+## Flash a T-Deck
+
+The guarded flash script accepts an explicit serial device, verifies the factory image against `SHA256SUMS`, pins esptool 4.11.0, and writes the merged image at `0x0`.
+
+```sh
+./scripts/build_release.sh
+./scripts/flash_tdeck.sh /dev/cu.usbmodem1101   # macOS example
+# ./scripts/flash_tdeck.sh /dev/ttyACM0         # Linux example
+```
+
+`./scripts/flash_tdeck.sh --auto` proceeds only when it finds exactly one eligible USB modem or ACM serial device. The script stops when the port, artifact, or checksum is ambiguous. After flashing, `scripts/smoke_tdeck.py` records a bounded 115200-baud startup log and checks the display, touch, storage, radio, and UI milestones without sending data to the device.
+
+Use the factory image for a fresh install. The application-only image at `0x10000` is for updates on a T-Deck that already has the matching Lilyshark bootloader and partition table. Full instructions, serial monitoring, expected files, and recovery boundaries are in [docs/FLASHING.md](docs/FLASHING.md).
 
 ## Build and test
 
@@ -666,19 +681,23 @@ On Apple Silicon with Homebrew:
 brew install sdl2 uv
 ```
 
-## Flash a T-Deck
+## Architecture
 
-The guarded flash script accepts an explicit serial device, verifies the factory image against `SHA256SUMS`, pins esptool 4.11.0, and writes the merged image at `0x0`.
+The firmware separates raw capture from protocol interpretation. A radio profile defines the LoRa PHY and suggests a decoder. Each received frame enters one protocol-neutral record, passes through the decoder registry, updates the bounded snapshot store, reaches the UI, and is written to the enabled capture sinks.
 
-```sh
-./scripts/build_release.sh
-./scripts/flash_tdeck.sh /dev/cu.usbmodem1101   # macOS example
-# ./scripts/flash_tdeck.sh /dev/ttyACM0         # Linux example
+```mermaid
+flowchart LR
+    A[Active radio profile] --> B[SX1262 receive and scan service]
+    B --> C[Raw frame plus RF metadata]
+    C --> D[Decoder registry]
+    D --> E[Protocol-aware packet]
+    C --> F[LSCAP and LoRaTap writers]
+    E --> G[64-record capture store]
+    G --> H[Product shell and analyzer views]
+    F --> I[microSD]
 ```
 
-`./scripts/flash_tdeck.sh --auto` proceeds only when it finds exactly one eligible USB modem or ACM serial device. The script stops when the port, artifact, or checksum is ambiguous. After flashing, `scripts/smoke_tdeck.py` records a bounded 115200-baud startup log and checks the display, touch, storage, radio, and UI milestones without sending data to the device.
-
-Use the factory image for a fresh install. The application-only image at `0x10000` is for updates on a T-Deck that already has the matching Lilyshark bootloader and partition table. Full instructions, serial monitoring, expected files, and recovery boundaries are in [docs/FLASHING.md](docs/FLASHING.md).
+The scan state machine gives the SX1262 exclusive ownership during a sweep. It has bounded point counts, per-frequency and overall timeouts, cancellation, partial results, and a receive-profile restore step on every exit path.
 
 ## Repository layout
 
@@ -722,6 +741,27 @@ docs/                         Quickstart, architecture, off-grid design, format 
 - An antenna suited to the frequencies you configure
 
 The T-Deck is the first hardware target. The capture record, decoder registry, and export formats stay independent of its display and input services so future compatible LoRa hardware can reuse the analyzer core.
+
+## Project status
+
+| Area | Evidence in this repository | Physical T-Deck status |
+| --- | --- | --- |
+| Product shell and analyzer UI | Exact 320x240 framebuffer comparisons cover 13 analyzer routes, six onboarding stages, Home, menus, confirmations, all five packet tabs, extra HEX pages, and Event Detail. Interaction tests cover keyboard, trackball-equivalent navigation, mouse/touch hit targets, back-stack behavior, first-run persistence, filtering, and failure rollback. | Pending display and input smoke test |
+| Embedded wordmark | A generated 264x128 A8 mask keeps the SVG's antialiased edge detail, lives in flash, and is recolored Lily Pink at draw time. A source/payload hash test and device-shell framebuffer check protect the asset. | Pending physical panel confirmation |
+| T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts. A host test checks every command, data byte, and delay in the panel initialization sequence against LilyGO T-Deck commit `274ddaa`. TFT_eSPI 2.5.43 is pinned with the upstream one-line SPI2 register fix at [`880ec0e`](https://github.com/maxmoneycash/TFT_eSPI/commit/880ec0e4657c0de56d28cc250bdbbe863386021e), and a compile-time guard rejects an invalid ESP32-S3 register base. The device shell also runs against host peripheral fakes. | Boot and panel output not yet observed on hardware |
+| SX1262 frame capture | The real radio service runs against host fakes covering configure, IRQ/read/rearm order, CRC mismatch, retry, scan, restore, and recovery | Reception and long-run recovery pending |
+| Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Live over-air sample pending |
+| MeshCore decoder | Version 1 structural and malformed-frame tests, including the legal empty `RAW_CUSTOM` form | Live over-air sample pending |
+| Reticulum/RNode decoder | Header-one/header-two, IFAC-marker, split, and malformed-frame tests | Live RNode sample pending |
+| Radio profile tuning | Sanitizer tests cover regional frequency stepping, BW, SF, CR, and persisted-value validation | Keyboard tuning and restart persistence pending |
+| `.lscap` export | Byte-exact writer tests and documented v1 layout | microSD write test pending |
+| LoRaTap PCAP | Byte-exact writer tests for the DLT 270 record layout | microSD and desktop-open test pending |
+| BMP screenshots | RGB565-to-BMP tests and unique-path device writer | Display readback and microSD test pending |
+| Touch, keyboard, and trackball | Input services compile; host tests cover the touch transform and polling deadlines across the 32-bit `millis()` rollover | On-device input, calibration, and interaction tests pending |
+| Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | ADC calibration and serial receiver test pending |
+| Spectrum scan | Request/result tests plus radio restore state machine | Experimental; complete hardware validation pending |
+
+The standalone C++ tests compile with warnings as errors and run under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator renders every analyzer and product-shell route into a full 320x240 RGB565 buffer and checks exact pixels, content thresholds, and uniqueness. A separate region-based motion test proves that eleven live diagnostic views change through the production update path; packet selection remains a deliberate snapshot. The telemetry model has sanitizer-backed tests for deterministic replay, bounded state, rolling windows, scan-time capture pause, and changing measurements. The serial checker is fixture-tested and reads without writing to the port. Alpha.7 also executes the real device setup and loop under the sanitizers through host peripheral fakes, including first-frame/backlight ordering, six-stage onboarding persistence, missing-hardware recovery, menu navigation, settings rollback, a radio frame flowing into both capture formats and the UI, five packet tabs, HEX paging, Traffic Filter, Protocol Detail, and event-history detail. These checks do not replace the pending physical display and input smoke tests. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
 
 ## Roadmap to a stable release
 
