@@ -34,7 +34,7 @@ const Docs = lazy(() => import("./screens/Docs"));
 import { fmtFreq, useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
-import { connectDeviceLink } from "../lib/deviceLink";
+import { connectDeviceLink, useDeviceLink } from "../lib/deviceLink";
 import "./meshterm.css";
 
 const VERSION = "0.1.0";
@@ -491,14 +491,21 @@ function App() {
   };
 
 
-  const ledClass = connected ? "on" : connecting || configuring ? "connecting" : "";
+  // The pill reports whichever link exists. MeshCore's states win when that
+  // flow is active; otherwise a Lilyshark analyzer link is just as much a
+  // radio on the other end of the cable, and "NO LINK" would be a lie.
+  const deviceLink = useDeviceLink();
+  const lilyLinked = !connected && !connecting && !configuring && deviceLink.status === "linked";
+  const ledClass = connected || lilyLinked ? "on" : connecting || configuring ? "connecting" : "";
   const connText = connected
     ? s.status === DeviceStatus.Configured
       ? "DEVICE CONFIGURED"
       : "LINK UP"
-    : connecting || configuring
-      ? "ESTABLISHING LINK…"
-      : "NO LINK";
+    : lilyLinked
+      ? "LILYSHARK USB"
+      : connecting || configuring
+        ? "ESTABLISHING LINK…"
+        : "NO LINK";
 
   let totalUnread = 0;
   for (const n of s.unread.values()) totalUnread += n;
@@ -590,8 +597,9 @@ function App() {
               <span className="flow-n">01</span>
               <span className="flow-k">FLASH</span>
               <span className="flow-v">
-                the radio runs the MeshCore companion firmware — a T-Deck,
-                Heltec, RAK or any supported LoRa board
+                the radio runs Lilyshark (<a href="/flash/" target="_blank" rel="noreferrer">
+                install it from the browser</a>) or the MeshCore companion
+                firmware — a T-Deck, Heltec, RAK or any supported LoRa board
               </span>
             </div>
             <div className="flow-step">

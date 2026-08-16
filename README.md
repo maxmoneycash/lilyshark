@@ -12,6 +12,25 @@
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-F0F4EF"></a>
 </p>
 
+<p align="center">
+  <a href="https://lilyshark.com/flash/"><strong>Flash a T-Deck from the browser</strong></a> ·
+  <a href="https://youtu.be/qpdk6I39Zcg"><strong>Watch the demo</strong></a> ·
+  <a href="https://lilyshark.com"><strong>Open the analyzer</strong></a>
+</p>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/media/tdeck-onboarding-night.png" alt="The guided first run on a T-Deck Plus, the web analyzer open behind it"></td>
+    <td width="33%"><img src="docs/media/tdeck-about-night.png" alt="The About screen on hardware: wordmark, version, protocols, license"></td>
+    <td width="33%"><img src="docs/media/tdeck-traffic-live-night.png" alt="The Traffic screen streaming frames in simulate mode"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>The guided first run, in hand</sub></td>
+    <td align="center"><sub>About, on the 320×240 panel</sub></td>
+    <td align="center"><sub>Traffic streaming, first field session</sub></td>
+  </tr>
+</table>
+
 Lilyshark turns a T-Deck into a handheld LoRa traffic and RF analyzer. It captures frames from the SX1262, keeps the raw bytes and radio measurements together, interprets supported mesh headers, tracks what the receiver has heard, surveys the band, and saves evidence to a microSD card.
 
 Meshtastic, MeshCore, and Reticulum-compatible RNode traffic share one capture engine and one interface. Each protocol decoder adds the meaning it can prove from the frame. Unknown or protected data remains available as raw bytes with frequency, bandwidth, spreading factor, coding rate, RSSI, SNR, CRC state, frequency error, and airtime.
@@ -22,8 +41,14 @@ The firmware is also a complete device shell, not a loose collection of graphs. 
 
 The diagnostic views change as the radio environment changes. Frames enter the Traffic feed, protocol totals roll forward, the spectrum history advances, node signals develop over time, surveys accumulate observations, and the synchronized Timeline shows packet rate, SNR, CRC failures, and events on one clock.
 
-> [!WARNING]
-> The current firmware is a developer alpha. The simulator, sanitizer-backed host tests, T-Deck build, and merged factory image run successfully in the development environment. No physical T-Deck was connected for the current build pass, so display orientation, touch calibration, radio reception, microSD behavior, optional GPS, battery readings, and spectrum-scan recovery still need a hardware smoke test. Treat the generated image as test firmware until those checks pass.
+> [!NOTE]
+> The current firmware is a developer alpha, and it runs on real hardware: on a
+> T-Deck Plus the display, keyboard, trackball, SX1262 (listening, error 0),
+> GPS (fix, 12 satellites via baud autodetect), battery readout, USB analyzer
+> link, and the full screen set have all been exercised in a field session.
+> Still untested on hardware: microSD capture writes, touch calibration, and
+> spectrum-scan recovery. Treat those paths as unverified until they get the
+> same treatment.
 
 ## Contents
 
@@ -568,7 +593,9 @@ The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/rele
 
 ## Flash a T-Deck
 
-The guarded flash script accepts an explicit serial device, verifies the factory image against `SHA256SUMS`, pins esptool 4.11.0, and writes the merged image at `0x0`.
+**The fast path needs no toolchain at all: [lilyshark.com/flash](https://lilyshark.com/flash/)** installs the current factory image from Chrome or Edge over Web Serial — plug the T-Deck in, click install, pick the port. The page shows the image's SHA-256 and the recovery steps.
+
+For a scripted install, the guarded flash script accepts an explicit serial device, verifies the factory image against `SHA256SUMS`, pins esptool 4.11.0, and writes the merged image at `0x0`.
 
 ```sh
 ./scripts/build_release.sh

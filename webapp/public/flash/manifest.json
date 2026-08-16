@@ -1,0 +1,11 @@
+{
+  "name": "Lilyshark",
+  "version": "0.1.0-alpha.7",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [{ "path": "lilyshark-tdeck.factory.bin", "offset": 0 }]
+    }
+  ]
+}

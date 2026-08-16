@@ -240,6 +240,9 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
                       <button className="primary" onClick={() => onOpen('TRAFFIC')}>
                         OPEN THE ANALYZER
                       </button>
+                      <button onClick={() => window.open('/flash/', '_blank')}>
+                        FLASH A T-DECK
+                      </button>
                       <button onClick={() => onOpen('PAPER')}>READ THE PAPER</button>
                     </motion.div>
                   )}
