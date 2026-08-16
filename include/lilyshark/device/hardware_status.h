@@ -82,6 +82,14 @@ class TDeckHardwareStatus
     std::uint32_t last_battery_sample_ms_ = 0;
     std::uint32_t last_valid_sentence_ms_ = 0;
     std::uint32_t last_passed_checksum_count_ = 0;
+    // Receivers ship at different default bauds (the T-Deck Plus's u-blox
+    // M10Q talks 38400; L76K units talk 9600), so a fixed rate reads garbage
+    // on half the hardware and reports "no receiver" for a module that is
+    // right there. Until a valid sentence arrives, the poll walks this list.
+    static constexpr std::uint32_t gps_baud_candidates_[4] = {9600, 38400, 115200, 4800};
+    static constexpr std::uint32_t gps_baud_probe_window_ms_ = 2500;
+    std::uint32_t gps_baud_started_ms_ = 0;
+    std::uint8_t gps_baud_index_ = 0;
     std::uint8_t battery_sample_count_ = 0;
     std::uint8_t battery_sample_index_ = 0;
     bool gps_enabled_ = false;

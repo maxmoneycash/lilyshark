@@ -192,6 +192,10 @@ SurveyAccumulator survey_accumulator{};
 RollingDiagnosticAccumulator rolling_diagnostics{};
 RuntimeEventHistory runtime_event_history{};
 bool first_frame_event_recorded = false;
+// Defined with the ingest path below; the packet inspector renders with them.
+void format_unix_date(std::uint32_t unix_seconds, char *out, std::size_t capacity) noexcept;
+bool decode_frame_shelby_pointer(const FrameRecord &record, ShelbyPointer &out) noexcept;
+
 bool observed_radio_initialized = false;
 bool observed_radio_receiving = false;
 bool pcap_bandwidth_warning_recorded = false;
@@ -2166,20 +2170,39 @@ void build_packet_detail(lv_obj_t * parent)
                   &font_mono_semibold_12);
         std::snprintf(line, sizeof(line), "KIND   %s", packetKindLabel(record->decoded));
         put_label(parent, line, 49, 134, theme::text(), &font_mono_10);
-        std::snprintf(line, sizeof(line), "FIELDS 0x%08lX   ATTR 0x%04X",
-                      static_cast<unsigned long>(record->decoded.present_fields),
-                      record->decoded.attributes);
-        put_label(parent, line, 49, 153, theme::text(), &font_mono_10);
-        std::snprintf(line, sizeof(line), "PAYLOAD %u @ %u   FLAGS 0x%08lX",
-                      record->decoded.payload_length, record->decoded.payload_offset,
-                      static_cast<unsigned long>(record->decoded.protocol_flags));
-        put_label(parent, line, 49, 172, theme::text(), &font_mono_10);
-        if(record->decoded.hasAttribute(AttributeShelbyPointer)) {
-            std::snprintf(line, sizeof(line), "SHELBY POINTER PRESENT / PROTOCOL PRESERVED");
+        // A pointer frame gives its diagnostics rows to the pointer itself:
+        // the same commitment the web analyzer resolves, decoded from the raw
+        // bytes on the device, is the story this tab exists to tell.
+        ShelbyPointer shelby_pointer{};
+        if(decode_frame_shelby_pointer(*record, shelby_pointer)) {
+            std::snprintf(line, sizeof(line), "SHELBY POINTER  %s  CHUNK %u/%u",
+                          shelby_pointer.isCapture() ? "CAPTURE" : "BLOB",
+                          static_cast<unsigned>(shelby_pointer.chunk_index) + 1U,
+                          static_cast<unsigned>(shelby_pointer.chunk_count));
+            put_label(parent, line, 49, 153, theme::cyan(), &font_mono_semibold_12);
+            std::snprintf(line, sizeof(line), "COMMIT 0x%02x%02x%02x%02x..%02x%02x%02x%02x",
+                          shelby_pointer.commitment[0], shelby_pointer.commitment[1],
+                          shelby_pointer.commitment[2], shelby_pointer.commitment[3],
+                          shelby_pointer.commitment[28], shelby_pointer.commitment[29],
+                          shelby_pointer.commitment[30], shelby_pointer.commitment[31]);
+            put_label(parent, line, 49, 174, theme::text(), &font_mono_10);
+            char expiry[16]{};
+            format_unix_date(shelby_pointer.expires_at_unix, expiry, sizeof(expiry));
+            std::snprintf(line, sizeof(line), "%lu B ON SHELBYNET  EXPIRES %s",
+                          static_cast<unsigned long>(shelby_pointer.size_bytes), expiry);
+            put_label(parent, line, 49, 193, theme::lime(), &font_mono_10);
         } else {
+            std::snprintf(line, sizeof(line), "FIELDS 0x%08lX   ATTR 0x%04X",
+                          static_cast<unsigned long>(record->decoded.present_fields),
+                          record->decoded.attributes);
+            put_label(parent, line, 49, 153, theme::text(), &font_mono_10);
+            std::snprintf(line, sizeof(line), "PAYLOAD %u @ %u   FLAGS 0x%08lX",
+                          record->decoded.payload_length, record->decoded.payload_offset,
+                          static_cast<unsigned long>(record->decoded.protocol_flags));
+            put_label(parent, line, 49, 172, theme::text(), &font_mono_10);
             format_protocol_detail();
+            put_label(parent, line, 49, 193, theme::cyan(), &font_mono_10);
         }
-        put_label(parent, line, 49, 193, theme::cyan(), &font_mono_10);
     } else if(packet_detail_tab == 3U) {
         constexpr std::size_t bytes_per_page = 40U;
         const std::size_t byte_count = record->raw.captured_length;
@@ -4341,6 +4364,35 @@ bool update_live_radio_label() noexcept
     return changed;
 }
 
+/// Calendar date from a Unix timestamp (civil-from-days), for lease expiries.
+/// The device has no timezone; UTC is the only honest rendering.
+void format_unix_date(std::uint32_t unix_seconds, char *out, std::size_t capacity) noexcept
+{
+    const std::int64_t z = static_cast<std::int64_t>(unix_seconds / 86400U) + 719468;
+    const std::int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+    const std::uint64_t doe = static_cast<std::uint64_t>(z - era * 146097);
+    const std::uint64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const std::int64_t y = static_cast<std::int64_t>(yoe) + era * 400;
+    const std::uint64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    const std::uint64_t mp = (5 * doy + 2) / 153;
+    const std::uint64_t d = doy - (153 * mp + 2) / 5 + 1;
+    const std::uint64_t m = mp < 10 ? mp + 3 : mp - 9;
+    std::snprintf(out, capacity, "%04lld-%02llu-%02llu",
+                  static_cast<long long>(y + (m <= 2 ? 1 : 0)),
+                  static_cast<unsigned long long>(m), static_cast<unsigned long long>(d));
+}
+
+/// Decode the Shelby pointer riding inside a stored frame, wherever the
+/// enclosing protocol put it. False when the frame carries none.
+bool decode_frame_shelby_pointer(const FrameRecord &record, ShelbyPointer &out) noexcept
+{
+    if(!record.decoded.hasAttribute(AttributeShelbyPointer)) return false;
+    const std::size_t offset = findShelbyPointer(record.raw.bytes, record.raw.captured_length);
+    if(offset >= record.raw.captured_length) return false;
+    return decodeShelbyPointer(record.raw.bytes + offset, record.raw.captured_length - offset,
+                               out) == ShelbyPointerResult::Ok;
+}
+
 void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                            bool allow_capture) noexcept
 {
@@ -4373,6 +4425,21 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
         first_frame_event_recorded = true;
     }
     if(survey_running && stored != nullptr) survey_accumulator.ingest(*stored);
+    // A pointer frame is the off-grid story arriving in real time; it earns a
+    // line in the event log the moment it lands, not just a detail-tab entry
+    // the user has to dig for.
+    if(stored != nullptr) {
+        ShelbyPointer pointer{};
+        if(decode_frame_shelby_pointer(*stored, pointer)) {
+            char message[kRuntimeEventMessageCapacity]{};
+            std::snprintf(message, sizeof(message),
+                          "Shelby pointer: %lu B blob, commit 0x%02x%02x..%02x%02x",
+                          static_cast<unsigned long>(pointer.size_bytes),
+                          pointer.commitment[0], pointer.commitment[1],
+                          pointer.commitment[30], pointer.commitment[31]);
+            record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Radio, message);
+        }
+    }
     if(allow_capture && native_capture_recording) {
         last_native_capture_result = stored != nullptr
             ? native_capture_writer.write(*stored)
@@ -6558,7 +6625,7 @@ bool run_simulator_render_test() noexcept
         0xa5666f12ca08abf9ULL, 0x4e993a3aa6388940ULL, 0xe6c9d863553be97aULL,
         0xa5f0734975306c69ULL, 0xc8a60ee25e4a75bbULL, 0xb001f37939e2809aULL,
         0x58f4a35f10689fcfULL, 0x88d179e2188e4626ULL, 0xb7a95ab1033f7e3bULL,
-        0xfa9f2c09c28015b0ULL, 0x410f758bfa6d57f7ULL, 0x56624c3700a45905ULL,
+        0xc36df0bfc6ae6cceULL, 0x410f758bfa6d57f7ULL, 0x56624c3700a45905ULL,
         0x5374881a952f5232ULL, 0x447e77256eefa3f2ULL,
     }};
 

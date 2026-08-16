@@ -14,7 +14,11 @@ inline constexpr std::uint8_t kAppSettingsMaximumPrimaryDiagnosticIndex = 8U;
 struct AppSettings {
     std::uint8_t onboarding_version = 0U;
     bool onboarding_complete = false;
-    std::uint8_t display_brightness = 12U;
+    // Full brightness out of the box: the 2.8" panel is dim enough at 12/16
+    // that first-boot text read as washed out on hardware. Users who want a
+    // dimmer panel turn it down; nobody should have to hunt for a setting to
+    // make the first screen readable.
+    std::uint8_t display_brightness = 16U;
     std::uint8_t keyboard_brightness = 96U;
     bool capture_enabled = true;
     bool gps_enabled = true;

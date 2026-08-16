@@ -80,7 +80,7 @@ void testDefaultsHaveStableGoldenEncoding()
     const AppSettings settings = defaultAppSettings();
     assert(!settings.onboarding_complete);
     assert(settings.onboarding_version == 0U);
-    assert(settings.display_brightness == 12U);
+    assert(settings.display_brightness == 16U);
     assert(settings.keyboard_brightness == 96U);
     assert(settings.capture_enabled);
     assert(settings.gps_enabled);
@@ -91,8 +91,8 @@ void testDefaultsHaveStableGoldenEncoding()
     assert(isValidAppSettings(settings));
 
     constexpr std::array<std::uint8_t, kAppSettingsV1Size> expected = {{
-        0x4c, 0x53, 0x41, 0x53, 0x01, 0x06, 0x00, 0x0c,
-        0x60, 0x00, 0x00, 0x00, 0xb0, 0xb9, 0xeb, 0xc4,
+        0x4c, 0x53, 0x41, 0x53, 0x01, 0x06, 0x00, 0x10,
+        0x60, 0x00, 0x00, 0x00, 0x33, 0xc3, 0xfb, 0x61,
     }};
     std::array<std::uint8_t, kAppSettingsV1Size> encoded{};
     assert(encodeAppSettingsV1(settings, encoded.data(), encoded.size()));

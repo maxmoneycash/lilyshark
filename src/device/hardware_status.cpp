@@ -38,7 +38,10 @@ void TDeckHardwareStatus::begin(bool enable_gps) noexcept
     snapshot_.gps.parser_available = LILYSHARK_HAS_TINYGPSPLUS != 0;
     snapshot_.gps.state = gps_enabled_ ? GpsState::Absent : GpsState::Disabled;
     if (gps_enabled_) {
-        gps_serial_.begin(tdeck::gps_baud, SERIAL_8N1, tdeck::gps_rx_pin, tdeck::gps_tx_pin);
+        gps_baud_index_ = 0;
+        gps_baud_started_ms_ = millis();
+        gps_serial_.begin(gps_baud_candidates_[gps_baud_index_], SERIAL_8N1, tdeck::gps_rx_pin,
+                          tdeck::gps_tx_pin);
     }
 
     const std::uint32_t now_ms = millis();
@@ -89,6 +92,20 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
         last_passed_checksum_count_ = passed_checksums;
         last_valid_sentence_ms_ = now_ms;
         gps_receiver_seen_ = true;
+    }
+
+    // No valid sentence yet: after a probe window, try the next baud. A wrong
+    // rate turns real NMEA into bytes that never pass a checksum, so silence
+    // here means "wrong speed" at least as often as "no module".
+    if (!gps_receiver_seen_ &&
+        static_cast<std::uint32_t>(now_ms - gps_baud_started_ms_) >= gps_baud_probe_window_ms_) {
+        gps_baud_index_ = static_cast<std::uint8_t>(
+            (gps_baud_index_ + 1U) %
+            (sizeof(gps_baud_candidates_) / sizeof(gps_baud_candidates_[0])));
+        gps_serial_.end();
+        gps_serial_.begin(gps_baud_candidates_[gps_baud_index_], SERIAL_8N1, tdeck::gps_rx_pin,
+                          tdeck::gps_tx_pin);
+        gps_baud_started_ms_ = now_ms;
     }
 
     const bool receiver_active = gps_receiver_seen_ &&
