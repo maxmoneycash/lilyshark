@@ -39,6 +39,7 @@
 #if defined(LILYSHARK_DEVICE)
 #include "lilyshark/core/monotonic_time.h"
 #include "lilyshark/core/capture_runtime.h"
+#include "lilyshark/device/simulate_source.h"
 #include "lilyshark/core/profile_settings.h"
 #include "lilyshark/core/profile_tuning.h"
 #include "lilyshark/core/rolling_diagnostics.h"
@@ -168,6 +169,10 @@ ReticulumDecoder reticulum_decoder{};
 ShelbyPointerDecoder shelby_pointer_decoder{};
 TDeckRadioService radio_service{};
 TDeckHardwareStatus hardware_status{};
+// Simulate mode's synthetic frame source. It feeds on_radio_frame() exactly as
+// the SX1262 does, so no screen, decoder, or capture writer knows the
+// difference — which is the point: simulate mode exercises the real pipeline.
+lilyshark::device::SimulateSource simulate_source{};
 TDeckTouch touch_service{};
 TDeckSdByteSink pcap_sink{};
 PcapLoraTapWriter pcap_writer{pcap_sink};
@@ -4027,18 +4032,22 @@ void build_display_input(lv_obj_t * parent)
     const char *touch_value = "READY";
     const char *input_value = "KB / BALL / TOUCH";
 #endif
-    add_shell_list_row(parent, 31, 34, "DISPLAY BRIGHTNESS", display_value,
+    add_shell_list_row(parent, 27, 28, "DISPLAY BRIGHTNESS", display_value,
                        display_input_selection == 0, theme::cyan());
-    add_shell_list_row(parent, 65, 34, "KEYBOARD LIGHT", keyboard_value,
+    add_shell_list_row(parent, 55, 28, "KEYBOARD LIGHT", keyboard_value,
                        display_input_selection == 1, theme::cyan());
-    add_shell_list_row(parent, 99, 34, "OPTIONAL GPS",
+    add_shell_list_row(parent, 83, 28, "OPTIONAL GPS",
                        app_settings.gps_enabled ? "ENABLED" : "OFF",
                        display_input_selection == 2,
                        app_settings.gps_enabled ? theme::lime() : theme::text_muted());
-    add_shell_list_row(parent, 133, 34, "STARTUP VIEW",
+    add_shell_list_row(parent, 111, 28, "STARTUP VIEW",
                        app_settings.resume_last_view ? "LAST LIVE VIEW" : "HOME",
                        display_input_selection == 3, theme::cyan());
-    add_shell_list_row(parent, 167, 34, "INPUTS",
+    add_shell_list_row(parent, 139, 28, "SIMULATE MODE",
+                       app_settings.simulate_mode ? "ON - SYNTHETIC" : "OFF",
+                       display_input_selection == 4,
+                       app_settings.simulate_mode ? theme::amber() : theme::text_muted());
+    add_shell_list_row(parent, 167, 28, "INPUTS",
                        input_value,
                        false,
                        std::strcmp(touch_value, "READY") == 0 &&
@@ -4894,8 +4903,8 @@ bool handle_shell_navigation_key(std::uint32_t key)
                 break;
             case ShellRoute::DisplayInput:
                 display_input_selection = next
-                    ? (display_input_selection + 1U) % 4U
-                    : (display_input_selection + 3U) % 4U;
+                    ? (display_input_selection + 1U) % 5U
+                    : (display_input_selection + 4U) % 5U;
                 break;
             case ShellRoute::SpectrumConfirmation:
                 spectrum_confirmation_selection = next
@@ -4950,8 +4959,13 @@ bool handle_shell_navigation_key(std::uint32_t key)
                 hardware_status.begin(app_settings.gps_enabled);
                 update_live_hardware_labels();
 #endif
-            } else {
+            } else if(display_input_selection == 3U) {
                 app_settings.resume_last_view = !app_settings.resume_last_view;
+            } else {
+                app_settings.simulate_mode = !app_settings.simulate_mode;
+#if defined(LILYSHARK_DEVICE)
+                simulate_source.reset();
+#endif
             }
 #if defined(LILYSHARK_DEVICE)
             if(!write_app_settings()) {
@@ -4978,6 +4992,11 @@ bool handle_shell_navigation_key(std::uint32_t key)
                                          app_settings.resume_last_view
                                              ? "Startup will resume the last live view"
                                              : "Startup will open Home");
+                } else if(display_input_selection == 4U) {
+                    record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::System,
+                                         app_settings.simulate_mode
+                                             ? "Simulate mode ON - frames are synthetic, not received"
+                                             : "Simulate mode off - showing radio traffic only");
                 }
             }
 #else
@@ -6322,7 +6341,7 @@ bool run_simulator_render_test() noexcept
         0xa5666f12ca08abf9ULL, 0x4e993a3aa6388940ULL, 0xe6c9d863553be97aULL,
         0xa5f0734975306c69ULL, 0xc8a60ee25e4a75bbULL, 0xb001f37939e2809aULL,
         0x58f4a35f10689fcfULL, 0x88d179e2188e4626ULL, 0xb7a95ab1033f7e3bULL,
-        0x02ad56ba4242596bULL, 0x410f758bfa6d57f7ULL, 0x56624c3700a45905ULL,
+        0xfa9f2c09c28015b0ULL, 0x410f758bfa6d57f7ULL, 0x56624c3700a45905ULL,
         0x5374881a952f5232ULL, 0x447e77256eefa3f2ULL,
     }};
 
@@ -7739,6 +7758,21 @@ void loop()
 
     const uint32_t now = millis();
     bool redraw = false;
+    // Simulate mode: hand a fabricated frame to the very same callback the
+    // radio driver calls, so ingest, decode, capture and every screen behave
+    // identically to a real reception.
+    if(app_settings.simulate_mode && simulate_source.due(now)) {
+        const RadioProfile &profile = radio_service.activeProfile();
+        const RawFrame frame = simulate_source.next(now,
+                                                    profile.center_frequency_hz,
+                                                    profile.bandwidth_hz,
+                                                    profile.spreading_factor,
+                                                    profile.coding_rate_denominator,
+                                                    profile.id);
+        on_radio_frame(frame, profile, nullptr);
+        redraw = true;
+    }
+
     const RadioStatus &radio_status = radio_service.status();
     if(radio_status.initialized != observed_radio_initialized ||
        radio_status.receiving != observed_radio_receiving) {

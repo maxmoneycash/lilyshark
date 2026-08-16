@@ -21,6 +21,10 @@ struct AppSettings {
     bool resume_last_view = false;
     std::uint8_t last_primary_diagnostic_index = 0U;
     bool spectrum_warning_acknowledged = false;
+    /// Simulate mode: synthesise mesh traffic on the device instead of waiting
+    /// for a radio. Off by default, and always announced in the UI while on —
+    /// a capture made in simulate mode must never look like one off the air.
+    bool simulate_mode = false;
 };
 
 enum class AppSettingsDecodeResult : std::uint8_t {

@@ -13,11 +13,13 @@ constexpr std::uint8_t kCaptureEnabledFlag = 1U << 1U;
 constexpr std::uint8_t kGpsEnabledFlag = 1U << 2U;
 constexpr std::uint8_t kResumeLastViewFlag = 1U << 3U;
 constexpr std::uint8_t kSpectrumWarningAcknowledgedFlag = 1U << 4U;
+constexpr std::uint8_t kSimulateModeFlag = 1U << 5U;
 constexpr std::uint8_t kKnownFlags = kOnboardingCompleteFlag |
                                       kCaptureEnabledFlag |
                                       kGpsEnabledFlag |
                                       kResumeLastViewFlag |
-                                      kSpectrumWarningAcknowledgedFlag;
+                                      kSpectrumWarningAcknowledgedFlag |
+                                      kSimulateModeFlag;
 
 std::uint32_t getU32(const std::uint8_t *bytes) noexcept
 {
@@ -62,7 +64,8 @@ std::uint8_t encodeFlags(const AppSettings &settings) noexcept
         (settings.resume_last_view ? kResumeLastViewFlag : 0U) |
         (settings.spectrum_warning_acknowledged
              ? kSpectrumWarningAcknowledgedFlag
-             : 0U));
+             : 0U) |
+        (settings.simulate_mode ? kSimulateModeFlag : 0U));
 }
 
 } // namespace
@@ -123,6 +126,7 @@ AppSettingsDecodeResult decodeAppSettings(const std::uint8_t *bytes,
     candidate.resume_last_view = (bytes[5] & kResumeLastViewFlag) != 0U;
     candidate.spectrum_warning_acknowledged =
         (bytes[5] & kSpectrumWarningAcknowledgedFlag) != 0U;
+    candidate.simulate_mode = (bytes[5] & kSimulateModeFlag) != 0U;
     candidate.onboarding_version = bytes[6];
     candidate.display_brightness = bytes[7];
     candidate.keyboard_brightness = bytes[8];
