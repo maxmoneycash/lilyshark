@@ -3,7 +3,7 @@
 # device attached, plus a port report. Read-only — it never writes the board.
 set -uo pipefail
 
-repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_dir="${LILYSHARK_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 image="${repo_dir}/dist/lilyshark-tdeck.factory.bin"
 checksums="${repo_dir}/dist/SHA256SUMS"
 ok=0
@@ -19,7 +19,7 @@ echo
 # 1. Image present, non-empty, and a real ESP32 image (magic byte 0xE9).
 if [[ -s "${image}" ]]; then
   size=$(wc -c < "${image}" | tr -d ' ')
-  magic=$(xxd -p -l 1 "${image}")
+  magic=$(od -An -tx1 -N1 "${image}" | tr -d '[:space:]')
   if [[ "${magic}" == "e9" ]]; then
     pass "factory image present and valid (${size} bytes, magic e9)"
   else
@@ -29,11 +29,38 @@ else
   bad "factory image missing: ${image}"
 fi
 
-# 2. Checksum manifest matches the image the script will actually write.
-if [[ -f "${checksums}" ]] && (cd "${repo_dir}/dist" && shasum -a 256 -c SHA256SUMS >/dev/null 2>&1); then
-  pass "SHA256SUMS matches the staged image"
+# 2. Verify only the factory entry. The documented prebuilt flow downloads the
+# factory image and the complete three-artifact manifest, not the app and ELF.
+sha256_file() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{ print $1 }'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{ print $1 }'
+  else
+    return 127
+  fi
+}
+
+expected=""
+if [[ -f "${checksums}" ]]; then
+  expected=$(awk '$2 == "lilyshark-tdeck.factory.bin" { print $1 }' "${checksums}")
+fi
+if [[ -z "${expected}" || "${expected}" == *$'\n'* ]]; then
+  bad "SHA256SUMS must contain exactly one factory-image entry"
+elif [[ ${#expected} -ne 64 || "${expected}" == *[!0-9A-Fa-f]* ]]; then
+  bad "SHA256SUMS factory-image entry is not a valid SHA-256 digest"
+elif [[ ! -s "${image}" ]]; then
+  bad "factory image is unavailable for checksum verification"
+elif actual=$(sha256_file "${image}" 2>/dev/null); then
+  expected=$(printf '%s' "${expected}" | tr '[:upper:]' '[:lower:]')
+  actual=$(printf '%s' "${actual}" | tr '[:upper:]' '[:lower:]')
+  if [[ "${actual}" == "${expected}" ]]; then
+    pass "SHA256SUMS matches the staged factory image"
+  else
+    bad "factory-image checksum mismatched — flash_tdeck.sh will refuse"
+  fi
 else
-  bad "checksum missing or mismatched — flash_tdeck.sh will refuse"
+  bad "neither shasum nor sha256sum is available"
 fi
 
 # 3. The staged image is not older than the compiled artifact.
@@ -59,11 +86,14 @@ else
   bad "uvx missing — required to run the pinned esptool"
 fi
 
-# 5. First-boot checker and its dependency.
-if [[ -f "${repo_dir}/scripts/smoke_tdeck.py" ]] && python3 -c "import serial" 2>/dev/null; then
-  pass "first-boot checker ready (smoke_tdeck.py + pyserial)"
+# 5. The first-boot checker uses only Python's standard library. Running its
+# help path proves it imports and parses without touching a serial device.
+smoke_checker="${repo_dir}/scripts/smoke_tdeck.py"
+if [[ -f "${smoke_checker}" ]] && command -v python3 >/dev/null 2>&1 && \
+   PYTHONDONTWRITEBYTECODE=1 python3 "${smoke_checker}" --help >/dev/null 2>&1; then
+  pass "first-boot checker ready (Python standard library)"
 else
-  bad "smoke_tdeck.py or pyserial unavailable"
+  bad "smoke_tdeck.py or python3 unavailable"
 fi
 
 # 6. Ports. Zero is expected until the board is plugged in and powered on.
