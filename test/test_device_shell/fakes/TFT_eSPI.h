@@ -60,6 +60,7 @@ class TFT_eSPI {
             if(x < 320U && y < 240U) fake.framebuffer[y * 320U + x] = pixels[index];
         }
         ++fake.display_flushes;
+        device_shell_fake::record("display.flush");
     }
 
     void endWrite() noexcept {}

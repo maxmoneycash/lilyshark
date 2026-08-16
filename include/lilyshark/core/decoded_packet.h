@@ -47,6 +47,10 @@ enum PacketAttribute : std::uint16_t {
     AttributeViaMqtt = 1U << 2,
     AttributeEncrypted = 1U << 3,
     AttributeTruncated = 1U << 4,
+    // The captured frame contains a complete, valid Shelby pointer. This is
+    // secondary application metadata: the packet's protocol remains the
+    // enclosing Meshtastic, MeshCore, Reticulum, or custom protocol.
+    AttributeShelbyPointer = 1U << 5,
 };
 
 struct DecodedPacket {

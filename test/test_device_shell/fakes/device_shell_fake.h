@@ -14,14 +14,20 @@ namespace device_shell_fake {
 
 struct FileData {
     std::vector<std::uint8_t> bytes{};
+    bool is_open = false;
+    std::size_t flush_calls = 0;
+    std::size_t close_calls = 0;
 };
 
 struct State {
     std::uint64_t now_us = 0;
     bool touch_present = true;
+    bool keyboard_present = true;
     bool sd_present = true;
     bool psram_available = true;
     bool preferences_available = true;
+    bool fail_app_settings_put = false;
+    bool fail_profile_put = false;
     bool fail_file_open = false;
     bool fail_file_write = false;
     bool fail_file_flush = false;
@@ -35,8 +41,14 @@ struct State {
     std::map<std::string, std::shared_ptr<FileData>> files{};
     std::set<std::string> directories{};
     std::vector<std::uint8_t> saved_profile{};
+    std::vector<std::uint8_t> saved_app_settings{};
+    std::size_t app_settings_put_calls = 0;
+    std::size_t profile_put_calls = 0;
+    std::size_t sd_end_calls = 0;
 
     std::array<std::uint16_t, 320U * 240U> framebuffer{};
+    std::array<std::uint16_t, 320U * 240U> first_backlight_framebuffer{};
+    bool first_backlight_frame_captured = false;
     std::uint32_t display_window_x = 0;
     std::uint32_t display_window_y = 0;
     std::uint32_t display_window_width = 0;

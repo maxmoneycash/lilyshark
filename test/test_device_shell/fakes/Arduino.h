@@ -51,7 +51,14 @@ inline void pinMode(std::uint8_t pin, int mode)
 
 inline void digitalWrite(std::uint8_t pin, int level)
 {
-    device_shell_fake::state().pin_levels[pin] = level;
+    auto &fake = device_shell_fake::state();
+    // Pin 42 is the T-Deck display backlight. Preserve the exact framebuffer
+    // that would first become visible so startup ordering can be asserted.
+    if(pin == 42U && level == HIGH && !fake.first_backlight_frame_captured) {
+        fake.first_backlight_framebuffer = fake.framebuffer;
+        fake.first_backlight_frame_captured = true;
+    }
+    fake.pin_levels[pin] = level;
     device_shell_fake::record("digital." + std::to_string(pin) + "." +
                               (level == HIGH ? "high" : "low"));
 }
@@ -90,6 +97,11 @@ class HardwareSerial {
     void begin(std::uint32_t baud, int, std::int8_t, std::int8_t)
     {
         device_shell_fake::record("gps.begin." + std::to_string(baud));
+    }
+
+    void end()
+    {
+        if(!console_) device_shell_fake::record("gps.end");
     }
 
     void println(const char *line)

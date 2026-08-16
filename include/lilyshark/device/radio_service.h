@@ -126,6 +126,7 @@ class TDeckRadioService
     // before the terminal state is exposed. Results may be partial on failure.
     bool startSpectrumSweep(const SpectrumSweepRequest &request) noexcept;
     void cancelSpectrumSweep() noexcept;
+    void clearSpectrumResult() noexcept;
     void poll() noexcept;
     void stop() noexcept;
 

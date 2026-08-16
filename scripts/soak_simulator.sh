@@ -77,4 +77,4 @@ fi
 
 cycles="$(grep -c '^Lilyshark soak cycle ' "${soak_log}" || true)"
 echo "Lilyshark soak result: passed ${duration_seconds}s with ${cycles} complete cycles" >>"${soak_log}"
-echo "Simulator soak passed: ${duration_seconds}s, ${cycles} complete nine-screen cycles"
+echo "Simulator soak passed: ${duration_seconds}s, ${cycles} complete UI cycles"

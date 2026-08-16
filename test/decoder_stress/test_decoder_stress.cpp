@@ -17,7 +17,7 @@ constexpr std::uint32_t kKnownFields =
     FieldNextHop | FieldRelayNode | FieldPayload;
 constexpr std::uint16_t kKnownAttributes =
     AttributeBroadcast | AttributeAcknowledgementRequested | AttributeViaMqtt | AttributeEncrypted |
-    AttributeTruncated;
+    AttributeTruncated | AttributeShelbyPointer;
 
 class DeterministicRandom
 {

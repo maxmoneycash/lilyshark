@@ -19,7 +19,23 @@ void TDeckHardwareStatus::begin(bool enable_gps) noexcept
     analogReadResolution(12);
     analogSetPinAttenuation(tdeck::battery_adc_pin, ADC_11db);
 
+    // Reconfiguration starts a new GPS session. Drain before ending the UART
+    // so bytes and parser state from a previous session cannot restore a stale
+    // fix when GPS is enabled again.
+    while (gps_serial_.available() > 0) {
+        (void)gps_serial_.read();
+    }
+    gps_serial_.end();
+#if LILYSHARK_HAS_TINYGPSPLUS
+    gps_parser_ = TinyGPSPlus{};
+#endif
+    last_valid_sentence_ms_ = 0;
+    last_passed_checksum_count_ = 0;
+    gps_receiver_seen_ = false;
+
     gps_enabled_ = enable_gps;
+    snapshot_.gps = GpsStatus{};
+    snapshot_.gps.parser_available = LILYSHARK_HAS_TINYGPSPLUS != 0;
     snapshot_.gps.state = gps_enabled_ ? GpsState::Absent : GpsState::Disabled;
     if (gps_enabled_) {
         gps_serial_.begin(tdeck::gps_baud, SERIAL_8N1, tdeck::gps_rx_pin, tdeck::gps_tx_pin);

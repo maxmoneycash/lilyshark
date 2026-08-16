@@ -17,9 +17,13 @@ class File {
         : data_(std::move(data)), open_(data_ != nullptr)
     {
         position_ = data_ == nullptr ? 0 : data_->bytes.size();
+        if(data_ != nullptr) data_->is_open = true;
     }
 
-    explicit operator bool() const noexcept { return open_ && data_ != nullptr; }
+    explicit operator bool() const noexcept
+    {
+        return open_ && data_ != nullptr && data_->is_open;
+    }
 
     std::size_t write(const std::uint8_t *source, std::size_t length)
     {
@@ -31,7 +35,10 @@ class File {
         return length;
     }
 
-    void flush() noexcept {}
+    void flush() noexcept
+    {
+        if(*this) ++data_->flush_calls;
+    }
 
     std::size_t position() const noexcept { return position_; }
 
@@ -42,7 +49,14 @@ class File {
         return data_->bytes.size();
     }
 
-    void close() noexcept { open_ = false; }
+    void close() noexcept
+    {
+        if(*this) {
+            data_->is_open = false;
+            ++data_->close_calls;
+        }
+        open_ = false;
+    }
 
   private:
     std::shared_ptr<device_shell_fake::FileData> data_{};

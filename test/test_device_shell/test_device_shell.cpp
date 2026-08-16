@@ -5,9 +5,13 @@
 #include <lvgl.h>
 
 #include "device_shell_fake.h"
+#include "lilyshark/core/app_settings.h"
+#include "lilyshark/core/profile_settings.h"
 #include "lilyshark/device/tdeck_display_init.h"
 #include "lilyshark/tdeck.h"
+#include "theme.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -16,6 +20,7 @@
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <vector>
 
 #if LV_MEM_SIZE != 98304U
 #error "device-shell test must use the same 98,304-byte LVGL heap as T-Deck firmware"
@@ -76,6 +81,40 @@ bool traceBefore(const std::string &first, const std::string &second)
     return first_index < second_index && second_index < state().trace.size();
 }
 
+std::size_t traceOccurrenceCount(const std::string &operation)
+{
+    std::size_t count = 0U;
+    for(const std::string &entry : state().trace) {
+        if(entry == operation) ++count;
+    }
+    return count;
+}
+
+bool seedAppSettings(const lilyshark::AppSettings &settings)
+{
+    state().saved_app_settings.resize(lilyshark::kAppSettingsV1Size);
+    return lilyshark::encodeAppSettingsV1(settings, state().saved_app_settings.data(),
+                                          state().saved_app_settings.size());
+}
+
+bool seedCompletedAppSettings()
+{
+    lilyshark::AppSettings settings = lilyshark::defaultAppSettings();
+    settings.onboarding_version = lilyshark::kAppSettingsOnboardingVersion;
+    settings.onboarding_complete = true;
+    return seedAppSettings(settings);
+}
+
+std::size_t pixelCount(const std::array<std::uint16_t, 320U * 240U> &frame,
+                       std::uint16_t first, std::uint16_t second)
+{
+    std::size_t count = 0U;
+    for(const std::uint16_t pixel : frame) {
+        if(pixel == first || pixel == second) ++count;
+    }
+    return count;
+}
+
 bool hasLabel(lv_obj_t *object, const char *text)
 {
     if(object == nullptr) return false;
@@ -88,6 +127,54 @@ bool hasLabel(lv_obj_t *object, const char *text)
     return false;
 }
 
+const char *labelWithPrefix(lv_obj_t *object, const char *prefix)
+{
+    if(object == nullptr) return nullptr;
+    if(lv_obj_check_type(object, &lv_label_class)) {
+        const char *text = lv_label_get_text(object);
+        if(text != nullptr && std::strncmp(text, prefix, std::strlen(prefix)) == 0) return text;
+    }
+    const std::uint32_t children = lv_obj_get_child_count(object);
+    for(std::uint32_t index = 0; index < children; ++index) {
+        const char *text = labelWithPrefix(
+            lv_obj_get_child(object, static_cast<std::int32_t>(index)), prefix);
+        if(text != nullptr) return text;
+    }
+    return nullptr;
+}
+
+std::size_t labelCount(lv_obj_t *object, const char *text)
+{
+    if(object == nullptr) return 0U;
+    std::size_t count = 0U;
+    if(lv_obj_check_type(object, &lv_label_class) &&
+       std::strcmp(lv_label_get_text(object), text) == 0) ++count;
+    const std::uint32_t children = lv_obj_get_child_count(object);
+    for(std::uint32_t index = 0; index < children; ++index) {
+        count += labelCount(lv_obj_get_child(object, static_cast<std::int32_t>(index)), text);
+    }
+    return count;
+}
+
+std::size_t visibleRuntimeEventRows(lv_obj_t *object)
+{
+    constexpr const char *event_types[] = {
+        "SYSTEM", "RADIO", "PROFILE", "CAPTURE", "STORAGE",
+        "SPECTRUM", "SCREENSHOT", "SURVEY", "HARDWARE",
+    };
+    std::size_t count = 0U;
+    for(const char *event_type : event_types) count += labelCount(object, event_type);
+    return count;
+}
+
+bool loadSavedAppSettings(lilyshark::AppSettings &settings)
+{
+    return state().saved_app_settings.size() == lilyshark::kAppSettingsV1Size &&
+           lilyshark::decodeAppSettings(state().saved_app_settings.data(),
+                                        state().saved_app_settings.size(), settings) ==
+               lilyshark::AppSettingsDecodeResult::LoadedV1;
+}
+
 std::shared_ptr<device_shell_fake::FileData> fileWithSuffix(const char *suffix)
 {
     const std::size_t suffix_length = std::strlen(suffix);
@@ -98,6 +185,35 @@ std::shared_ptr<device_shell_fake::FileData> fileWithSuffix(const char *suffix)
         }
     }
     return {};
+}
+
+std::shared_ptr<device_shell_fake::FileData> fileAtPath(const char *path)
+{
+    const auto entry = state().files.find(path);
+    return entry == state().files.end() ? std::shared_ptr<device_shell_fake::FileData>{}
+                                        : entry->second;
+}
+
+bool hasPcapHeader(const std::shared_ptr<device_shell_fake::FileData> &file)
+{
+    constexpr std::array<std::uint8_t, 24> expected = {{
+        0xd4, 0xc3, 0xb2, 0xa1, 0x02, 0x00, 0x04, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x0e, 0x01, 0x00, 0x00, 0x0e, 0x01, 0x00, 0x00,
+    }};
+    return file != nullptr && file->bytes.size() == expected.size() &&
+           std::memcmp(file->bytes.data(), expected.data(), expected.size()) == 0;
+}
+
+bool hasLilysharkCaptureHeader(const std::shared_ptr<device_shell_fake::FileData> &file)
+{
+    constexpr std::array<std::uint8_t, 24> expected = {{
+        'L', 'S', 'C', 'P', 0x01, 0x00, 0x00, 0x00,
+        0x18, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x40, 0x42, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00,
+    }};
+    return file != nullptr && file->bytes.size() == expected.size() &&
+           std::memcmp(file->bytes.data(), expected.data(), expected.size()) == 0;
 }
 
 void timerCallback(lv_timer_t *)
@@ -117,6 +233,8 @@ bool healthyScenario()
     device_shell_fake::reset();
     Wire.reset();
     radiolib_fake::state().reset();
+    if(!require(seedCompletedAppSettings(),
+                "completed app settings could not be encoded")) return false;
 
     setup();
 
@@ -130,6 +248,8 @@ bool healthyScenario()
     if(!require(state().serial_log.find("Lilyshark native capture: recording /lilyshark/capture-0001.lscap") !=
                     std::string::npos,
                 "native writer did not start")) return false;
+    if(!require(hasLabel(lv_screen_active(), "HOME"),
+                "returning-user startup did not open Home")) return false;
 
     const std::string power_high = "digital." +
         std::to_string(lilyshark::tdeck::power_enable_pin) + ".high";
@@ -158,9 +278,17 @@ bool healthyScenario()
     if(!require(traceBefore("display.command.1", "display.rotation.1") &&
                     traceBefore("display.command.41", "display.rotation.1"),
                 "software reset and vendor sequence did not precede rotation")) return false;
-    if(!require(traceBefore("display.fill.0", backlight_high) &&
+    if(!require(traceBefore("display.fill.0", "display.flush") &&
+                    traceBefore("display.flush", backlight_high) &&
                     traceBefore("display.fill.0", "keyboard.brightness.96"),
-                "display was illuminated or keyboard brightness set before black fill")) return false;
+                "the splash did not flush between the black fill and first backlight")) return false;
+    const std::uint16_t pink = lv_color_to_u16(lilyshark::theme::pink());
+    const std::uint16_t swapped_pink = static_cast<std::uint16_t>((pink << 8U) | (pink >> 8U));
+    if(!require(state().first_backlight_frame_captured &&
+                    pixelCount(state().first_backlight_framebuffer, pink, swapped_pink) > 64U,
+                "the first visible framebuffer did not contain the antialiased pink logo")) {
+        return false;
+    }
 
     auto pcap = fileWithSuffix(".pcap");
     auto native_capture = fileWithSuffix(".lscap");
@@ -180,15 +308,14 @@ bool healthyScenario()
     if(!require(state().lv_timer_callbacks != 0U && state().display_flushes != 0U,
                 "loop did not service LVGL timers and display flushes")) return false;
 
-    constexpr const char *screen_titles[] = {
-        "TRAFFIC", "SPECTRUM", "NODES", "NODE DETAIL", "PACKET DETAIL",
-        "MAP", "SURVEY", "EVENTS", "AIRTIME",
+    constexpr const char *primary_titles[] = {
+        "TRAFFIC", "SPECTRUM", "NODES", "MAP", "SURVEY", "AIRTIME", "EVENTS",
     };
-    for(std::size_t index = 0; index < 9U; ++index) {
+    for(std::size_t index = 0; index < 7U; ++index) {
         sendKeyboard(static_cast<std::uint8_t>('1' + index));
-        if(!hasLabel(lv_screen_active(), screen_titles[index])) {
+        if(labelWithPrefix(lv_screen_active(), primary_titles[index]) == nullptr) {
             std::fprintf(stderr, "device-shell screen %zu (%s) was not built; serial log:\n%s",
-                         index + 1U, screen_titles[index], state().serial_log.c_str());
+                         index + 1U, primary_titles[index], state().serial_log.c_str());
             return require(false,
                            "keyboard navigation did not build the requested live device screen");
         }
@@ -196,6 +323,13 @@ bool healthyScenario()
         if(!require(memory.total_size <= LV_MEM_SIZE && memory.free_size > 1024U,
                     "a live device screen exhausted the device-sized LVGL heap")) return false;
     }
+
+    sendKeyboard('8');
+    if(!require(hasLabel(lv_screen_active(), "SETTINGS"),
+                "8 did not open Settings")) return false;
+    sendKeyboard('M');
+    if(!require(hasLabel(lv_screen_active(), "HOME"),
+                "M did not return the shell to Home")) return false;
 
     sendKeyboard('1');
     const std::uint64_t empty_traffic_hash = device_shell_fake::framebuffer_hash();
@@ -209,6 +343,10 @@ bool healthyScenario()
         0xde, 0xc0, 0xad, 0x0b, 0xbb, 0x2a, 0x56, 0x78,
         0xaa, 0xbb, 0xcc,
     };
+    radio.packet.resize(95U);
+    for(std::size_t index = 19U; index < radio.packet.size(); ++index) {
+        radio.packet[index] = static_cast<std::uint8_t>(index);
+    }
     radio.packet_length = radio.packet.size();
     radio.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
     radio.triggerDio1();
@@ -226,6 +364,322 @@ bool healthyScenario()
                     device_shell_fake::framebuffer_hash() != empty_traffic_hash,
                 "captured frame did not redraw the live Traffic screen")) return false;
 
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "PACKET DETAIL"),
+                "Enter did not open Packet Detail for the injected frame")) return false;
+    if(!require(labelWithPrefix(lv_screen_active(), "FRAME #") != nullptr &&
+                    labelWithPrefix(lv_screen_active(), "PAYLOAD OFFSET ") != nullptr &&
+                    hasLabel(lv_screen_active(), "LEFT / RIGHT  SECTION"),
+                "Packet Detail did not open on the PKT summary tab")) return false;
+
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(labelWithPrefix(lv_screen_active(), "CENTER  ") != nullptr &&
+                    labelWithPrefix(lv_screen_active(), "AIRTIME ") != nullptr,
+                "Packet Detail did not render the RF metadata tab")) return false;
+
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(labelWithPrefix(lv_screen_active(), "STATE  ") != nullptr &&
+                    labelWithPrefix(lv_screen_active(), "FIELDS ") != nullptr &&
+                    labelWithPrefix(lv_screen_active(), "PAYLOAD ") != nullptr,
+                "Packet Detail did not render the decoder tab")) return false;
+
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "RAW BYTES 0-39 / 95") &&
+                    hasLabel(lv_screen_active(), "UP / DOWN  PAGE 1 OF 3") &&
+                    hasLabel(lv_screen_active(), "FF FF FF FF 78 56 34 12 DE C0 "),
+                "Packet Detail did not render the first HEX page")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_UP));
+    if(!require(hasLabel(lv_screen_active(), "RAW BYTES 0-39 / 95") &&
+                    hasLabel(lv_screen_active(), "UP / DOWN  PAGE 1 OF 3"),
+                "Packet Detail moved above its first page")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    if(!require(hasLabel(lv_screen_active(), "RAW BYTES 40-79 / 95") &&
+                    hasLabel(lv_screen_active(), "UP / DOWN  PAGE 2 OF 3") &&
+                    hasLabel(lv_screen_active(), "28 29 2A 2B 2C 2D 2E 2F 30 31 "),
+                "Packet Detail did not render the second 40-byte page")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    if(!require(hasLabel(lv_screen_active(), "RAW BYTES 80-94 / 95") &&
+                    hasLabel(lv_screen_active(), "UP / DOWN  PAGE 3 OF 3") &&
+                    hasLabel(lv_screen_active(), "50 51 52 53 54 55 56 57 58 59 "),
+                "Packet Detail did not render the final partial page")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    if(!require(hasLabel(lv_screen_active(), "RAW BYTES 80-94 / 95") &&
+                    hasLabel(lv_screen_active(), "UP / DOWN  PAGE 3 OF 3"),
+                "Packet Detail moved beyond its final page")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_UP));
+    if(!require(hasLabel(lv_screen_active(), "RAW BYTES 40-79 / 95") &&
+                    hasLabel(lv_screen_active(), "UP / DOWN  PAGE 2 OF 3"),
+                "Packet Detail did not page upward from the final page")) return false;
+
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "CURRENT WRITER STATE") &&
+                    labelWithPrefix(lv_screen_active(), "CAPTURED 95   ORIGINAL 95") != nullptr &&
+                    labelWithPrefix(lv_screen_active(), "FNV32 ") != nullptr,
+                "Packet Detail did not render the RAW capture-provenance tab")) return false;
+    sendKeyboard(0x08U);
+    if(!require(hasLabel(lv_screen_active(), "TRAFFIC"),
+                "Back did not return Packet Detail to Traffic")) return false;
+
+    sendKeyboard('9');
+    if(!require(hasLabel(lv_screen_active(), "PROTOCOLS") &&
+                    hasLabel(lv_screen_active(), "MESHTASTIC") &&
+                    hasLabel(lv_screen_active(), "MESHCORE") &&
+                    hasLabel(lv_screen_active(), "RETICULUM"),
+                "9 did not open the protocol health tool")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "PROTOCOL DETAIL") &&
+                    hasLabel(lv_screen_active(), "MESHTASTIC") &&
+                    hasLabel(lv_screen_active(), "LEFT/RIGHT CLASS  ENTER FILTER"),
+                "Protocols Enter did not open Protocol Detail")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "MESHCORE"),
+                "Protocol Detail did not move to the next protocol class")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "TRAFFIC *"),
+                "Protocol Detail Enter did not apply a Traffic filter")) return false;
+
+    sendKeyboard('X');
+    if(!require(hasLabel(lv_screen_active(), "TRAFFIC FILTER") &&
+                    hasLabel(lv_screen_active(), "MESHCORE") &&
+                    hasLabel(lv_screen_active(), "STRUCTURAL OK") &&
+                    hasLabel(lv_screen_active(), "FILTER ACTIVE") &&
+                    hasLabel(lv_screen_active(),
+                             "Filter the bounded inspection list. Capture files stay complete."),
+                "Traffic filter did not expose the applied protocol predicate")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "RETICULUM") &&
+                    hasLabel(lv_screen_active(), "MALFORMED") &&
+                    hasLabel(lv_screen_active(), "VALID"),
+                "Traffic filter predicates did not respond to navigation")) return false;
+    sendKeyboard('R');
+    if(!require(labelCount(lv_screen_active(), "ANY") == 3U &&
+                    hasLabel(lv_screen_active(), "SHOWING ALL FRAMES"),
+                "Traffic filter reset did not restore all predicates")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "TRAFFIC") &&
+                    !hasLabel(lv_screen_active(), "TRAFFIC *"),
+                "Traffic filter apply did not return to unfiltered Traffic")) return false;
+
+    // Keep only structurally decoded header rows, then inject a newer raw frame. The
+    // highlighted filtered row and Enter detail must remain on the newest
+    // matching frame rather than indexing the unfiltered store by mistake.
+    sendKeyboard('X');
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "TRAFFIC *") &&
+                    hasLabel(lv_screen_active(), "12345678"),
+                "header filter did not retain the decoded Meshtastic frame")) return false;
+
+    radio.packet = {0x01U, 0x02U, 0x03U, 0x04U};
+    radio.packet_length = radio.packet.size();
+    radio.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+    radio.triggerDio1();
+    device_shell_fake::advance_ms(250U);
+    loop();
+    sendKeyboard('\r');
+    const char *filtered_frame = labelWithPrefix(lv_screen_active(), "FRAME #");
+    if(!require(hasLabel(lv_screen_active(), "PACKET DETAIL") &&
+                    filtered_frame != nullptr &&
+                    std::strstr(filtered_frame, "CAPTURED 95 / ORIGINAL 95") != nullptr,
+                "filtered Enter opened the newer nonmatching raw frame")) return false;
+    sendKeyboard(0x08U);
+    sendKeyboard('X');
+    sendKeyboard('R');
+    sendKeyboard('\r');
+
+    sendKeyboard('3');
+    if(!require(hasLabel(lv_screen_active(), "NODES") &&
+                    hasLabel(lv_screen_active(), "12345678"),
+                "the injected source did not reach the Nodes route")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "NODE DETAIL"),
+                "Enter did not open Node Detail for the injected source")) return false;
+    sendKeyboard(0x08U);
+    if(!require(hasLabel(lv_screen_active(), "NODES"),
+                "Back did not return Node Detail to Nodes")) return false;
+
+    sendKeyboard('M');
+    if(!require(hasLabel(lv_screen_active(), "HOME"),
+                "M did not open Home from an analyzer route")) return false;
+    sendKeyboard('M');
+    if(!require(hasLabel(lv_screen_active(), "NODES"),
+                "M did not restore the analyzer route beneath Home")) return false;
+
+    sendKeyboard('8');
+    if(!require(hasLabel(lv_screen_active(), "SETTINGS"),
+                "8 did not reopen Settings from the analyzer")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "CAPTURE & STORAGE") &&
+                    hasLabel(lv_screen_active(), "CAPTURE MODE") &&
+                    hasLabel(lv_screen_active(), "ENTER  STOP CAPTURE"),
+                "Settings did not open the active Capture & Storage controls")) return false;
+
+    const std::size_t pcap_flushes_before_stop = pcap->flush_calls;
+    const std::size_t native_flushes_before_stop = native_capture->flush_calls;
+    if(!require(pcap->is_open && native_capture->is_open,
+                "capture files were not open before the operator stop")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "OFF") &&
+                    hasLabel(lv_screen_active(), "ENTER  START CAPTURE"),
+                "operator stop did not update Capture & Storage")) return false;
+    if(!require(!pcap->is_open && !native_capture->is_open &&
+                    pcap->close_calls == 1U && native_capture->close_calls == 1U &&
+                    pcap->flush_calls == pcap_flushes_before_stop + 1U &&
+                    native_capture->flush_calls == native_flushes_before_stop + 1U,
+                "operator stop did not flush and close both capture writers")) return false;
+
+    lilyshark::AppSettings persisted{};
+    if(!require(loadSavedAppSettings(persisted) && !persisted.capture_enabled,
+                "operator stop did not persist the disabled capture preference")) return false;
+
+    const std::size_t files_before_restart = state().files.size();
+    sendKeyboard('\r');
+    auto restarted_pcap = fileAtPath("/lilyshark/capture-0002.pcap");
+    auto restarted_native = fileAtPath("/lilyshark/capture-0002.lscap");
+    if(!require(hasLabel(lv_screen_active(), "RECORDING") &&
+                    hasLabel(lv_screen_active(), "ENTER  STOP CAPTURE"),
+                "operator restart did not update Capture & Storage")) return false;
+    if(!require(state().files.size() == files_before_restart + 2U &&
+                    restarted_pcap != nullptr && restarted_native != nullptr &&
+                    restarted_pcap->is_open && restarted_native->is_open,
+                "operator restart did not open a new PCAP and LSCAP session")) return false;
+    if(!require(hasPcapHeader(restarted_pcap) &&
+                    hasLilysharkCaptureHeader(restarted_native),
+                "restarted capture files do not contain valid format headers")) return false;
+    if(!require(loadSavedAppSettings(persisted) && persisted.capture_enabled,
+                "operator restart did not persist the enabled capture preference")) return false;
+
+    sendKeyboard(0x08U);
+    if(!require(hasLabel(lv_screen_active(), "SETTINGS"),
+                "Back did not return Capture & Storage to Settings")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "DISPLAY & INPUT") &&
+                    hasLabel(lv_screen_active(), "OPTIONAL GPS") &&
+                    hasLabel(lv_screen_active(), "STARTUP VIEW") &&
+                    hasLabel(lv_screen_active(), "HOME"),
+                "Settings did not open Display & Input with default preferences")) return false;
+
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "OFF") &&
+                    loadSavedAppSettings(persisted) && !persisted.gps_enabled,
+                "optional GPS toggle was not reflected and persisted")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "LAST LIVE VIEW") &&
+                    loadSavedAppSettings(persisted) && persisted.resume_last_view,
+                "startup-view toggle was not reflected and persisted")) return false;
+
+    sendKeyboard('7');
+    lv_obj_t *events_screen = lv_screen_active();
+    if(!require(hasLabel(events_screen, "EVENTS") &&
+                    visibleRuntimeEventRows(events_screen) == 6U,
+                "Events did not render the six-row bounded runtime feed")) return false;
+    if(!require(!hasLabel(events_screen, "NEW NODE") &&
+                    !hasLabel(events_screen, "Mobile-4 appeared  SNR -12.1") &&
+                    !hasLabel(events_screen, "HIGH UTIL") &&
+                    !hasLabel(events_screen, "NODE LOST"),
+                "Events still rendered the obsolete simulator snapshot rows")) return false;
+
+    const char *top_range = labelWithPrefix(events_screen, "1-6/");
+    unsigned event_count = 0U;
+    if(!require(top_range != nullptr && std::sscanf(top_range, "1-6/%u", &event_count) == 1 &&
+                    event_count > 6U,
+                "Events did not expose a scrollable feed longer than six rows")) return false;
+
+    bool saw_first_frame = false;
+    bool saw_capture_stop = false;
+    bool saw_capture_restart = false;
+    bool saw_gps_disable = false;
+    bool saw_startup_preference = false;
+    const auto observe_expected_events = [&]() {
+        lv_obj_t *screen = lv_screen_active();
+        saw_first_frame = saw_first_frame ||
+            hasLabel(screen, "First MT frame  RSSI -91.5  SNR -7.2");
+        saw_capture_stop = saw_capture_stop ||
+            hasLabel(screen, "Capture stopped by operator");
+        saw_capture_restart = saw_capture_restart ||
+            hasLabel(screen, "New LSCAP and PCAP session started");
+        saw_gps_disable = saw_gps_disable ||
+            hasLabel(screen, "Optional GPS polling disabled");
+        saw_startup_preference = saw_startup_preference ||
+            hasLabel(screen, "Startup will resume the last live view");
+    };
+    observe_expected_events();
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_UP));
+    if(!require(labelWithPrefix(lv_screen_active(), "1-6/") != nullptr,
+                "Events moved above the newest row")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    if(!require(labelWithPrefix(lv_screen_active(), "2-7/") != nullptr,
+                "Events did not scroll down by one row")) return false;
+    observe_expected_events();
+
+    for(unsigned offset = 1U; offset < event_count - 6U; ++offset) {
+        sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+        observe_expected_events();
+    }
+    char oldest_range[24]{};
+    std::snprintf(oldest_range, sizeof(oldest_range), "%u-%u/%u",
+                  event_count - 5U, event_count, event_count);
+    if(!require(hasLabel(lv_screen_active(), oldest_range) &&
+                    visibleRuntimeEventRows(lv_screen_active()) == 6U,
+                "Events did not reach the oldest six-row window")) return false;
+    if(!(saw_first_frame && saw_capture_stop && saw_capture_restart &&
+         saw_gps_disable && saw_startup_preference)) {
+        std::fprintf(stderr,
+                     "event-action visibility: frame=%d stop=%d restart=%d gps=%d startup=%d\n",
+                     saw_first_frame, saw_capture_stop, saw_capture_restart,
+                     saw_gps_disable, saw_startup_preference);
+        return require(false,
+                       "Events pagination did not expose the actual frame and settings actions");
+    }
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    if(!require(hasLabel(lv_screen_active(), oldest_range),
+                "Events moved beyond the oldest row")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_UP));
+    char previous_range[24]{};
+    std::snprintf(previous_range, sizeof(previous_range), "%u-%u/%u",
+                  event_count - 6U, event_count - 1U, event_count);
+    if(!require(hasLabel(lv_screen_active(), previous_range),
+                "Events did not scroll upward from the oldest window")) return false;
+    for(unsigned offset = 1U; offset < event_count - 6U; ++offset) {
+        sendKeyboard(static_cast<std::uint8_t>(LV_KEY_UP));
+    }
+    if(!require(labelWithPrefix(lv_screen_active(), "1-6/") != nullptr,
+                "Events did not return to the newest six-row window")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    if(!require(labelWithPrefix(lv_screen_active(), "2-7/") != nullptr,
+                "Events did not leave the newest window before the reopen check")) return false;
+    sendKeyboard('8');
+    sendKeyboard('7');
+    if(!require(labelWithPrefix(lv_screen_active(), "1-6/") != nullptr,
+                "reopening Events did not return to the newest incident")) return false;
+    char event_position[24]{};
+    sendKeyboard('\r');
+    std::snprintf(event_position, sizeof(event_position), "EVENT 1 OF %u", event_count);
+    if(!require(hasLabel(lv_screen_active(), "EVENT DETAIL") &&
+                    hasLabel(lv_screen_active(), "FULL EVENT MESSAGE") &&
+                    hasLabel(lv_screen_active(), event_position),
+                "Events Enter did not expose the complete selected message")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    std::snprintf(event_position, sizeof(event_position), "EVENT 2 OF %u", event_count);
+    if(!require(hasLabel(lv_screen_active(), event_position),
+                "Event Detail did not move to the next incident")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_UP));
+    sendKeyboard(0x08U);
+    if(!require(labelWithPrefix(lv_screen_active(), "1-6/") != nullptr,
+                "Event Detail Back did not restore the newest Events window")) return false;
+
     return true;
 }
 
@@ -234,11 +688,14 @@ bool recoverableFailureScenario()
     device_shell_fake::reset();
     Wire.reset();
     state().touch_present = false;
+    state().keyboard_present = false;
     state().sd_present = false;
     state().psram_available = false;
     auto &radio = radiolib_fake::state();
     radio.reset();
     radio.begin_results = {-707, RADIOLIB_ERR_NONE};
+    if(!require(seedCompletedAppSettings(),
+                "completed recovery settings could not be encoded")) return false;
 
     setup();
 
@@ -246,6 +703,8 @@ bool recoverableFailureScenario()
                 "recoverable startup milestones are missing or out of order")) return false;
     if(!require(state().serial_log.find("Lilyshark touch: not found (0x00)") != std::string::npos,
                 "missing touch was not reported")) return false;
+    if(!require(state().serial_log.find("Lilyshark keyboard: not found") != std::string::npos,
+                "missing keyboard was not reported")) return false;
     if(!require(state().serial_log.find("Spectrum unavailable: PSRAM allocation failed") !=
                     std::string::npos,
                 "missing PSRAM was not reported")) return false;
@@ -256,11 +715,19 @@ bool recoverableFailureScenario()
                 "missing SD was not reported for both capture formats")) return false;
     if(!require(state().files.empty(), "capture files were opened without an SD card")) return false;
     if(!require(radio.begin_calls == 1U, "initial radio failure count is wrong")) return false;
+    if(!require(hasLabel(lv_screen_active(), "HOME"),
+                "returning-user recovery startup did not open Home")) return false;
 
     device_shell_fake::advance_ms(1000);
     loop();
     if(!require(radio.begin_calls == 2U && radio.start_receive_calls == 1U,
                 "radio did not recover through the real loop retry path")) return false;
+
+    state().keyboard_present = true;
+    device_shell_fake::advance_ms(2000);
+    loop();
+    if(!require(traceOccurrenceCount("keyboard.brightness.96") >= 3U,
+                "keyboard reconnect probe did not restore input")) return false;
 
     sendKeyboard('2');
     if(!require(hasLabel(lv_screen_active(), "SPECTRUM BUFFER UNAVAILABLE"),
@@ -273,6 +740,436 @@ bool recoverableFailureScenario()
     }
     if(!require(state().lv_timer_callbacks != 0U,
                 "recoverable failure loop stopped servicing LVGL")) return false;
+    return true;
+}
+
+bool freshOnboardingScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+
+    setup();
+
+    if(!require(hasLabel(lv_screen_active(), "FIRST RUN") &&
+                    hasLabel(lv_screen_active(), "1 / 6"),
+                "fresh settings did not open onboarding welcome")) return false;
+    sendKeyboard('1');
+    if(!require(hasLabel(lv_screen_active(), "FIRST RUN"),
+                "direct analyzer shortcuts escaped onboarding")) return false;
+
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "WHAT LILYSHARK DOES") &&
+                    hasLabel(lv_screen_active(), "2 / 6") &&
+                    hasLabel(lv_screen_active(), "PACKETS") &&
+                    hasLabel(lv_screen_active(), "CAPTURE"),
+                "onboarding did not advance to capability overview")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "CHOOSE NETWORK") &&
+                    hasLabel(lv_screen_active(), "3 / 6"),
+                "onboarding did not advance to network selection")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "RADIO PROFILE") &&
+                    hasLabel(lv_screen_active(), "4 / 6"),
+                "onboarding did not advance to profile review")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "FIELD CONTROLS") &&
+                    hasLabel(lv_screen_active(), "5 / 6") &&
+                    hasLabel(lv_screen_active(), "TRACKBALL"),
+                "onboarding did not advance to field controls")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "DEVICE CHECK") &&
+                    hasLabel(lv_screen_active(), "6 / 6"),
+                "onboarding did not advance after applying the profile")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "HOME"),
+                "completed onboarding did not open Home")) return false;
+
+    lilyshark::AppSettings saved{};
+    if(!require(state().saved_app_settings.size() == lilyshark::kAppSettingsV1Size &&
+                    lilyshark::decodeAppSettings(state().saved_app_settings.data(),
+                                                 state().saved_app_settings.size(), saved) ==
+                        lilyshark::AppSettingsDecodeResult::LoadedV1 &&
+                    saved.onboarding_complete &&
+                    saved.onboarding_version == lilyshark::kAppSettingsOnboardingVersion,
+                "completed onboarding did not persist valid app settings")) return false;
+    return true;
+}
+
+bool onboardingSaveFailureScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+
+    setup();
+    state().fail_app_settings_put = true;
+
+    sendKeyboard('\r');
+    sendKeyboard('\r');
+    sendKeyboard('\r');
+    sendKeyboard('\r');
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "DEVICE CHECK") &&
+                    hasLabel(lv_screen_active(), "6 / 6"),
+                "save-failure scenario did not reach Device Check")) return false;
+
+    sendKeyboard('\r');
+    lilyshark::AppSettings saved{};
+    if(!require(hasLabel(lv_screen_active(), "DEVICE CHECK") &&
+                    hasLabel(lv_screen_active(),
+                             "SETTINGS SAVE FAILED - ENTER TO RETRY") &&
+                    hasLabel(lv_screen_active(), "ENTER  RETRY SAVE") &&
+                    !hasLabel(lv_screen_active(), "HOME"),
+                "failed onboarding save did not remain on Device Check with retry UI")) {
+        return false;
+    }
+    if(!require(state().app_settings_put_calls == 1U &&
+                    !loadSavedAppSettings(saved) &&
+                    state().serial_log.find("Lilyshark onboarding state was not saved") !=
+                        std::string::npos,
+                "failed onboarding save was not observable or was treated as persisted")) {
+        return false;
+    }
+
+    state().fail_app_settings_put = false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "HOME") &&
+                    !hasLabel(lv_screen_active(), "ENTER  RETRY SAVE"),
+                "successful onboarding retry did not open Home")) return false;
+    if(!require(state().app_settings_put_calls == 2U &&
+                    loadSavedAppSettings(saved) && saved.onboarding_complete &&
+                    saved.onboarding_version == lilyshark::kAppSettingsOnboardingVersion,
+                "successful onboarding retry did not persist completed settings")) return false;
+    return true;
+}
+
+bool onboardingProfileSaveFailureScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+
+    setup();
+    state().fail_profile_put = true;
+
+    sendKeyboard('\r');
+    sendKeyboard('\r');
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "RADIO PROFILE") &&
+                    hasLabel(lv_screen_active(), "4 / 6"),
+                "profile-save-failure scenario did not reach profile review")) return false;
+
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "RADIO PROFILE") &&
+                    hasLabel(lv_screen_active(), "4 / 6") &&
+                    hasLabel(lv_screen_active(), "PROFILE ACTIVE / SAVE FAILED") &&
+                    hasLabel(lv_screen_active(), "ENTER  RETRY") &&
+                    !hasLabel(lv_screen_active(), "DEVICE CHECK"),
+                "failed profile save did not remain on profile review with retry UI")) {
+        return false;
+    }
+    if(!require(state().profile_put_calls == 1U && state().saved_profile.empty() &&
+                    state().serial_log.find("Lilyshark profile settings were not saved") !=
+                        std::string::npos,
+                "failed onboarding profile save was not observable or was treated as saved")) {
+        return false;
+    }
+
+    state().fail_profile_put = false;
+    sendKeyboard('\r');
+    lilyshark::RadioProfile saved_profile{};
+    if(!require(hasLabel(lv_screen_active(), "FIELD CONTROLS") &&
+                    hasLabel(lv_screen_active(), "5 / 6") &&
+                    !hasLabel(lv_screen_active(), "ENTER  RETRY"),
+                "successful profile retry did not advance to field controls")) return false;
+    if(!require(state().profile_put_calls == 2U &&
+                    state().saved_profile.size() == lilyshark::kSavedProfileV2Size &&
+                    lilyshark::decodeSavedProfile(state().saved_profile.data(),
+                                                  state().saved_profile.size(), saved_profile) ==
+                        lilyshark::SavedProfileDecodeResult::LoadedV2,
+                "successful onboarding profile retry did not persist a valid profile")) {
+        return false;
+    }
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "DEVICE CHECK") &&
+                    hasLabel(lv_screen_active(), "6 / 6"),
+                "profile retry flow did not continue to Device Check")) return false;
+    return true;
+}
+
+bool resetSettingsSaveFailureScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+
+    lilyshark::AppSettings original = lilyshark::defaultAppSettings();
+    original.onboarding_version = lilyshark::kAppSettingsOnboardingVersion;
+    original.onboarding_complete = true;
+    original.display_brightness = 5U;
+    original.keyboard_brightness = 48U;
+    original.gps_enabled = false;
+    original.resume_last_view = true;
+    original.last_primary_diagnostic_index = 4U;
+    original.spectrum_warning_acknowledged = true;
+    if(!require(seedAppSettings(original),
+                "custom reset settings could not be encoded")) return false;
+
+    setup();
+    sendKeyboard('8');
+    for(std::size_t index = 0; index < 6U; ++index) {
+        sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    }
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "RESET SETUP") &&
+                    hasLabel(lv_screen_active(), "NO  KEEP SETTINGS"),
+                "Settings did not open reset confirmation")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+
+    const std::vector<std::uint8_t> persisted_before = state().saved_app_settings;
+    state().fail_app_settings_put = true;
+    sendKeyboard('\r');
+    lilyshark::AppSettings persisted{};
+    if(!require(hasLabel(lv_screen_active(), "RESET SETUP") &&
+                    hasLabel(lv_screen_active(),
+                             "SETTINGS SAVE FAILED - NOTHING WAS RESET") &&
+                    hasLabel(lv_screen_active(), "ENTER  RETRY") &&
+                    !hasLabel(lv_screen_active(), "FIRST RUN"),
+                "failed reset save did not stay in confirmation with retry UI")) {
+        return false;
+    }
+    if(!require(state().app_settings_put_calls == 1U &&
+                    state().saved_app_settings == persisted_before &&
+                    loadSavedAppSettings(persisted) &&
+                    persisted.display_brightness == original.display_brightness &&
+                    persisted.keyboard_brightness == original.keyboard_brightness &&
+                    persisted.gps_enabled == original.gps_enabled &&
+                    persisted.resume_last_view == original.resume_last_view,
+                "failed reset save changed persisted settings")) return false;
+
+    state().fail_app_settings_put = false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "FIRST RUN") &&
+                    hasLabel(lv_screen_active(), "1 / 6") &&
+                    !hasLabel(lv_screen_active(), "RESET SETUP"),
+                "successful reset retry did not return to first-run setup")) return false;
+    if(!require(state().app_settings_put_calls == 2U && loadSavedAppSettings(persisted) &&
+                    !persisted.onboarding_complete && persisted.onboarding_version == 0U &&
+                    persisted.display_brightness == 12U &&
+                    persisted.keyboard_brightness == 96U && persisted.gps_enabled &&
+                    !persisted.resume_last_view,
+                "successful reset retry did not persist default settings")) return false;
+    return true;
+}
+
+bool displayInputSaveFailureScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+    if(!require(seedCompletedAppSettings(),
+                "completed display settings could not be encoded")) return false;
+
+    setup();
+    sendKeyboard('8');
+    for(std::size_t index = 0; index < 3U; ++index) {
+        sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    }
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "DISPLAY & INPUT") &&
+                    hasLabel(lv_screen_active(), "12 / 16") &&
+                    hasLabel(lv_screen_active(), "ENABLED") &&
+                    hasLabel(lv_screen_active(), "HOME"),
+                "Settings did not open Display & Input with prior values")) return false;
+
+    const std::vector<std::uint8_t> persisted_before = state().saved_app_settings;
+    state().fail_app_settings_put = true;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "12 / 16") &&
+                    hasLabel(lv_screen_active(), "SAVE FAILED - VALUE RESTORED") &&
+                    state().saved_app_settings == persisted_before,
+                "display-brightness save failure did not visibly restore its prior value")) {
+        return false;
+    }
+
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    const std::size_t gps_end_before = traceOccurrenceCount("gps.end");
+    const std::size_t gps_begin_before = traceOccurrenceCount("gps.begin.9600");
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "ENABLED") &&
+                    hasLabel(lv_screen_active(), "SAVE FAILED - VALUE RESTORED") &&
+                    traceOccurrenceCount("gps.end") == gps_end_before + 2U &&
+                    traceOccurrenceCount("gps.begin.9600") == gps_begin_before + 1U &&
+                    state().saved_app_settings == persisted_before,
+                "GPS save failure did not visibly and physically restore the prior state")) {
+        return false;
+    }
+
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    lilyshark::AppSettings persisted{};
+    if(!require(hasLabel(lv_screen_active(), "HOME") &&
+                    hasLabel(lv_screen_active(), "SAVE FAILED - VALUE RESTORED") &&
+                    state().app_settings_put_calls == 3U &&
+                    state().saved_app_settings == persisted_before &&
+                    loadSavedAppSettings(persisted) &&
+                    persisted.display_brightness == 12U && persisted.gps_enabled &&
+                    !persisted.resume_last_view,
+                "startup-view save failure persisted or displayed a false value")) {
+        return false;
+    }
+    return true;
+}
+
+bool capturePreferenceSaveFailureScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+    if(!require(seedCompletedAppSettings(),
+                "completed capture settings could not be encoded")) return false;
+
+    setup();
+    auto initial_pcap = fileAtPath("/lilyshark/capture-0001.pcap");
+    auto initial_native = fileAtPath("/lilyshark/capture-0001.lscap");
+    sendKeyboard('8');
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_DOWN));
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "CAPTURE & STORAGE") &&
+                    initial_pcap != nullptr && initial_native != nullptr &&
+                    initial_pcap->is_open && initial_native->is_open,
+                "capture failure scenario did not start with an active session")) return false;
+
+    const std::vector<std::uint8_t> enabled_settings = state().saved_app_settings;
+    state().fail_app_settings_put = true;
+    sendKeyboard('\r');
+    auto restored_pcap = fileAtPath("/lilyshark/capture-0002.pcap");
+    auto restored_native = fileAtPath("/lilyshark/capture-0002.lscap");
+    lilyshark::AppSettings persisted{};
+    if(!require(hasLabel(lv_screen_active(), "SAVE FAILED - ENTER RETRY") &&
+                    labelCount(lv_screen_active(), "RECORDING") == 3U &&
+                    restored_pcap != nullptr && restored_native != nullptr &&
+                    restored_pcap->is_open && restored_native->is_open,
+                "capture preference failure did not report the restored recording state")) {
+        return false;
+    }
+    if(!require(!initial_pcap->is_open && !initial_native->is_open &&
+                    state().app_settings_put_calls == 1U &&
+                    state().saved_app_settings == enabled_settings &&
+                    loadSavedAppSettings(persisted) && persisted.capture_enabled,
+                "capture preference failure changed storage or failed to restore runtime")) {
+        return false;
+    }
+    sendKeyboard('7');
+    if(!require(hasLabel(lv_screen_active(),
+                         "Capture setting was not saved; prior state restored"),
+                "capture preference rollback was not reported in Events")) return false;
+
+    state().fail_app_settings_put = false;
+    sendKeyboard('8');
+    sendKeyboard('\r');
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "CAPTURE & STORAGE") &&
+                    labelCount(lv_screen_active(), "OFF") == 3U &&
+                    hasLabel(lv_screen_active(), "ENTER  START CAPTURE") &&
+                    loadSavedAppSettings(persisted) && !persisted.capture_enabled,
+                "successful capture preference retry did not stop and persist capture")) {
+        return false;
+    }
+
+    sendKeyboard('\r');
+    auto active_pcap = fileAtPath("/lilyshark/capture-0003.pcap");
+    auto active_native = fileAtPath("/lilyshark/capture-0003.lscap");
+    if(!require(active_pcap != nullptr && active_native != nullptr &&
+                    active_pcap->is_open && active_native->is_open &&
+                    loadSavedAppSettings(persisted) && persisted.capture_enabled,
+                "capture could not be restarted before restart-failure injection")) return false;
+
+    const std::vector<std::uint8_t> enabled_before_restart_failure =
+        state().saved_app_settings;
+    state().fail_app_settings_put = true;
+    state().fail_file_open = true;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "RETRY NEEDED") &&
+                    hasLabel(lv_screen_active(), "SAVE FAILED - ENTER RETRY") &&
+                    labelCount(lv_screen_active(), "OFF") == 2U &&
+                    !hasLabel(lv_screen_active(), "RECORDING") &&
+                    !active_pcap->is_open && !active_native->is_open &&
+                    fileAtPath("/lilyshark/capture-0004.pcap") == nullptr &&
+                    fileAtPath("/lilyshark/capture-0004.lscap") == nullptr,
+                "failed capture rollback did not report the actual stopped runtime")) {
+        return false;
+    }
+    if(!require(state().saved_app_settings == enabled_before_restart_failure &&
+                    loadSavedAppSettings(persisted) && persisted.capture_enabled,
+                "failed capture rollback persisted a false disabled preference")) return false;
+    sendKeyboard('7');
+    if(!require(hasLabel(lv_screen_active(),
+                         "Capture setting save and session restart both failed"),
+                "capture restart failure was not reported in Events")) return false;
+
+    state().fail_app_settings_put = false;
+    state().fail_file_open = false;
+    sendKeyboard('8');
+    sendKeyboard('\r');
+    sendKeyboard('\r');
+    auto retry_pcap = fileAtPath("/lilyshark/capture-0004.pcap");
+    auto retry_native = fileAtPath("/lilyshark/capture-0004.lscap");
+    if(!require(labelCount(lv_screen_active(), "RECORDING") == 3U &&
+                    retry_pcap != nullptr && retry_native != nullptr &&
+                    retry_pcap->is_open && retry_native->is_open &&
+                    loadSavedAppSettings(persisted) && persisted.capture_enabled,
+                "capture did not recover after the injected save and restart failures cleared")) {
+        return false;
+    }
+
+    state().fail_file_flush = true;
+    device_shell_fake::advance_ms(5100U);
+    loop();
+    if(!require(hasLabel(lv_screen_active(), "I/O ERROR") &&
+                    hasLabel(lv_screen_active(), "RETRY NEEDED") &&
+                    !retry_pcap->is_open && !retry_native->is_open,
+                "runtime SD flush failure was not shown as a recoverable storage fault")) {
+        return false;
+    }
+
+    state().fail_file_flush = false;
+    const std::size_t end_calls_before_retry = state().sd_end_calls;
+    sendKeyboard('\r');
+    auto remounted_pcap = fileAtPath("/lilyshark/capture-0005.pcap");
+    auto remounted_native = fileAtPath("/lilyshark/capture-0005.lscap");
+    if(!require(state().sd_end_calls == end_calls_before_retry + 1U &&
+                    labelCount(lv_screen_active(), "RECORDING") == 3U &&
+                    hasLabel(lv_screen_active(), "READY") &&
+                    remounted_pcap != nullptr && remounted_native != nullptr &&
+                    remounted_pcap->is_open && remounted_native->is_open,
+                "capture retry did not unmount, remount, and reopen storage after I/O failure")) {
+        return false;
+    }
+    return true;
+}
+
+bool corruptSettingsScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+    state().saved_app_settings.assign(lilyshark::kAppSettingsV1Size, 0xa5U);
+
+    setup();
+
+    if(!require(state().serial_log.find(
+                    "Lilyshark app settings invalid; first-run setup required") !=
+                    std::string::npos,
+                "corrupt app settings were not reported")) return false;
+    if(!require(hasLabel(lv_screen_active(), "FIRST RUN") &&
+                    hasLabel(lv_screen_active(), "1 / 6"),
+                "corrupt app settings did not fall back to onboarding")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "WHAT LILYSHARK DOES"),
+                "corrupt-settings recovery left onboarding unusable")) return false;
     return true;
 }
 
@@ -299,6 +1196,20 @@ void testDeviceShellEntryPath()
                                   "healthy device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(recoverableFailureScenario),
                                   "recoverable device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(freshOnboardingScenario),
+                                  "fresh-onboarding device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(onboardingSaveFailureScenario),
+                                  "onboarding-save-failure device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(onboardingProfileSaveFailureScenario),
+                                  "onboarding-profile-save-failure device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(resetSettingsSaveFailureScenario),
+                                  "reset-settings-save-failure device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(displayInputSaveFailureScenario),
+                                  "display-input-save-failure device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(capturePreferenceSaveFailureScenario),
+                                  "capture-preference-save-failure device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(corruptSettingsScenario),
+                                  "corrupt-settings device-shell scenario failed");
 }
 
 } // namespace

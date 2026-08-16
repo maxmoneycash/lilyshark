@@ -10,11 +10,11 @@ namespace lilyshark {
 /// This is deliberately not a link-layer decoder. A Shelby pointer is an
 /// application payload convention, so the same bytes appear inside Meshtastic,
 /// MeshCore, and Reticulum frames alike. Registering this decoder after the
-/// protocol decoders lets Lilyshark report "this frame carries a Shelby
-/// pointer" without claiming to own the frame's protocol.
+/// protocol decoders lets the registry add AttributeShelbyPointer without
+/// replacing the enclosing packet's protocol or decoded fields.
 ///
-/// Reports ProtocolId::Custom because the enclosing protocol has already been
-/// identified by whichever decoder matched first.
+/// Reports ProtocolId::Custom when it is the only matching decoder. When an
+/// enclosing protocol matched first, only AttributeShelbyPointer is merged.
 class ShelbyPointerDecoder final : public PacketDecoder
 {
   public:

@@ -175,6 +175,11 @@ void testFailedRecordWriteLeavesOnlyFileHeader()
     assert(writer.failed());
     assert(writer.write(frame) == LilysharkCaptureWriteResult::SinkError);
     assert(sink.writeCount() == 2);
+
+    writer.reset();
+    assert(!writer.started());
+    assert(!writer.failed());
+    assert(writer.begin() == LilysharkCaptureWriteResult::Ok);
 }
 
 } // namespace

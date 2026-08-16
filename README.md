@@ -111,13 +111,13 @@ one of them on the device.
   <tr>
     <td width="25%"><img src="design/previews/firmware/spectrum.png" alt="Spectrum — band scan"></td>
     <td width="25%"><img src="design/previews/firmware/nodes.png" alt="Nodes — roster with signal history"></td>
-    <td width="25%"><img src="design/previews/firmware/node-detail.png" alt="Node detail — SNR/RSSI/hop plots"></td>
+    <td width="25%"><img src="design/previews/firmware/node-detail.png" alt="Node detail — SNR and RSSI histories with frame and CRC counts"></td>
     <td width="25%"><img src="design/previews/firmware/packet-detail.png" alt="Packet detail"></td>
   </tr>
   <tr>
     <td align="center"><sub>Spectrum — band scan</sub></td>
     <td align="center"><sub>Nodes — roster with signal history</sub></td>
-    <td align="center"><sub>Node detail — SNR/RSSI/hop plots</sub></td>
+    <td align="center"><sub>Node detail — SNR/RSSI histories, frames, and CRC errors</sub></td>
     <td align="center"><sub>Packet detail</sub></td>
   </tr>
   <tr>
@@ -638,12 +638,14 @@ Run the automatic presentation tour for a screen recording:
 ./scripts/run_ui_demo.sh
 ```
 
-On macOS, `./scripts/run_ui_demo.sh --record` binds the system recorder to the
-dedicated Lilyshark simulator window automatically, holds on the pink splash
-until capture is active, then drives one complete pass through the real UI
-navigation while deterministic synthetic telemetry continues to move. Use
-`--record-manual` only when automatic window capture is unavailable. See the
-[recording guide](docs/RECORDING_UI.md) for the full shot list and output options.
+On macOS 14 or newer, `./scripts/run_ui_demo.sh --record` binds a
+desktop-independent ScreenCaptureKit recorder to the dedicated Lilyshark
+simulator window, holds on the pink splash until capture is active, then drives
+one complete pass through the real UI navigation while deterministic synthetic
+telemetry continues to move. The Retina window capture remains intact if
+another app covers it or the user changes Spaces. Use `--record-manual` only
+when automatic window capture is unavailable. See the [recording
+guide](docs/RECORDING_UI.md) for the full shot list and output options.
 
 Regenerate the exact README screenshots and the deterministic live GIF after an intentional UI change:
 

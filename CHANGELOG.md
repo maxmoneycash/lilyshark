@@ -6,6 +6,37 @@ pre-release, so versions are dates, not semver.
 
 ## [2026-08-15]
 
+### Added — complete T-Deck product shell
+
+- The first visible application frame is the antialiased Lily Pink wordmark.
+  Six first-run stages explain the tools, select the mesh family and radio
+  profile, teach the controls, report actual hardware readiness, and persist
+  completion only after a verified settings write.
+- Home and Settings now route to radio profiles, capture and storage controls,
+  device status, display and input controls, Help, About, guarded spectrum
+  ownership, and guarded setup reset.
+- Thirteen analyzer and tool routes now cover Traffic, composable filters,
+  rolling Protocols and Protocol Detail, fast/deep Spectrum, Nodes and Node
+  Detail, a five-tab Packet Inspector, local GPS, Survey, Airtime, Timeline,
+  and a scrollable semantic Events history.
+- The simulator now drives those screens with one deterministic moving RF
+  stream. Exact 320x240 tests cover 13 analyzer routes, 17 shell routes, and
+  eight Packet/Event substates; a separate motion gate checks each live data
+  region. An 87-step state-aware tour records the complete UI in a dedicated
+  macOS window, and the README gallery/GIF are generated from the same frames.
+
+### Changed — device truth and recovery
+
+- App-setting, profile, capture, and reset writes expose failures and restore
+  the prior runtime state instead of reporting success. Capture sessions can
+  stop, restart, unmount, remount, and recover from writer or flush failures.
+- Packet Detail retains capture-time RF metadata and every raw byte, with
+  protocol-specific facts supplied by the real decoders. Protocol filters do
+  not alter either capture file.
+- GPS restarts discard stale parser state, input polling survives `millis()`
+  rollover, and the device UI distinguishes unavailable, disabled, degraded,
+  unsupported, and recording states.
+
 ### Added — web app, rebuilt as a terminal
 
 - The web app is now a terminal-style interface ported from
@@ -52,5 +83,5 @@ pre-release, so versions are dates, not semver.
 ## Earlier
 
 The alpha series brought up the T-Deck hardware: display initialization and
-runtime evidence, live UI input, diagnostics hardening, and the first
-flashed-device checks. See the git history for the full trail.
+runtime evidence, live UI input, diagnostics hardening, and the first-device
+smoke-test harness. See the git history for the full trail.

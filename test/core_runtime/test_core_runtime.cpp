@@ -22,6 +22,29 @@ class NeverDecoder final : public PacketDecoder
     }
 };
 
+class ShelbyMarkerDecoder final : public PacketDecoder
+{
+  public:
+    ProtocolId protocol() const noexcept override { return ProtocolId::Custom; }
+
+    DecodeResult decode(const RawFrame &frame, const RadioProfile &,
+                        DecodedPacket &output) const noexcept override
+    {
+        output = makeUnknownPacket(frame);
+        output.protocol = ProtocolId::Custom;
+        output.state = DecodeState::PayloadDecoded;
+        output.kind = PacketKind::Data;
+        output.attributes |= AttributeShelbyPointer;
+        // This attribute belongs to the secondary decode and must not leak
+        // into a packet already owned by the primary protocol decoder.
+        output.attributes |= AttributeEncrypted;
+        output.payload_offset = 1;
+        output.payload_length = 2;
+        output.protocol_flags = 0xfeedU;
+        return DecodeResult::Matched;
+    }
+};
+
 RawFrame makeFrame(std::uint8_t marker)
 {
     RawFrame frame{};
@@ -153,6 +176,45 @@ void testMeshtasticOuterHeader()
     assert(decoded.hasAttribute(AttributeBroadcast));
     assert(decoded.hasAttribute(AttributeAcknowledgementRequested));
     assert(decoded.hasAttribute(AttributeViaMqtt));
+    assert(!decoded.hasAttribute(AttributeEncrypted));
+}
+
+void testSecondaryShelbyMarkerPreservesPrimaryDecode()
+{
+    MeshtasticDecoder meshtastic{};
+    ShelbyMarkerDecoder shelby{};
+    DecoderRegistry registry{};
+    assert(registry.add(meshtastic));
+    assert(registry.add(shelby));
+
+    RadioProfile profile{};
+    profile.protocol_hint = ProtocolId::Meshtastic;
+    DecodedPacket decoded{};
+    const DecodeResult result = registry.decode(makeMeshtasticFrame(), profile, decoded);
+
+    assert(result == DecodeResult::Matched);
+    assert(decoded.protocol == ProtocolId::Meshtastic);
+    assert(decoded.state == DecodeState::HeaderOnly);
+    assert(decoded.kind == PacketKind::OpaquePayload);
+    assert(decoded.destination == 0xffffffffU);
+    assert(decoded.source == 0x12345678U);
+    assert(decoded.packet_id == 0x0badc0deU);
+    assert(decoded.protocol_flags == 0xbbU);
+    assert(decoded.payload_offset == MeshtasticDecoder::kOuterHeaderLength);
+    assert(decoded.payload_length == 3);
+    assert(decoded.hasAttribute(AttributeShelbyPointer));
+    assert(!decoded.hasAttribute(AttributeEncrypted));
+
+    RawFrame malformed = makeMeshtasticFrame();
+    malformed.bytes[4] = 0;
+    malformed.bytes[5] = 0;
+    malformed.bytes[6] = 0;
+    malformed.bytes[7] = 0;
+    assert(registry.decode(malformed, profile, decoded) == DecodeResult::Malformed);
+    assert(decoded.protocol == ProtocolId::Meshtastic);
+    assert(decoded.state == DecodeState::Malformed);
+    assert(decoded.packet_id == 0x0badc0deU);
+    assert(decoded.hasAttribute(AttributeShelbyPointer));
     assert(!decoded.hasAttribute(AttributeEncrypted));
 }
 
@@ -494,6 +556,7 @@ int main()
     testUnknownFallbackDoesNotGuessProtocol();
     testDecoderRegistryHasFixedCapacity();
     testMeshtasticOuterHeader();
+    testSecondaryShelbyMarkerPreservesPrimaryDecode();
     testMeshtasticMalformedFramesRemainInspectable();
     testMeshCoreAckAndTransportEnvelope();
     testMeshCoreProtectedAndMalformedFrames();
