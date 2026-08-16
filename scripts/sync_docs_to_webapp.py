@@ -25,6 +25,7 @@ DEST = REPO_ROOT / "webapp" / "public" / "docs"
 # (source relative to repo root, doc id, destination relative to DEST)
 DOCS = [
     ("docs/quickstart.md", "quickstart", "quickstart.md"),
+    ("docs/hardware.md", "hardware", "hardware.md"),
     ("docs/architecture.md", "architecture", "architecture.md"),
     ("docs/why-shelby.md", "why-shelby", "why-shelby.md"),
     ("docs/shelby-off-grid.md", "shelby-off-grid", "shelby-off-grid.md"),
@@ -39,8 +40,12 @@ DOCS = [
     ("samples/README.md", "samples", "samples/README.md"),
 ]
 
-# Charts referenced by the analysis reports (same-directory relative links).
+# Charts referenced by the analysis reports (same-directory relative links),
+# and the hardware photos the hardware doc embeds.
 ASSETS = [
+    ("docs/media/tdeck-onboarding-night.png", "media/tdeck-onboarding-night.png"),
+    ("docs/media/tdeck-about-night.png", "media/tdeck-about-night.png"),
+    ("docs/media/tdeck-traffic-live-night.png", "media/tdeck-traffic-live-night.png"),
     ("analysis/chart_pointer_capacity.svg", "analysis/chart_pointer_capacity.svg"),
     ("analysis/chart_shelby_storage.svg", "analysis/chart_shelby_storage.svg"),
     ("analysis/chart_airtime_cost.svg", "analysis/chart_airtime_cost.svg"),

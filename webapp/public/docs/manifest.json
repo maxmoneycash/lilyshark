@@ -6,6 +6,12 @@
     "source": "docs/quickstart.md"
   },
   {
+    "id": "hardware",
+    "title": "Lilyshark on real hardware",
+    "path": "/docs/hardware.md",
+    "source": "docs/hardware.md"
+  },
+  {
     "id": "architecture",
     "title": "Architecture",
     "path": "/docs/architecture.md",

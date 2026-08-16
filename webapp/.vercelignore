@@ -8,5 +8,8 @@ packages/
 .turbo/
 .pnpm-store/
 node_modules/
-docs/
+# Root-anchored: a bare "docs/" also matched public/docs, silently stripping
+# the DOCS screen's content out of every deploy.
+/docs/
+!public/docs
 artifacts/
