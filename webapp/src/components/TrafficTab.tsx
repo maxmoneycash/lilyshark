@@ -15,6 +15,7 @@ import { demoNextFrame, isDemo } from '../mesh/demo';
 import { startTrafficDemoInterval } from './trafficDemo';
 import {
   DEMO_BLOB,
+  fetchAnchor,
   fetchBlob as fetchBlobBytes,
   resolveByCommitment,
 } from '../lib/shelby';
@@ -125,8 +126,9 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
    * happens, because to a viewer a bare button press followed by a table
    * reload explains nothing. Each step lands in the trace with its real
    * timing: the indexer lookup that turns a commitment into an object name,
-   * the RPC fetch, the size check against what the pointer promised, and the
-   * open. The trace stays up afterward so the story can be read back.
+   * the RPC fetch, the size check against what the pointer promised, the
+   * on-chain anchor check against the capture registry, and the open. The
+   * trace stays up afterward so the story can be read back.
    */
   interface TraceStep {
     label: string;
@@ -159,7 +161,14 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
       show();
 
       t0 = performance.now();
-      const bytes = await fetchBlobBytes(p.owner, found.name);
+      const bytes = await fetchBlobBytes(p.owner, found.name, (attempt, waitMs) => {
+        steps[2] = {
+          label: 'SHELBY RPC',
+          detail: `rate-limited — retrying in ${Math.round(waitMs / 1000)} s (${attempt}/2)…`,
+          state: 'run',
+        };
+        show();
+      });
       steps[2] = {
         label: 'SHELBY RPC',
         detail: `${bytes.byteLength.toLocaleString()} B · ${Math.round(performance.now() - t0)} ms`,
@@ -173,6 +182,32 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
           : `size mismatch: pointer said ${p.sizeBytes.toLocaleString()} B`,
         state: sizeOk ? 'ok' : 'err',
       });
+      steps.push({ label: 'ANCHOR', detail: 'checking the on-chain registry…', state: 'run' });
+      show();
+
+      // The chain check must never block the open: a dead fullnode leaves the
+      // anchor unverified, not the capture unreadable.
+      t0 = performance.now();
+      try {
+        const anchor = await fetchAnchor(p.owner, p.commitment);
+        steps[steps.length - 1] = anchor
+          ? {
+              label: 'ANCHOR',
+              detail: `vouched on-chain by ${p.owner.slice(0, 6)}…${p.owner.slice(-4)} on ${new Date(anchor.registeredAtUnix * 1000).toISOString().slice(0, 10)} · ${Math.round(performance.now() - t0)} ms`,
+              state: 'ok',
+            }
+          : {
+              label: 'ANCHOR',
+              detail: 'no on-chain anchor for this commitment',
+              state: 'err',
+            };
+      } catch {
+        steps[steps.length - 1] = {
+          label: 'ANCHOR',
+          detail: 'registry unreachable — anchor unverified',
+          state: 'err',
+        };
+      }
       show();
 
       keepTrace.current = true;
