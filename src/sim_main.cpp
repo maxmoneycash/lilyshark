@@ -8192,6 +8192,8 @@ void setup()
     build_current_screen();
     lv_refr_now(display);
     Serial.println("Lilyshark UI ready");
+    Serial.printf("LSK ID {\"app\":\"lilyshark\",\"fw\":\"%s\",\"board\":\"t-deck\"}\n",
+                  firmware_version);
     record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
                          !onboarding_complete ? "First-run setup ready" :
                          (app_settings.resume_last_view ? "Last live view ready" : "Home ready"));
