@@ -151,7 +151,7 @@ export function ThisDevicePanel() {
 						<button
 							onClick={() =>
 								window.dispatchEvent(
-									new CustomEvent("lilyshark-tab", { detail: "MAPA" }),
+									new CustomEvent("lilyshark-tab", { detail: "MAP" }),
 								)
 							}
 						>
@@ -160,7 +160,7 @@ export function ThisDevicePanel() {
 						<button
 							onClick={() =>
 								window.dispatchEvent(
-									new CustomEvent("lilyshark-tab", { detail: "NODOS" }),
+									new CustomEvent("lilyshark-tab", { detail: "NODES" }),
 								)
 							}
 						>

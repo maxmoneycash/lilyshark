@@ -30,8 +30,8 @@ export function openDb(): Promise<IDBDatabase> {
       const hops = db.createObjectStore("hops", { keyPath: ["node", "ts"] });
       hops.createIndex("node", "node");
       hops.createIndex("ts", "ts");
-      const sightings = db.createObjectStore("sightings", { keyPath: ["node", "hora"] });
-      sightings.createIndex("hora", "hora");
+      const sightings = db.createObjectStore("sightings", { keyPath: ["node", "hourBucket"] });
+      sightings.createIndex("hourBucket", "hourBucket");
       const neighbors = db.createObjectStore("neighbors", { keyPath: ["node", "neighbor"] });
       neighbors.createIndex("node", "node");
       neighbors.createIndex("ts", "ts");
@@ -351,29 +351,29 @@ export async function loadHopChanges(
 
 // ── sightings ───────────────────────────────────────────────────────────────
 
-const HORA_MS = 3_600_000;
+const HOUR_MS = 3_600_000;
 
 /** Marks that a node was heard during the current hour. A counter per node
  *  and hour instead of a row per packet: the mesh transmits non-stop and
  *  second-level detail isn't needed to know who was alive and when. */
-export async function marcarEscucha(node: number, ts = Date.now()): Promise<void> {
+export async function markHeard(node: number, ts = Date.now()): Promise<void> {
   const { os, tx } = await store("sightings", "readwrite");
-  const hora = Math.floor(ts / HORA_MS);
-  const prev = await reqAsPromise(os.get([node, hora])) as
-    | { node: number; hora: number; n: number }
+  const hourBucket = Math.floor(ts / HOUR_MS);
+  const prev = await reqAsPromise(os.get([node, hourBucket])) as
+    | { node: number; hourBucket: number; n: number }
     | undefined;
-  os.put({ node, hora, n: (prev?.n ?? 0) + 1 });
+  os.put({ node, hourBucket, n: (prev?.n ?? 0) + 1 });
   await txDone(tx);
 }
 
 /** Activity per node and hour since a given date. */
 export async function loadActividad(
-  desde: number,
-): Promise<{ node: number; hora: number; n: number }[]> {
+  sinceMs: number,
+): Promise<{ node: number; hourBucket: number; n: number }[]> {
   const { os } = await store("sightings");
   return collect(
-    os.index("hora"),
-    IDBKeyRange.lowerBound(Math.floor(desde / HORA_MS)),
+    os.index("hourBucket"),
+    IDBKeyRange.lowerBound(Math.floor(sinceMs / HOUR_MS)),
   );
 }
 
@@ -455,8 +455,8 @@ export async function purgeOlderThan(days: number): Promise<number> {
   // sightings stores the hour, not the ms
   total += await deleteRange(
     tx.objectStore("sightings"),
-    "hora",
-    IDBKeyRange.upperBound(Math.floor(cut / HORA_MS), true),
+    "hourBucket",
+    IDBKeyRange.upperBound(Math.floor(cut / HOUR_MS), true),
   );
   await txDone(tx);
   return total;

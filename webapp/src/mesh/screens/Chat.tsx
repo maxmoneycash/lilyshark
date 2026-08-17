@@ -3,7 +3,7 @@ import { clearUnread, getSnapshot, subscribe, type Message } from "../store";
 import { clearConvo, retryMessage, sendText } from "../radio";
 import { saveText, stamp } from "../export";
 import { t } from "../i18n";
-import { fechaHora, hora } from "../fmt";
+import { fechaHora, hhmm } from "../fmt";
 
 // in search results the time alone isn't enough: they may be from another day
 const fecha = (ms: number) =>
@@ -19,9 +19,9 @@ const fechaSep = (ms: number): string => {
   d.setHours(0, 0, 0, 0);
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const dias = Math.round((hoy.getTime() - d.getTime()) / 86_400_000);
-  if (dias === 0) return t("HOY");
-  if (dias === 1) return t("AYER");
+  const days = Math.round((hoy.getTime() - d.getTime()) / 86_400_000);
+  if (days === 0) return t("TODAY");
+  if (days === 1) return t("YESTERDAY");
   return new Date(ms).toLocaleDateString(undefined, {
     weekday: "short",
     day: "2-digit",
@@ -97,7 +97,7 @@ export default function Chat({
     label: `#${c.name}`,
   }));
   if (channelConvos.length === 0) {
-    channelConvos.push({ key: "ch:0", label: t("#Principal") });
+    channelConvos.push({ key: "ch:0", label: t("#Primary") });
   }
   const dmKeys = new Set(
     s.messages.filter((m) => m.convo.startsWith("dm:")).map((m) => m.convo),
@@ -110,7 +110,7 @@ export default function Chat({
 
   const nodeShort = (num: number) =>
     num === s.myNodeNum
-      ? t("YO")
+      ? t("ME")
       : (s.nodes.get(num)?.shortName ?? num.toString(16).slice(-4));
 
   const labelOf = (key: string) =>
@@ -130,14 +130,14 @@ export default function Chat({
     try {
       await sendText(text, convo, rid);
     } catch (e) {
-      setError(t("FALLO TX: {0}", String(e)));
+      setError(t("TX FAILED: {0}", String(e)));
     }
   };
 
   return (
     <main>
       <div className="panel" style={{ width: 230, flexShrink: 0 }}>
-        <div className="panel-title">{t("PANEL // CANALES")}</div>
+        <div className="panel-title">{t("PANEL // CHANNELS")}</div>
         <div style={{ padding: "8px 0" }}>
           {channelConvos.map((c) => (
             <div
@@ -153,12 +153,12 @@ export default function Chat({
           ))}
         </div>
         <div className="panel-title" style={{ borderTop: "1px solid var(--border)" }}>
-          {t("MENSAJES DIRECTOS")}
+          {t("DIRECT MESSAGES")}
         </div>
         <div style={{ padding: "8px 0" }}>
           {dmConvos.length === 0 && (
             <div className="convo-item dim" style={{ cursor: "default" }}>
-              <span>{t("— ninguno —")}</span>
+              <span>{t("— none —")}</span>
             </div>
           )}
           {dmConvos.map((c) => (
@@ -182,14 +182,14 @@ export default function Chat({
             PANEL // CHAT · {convoLabel}
             {convo.startsWith("dm:") &&
               (s.nodes.get(Number(convo.slice(3)))?.publicKey ? (
-                <span title={t("cifrado extremo a extremo (PKI)")}> 🔒 PKI</span>
+                <span title={t("end-to-end encrypted (PKI)")}> 🔒 PKI</span>
               ) : (
                 <span
                   className="warn"
-                  title={t("sin clave pública: va cifrado sólo con la PSK del canal")}
+                  title={t("no public key: encrypted with the channel PSK only")}
                 >
                   {" "}
-                  {t("⚠ SIN PKI")}
+                  {t("⚠ NO PKI")}
                 </span>
               ))}
           </span>
@@ -204,13 +204,13 @@ export default function Chat({
                   e.currentTarget.blur();
                 }
               }}
-              placeholder={t("buscar en todo el historial_")}
-              title={t("Ctrl+F · ESC limpia")}
+              placeholder={t("search the whole history_")}
+              title={t("Ctrl+F · ESC clears")}
               style={{ width: 190, fontSize: 11 }}
             />
             <button
               style={{ fontSize: 10, padding: "0 6px" }}
-              title={t("Exportar esta conversación a un archivo de texto")}
+              title={t("Export this conversation to a text file")}
               disabled={msgs.length === 0}
               onClick={async () => {
                 try {
@@ -223,18 +223,18 @@ export default function Chat({
                       )
                       .join("\n"),
                   );
-                  setError(path ? t("EXPORTADO → {0}", path) : "");
+                  setError(path ? t("EXPORTED → {0}", path) : "");
                 } catch (e) {
-                  setError(t("FALLO EXPORT: {0}", String(e)));
+                  setError(t("EXPORT FAILED: {0}", String(e)));
                 }
               }}
             >
-              {t("⭳ EXPORTAR")}
+              {t("⭳ EXPORT")}
             </button>
             <button
               className="danger"
               style={{ fontSize: 10, padding: "0 6px" }}
-              title={t("Borrar todos los mensajes de esta conversación")}
+              title={t("Delete all messages in this conversation")}
               disabled={convoCount === 0}
               onClick={() => {
                 if (confirmClear) {
@@ -244,7 +244,7 @@ export default function Chat({
                 } else {
                   setConfirmClear(true);
                   setError(
-                    t("⚠ SE BORRARÁN {0} MENSAJES · PULSA OTRA VEZ", convoCount),
+                    t("⚠ {0} MESSAGES WILL BE DELETED · PRESS AGAIN", convoCount),
                   );
                   clearTimeout(clearTimer.current);
                   clearTimer.current = setTimeout(
@@ -254,9 +254,9 @@ export default function Chat({
                 }
               }}
             >
-              {confirmClear ? t("¿SEGURO?") : t("🗑 LIMPIAR")}
+              {confirmClear ? t("SURE?") : t("🗑 CLEAR")}
             </button>
-            {t("{0} NODOS EN ESCUCHA", s.nodes.size)}
+            {t("{0} NODES LISTENING", s.nodes.size)}
           </span>
         </div>
         <div
@@ -272,13 +272,13 @@ export default function Chat({
           {msgs.length === 0 && (
             <div className="dim" style={{ fontSize: 11 }}>
               {q
-                ? t('SIN RESULTADOS PARA "{0}"_', search)
-                : t("──── SIN MENSAJES EN {0} — AWAITING SIGNAL_ ────", convoLabel)}
+                ? t("NO RESULTS FOR \"{0}\"_", search)
+                : t("──── NO MESSAGES IN {0} — AWAITING SIGNAL_ ────", convoLabel)}
             </div>
           )}
           {q && msgs.length > 0 && (
             <div className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
-              {t("{0} RESULTADOS · CLIC PARA IR A LA CONVERSACIÓN", msgs.length)}
+              {t("{0} RESULTS · CLICK TO JUMP TO THE CONVERSATION", msgs.length)}
             </div>
           )}
           {msgs.map((m, i) => {
@@ -315,15 +315,15 @@ export default function Chat({
                       ↩{" "}
                       {orig
                         ? `<${nodeShort(orig.from)}> ${orig.text}`
-                        : t("(mensaje original)")}
+                        : t("(original message)")}
                     </div>
                   );
                 })()}
-              <span className="dim" title={fechaHora(m.ts)}>[{hora(m.ts)}]</span>{" "}
+              <span className="dim" title={fechaHora(m.ts)}>[{hhmm(m.ts)}]</span>{" "}
               <span
                 className={`nodelink ${m.mine ? "" : "warn"}`}
                 style={m.mine ? { fontWeight: 700 } : undefined}
-                title={t("Acciones del nodo")}
+                title={t("Node actions")}
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenu({ num: m.from, x: e.clientX, y: e.clientY });
@@ -336,11 +336,11 @@ export default function Chat({
                 (() => {
                   const parts = [
                     m.hops === 0
-                      ? t("directo")
+                      ? t("direct")
                       : m.hops === 1
-                        ? t("1 salto")
+                        ? t("1 hop")
                         : m.hops !== undefined
-                          ? t("{0} saltos", m.hops)
+                          ? t("{0} hops", m.hops)
                           : null,
                     m.snr !== undefined ? `${m.snr.toFixed(1)} dB` : null,
                   ].filter(Boolean);
@@ -348,8 +348,7 @@ export default function Chat({
                     <span
                       className="dim"
                       style={{ fontSize: 10 }}
-                      title={t(
-                        "Saltos hasta nosotros (hopStart − hopLimit) · SNR del último salto",
+                      title={t("Hops to reach us (hopStart − hopLimit) · SNR of the last hop",
                       )}
                     >
                       [{parts.join(" · ")}]{" "}
@@ -358,30 +357,30 @@ export default function Chat({
                 })()}
               {m.text}{" "}
               {m.mine && m.state === "queued" && (
-                <span className="warn">{t("⧗ en cola")}</span>
+                <span className="warn">{t("⧗ queued")}</span>
               )}
               {m.mine && m.state === "sent" && (
-                <span className="dim">{t("➤ enviado a radio")}</span>
+                <span className="dim">{t("➤ sent to radio")}</span>
               )}
               {m.mine && m.state === "delivered" && (
-                <span className="dim">{t("✓ entregado")}</span>
+                <span className="dim">{t("✓ delivered")}</span>
               )}
               {m.mine && m.state === "failed" && (
                 <>
-                  <span className="err">{t("✗ fallo")}</span>{" "}
+                  <span className="err">{t("✗ failed")}</span>{" "}
                   <button
                     style={{ fontSize: 10, padding: "0 6px" }}
-                    title={t("Reintentar envío")}
+                    title={t("Retry send")}
                     onClick={() => retryMessage(m).catch(() => {})}
                   >
-                    {t("↻ REINTENTAR")}
+                    {t("↻ RETRY")}
                   </button>
                 </>
               )}
               {!q && (
                 <button
                   className="quote-btn"
-                  title={t("Responder")}
+                  title={t("Reply")}
                   onClick={() => {
                     setReplyTo(m);
                     inputRef.current?.focus();
@@ -399,7 +398,7 @@ export default function Chat({
         {replyTo && (
           <div className="reply-bar">
             <span className="dim">
-              ↩ {t("respondiendo a")} &lt;{nodeShort(replyTo.from)}&gt;:{" "}
+              ↩ {t("replying to")} &lt;{nodeShort(replyTo.from)}&gt;:{" "}
               {replyTo.text.slice(0, 60)}
             </span>
             <button
@@ -417,12 +416,11 @@ export default function Chat({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSend()}
-            placeholder={t("escribe un mensaje_")}
+            placeholder={t("type a message_")}
           />
           <span className="cursor">█</span>
           <span className="dim" style={{ fontSize: 11 }}>
-            {t(
-              "ENTER=TX · {0} B LIBRES",
+            {t("ENTER=TX · {0} B FREE",
               Math.max(0, 200 - new TextEncoder().encode(draft).length),
             )}
           </span>
@@ -449,7 +447,7 @@ export default function Chat({
                       close();
                     }}
                   >
-                    {t("✉ Enviar DM")}
+                    {t("✉ Send DM")}
                   </button>
                 )}
                 <button
@@ -458,7 +456,7 @@ export default function Chat({
                     close();
                   }}
                 >
-                  {t("☷ Ver en NODOS")}
+                  {t("☷ View in NODES")}
                 </button>
                 {hasPos && (
                   <button
@@ -467,7 +465,7 @@ export default function Chat({
                       close();
                     }}
                   >
-                    {t("⚲ Ver en MAPA")}
+                    {t("⚲ View on MAP")}
                   </button>
                 )}
               </div>

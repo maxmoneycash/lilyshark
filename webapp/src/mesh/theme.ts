@@ -25,7 +25,7 @@ export const THEMES = {
 		hcBg: "#FFFFFF",
 		tint: "hue-rotate(281deg) saturate(1.8)",
 	},
-	verde: {
+	green: {
 		fg: "#39ff5a",
 		hc: "#4dff6a",
 		bg: "#0a0f0a",
@@ -33,7 +33,7 @@ export const THEMES = {
 		hcBg: "#000000",
 		tint: "hue-rotate(83deg) saturate(2.2)",
 	},
-	ambar: {
+	amber: {
 		fg: "#e8a84c",
 		hc: "#ffb64d",
 		bg: "#0f0c07",
@@ -41,7 +41,7 @@ export const THEMES = {
 		hcBg: "#000000",
 		tint: "hue-rotate(-9deg) saturate(2)",
 	},
-	cian: {
+	cyan: {
 		fg: "#5ccfe6",
 		hc: "#4de1ff",
 		bg: "#070f13",
@@ -49,7 +49,7 @@ export const THEMES = {
 		hcBg: "#000000",
 		tint: "hue-rotate(141deg) saturate(1.8)",
 	},
-	hueso: {
+	bone: {
 		fg: "#cfcfc2",
 		hc: "#ffffff",
 		bg: "#0d0d0c",
@@ -57,7 +57,7 @@ export const THEMES = {
 		hcBg: "#000000",
 		tint: "saturate(0.3)",
 	},
-	huesoinv: {
+	boneInverted: {
 		fg: "#2b2b26",
 		hc: "#000000",
 		bg: "#e8e6dd",
@@ -65,7 +65,7 @@ export const THEMES = {
 		hcBg: "#ffffff",
 		tint: "saturate(0.3)",
 	},
-	violeta: {
+	violet: {
 		fg: "#b3a5e3",
 		hc: "#b9a3ff",
 		bg: "#0c0a12",
@@ -83,20 +83,20 @@ export type Theme = keyof typeof THEMES;
  *  because the check kept its own hand-written copy of the list. */
 export const THEME_LABELS: Record<Theme, string> = {
 	lilyshark: "LILYSHARK",
-	verde: "VERDE FÓSFORO",
-	ambar: "ÁMBAR",
-	cian: "CIAN",
-	hueso: "HUESO",
-	huesoinv: "HUESO INVERTIDO",
-	violeta: "VIOLETA",
+	green: "PHOSPHOR GREEN",
+	amber: "AMBER",
+	cyan: "CYAN",
+	bone: "BONE",
+	boneInverted: "INVERTED BONE",
+	violet: "VIOLET",
 };
 
 /** Light-background themes: the map filter chain and the second color flip.
  *  Everything else derives from --fg/--bg and needs no special case. */
-const CLAROS = new Set<Theme>(["lilyshark", "huesoinv"]);
+const LIGHT_THEMES = new Set<Theme>(["lilyshark", "boneInverted"]);
 
 export function isLight(): boolean {
-	return CLAROS.has(getTheme());
+	return LIGHT_THEMES.has(getTheme());
 }
 
 const THEME_KEY = "theme";

@@ -1,55 +1,27 @@
-import { useEffect, useState } from "react";
-// explicit .ts: Vite doesn't care, but Node's loader needs it for the self-check
-import en from "./locales/en.ts";
+/** The interface is English, and the strings live at their call sites.
+ *
+ *  This used to be a translation layer: the key was the Spanish source text
+ *  and locales/en.ts mapped it to English. That indirection is gone — every
+ *  call site now holds the text it renders, so what you read in the source is
+ *  what appears on screen.
+ *
+ *  t() survives because roughly four hundred call sites pass interpolation
+ *  arguments through it, and because log entries are stored as a string plus
+ *  its arguments and only formatted when the DEBUG screen draws them. All it
+ *  does now is fill {0}, {1}, … positionally.
+ */
 
-/** Minimal i18n: the key IS the Spanish text; en.ts maps es→en.
- *  Adding a language = one more file and one branch in t(). No dependencies. */
-
-export type Lang = "es" | "en";
-
-const LANG_KEY = "lang";
-const LANG_EVENT = "langchange";
-
-/** What the selector shows: "auto" while nothing has been chosen by hand. */
-export function getLangPref(): Lang | "auto" {
-  const saved = localStorage.getItem(LANG_KEY);
-  // Spanish is not a shipped language. A leftover "es" in storage must not
-  // flip the UI; treat it as unset.
-  return saved === "en" ? "en" : "auto";
-}
-
-export function getLang(): Lang {
-  return "en";
-}
-
-export function setLang(l: Lang | "auto"): void {
-  if (l === "en") localStorage.setItem(LANG_KEY, l);
-  else localStorage.removeItem(LANG_KEY);
-  // Switch live instead of reloading: a reload would drop the radio connection.
-  lang = getLang();
-  window.dispatchEvent(new Event(LANG_EVENT));
-}
-
-// current resolved language; setLang refreshes it
-let lang = getLang();
-
-/** Re-renders on a language change. Called once at the root so the whole UI
- *  re-translates without a reload. */
-export function useLangTick(): number {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const on = () => setTick((v) => v + 1);
-    window.addEventListener(LANG_EVENT, on);
-    return () => window.removeEventListener(LANG_EVENT, on);
-  }, []);
-  return tick;
-}
-
-/** t("texto en español") · t("hace {0}", x) to interpolate */
-export function t(es: string, ...args: (string | number)[]): string {
-  let s = lang === "en" ? (en[es] ?? es) : es;
+/** t("heard {0}", x) → "heard 3s". */
+export function t(text: string, ...args: (string | number)[]): string {
+  let out = text;
   args.forEach((a, i) => {
-    s = s.replace(`{${i}}`, String(a));
+    out = out.replace(`{${i}}`, String(a));
   });
-  return s;
+  return out;
+}
+
+/** Kept so screens can keep calling it. There is nothing left to re-render
+ *  for, so it never ticks. */
+export function useLangTick(): number {
+  return 0;
 }

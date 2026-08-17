@@ -129,7 +129,7 @@ export default function Mesh() {
 	const [sel, setSel] = useState<number | undefined>();
 	const [reload, setReload] = useState(0);
 	const [vista, setVista] = useState<"grafo" | "actividad">("grafo");
-	const [act, setAct] = useState<{ node: number; hora: number; n: number }[]>(
+	const [act, setAct] = useState<{ node: number; hhmm: number; n: number }[]>(
 		[],
 	);
 	const [actHoras, setActHoras] = useState(48);
@@ -193,16 +193,16 @@ export default function Mesh() {
 
 	// activity grid: rows = nodes, columns = hours
 	const rejilla = useMemo(() => {
-		const ahora = Math.floor(Date.now() / 3_600_000);
-		const horas = Array.from(
+		const nowMs = Math.floor(Date.now() / 3_600_000);
+		const hours = Array.from(
 			{ length: actHoras },
-			(_, i) => ahora - actHoras + 1 + i,
+			(_, i) => nowMs - actHoras + 1 + i,
 		);
 		const porNodo = new Map<number, Map<number, number>>();
 		let max = 1;
 		for (const r of act) {
 			const m = porNodo.get(r.node) ?? new Map<number, number>();
-			m.set(r.hora, (m.get(r.hora) ?? 0) + r.n);
+			m.set(r.hhmm, (m.get(r.hhmm) ?? 0) + r.n);
 			porNodo.set(r.node, m);
 			if (r.n > max) max = r.n;
 		}
@@ -213,7 +213,7 @@ export default function Mesh() {
 				total: [...m.values()].reduce((a, b) => a + b, 0),
 			}))
 			.sort((a, b) => b.total - a.total);
-		return { horas, filas, max };
+		return { hours, filas, max };
 	}, [act, actHoras]);
 
 	const tile = (label: string, value: string | number, cls = "") => (
@@ -233,7 +233,7 @@ export default function Mesh() {
 	return (
 		<main style={{ flexDirection: "column" }}>
 			<div className="panel" style={{ flexShrink: 0 }}>
-				<div className="panel-title">{t("RESUMEN // MALLA")}</div>
+				<div className="panel-title">{t("SUMMARY // MESH")}</div>
 				<div
 					style={{
 						display: "flex",
@@ -243,25 +243,25 @@ export default function Mesh() {
 						alignItems: "stretch",
 					}}
 				>
-					{tile(t("NODOS"), sum.total)}
-					{tile(t("ACTIVOS 1 H"), sum.activos1h)}
-					{tile(t("ACTIVOS 24 H"), sum.activos24h)}
-					{tile(t("CON POSICIÓN"), sum.conPosicion)}
-					{tile(t("REPETIDORES"), sum.repetidores)}
-					{tile(t("CON PKI"), sum.conPki)}
+					{tile(t("NODES"), sum.total)}
+					{tile(t("ACTIVE 1 H"), sum.activos1h)}
+					{tile(t("ACTIVE 24 H"), sum.active24h)}
+					{tile(t("WITH POSITION"), sum.withPosition)}
+					{tile(t("REPEATERS"), sum.repetidores)}
+					{tile(t("WITH PKI"), sum.conPki)}
 					{tile(
-						t("BATERÍA BAJA"),
+						t("LOW BATTERY"),
 						sum.bateriaBaja,
 						sum.bateriaBaja > 0 ? "err" : "",
 					)}
-					{tile(t("NUNCA OÍDOS"), sum.nuncaOidos, "dim")}
+					{tile(t("NEVER HEARD"), sum.nuncaOidos, "dim")}
 
 					<div className="panel" style={{ padding: "8px 12px", minWidth: 190 }}>
 						<div
 							className="dim"
 							style={{ fontSize: 10, letterSpacing: 2, marginBottom: 4 }}
 						>
-							{t("SALTOS")}
+							{t("HOPS")}
 						</div>
 						{saltos.map(([k, n]) => (
 							<div
@@ -270,9 +270,9 @@ export default function Mesh() {
 							>
 								<span style={{ width: 70 }} className={k === "?" ? "dim" : ""}>
 									{k === "?"
-										? t("DESCONOCIDO")
+										? t("UNKNOWN")
 										: k === 0
-											? t("DIRECTO")
+											? t("DIRECT")
 											: `${k}`}
 								</span>
 								<span style={{ flex: 1 }}>
@@ -292,7 +292,7 @@ export default function Mesh() {
 								className="warn"
 								style={{ fontSize: 10, letterSpacing: 2, marginBottom: 4 }}
 							>
-								{t("★ FAVORITOS CALLADOS")}
+								{t("★ SILENT FAVORITES")}
 							</div>
 							<div style={{ maxHeight: 92, overflowY: "auto" }}>
 								{sum.mudos.map((n) => (
@@ -302,7 +302,7 @@ export default function Mesh() {
 									>
 										<span style={{ flex: 1 }}>{n.shortName}</span>
 										<span className="dim" title={fechaHora(n.lastHeard * 1000)}>
-											{t("hace {0}", ago(n.lastHeard))}
+											{t("{0} ago", ago(n.lastHeard))}
 										</span>
 									</div>
 								))}
@@ -320,18 +320,18 @@ export default function Mesh() {
 							style={{ fontSize: 10 }}
 							onClick={() => setVista("grafo")}
 						>
-							{t("GRAFO")}
+							{t("GRAPH")}
 						</button>
 						<button
 							className={vista === "actividad" ? "tab active" : "tab"}
 							style={{ fontSize: 10 }}
 							onClick={() => setVista("actividad")}
 						>
-							{t("ACTIVIDAD")}
+							{t("ACTIVITY")}
 						</button>
 						{vista === "grafo"
-							? `${t("{0} NODOS", ids.length)} · ${t("{0} ENLACES", edges.length)}`
-							: t("{0} NODOS OÍDOS", rejilla.filas.length)}
+							? `${t("{0} NODES", ids.length)} · ${t("{0} LINKS", edges.length)}`
+							: t("{0} NODES HEARD", rejilla.filas.length)}
 					</span>
 					<span style={{ display: "flex", gap: 10, alignItems: "center" }}>
 						{vista === "actividad" &&
@@ -347,16 +347,15 @@ export default function Mesh() {
 							))}
 						<button
 							style={{ fontSize: 10, padding: "0 6px" }}
-							title={t("Releer vecinos y traceroutes de la base de datos")}
+							title={t("Reload neighbors and traceroutes from the database")}
 							onClick={() => setReload((v) => v + 1)}
 						>
-							⟳ {t("RECARGAR")}
+							⟳ {t("RELOAD")}
 						</button>
 						<span className="dim" style={{ fontSize: 11 }}>
 							{vista === "actividad"
-								? t("UNA CELDA = UNA HORA")
-								: t(
-										"{0} POR VECINOS",
+								? t("ONE CELL = ONE HOUR")
+								: t("{0} FROM NEIGHBORS",
 										edges.filter((e) => e.src === "vecinos").length,
 									)}
 						</span>
@@ -366,8 +365,7 @@ export default function Mesh() {
 				{vista === "actividad" ? (
 					rejilla.filas.length === 0 ? (
 						<p className="dim" style={{ padding: 16, fontSize: 12 }}>
-							{t(
-								"SIN ESCUCHAS REGISTRADAS — el historial empieza a llenarse ahora, con la app conectada_",
+							{t("NO SIGHTINGS RECORDED — the history starts filling up now, with the app connected_",
 							)}
 						</p>
 					) : (
@@ -386,9 +384,9 @@ export default function Mesh() {
 												}}
 											>
 												{short(f.node)}
-												{f.node === s.myNodeNum && ` (${t("YO")})`}
+												{f.node === s.myNodeNum && ` (${t("ME")})`}
 											</td>
-											{rejilla.horas.map((h) => {
+											{rejilla.hours.map((h) => {
 												const n = f.celdas.get(h) ?? 0;
 												// intensity relative to the max, with a visible floor
 												const op =
@@ -397,7 +395,7 @@ export default function Mesh() {
 												return (
 													<td
 														key={h}
-														title={`${short(f.node)} · ${fechaHora(d.getTime())} · ${t("{0} paquetes", n)}`}
+														title={`${short(f.node)} · ${fechaHora(d.getTime())} · ${t("{0} packets", n)}`}
 														style={{
 															width: 9,
 															height: 14,
@@ -423,8 +421,7 @@ export default function Mesh() {
 					)
 				) : ids.length === 0 ? (
 					<p className="dim" style={{ padding: 16, fontSize: 12 }}>
-						{t(
-							"SIN ENLACES — activa NEIGHBOR INFO en CONFIG o lanza traceroutes desde NODOS_",
+						{t("NO LINKS — enable NEIGHBOR INFO in CONFIG or run traceroutes from NODES_",
 						)}
 					</p>
 				) : (
@@ -535,13 +532,13 @@ export default function Mesh() {
 										style={{ fontSize: 11, marginBottom: 8 }}
 									>
 										!{sel.toString(16)}
-										{sel === s.myNodeNum && ` · (${t("YO")})`}
+										{sel === s.myNodeNum && ` · (${t("ME")})`}
 									</div>
 									<div
 										className="dim"
 										style={{ fontSize: 10, letterSpacing: 2, marginBottom: 4 }}
 									>
-										{t("ENLACES")} ({selEdges.length})
+										{t("LINKS")} ({selEdges.length})
 									</div>
 									<div style={{ maxHeight: 320, overflowY: "auto" }}>
 										{selEdges
@@ -576,14 +573,14 @@ export default function Mesh() {
 				)}
 
 				<div className="panel-foot">
-					<span>{t("LÍNEA CONTINUA = VECINO DIRECTO")}</span>
+					<span>{t("SOLID LINE = DIRECT NEIGHBOR")}</span>
 					<span className="spacer" />
 					{ids.length > 45 && (
 						<span className="dim">
-							{t("CLIC EN UN NODO PARA VER NOMBRES")} ·{" "}
+							{t("CLICK A NODE TO SEE NAMES")} ·{" "}
 						</span>
 					)}
-					<span>{t("DISCONTINUA = TRAMO DE TRACEROUTE")}</span>
+					<span>{t("DASHED = TRACEROUTE SEGMENT")}</span>
 				</div>
 			</div>
 		</main>

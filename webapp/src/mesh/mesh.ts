@@ -7,9 +7,9 @@ const TYPE_REPEATER = 2;
 export interface MeshSummary {
   total: number;
   activos1h: number;
-  activos24h: number;
+  active24h: number;
   nuncaOidos: number; // lastHeard 0: they come from the contact list, we never heard them
-  conPosicion: number;
+  withPosition: number;
   repetidores: number;
   conPki: number;
   bateriaBaja: number; // <= 20 % (>100 is external power, doesn't count)
@@ -26,9 +26,9 @@ export function summarize(
   const r: MeshSummary = {
     total: 0,
     activos1h: 0,
-    activos24h: 0,
+    active24h: 0,
     nuncaOidos: 0,
-    conPosicion: 0,
+    withPosition: 0,
     repetidores: 0,
     conPki: 0,
     bateriaBaja: 0,
@@ -41,7 +41,7 @@ export function summarize(
     else {
       const h = (now - n.lastHeard * 1000) / 3_600_000;
       if (h < 1) r.activos1h++;
-      if (h < 24) r.activos24h++;
+      if (h < 24) r.active24h++;
       if (n.fav && h >= mudoDesdeH) r.mudos.push(n);
     }
     // (0,0) is junk GPS, the same criterion the map uses
@@ -50,7 +50,7 @@ export function summarize(
       n.lon !== undefined &&
       (Math.abs(n.lat) > 0.1 || Math.abs(n.lon) > 0.1)
     ) {
-      r.conPosicion++;
+      r.withPosition++;
     }
     if (n.type === TYPE_REPEATER) r.repetidores++;
     if (n.publicKey) r.conPki++;

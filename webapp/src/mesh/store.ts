@@ -1,4 +1,4 @@
-import { hora } from "./fmt";
+import { hhmm } from "./fmt";
 import { t } from "./i18n";
 
 /** Connection lifecycle. Numeric order matters: `status >= Connected` is the
@@ -174,9 +174,9 @@ export function addLog(key: string, ...args: (string | number)[]): void {
   });
 }
 
-/** Render a log entry in the current language. hora() is language-neutral. */
+/** Render a log entry in the current language. hhmm() is language-neutral. */
 export function fmtLog(e: LogEntry): string {
-  return `${hora(e.time)} ${t(e.key, ...e.args)}`;
+  return `${hhmm(e.time)} ${t(e.key, ...e.args)}`;
 }
 
 export function markUnread(convo: string): void {

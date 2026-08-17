@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   appendTelemetryHistory,
+  isLilysharkBanner,
+  nextSerialAction,
   parseLskLine,
   TELEMETRY_HISTORY_LIMIT,
   type DeviceTelemetry,
@@ -110,6 +112,32 @@ test('parseLskLine reads extra telemetry fields when present', () => {
   assert.equal(parsed.telemetry.bwHz, 250000);
   assert.equal(parsed.telemetry.rx, 44);
   assert.equal(parsed.telemetry.crc, 2);
+});
+
+test('boot console lines count as Lilyshark, not as silence', () => {
+  assert.equal(isLilysharkBanner('Lilyshark starting'), true);
+  assert.equal(isLilysharkBanner('Lilyshark UI ready'), true);
+  assert.equal(isLilysharkBanner('LSK ID {"app":"lilyshark","fw":"x"}'), true);
+  assert.equal(isLilysharkBanner('FRAME 12'), false);
+});
+
+test('a USB drop during the first handshake is a retry, not a failure', () => {
+  assert.equal(
+    nextSerialAction({ event: 'stream-drop', deliberate: false, attempt: 0 }),
+    'retry',
+  );
+  assert.equal(
+    nextSerialAction({ event: 'timeout', deliberate: false, attempt: 1 }),
+    'retry',
+  );
+  assert.equal(
+    nextSerialAction({ event: 'stream-drop', deliberate: false, attempt: 2 }),
+    'fail',
+  );
+  assert.equal(
+    nextSerialAction({ event: 'stream-drop', deliberate: true, attempt: 0 }),
+    'ignore',
+  );
 });
 
 test('appendTelemetryHistory keeps a bounded ring of samples', () => {

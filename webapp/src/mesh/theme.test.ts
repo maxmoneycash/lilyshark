@@ -106,11 +106,11 @@ const dist = (a: number, b: number) =>
 for (const [name, th] of Object.entries(THEMES)) {
 	const objetivo = hsl(hex(th.fg));
 	const salida = hsl(tile(th.tint, TRAZO));
-	if (name === "huesoinv") {
-		// tema claro: no pasa por esta cadena, App.css le da la suya sin invert()
+	if (name === "boneInverted") {
+		// themeTick claro: no pasa por esta cadena, App.css le da la suya sin invert()
 		continue;
 	}
-	if (name === "hueso") {
+	if (name === "bone") {
 		// near-grey theme: the map must stay neutral, no hue to match
 		assert.ok(
 			salida.s < 0.2,
@@ -130,17 +130,17 @@ for (const [name, th] of Object.entries(THEMES)) {
 }
 
 // ── alto contraste ──
-// El modo mantiene el tono del tema y lleva el fondo al extremo (negro puro en
+// El modo mantiene el tono del themeTick y lleva el fondo al extremo (negro puro en
 // los temas oscuros, blanco en el claro). Vale la pena solo si de verdad sube
-// el contraste: un color más saturado puede ser más oscuro que el original y
-// salir perdiendo (el violeta, sin ir más lejos).
+// contrast: a more saturated colour can be darker than the original and
+// come out worse (violet being the obvious case).
 const lum = (c: RGB) => {
 	const [r, g, b] = c.map((v) =>
 		v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4,
 	) as RGB;
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
-// simétrico: en el tema claro el texto es el oscuro de los dos
+// symmetric: on the light theme the text is the darker of the two
 const ratio = (a: RGB, b: RGB) =>
 	(Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
 
@@ -160,16 +160,16 @@ for (const [name, th] of Object.entries(THEMES)) {
 
 	const base = hsl(hex(th.fg));
 	const vivo = hsl(hex(th.hc));
-	if (name === "hueso" || name === "huesoinv") {
-		assert.ok(vivo.s < 0.05, `${name}: el tema neutro debe seguir sin tono`);
+	if (name === "bone" || name === "boneInverted") {
+		assert.ok(vivo.s < 0.05, `${name}: el themeTick neutro debe seguir sin tono`);
 		continue;
 	}
-	// mismo tema, no otro color
+	// mismo themeTick, no otro color
 	assert.ok(
 		dist(vivo.h, base.h) < 8,
 		`${name}: alto contraste vira de ${base.h.toFixed(0)}° a ${vivo.h.toFixed(0)}°`,
 	);
-	// >= con margen: el verde ya sale saturado al 100 % y solo se le gana brillo
+	// >= con margen: el green ya sale saturado al 100 % y solo se le gana brillo
 	assert.ok(
 		vivo.s >= base.s - 0.01,
 		`${name}: alto contraste menos saturado que el normal`,

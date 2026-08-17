@@ -28,7 +28,7 @@ import {
   loadMessages,
   loadNodes,
   loadWaypoints,
-  marcarEscucha,
+  markHeard,
   saveHopChange,
   saveMessage,
   saveNeighbors,
@@ -126,7 +126,7 @@ export async function loadHistory(): Promise<void> {
 // vanish either: with no trace it's impossible to tell whether a table is
 // empty because the data never arrived or because the write failed.
 function dbFail(what: string) {
-  return (e: unknown) => addLog("BD: fallo al guardar {0}: {1}", what, String(e));
+  return (e: unknown) => addLog("DB: failed to save {0}: {1}", what, String(e));
 }
 
 // ── notifications ───────────────────────────────────────────────────────────
@@ -189,7 +189,7 @@ function upsertNode(num: number, patch: Partial<NodeEntry>): void {
     const merged = { ...prev, ...patch };
     s.nodes = new Map(s.nodes).set(num, merged);
     // ponytail: one write per event; IndexedDB handles this rate easily
-    saveNode(merged).catch(dbFail(t("nodo")));
+    saveNode(merged).catch(dbFail(t("node")));
     // Only counts as a sighting once we're configured: during the initial dump
     // the radio re-sends its whole contact list and we'd mark every contact as
     // "heard now" on every startup. The patch's lastHeard (epoch s) is used
@@ -199,7 +199,7 @@ function upsertNode(num: number, patch: Partial<NodeEntry>): void {
       patch.lastHeard > prev.lastHeard &&
       s.status === DeviceStatus.Configured
     ) {
-      marcarEscucha(num, patch.lastHeard * 1000).catch(dbFail(t("escucha")));
+      markHeard(num, patch.lastHeard * 1000).catch(dbFail(t("sighting")));
     }
 
     // Distance change: a contact going from direct to 2 hops usually means a
@@ -221,16 +221,16 @@ function upsertNode(num: number, patch: Partial<NodeEntry>): void {
 const rutaAvisada = new Map<number, number>();
 
 function avisarCambioRuta(n: NodeEntry, antes: number): void {
-  const ahora = n.hopsAway as number;
-  saveHopChange(n.num, ahora, antes).catch(dbFail(t("cambio de ruta")));
+  const nowMs = n.hopsAway as number;
+  saveHopChange(n.num, nowMs, antes).catch(dbFail(t("route change")));
   const quien = n.longName || n.shortName;
-  addLog("RUTA: {0} pasa de {1} a {2} saltos", quien, antes, ahora);
+  addLog("ROUTE: {0} goes from {1} to {2} hops", quien, antes, nowMs);
   if (!n.fav || !getAlertCfg().on) return;
   if (Date.now() - (rutaAvisada.get(n.num) ?? -Infinity) < COOLDOWN_MS) return;
   rutaAvisada.set(n.num, Date.now());
   void notify(
-    t("{0} · ruta {1}", quien, ahora > antes ? t("más larga") : t("más corta")),
-    t("Ahora a {0} saltos (antes {1})", ahora, antes),
+    t("{0} · route {1}", quien, nowMs > antes ? t("longer") : t("shorter")),
+    t("Now {0} hops away (was {1})", nowMs, antes),
   );
 }
 
@@ -260,7 +260,7 @@ function expect<T>(c: Connection, code: number, ms: number, what: string): Promi
     const timer = setTimeout(() => {
       if (done) return;
       done = true;
-      reject(new Error(t("{0}: sin respuesta en {1}s", what, ms / 1000)));
+      reject(new Error(t("{0}: no reply in {1}s", what, ms / 1000)));
     }, ms);
   });
 }
@@ -269,7 +269,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   return Promise.race([
     p,
     new Promise<never>((_, rej) =>
-      setTimeout(() => rej(new Error(t("{0} no respondió en {1}s", what, ms / 1000))), ms),
+      setTimeout(() => rej(new Error(t("{0} did not respond in {1}s", what, ms / 1000))), ms),
     ),
   ]);
 }
@@ -311,7 +311,7 @@ function ingestContact(c: MeshCoreContact): number {
       routeBack: [],
       snrBack: [],
       ts: Date.now(),
-    }).catch(dbFail(t("ruta")));
+    }).catch(dbFail(t("route")));
   }
   return num;
 }
@@ -323,7 +323,7 @@ async function refreshContacts(): Promise<void> {
   contactsBusy = true;
   try {
     const contacts = await withCmdLock(() =>
-      withTimeout(c.getContacts(), 30_000, t("la lista de contactos")),
+      withTimeout(c.getContacts(), 30_000, t("the contact list")),
     );
     for (const contact of contacts) ingestContact(contact);
     // Direct contacts are our real neighbors: that's what draws solid lines
@@ -336,7 +336,7 @@ async function refreshContacts(): Promise<void> {
           const num = numFromKeyBytes(x.publicKey);
           return { num, snr: nodes.get(num)?.snr ?? 0 };
         });
-      saveNeighbors(myNodeNum, direct, Date.now()).catch(dbFail(t("vecinos")));
+      saveNeighbors(myNodeNum, direct, Date.now()).catch(dbFail(t("neighbors")));
     }
   } finally {
     contactsBusy = false;
@@ -366,12 +366,12 @@ function ingestMessage(msg: Message): void {
     s.messages = [...s.messages, msg];
   });
   markUnread(msg.convo);
-  saveMessage(msg).catch(dbFail(t("mensaje")));
+  saveMessage(msg).catch(dbFail(t("message")));
   const { nodes, channels } = getSnapshot();
   const who =
     msg.from !== 0
       ? (nodes.get(msg.from)?.longName ?? `!${msg.from.toString(16)}`)
-      : t("desconocido");
+      : t("unknown");
   const isDm = msg.convo.startsWith("dm:");
   const where = isDm ? "DM" : `#${channels.get(msg.channel)?.name ?? msg.channel}`;
   void notifyIncoming(`${who} · ${where}`, msg.text, isDm);
@@ -439,7 +439,7 @@ async function syncMessages(): Promise<void> {
     // bounded loop: a stuck radio must not spin this forever
     for (let i = 0; i < 500; i++) {
       const r = await withCmdLock(() =>
-        withTimeout(c.syncNextMessage(), 10_000, t("la cola de mensajes")),
+        withTimeout(c.syncNextMessage(), 10_000, t("the message queue")),
       );
       if (!r) break;
       if (r.contactMessage) handleContactMessage(r.contactMessage);
@@ -462,7 +462,7 @@ function setMsgState(id: number, ts: number, state: Message["state"]): void {
       m.id === id && m.ts === ts ? { ...m, state } : m,
     );
   });
-  updateMessageState(id, state).catch(dbFail(t("estado de mensaje")));
+  updateMessageState(id, state).catch(dbFail(t("message state")));
 }
 
 function onSendConfirmed(p: { ackCode: number; roundTrip: number }): void {
@@ -471,7 +471,7 @@ function onSendConfirmed(p: { ackCode: number; roundTrip: number }): void {
   pendingAcks.delete(p.ackCode);
   clearTimeout(pending.timer);
   setMsgState(pending.msgId, pending.ts, "delivered");
-  addLog("ACK en {0} ms", p.roundTrip);
+  addLog("ACK in {0} ms", p.roundTrip);
 }
 
 // ── event wiring ────────────────────────────────────────────────────────────
@@ -481,7 +481,7 @@ let advertDebounce: number | undefined;
 function scheduleContactRefresh(): void {
   clearTimeout(advertDebounce);
   advertDebounce = setTimeout(() => {
-    refreshContacts().catch((e) => addLog("CONTACTOS: {0}", String(e)));
+    refreshContacts().catch((e) => addLog("CONTACTS: {0}", String(e)));
   }, 2_000) as unknown as number;
 }
 
@@ -494,7 +494,7 @@ function wireEvents(c: Connection): void {
   c.on<{ publicKey: Uint8Array }>(Constants.PushCodes.Advert, (p) => {
     const num = numFromKeyBytes(p.publicKey);
     const name = getSnapshot().nodes.get(num)?.longName ?? `!${num.toString(16)}`;
-    addLog("ADVERT de {0}", name);
+    addLog("ADVERT from {0}", name);
     upsertNode(num, { lastHeard: Math.floor(Date.now() / 1000) });
     scheduleContactRefresh();
   });
@@ -502,7 +502,7 @@ function wireEvents(c: Connection): void {
   // Manual-add firmware pushes the full advert instead: accept it explicitly,
   // which is this terminal's job — it records everything the mesh says.
   c.on<MeshCoreContact & { lastMod?: number }>(Constants.PushCodes.NewAdvert, (adv) => {
-    addLog("ADVERT nuevo de {0}", adv.advName || "?");
+    addLog("New ADVERT from {0}", adv.advName || "?");
     void withCmdLock(() =>
       c.sendCommandAddUpdateContact(
         adv.publicKey,
@@ -522,7 +522,7 @@ function wireEvents(c: Connection): void {
   c.on<{ publicKey: Uint8Array }>(Constants.PushCodes.PathUpdated, (p) => {
     const num = numFromKeyBytes(p.publicKey);
     const name = getSnapshot().nodes.get(num)?.longName ?? `!${num.toString(16)}`;
-    addLog("RUTA actualizada hacia {0}", name);
+    addLog("PATH updated towards {0}", name);
     scheduleContactRefresh();
   });
 
@@ -563,7 +563,7 @@ function wireEvents(c: Connection): void {
       s.traceroutes = new Map(s.traceroutes).set(dest, tr);
     });
     saveTraceroute(dest, tr).catch(dbFail("traceroute"));
-    addLog("Trace hacia !{0}: {1} saltos", dest.toString(16), tr.route.length);
+    addLog("Trace to !{0}: {1} hops", dest.toString(16), tr.route.length);
   });
 
   c.on<{ pubKeyPrefix: Uint8Array; lppSensorData: Uint8Array }>(
@@ -597,7 +597,7 @@ function ingestLpp(from: number, lpp: Uint8Array): void {
       const base = LPP_METRICS[entry.type] ?? `lpp${entry.type}`;
       // channel 1 is the conventional "the device itself" channel
       const metric = entry.channel <= 1 ? base : `${base}_ch${entry.channel}`;
-      saveTelemetry(from, metric, entry.value, ts).catch(dbFail(t("telemetría")));
+      saveTelemetry(from, metric, entry.value, ts).catch(dbFail(t("telemetry")));
       if (metric === "voltage") {
         upsertNode(from, {
           voltage: entry.value,
@@ -607,10 +607,10 @@ function ingestLpp(from: number, lpp: Uint8Array): void {
       n++;
     }
   } catch (e) {
-    addLog("LPP: datos ilegibles de !{0}: {1}", from.toString(16), String(e));
+    addLog("LPP: unreadable data from !{0}: {1}", from.toString(16), String(e));
   }
   if (n > 0) {
-    addLog("TELEMETRÍA de !{0}: {1} métricas", from.toString(16), n);
+    addLog("TELEMETRY from !{0}: {1} metrics", from.toString(16), n);
     mutate((s) => {
       s.posUpdates = new Map(s.posUpdates).set(from, ts);
     });
@@ -635,15 +635,15 @@ async function pollSelfTelemetry(): Promise<void> {
         c,
         Constants.ResponseCodes.BatteryVoltage,
         5_000,
-        t("la batería"),
+        t("the battery"),
       );
       await c.sendCommandGetBatteryVoltage();
       return p;
     });
     const volts = bat.batteryMilliVolts / 1000;
     const pct = liPoPercent(bat.batteryMilliVolts);
-    saveTelemetry(myNodeNum, "voltage", volts, ts).catch(dbFail(t("telemetría")));
-    saveTelemetry(myNodeNum, "batteryLevel", pct, ts).catch(dbFail(t("telemetría")));
+    saveTelemetry(myNodeNum, "voltage", volts, ts).catch(dbFail(t("telemetry")));
+    saveTelemetry(myNodeNum, "batteryLevel", pct, ts).catch(dbFail(t("telemetry")));
     upsertNode(myNodeNum, {
       voltage: volts,
       batteryLevel: pct,
@@ -663,25 +663,25 @@ async function pollSelfTelemetry(): Promise<void> {
     const r = radio as { noiseFloor: number; lastRssi: number; lastSnr: number; txAirSecs: number; rxAirSecs: number };
     const k = core as { uptimeSecs: number; queueLen: number };
     const q = pkts as { recv: number; sent: number };
-    saveTelemetry(myNodeNum, "noiseFloor", r.noiseFloor, ts).catch(dbFail(t("telemetría")));
+    saveTelemetry(myNodeNum, "noiseFloor", r.noiseFloor, ts).catch(dbFail(t("telemetry")));
     if (prevStats) {
       const dt = (ts - prevStats.ts) / 1000;
       if (dt > 0) {
         // air-seconds deltas → duty-cycle %, the closest MeshCore gets to
         // Meshtastic's channel utilization charts
-        saveTelemetry(myNodeNum, "airUtilTx", ((r.txAirSecs - prevStats.txAirSecs) / dt) * 100, ts).catch(dbFail(t("telemetría")));
-        saveTelemetry(myNodeNum, "channelUtilization", ((r.rxAirSecs - prevStats.rxAirSecs) / dt) * 100, ts).catch(dbFail(t("telemetría")));
-        saveTelemetry(myNodeNum, "packetsRx", q.recv - prevStats.recv, ts).catch(dbFail(t("telemetría")));
-        saveTelemetry(myNodeNum, "packetsTx", q.sent - prevStats.sent, ts).catch(dbFail(t("telemetría")));
+        saveTelemetry(myNodeNum, "airUtilTx", ((r.txAirSecs - prevStats.txAirSecs) / dt) * 100, ts).catch(dbFail(t("telemetry")));
+        saveTelemetry(myNodeNum, "channelUtilization", ((r.rxAirSecs - prevStats.rxAirSecs) / dt) * 100, ts).catch(dbFail(t("telemetry")));
+        saveTelemetry(myNodeNum, "packetsRx", q.recv - prevStats.recv, ts).catch(dbFail(t("telemetry")));
+        saveTelemetry(myNodeNum, "packetsTx", q.sent - prevStats.sent, ts).catch(dbFail(t("telemetry")));
       }
     }
     prevStats = { txAirSecs: r.txAirSecs, rxAirSecs: r.rxAirSecs, recv: q.recv, sent: q.sent, ts };
-    saveTelemetry(myNodeNum, "uptime", k.uptimeSecs, ts).catch(dbFail(t("telemetría")));
-    saveTelemetry(myNodeNum, "txQueue", k.queueLen, ts).catch(dbFail(t("telemetría")));
+    saveTelemetry(myNodeNum, "uptime", k.uptimeSecs, ts).catch(dbFail(t("telemetry")));
+    saveTelemetry(myNodeNum, "txQueue", k.queueLen, ts).catch(dbFail(t("telemetry")));
   } catch {
     // older firmware without GetStats: stop asking
     statsSupported = false;
-    addLog("STATS no soportado por este firmware");
+    addLog("STATS not supported by this firmware");
   }
 }
 
@@ -730,9 +730,9 @@ function handleLost(): void {
   device = undefined;
   stopTimers();
   setStatus(DeviceStatus.Disconnected);
-  addLog("Enlace perdido");
+  addLog("Link lost");
   if (!onConnectionLost) {
-    addLog("RECONEXION: sin manejador registrado, no se reintenta");
+    addLog("RECONNECT: no handler registered, not retrying");
     return;
   }
   onConnectionLost();
@@ -759,7 +759,7 @@ function waitEvent(c: Connection, event: string, ms: number, what: string): Prom
     const timer = setTimeout(() => {
       if (done) return;
       done = true;
-      reject(new Error(t("{0} no respondió en {1}s", what, ms / 1000)));
+      reject(new Error(t("{0} did not respond in {1}s", what, ms / 1000)));
     }, ms);
   });
 }
@@ -774,17 +774,17 @@ async function connectWith(make: () => Promise<Connection | null | undefined>): 
   setStatus(DeviceStatus.Connecting);
   let c: Connection | null | undefined;
   try {
-    c = await withTimeout(make(), OPEN_TIMEOUT_MS, t("la conexión"));
+    c = await withTimeout(make(), OPEN_TIMEOUT_MS, t("the connection"));
   } catch (e) {
     setStatus(DeviceStatus.Disconnected);
     throw e;
   }
   if (!c) {
     setStatus(DeviceStatus.Disconnected);
-    throw new Error(t("Conexión cancelada"));
+    throw new Error(t("Connection cancelled"));
   }
 
-  const ready = waitEvent(c, "connected", 25_000, t("el dispositivo"));
+  const ready = waitEvent(c, "connected", 25_000, t("the device"));
   wireEvents(c);
   device = c;
   try {
@@ -803,7 +803,7 @@ async function connectWith(make: () => Promise<Connection | null | undefined>): 
 
 async function configure(c: Connection): Promise<void> {
   const info = await withCmdLock(() =>
-    withTimeout(c.getSelfInfo(15_000), 16_000, t("la identidad de la radio")),
+    withTimeout(c.getSelfInfo(15_000), 16_000, t("the radio identity")),
   );
   const myNum = registerKey(info.publicKey);
   mutate((s) => {
@@ -844,7 +844,7 @@ async function configure(c: Connection): Promise<void> {
         c,
         Constants.ResponseCodes.DeviceInfo,
         5_000,
-        t("la información del equipo"),
+        t("the device info"),
       );
       await c.sendCommandDeviceQuery(Constants.SupportedCompanionProtocolVersion);
       return p;
@@ -862,8 +862,8 @@ async function configure(c: Connection): Promise<void> {
   }
 
   await refreshContacts();
-  await refreshChannels().catch((e) => addLog("CANALES: {0}", String(e)));
-  addLog("Configurado: {0} contactos", getSnapshot().nodes.size);
+  await refreshChannels().catch((e) => addLog("CHANNELS: {0}", String(e)));
+  addLog("Configured: {0} contacts", getSnapshot().nodes.size);
 
   // drain queued messages + start the periodic pollers
   void syncMessages();
@@ -885,12 +885,12 @@ export async function connectSerial(): Promise<void> {
 export async function reconnectSerial(): Promise<void> {
   await connectWith(async () => {
     const serial = (navigator as { serial?: { getPorts(): Promise<unknown[]> } }).serial;
-    if (!serial) throw new Error(t("Web Serial no disponible en este navegador"));
+    if (!serial) throw new Error(t("Web Serial is not available in this browser"));
     const ports = await serial.getPorts();
     const port = ports[0] as
       | { open(o: { baudRate: number }): Promise<void>; readable: unknown }
       | undefined;
-    if (!port) throw new Error(t("Sin puerto autorizado que reintentar"));
+    if (!port) throw new Error(t("No granted port to retry"));
     if (!port.readable) await port.open({ baudRate: 115200 });
     return new WebSerialConnection(port);
   });
@@ -907,7 +907,7 @@ export async function connectBle(): Promise<void> {
 
 export async function reconnectBle(): Promise<void> {
   await connectWith(async () => {
-    if (!lastBleDevice) throw new Error(t("Sin dispositivo BLE que reintentar"));
+    if (!lastBleDevice) throw new Error(t("No BLE device to retry"));
     return new WebBleConnection(lastBleDevice);
   });
 }
@@ -916,7 +916,7 @@ export async function reconnectBle(): Promise<void> {
 export async function reconnectLast(): Promise<void> {
   if (lastMode === "serial") return reconnectSerial();
   if (lastMode === "ble") return reconnectBle();
-  throw new Error(t("Sin conexión previa que reintentar"));
+  throw new Error(t("No previous connection to retry"));
 }
 
 export function canReconnect(): boolean {
@@ -959,7 +959,7 @@ function queryChannel(c: Connection, idx: number): Promise<ChannelEntry | undefi
 
 export async function refreshChannels(): Promise<void> {
   const c = device;
-  if (!c) throw new Error(t("Sin conexión"));
+  if (!c) throw new Error(t("Not connected"));
   const found = new Map<number, ChannelEntry>();
   for (let i = 0; i < MAX_CHANNELS; i++) {
     const ch = await queryChannel(c, i);
@@ -979,14 +979,14 @@ export async function setChannelCfg(
   secret: Uint8Array,
 ): Promise<void> {
   const c = device;
-  if (!c) throw new Error(t("Sin conexión"));
-  if (secret.length !== 16) throw new Error(t("La clave debe tener 16 bytes"));
+  if (!c) throw new Error(t("Not connected"));
+  if (secret.length !== 16) throw new Error(t("The key must be 16 bytes"));
   await withCmdLock(async () => {
-    const p = expect(c, Constants.ResponseCodes.Ok, 5_000, t("el canal"));
+    const p = expect(c, Constants.ResponseCodes.Ok, 5_000, t("the channel"));
     await c.sendCommandSetChannel(index, name, secret);
     return p;
   });
-  addLog("Canal {0} guardado: {1}", index, name || "—");
+  addLog("Channel {0} saved: {1}", index, name || "—");
   await refreshChannels();
 }
 
@@ -1001,7 +1001,7 @@ export function genChannelSecret(): Uint8Array {
 
 async function okCommand(fn: (c: Connection) => Promise<void>, what: string): Promise<void> {
   const c = device;
-  if (!c) throw new Error(t("Sin conexión"));
+  if (!c) throw new Error(t("Not connected"));
   await withCmdLock(async () => {
     const p = expect(c, Constants.ResponseCodes.Ok, 8_000, what);
     await fn(c);
@@ -1010,7 +1010,7 @@ async function okCommand(fn: (c: Connection) => Promise<void>, what: string): Pr
 }
 
 export async function setAdvertNameCfg(name: string): Promise<void> {
-  await okCommand((c) => c.setAdvertName(name), t("el nombre"));
+  await okCommand((c) => c.setAdvertName(name), t("the name"));
   mutate((s) => {
     if (s.selfInfo) s.selfInfo = { ...s.selfInfo, name };
   });
@@ -1018,7 +1018,7 @@ export async function setAdvertNameCfg(name: string): Promise<void> {
   if (myNodeNum !== undefined) {
     upsertNode(myNodeNum, { longName: name, shortName: shortNameOf(name, myNodeNum) });
   }
-  addLog("Nombre cambiado a {0}", name);
+  addLog("Name changed to {0}", name);
 }
 
 // Fixed position: MeshCore adverts carry it to the mesh, same purpose as the
@@ -1026,22 +1026,22 @@ export async function setAdvertNameCfg(name: string): Promise<void> {
 export async function setFixedPosition(lat: number, lon: number): Promise<void> {
   await okCommand(
     (c) => c.setAdvertLatLong(Math.round(lat * 1e6), Math.round(lon * 1e6)),
-    t("la posición"),
+    t("the position"),
   );
   mutate((s) => {
     if (s.selfInfo) s.selfInfo = { ...s.selfInfo, advLat: lat, advLon: lon };
   });
   const { myNodeNum } = getSnapshot();
   if (myNodeNum !== undefined) upsertNode(myNodeNum, { lat, lon });
-  addLog("Posición fija: {0}, {1}", lat.toFixed(5), lon.toFixed(5));
+  addLog("Fixed position: {0}, {1}", lat.toFixed(5), lon.toFixed(5));
 }
 
 export async function clearFixedPosition(): Promise<void> {
-  await okCommand((c) => c.setAdvertLatLong(0, 0), t("la posición"));
+  await okCommand((c) => c.setAdvertLatLong(0, 0), t("the position"));
   mutate((s) => {
     if (s.selfInfo) s.selfInfo = { ...s.selfInfo, advLat: 0, advLon: 0 };
   });
-  addLog("Posición fija borrada");
+  addLog("Fixed position cleared");
 }
 
 export async function applyRadioParams(
@@ -1050,7 +1050,7 @@ export async function applyRadioParams(
   sf: number,
   cr: number,
 ): Promise<void> {
-  await okCommand((c) => c.setRadioParams(freq, bw, sf, cr), t("los parámetros de radio"));
+  await okCommand((c) => c.setRadioParams(freq, bw, sf, cr), t("the radio parameters"));
   mutate((s) => {
     if (s.selfInfo)
       s.selfInfo = { ...s.selfInfo, radioFreq: freq, radioBw: bw, radioSf: sf, radioCr: cr };
@@ -1059,7 +1059,7 @@ export async function applyRadioParams(
 }
 
 export async function applyTxPower(dbm: number): Promise<void> {
-  await okCommand((c) => c.setTxPower(dbm), t("la potencia"));
+  await okCommand((c) => c.setTxPower(dbm), t("the power"));
   mutate((s) => {
     if (s.selfInfo) s.selfInfo = { ...s.selfInfo, txPower: dbm };
   });
@@ -1068,27 +1068,27 @@ export async function applyTxPower(dbm: number): Promise<void> {
 
 export async function sendAdvert(flood: boolean): Promise<void> {
   const c = device;
-  if (!c) throw new Error(t("Sin conexión"));
+  if (!c) throw new Error(t("Not connected"));
   await withCmdLock(() => (flood ? c.sendFloodAdvert() : c.sendZeroHopAdvert()));
   addLog(flood ? "Advert (flood) enviado" : "Advert (zero hop) enviado");
 }
 
 export async function rebootRadio(): Promise<void> {
   const c = device;
-  if (!c) throw new Error(t("Sin conexión"));
+  if (!c) throw new Error(t("Not connected"));
   await c.sendCommandReboot();
-  addLog("Reboot enviado a la radio");
+  addLog("Reboot sent to the radio");
 }
 
 export async function exportPrivateKeyB64(): Promise<string> {
   const c = device;
-  if (!c) throw new Error(t("Sin conexión"));
+  if (!c) throw new Error(t("Not connected"));
   const r = await withCmdLock(async () => {
     const p = expect<{ privateKey: Uint8Array }>(
       c,
       Constants.ResponseCodes.PrivateKey,
       5_000,
-      t("la clave privada"),
+      t("the private key"),
     );
     await c.sendCommandExportPrivateKey();
     return p;
@@ -1124,7 +1124,7 @@ export function exportConfigJson(): string {
 }
 
 export async function importConfigJson(json: string): Promise<number> {
-  if (!device) throw new Error(t("Sin conexión"));
+  if (!device) throw new Error(t("Not connected"));
   const data = JSON.parse(json) as {
     v: number;
     name?: string;
@@ -1137,7 +1137,7 @@ export async function importConfigJson(json: string): Promise<number> {
     radioCr?: number;
     channels?: { index: number; name: string; secret?: string }[];
   };
-  if (data.v !== 1) throw new Error(t("versión de backup desconocida: {0}", data.v));
+  if (data.v !== 1) throw new Error(t("unknown backup version: {0}", data.v));
   let n = 0;
   if (data.name) {
     await setAdvertNameCfg(data.name);
@@ -1165,7 +1165,7 @@ export async function importConfigJson(json: string): Promise<number> {
     await setChannelCfg(ch.index, ch.name, b64ToBytes(ch.secret));
     n++;
   }
-  addLog("Backup restaurado: {0} ajustes aplicados", n);
+  addLog("Backup restored: {0} settings applied", n);
   return n;
 }
 
@@ -1193,7 +1193,7 @@ export async function deleteNode(num: number): Promise<void> {
     s.nodes = m;
   });
   await deleteNodeDb(num).catch(() => {});
-  addLog("Nodo !{0} borrado", num.toString(16));
+  addLog("Node !{0} deleted", num.toString(16));
 }
 
 // Clears the messages of one conversation from the store and the DB.
@@ -1202,18 +1202,18 @@ export async function clearConvo(convo: string): Promise<void> {
     s.messages = s.messages.filter((m) => m.convo !== convo);
   });
   const n = await deleteConvoMessages(convo).catch(() => 0);
-  addLog("Conversación {0} limpiada: {1} mensajes borrados", convo, n);
+  addLog("Conversation {0} cleared: {1} messages deleted", convo, n);
 }
 
 /** Trace the stored out path towards a contact: each hop answers with its SNR.
  *  The reply arrives via the TraceData push, which stores and logs it. */
 export async function runTraceroute(dest: number): Promise<void> {
   const c = device;
-  if (!c) throw new Error(t("Sin conexión"));
+  if (!c) throw new Error(t("Not connected"));
   const node = getSnapshot().nodes.get(dest);
   const path = node?.outPath ?? [];
   if (path.length === 0) {
-    throw new Error(t("Contacto directo o sin ruta conocida: nada que trazar"));
+    throw new Error(t("Direct contact or no known path: nothing to trace"));
   }
   mutate((s) => {
     const m = new Map(s.traceroutes);
@@ -1223,30 +1223,30 @@ export async function runTraceroute(dest: number): Promise<void> {
   const tag = Math.floor(Math.random() * 0xffffffff) >>> 0;
   pendingTraces.set(tag, dest);
   await withCmdLock(() => c.sendCommandSendTracePath(tag, 0, Uint8Array.from(path)));
-  addLog("Trace lanzado hacia !{0} ({1} saltos)", dest.toString(16), path.length);
+  addLog("Trace launched to !{0} ({1} hops)", dest.toString(16), path.length);
 }
 
 /** Drops the stored out path so the next exchange floods and re-learns it. */
 export async function resetPath(num: number): Promise<void> {
   const c = device;
   const pk = pubkeyByNum.get(num);
-  if (!c || !pk) throw new Error(t("Sin conexión"));
+  if (!c || !pk) throw new Error(t("Not connected"));
   await withCmdLock(async () => {
-    const p = expect(c, Constants.ResponseCodes.Ok, 5_000, t("la ruta"));
+    const p = expect(c, Constants.ResponseCodes.Ok, 5_000, t("the path"));
     await c.sendCommandResetPath(pk);
     return p;
   });
   upsertNode(num, { hopsAway: undefined, outPath: [] });
-  addLog("Ruta hacia !{0} reiniciada", num.toString(16));
+  addLog("Path to !{0} reset", num.toString(16));
 }
 
 /** Asks the radio to broadcast this contact's card to the mesh. */
 export async function shareContact(num: number): Promise<void> {
   const c = device;
   const pk = pubkeyByNum.get(num);
-  if (!c || !pk) throw new Error(t("Sin conexión"));
+  if (!c || !pk) throw new Error(t("Not connected"));
   await withCmdLock(() => c.sendCommandShareContact(pk));
-  addLog("Contacto !{0} compartido en la malla", num.toString(16));
+  addLog("Contact !{0} shared with the mesh", num.toString(16));
 }
 
 /** Requests sensor telemetry (Cayenne LPP) from a contact. The reply arrives
@@ -1254,9 +1254,9 @@ export async function shareContact(num: number): Promise<void> {
 export async function requestTelemetry(num: number): Promise<void> {
   const c = device;
   const pk = pubkeyByNum.get(num);
-  if (!c || !pk) throw new Error(t("Sin conexión"));
+  if (!c || !pk) throw new Error(t("Not connected"));
   await withCmdLock(() => c.sendCommandSendTelemetryReq(pk));
-  addLog("Telemetría pedida a !{0}", num.toString(16));
+  addLog("Telemetry requested from !{0}", num.toString(16));
 }
 
 // ── local waypoints ─────────────────────────────────────────────────────────
@@ -1291,14 +1291,14 @@ const ACK_TIMEOUT_MIN_MS = 12_000;
 
 async function transmit(msg: Message): Promise<void> {
   const c = device;
-  if (!c) throw new Error(t("Sin conexión"));
+  if (!c) throw new Error(t("Not connected"));
   const isDm = msg.convo.startsWith("dm:");
   if (isDm) {
     const dest = Number(msg.convo.slice(3));
     const pk = pubkeyByNum.get(dest);
-    if (!pk) throw new Error(t("Contacto desconocido"));
+    if (!pk) throw new Error(t("Unknown contact"));
     const sent = await withCmdLock(() =>
-      withTimeout(c.sendTextMessage(pk, msg.text), 15_000, t("el envío")),
+      withTimeout(c.sendTextMessage(pk, msg.text), 15_000, t("the send")),
     );
     if (sent.expectedAckCrc) {
       setMsgState(msg.id, msg.ts, "sent");
@@ -1306,7 +1306,7 @@ async function transmit(msg: Message): Promise<void> {
       const timer = setTimeout(() => {
         if (pendingAcks.delete(sent.expectedAckCrc)) {
           setMsgState(msg.id, msg.ts, "failed");
-          addLog("Sin ACK de !{0}: mensaje fallido", dest.toString(16));
+          addLog("No ACK from !{0}: message failed", dest.toString(16));
         }
       }, wait) as unknown as number;
       pendingAcks.set(sent.expectedAckCrc, { msgId: msg.id, ts: msg.ts, timer });
@@ -1317,7 +1317,7 @@ async function transmit(msg: Message): Promise<void> {
   } else {
     const channel = Number(msg.convo.slice(3));
     await withCmdLock(() =>
-      withTimeout(c.sendChannelTextMessage(channel, msg.text), 15_000, t("el envío")),
+      withTimeout(c.sendChannelTextMessage(channel, msg.text), 15_000, t("the send")),
     );
     // broadcast: the radio accepted it; there is no ack to wait for
     setMsgState(msg.id, msg.ts, "sent");
@@ -1326,7 +1326,7 @@ async function transmit(msg: Message): Promise<void> {
 
 // Retries a failed message reusing the same entry (id/ts untouched).
 export async function retryMessage(msg: Message): Promise<void> {
-  if (!device) throw new Error(t("Sin conexión"));
+  if (!device) throw new Error(t("Not connected"));
   setMsgState(msg.id, msg.ts, "queued");
   try {
     await transmit(msg);
@@ -1352,7 +1352,7 @@ export async function sendText(
       "This T-Deck is a listener. It hears Meshtastic nodes but cannot send messages.",
     );
   }
-  if (!device) throw new Error(t("Sin conexión"));
+  if (!device) throw new Error(t("Not connected"));
   const isDm = convo.startsWith("dm:");
   const destination = isDm ? Number(convo.slice(3)) : 0xffffffff;
   const channel = isDm ? 0 : Number(convo.slice(3));
@@ -1373,7 +1373,7 @@ export async function sendText(
     msg.from = s.myNodeNum ?? 0;
     s.messages = [...s.messages, msg];
   });
-  saveMessage(msg).catch(dbFail(t("mensaje")));
+  saveMessage(msg).catch(dbFail(t("message")));
 
   try {
     await transmit(msg);

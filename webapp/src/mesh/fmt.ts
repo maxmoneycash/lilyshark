@@ -45,7 +45,7 @@ export function useHourTick(): number {
 }
 
 /** hh:mm:ss. 2-digit even in 12 h: the width has to stay fixed in a monospace UI. */
-export function hora(ms: number, segundos = true): string {
+export function hhmm(ms: number, segundos = true): string {
   return new Date(ms).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",

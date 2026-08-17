@@ -2,66 +2,66 @@
 import assert from "node:assert";
 
 // fmt.ts reads localStorage, which doesn't exist in Node
-const guardado = new Map<string, string>();
+const stored = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", {
 	value: {
-		getItem: (k: string) => guardado.get(k) ?? null,
-		setItem: (k: string, v: string) => void guardado.set(k, v),
-		removeItem: (k: string) => void guardado.delete(k),
+		getItem: (k: string) => stored.get(k) ?? null,
+		setItem: (k: string, v: string) => void stored.set(k, v),
+		removeItem: (k: string) => void stored.delete(k),
 	},
 	configurable: true,
 });
 
-const { asciiBattery, distKm, fechaHora, fmtDist, getHourPref, hora, is12h } =
+const { asciiBattery, distKm, fechaHora, fmtDist, getHourPref, hhmm, is12h } =
 	await import("./fmt.ts");
 
 const T = new Date("2026-07-20T15:04:05").getTime();
 const MEDIANOCHE = new Date("2026-07-20T00:30:00").getTime();
 
 // ── clock format ─────────────────────────────────────────────────────────
-assert.equal(getHourPref(), "auto", "sin nada guardado, automático");
+assert.equal(getHourPref(), "auto", "nothing stored yields the default");
 
-guardado.set("hourFormat", "24");
+stored.set("hourFormat", "24");
 assert.equal(is12h(), false);
-assert.match(hora(T), /^15[:.]04[:.]05$/, `24 h da ${hora(T)}`);
-assert.ok(!/\d\d:\d\d:\d\d.+[ap]/i.test(hora(T)), "24 h no lleva AM/PM");
+assert.match(hhmm(T), /^15[:.]04[:.]05$/, `24 h da ${hhmm(T)}`);
+assert.ok(!/\d\d:\d\d:\d\d.+[ap]/i.test(hhmm(T)), "24 h no lleva AM/PM");
 
-guardado.set("hourFormat", "12");
+stored.set("hourFormat", "12");
 assert.equal(is12h(), true);
 // 2-digit on purpose: the column mustn't shift width in a monospace table
 assert.match(
-	hora(T),
+	hhmm(T),
 	/\b03[:.]04/,
-	`12 h debería mostrar las 3, da ${hora(T)}`,
+	`12 h should show 3 o'clock, got ${hhmm(T)}`,
 );
-assert.match(hora(T), /[ap]\.?\s?m|[AP]M/i, `12 h sin AM/PM: ${hora(T)}`);
+assert.match(hhmm(T), /[ap]\.?\s?m|[AP]M/i, `12 h sin AM/PM: ${hhmm(T)}`);
 // midnight in 12 h is 12, never 0: the classic off-by-one of hand-rolled formatters
 assert.match(
-	hora(MEDIANOCHE),
+	hhmm(MEDIANOCHE),
 	/\b12[:.]30/,
-	`medianoche da ${hora(MEDIANOCHE)}`,
+	`medianoche da ${hhmm(MEDIANOCHE)}`,
 );
 
 // seconds are optional, but the hour must not change with them
 assert.ok(
-	hora(T, false).length < hora(T).length,
-	"sin segundos debe ser más corto",
+	hhmm(T, false).length < hhmm(T).length,
+	"without seconds it must be shorter",
 );
-assert.ok(hora(T).startsWith(hora(T, false).slice(0, 2)));
+assert.ok(hhmm(T).startsWith(hhmm(T, false).slice(0, 2)));
 
 // a corrupt value falls back to automatic instead of breaking the clock
-guardado.set("hourFormat", "basura");
+stored.set("hourFormat", "basura");
 assert.equal(getHourPref(), "auto");
-assert.ok(hora(T).length > 0);
+assert.ok(hhmm(T).length > 0);
 
 // ── date + time ──────────────────────────────────────────────────────────
 // toLocaleString with only hour12 and no component would return the date
 // alone: fechaHora has to keep carrying the time
-guardado.set("hourFormat", "24");
+stored.set("hourFormat", "24");
 assert.match(
 	fechaHora(T),
 	/15[:.]04/,
-	`fechaHora pierde la hora: ${fechaHora(T)}`,
+	`fechaHora pierde la hhmm: ${fechaHora(T)}`,
 );
 assert.match(
 	fechaHora(T),
@@ -73,7 +73,7 @@ assert.match(
 // the width is fixed: it lines up in a column of a monospace table
 const anchos = new Set([0, 5, 50, 99, 100].map((n) => asciiBattery(n).length));
 assert.equal(anchos.size, 1, `la barra cambia de ancho: ${[...anchos]}`);
-assert.ok(asciiBattery(101).includes("PWR"), ">100 % es alimentación externa");
+assert.ok(asciiBattery(101).includes("PWR"), ">100 % means external power");
 assert.equal(asciiBattery(undefined), "—");
 
 // ── distance ─────────────────────────────────────────────────────────────

@@ -20,7 +20,6 @@ import {
   resolveByCommitment,
 } from '../lib/shelby';
 import {
-  autoLinkDeviceLink,
   connectDeviceLink,
   disconnectDeviceLink,
   useDeviceLink,
@@ -145,12 +144,9 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const resolving = trace?.some((t) => t.state === 'run') ?? false;
   const link = useDeviceLink();
 
-  // A T-Deck the browser already has permission for links itself when the
-  // analyzer opens: plug in, come here, watch the panel fill. Silent when
-  // there is no such device, so nothing is asked of a visitor without one.
-  useEffect(() => {
-    void autoLinkDeviceLink();
-  }, []);
+  // TerminalApp already auto-links a granted T-Deck once for the whole
+  // session. A second attempt here raced the header CONNECT button and
+  // held the USB CDC port while the board was rebooting.
 
   // Shared by the selected frame's RESOLVE and the device link's pointer
   // hand-off: both are the same walk from coordinates to opened capture.

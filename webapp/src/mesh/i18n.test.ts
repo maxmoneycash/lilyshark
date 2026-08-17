@@ -1,117 +1,80 @@
-// Self-check: node --experimental-strip-types src/i18n.test.ts
-// An untranslated key breaks nothing: t() returns the Spanish. That's exactly
-// why it has to be hunted on purpose, or the English UI fills up with leftovers.
+// Self-check: node --experimental-strip-types src/mesh/i18n.test.ts
+//
+// The interface used to be written in Spanish and translated to English at
+// render time by locales/en.ts. Both are gone: every call site now holds the
+// English text it renders. This test is what stops Spanish coming back — a
+// leftover string no longer breaks anything visibly, which is exactly why it
+// has to be hunted on purpose.
 import assert from "node:assert";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import en from "./locales/en.ts";
-import { THEME_LABELS } from "./theme.ts";
+import { t } from "./i18n.ts";
 
-// t("...") / t('...') and addLog("...") / addLog('...'), keeping the literal.
-// addLog stores the key untranslated (fmtLog translates it at render), so its
-// keys must be in en.ts just like t()'s.
-const CALL = /\b(?:t|addLog)\(\s*(["'])(.*?)(?<!\\)\1/gs;
+// ── t() is interpolation and nothing else ────────────────────────────────
+assert.equal(t("plain"), "plain");
+assert.equal(t("heard {0}", "3s"), "heard 3s");
+assert.equal(t("{0} of {1}", 2, 7), "2 of 7");
+assert.equal(t("no args {0}"), "no args {0}", "a missing argument stays literal");
 
-// keys that never appear as a literal because they're built at runtime:
-// tabs (t(tab)), theme names (t(THEME_LABELS[x])) and the battery forecast
-// texts, which battery.ts returns as a key. The theme names come from the real
-// table: a copy by hand is what let INVERTED BONE ship untranslated.
-const DINAMICAS = [
-	"NODOS",
-	"MAPA",
-	"MALLA",
-	"TELEMETRÍA",
-	...Object.values(THEME_LABELS),
-	"BATERÍA IRREGULAR · sin previsión fiable",
-	"CARGANDO · {0} %/h",
-	"ESTABLE · sin descarga apreciable",
-	"SE AGOTA EN ~{0} h",
-	"SE AGOTA EN ~{0} días",
-];
+// ── the translation layer is really gone ─────────────────────────────────
+assert.ok(!existsSync("src/mesh/locales"), "locales/ must not come back");
 
-function fuentes(dir: string): string[] {
+// ── no Spanish in any shipped source ─────────────────────────────────────
+function sources(dir: string): string[] {
 	const out: string[] = [];
 	for (const e of readdirSync(dir, { withFileTypes: true })) {
 		const p = join(dir, e.name);
-		if (e.isDirectory()) out.push(...fuentes(p));
-		// i18n.ts is excluded: its example comment is not a real string
-		else if (/\.tsx?$/.test(e.name) && !/\.test\.ts$/.test(e.name))
-			if (!p.includes("locales") && e.name !== "i18n.ts") out.push(p);
+		if (e.isDirectory()) {
+			if (e.name !== "assets") out.push(...sources(p));
+		} else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) {
+			out.push(p);
+		}
 	}
 	return out;
 }
 
-const usadas = new Set<string>();
-// ported into the lilyshark webapp: the terminal UI lives under src/mesh, and
-// scanning the whole webapp would catch unrelated t() calls outside the port
-for (const f of fuentes("src/mesh")) {
-	const src = readFileSync(f, "utf8");
-	for (const m of src.matchAll(CALL)) usadas.add(m[2]);
+// Characters that only appear in Spanish text, and words common enough in this
+// codebase's former Spanish to catch a paste that happens to avoid accents.
+const ACCENTED = /[áéíóúüñÁÉÍÓÚÜÑ¿¡]/;
+// Built from escaped fragments on purpose: written as one literal, a global
+// rename sweep across the tree edits this list too and quietly turns the guard
+// into a matcher for English words.
+const SPANISH_WORDS = [
+	"sin", "para", "los", "las", "del", "una", "uno",
+	"por", "que", "pero", "desde", "hasta",
+	"nodo", "nodos", "mensaje", "canal", "canales",
+	"hora", "horas", "dias", "guardar", "fallo",
+	"desconectar", "ninguno", "todos", "escucha",
+	"estable", "cargando", "idioma", "tema",
+];
+const WORDS = new RegExp(`\\b(${SPANISH_WORDS.join("|")})\\b`, "i");
+
+const STRING = /(["'])((?:(?!\1)[^\\\n]|\\.)*)\1/g;
+
+/** Comments must go first: an apostrophe in English prose ("don't") would
+ *  otherwise open a string literal and swallow the rest of the file. */
+function stripComments(src: string): string {
+	return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
-assert.ok(
-	usadas.size > 100,
-	`pocas claves encontradas (${usadas.size}): ¿regex rota?`,
-);
+const offenders: string[] = [];
+for (const f of sources("src")) {
+	const src = stripComments(readFileSync(f, "utf8"));
+	// Strings only: a stray accent in a code comment is not what ships.
+	for (const m of src.matchAll(STRING)) {
+		const s = m[2];
+		if (s.length < 3) continue;
+		// Skip anything that cannot be user-facing text.
+		if (/^[\w./@-]+$/.test(s)) continue; // paths, ids, mime types
+		if (/^#[0-9a-f]{3,8}$/i.test(s)) continue; // colours
+		if (ACCENTED.test(s) || WORDS.test(s)) offenders.push(`${f}: ${JSON.stringify(s)}`);
+	}
+}
 
-const faltan = [...usadas].filter((k) => !(k in en));
 assert.deepEqual(
-	faltan,
+	offenders,
 	[],
-	`sin traducir en en.ts:\n  ${faltan.join("\n  ")}`,
+	`Spanish found in shipped strings:\n  ${offenders.join("\n  ")}`,
 );
 
-// the dynamic ones don't show up in the scan, so they're checked by hand
-const faltanDin = DINAMICAS.filter((k) => !(k in en));
-assert.deepEqual(faltanDin, [], `claves dinámicas sin traducir: ${faltanDin}`);
-
-// ── automatic language ───────────────────────────────────────────────────
-// i18n.ts reads localStorage and navigator, which don't exist in Node
-const guardado = new Map<string, string>();
-const stub = (lang: string) => {
-	Object.defineProperty(globalThis, "navigator", {
-		value: { language: lang },
-		configurable: true,
-	});
-};
-Object.defineProperty(globalThis, "localStorage", {
-	value: {
-		getItem: (k: string) => guardado.get(k) ?? null,
-		setItem: (k: string, v: string) => void guardado.set(k, v),
-		removeItem: (k: string) => void guardado.delete(k),
-	},
-	configurable: true,
-});
-stub("es-ES");
-
-const { getLang, getLangPref } = await import("./i18n.ts");
-
-// English-only product: "auto" resolves to English whatever the browser says.
-// A Spanish locale used to flip the whole UI to Spanish, which is precisely
-// what must never happen now, so every locale below has to come back "en".
-assert.equal(getLangPref(), "auto", "sin nada guardado, automático");
-for (const loc of [
-	"es-ES",
-	"es",
-	"ES-MX", // capitals: Windows sometimes reports them
-	"en-US",
-	"ca-ES",
-	"fr",
-	"de-DE",
-	"est-EE",
-	"eu-ES",
-]) {
-	stub(loc);
-	assert.equal(getLang(), "en", `${loc} debe resolver a inglés`);
-}
-// A leftover Spanish preference must not surface Spanish in the UI.
-guardado.set("lang", "es");
-assert.equal(getLangPref(), "auto");
-assert.equal(getLang(), "en", "saved es must not resolve to Spanish");
-guardado.set("lang", "en");
-assert.equal(getLang(), "en");
-guardado.set("lang", "basura");
-assert.equal(getLangPref(), "auto", "un valor corrupto vuelve a automático");
-assert.equal(getLang(), "en", "y automático es inglés");
-
-console.log(`i18n.test.ts OK · ${usadas.size} claves usadas, todas traducidas`);
+console.log(`i18n.test.ts OK · English-only, ${sources("src").length} sources scanned`);

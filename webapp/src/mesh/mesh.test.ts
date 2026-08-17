@@ -59,14 +59,14 @@ const sum = summarize(
 );
 assert.equal(sum.total, 5);
 assert.equal(sum.activos1h, 1);
-assert.equal(sum.activos24h, 3, "1, 2 y 5 están dentro de 24 h");
+assert.equal(sum.active24h, 3, "1, 2 and 5 fall inside 24 h");
 assert.equal(sum.nuncaOidos, 1);
-assert.equal(sum.conPosicion, 1, "(0,0) no cuenta como posición");
+assert.equal(sum.withPosition, 1, "(0,0) does not count as a position");
 assert.equal(sum.repetidores, 1);
 assert.equal(sum.conPki, 1);
 assert.equal(sum.bateriaBaja, 1);
 assert.equal(sum.saltos.get(2), 2);
-assert.equal(sum.saltos.get("?"), 2, "sin hopsAway van al cubo '?'");
+assert.equal(sum.saltos.get("?"), 2, "entries without hopsAway fall in the '?' bucket");
 
 // battery >100 = external power, not a low battery
 assert.equal(summarize([nd({ batteryLevel: 101 })], NOW).bateriaBaja, 0);

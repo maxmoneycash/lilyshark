@@ -1,6 +1,6 @@
 import type { NodeEntry } from "./store";
 
-import type { Prevision } from "./battery";
+import type { Forecast } from "./battery";
 
 export interface AlertCfg {
   on: boolean;
@@ -83,15 +83,15 @@ export function evalAlerts(
 
     // lastHeard in epoch s; 0 = never heard, which is not measurable silence
     if (n.lastHeard > 0) {
-      const horas = (now - n.lastHeard * 1000) / 3_600_000;
-      if (horas >= cfg.silentH) {
+      const hours = (now - n.lastHeard * 1000) / 3_600_000;
+      if (hours >= cfg.silentH) {
         const key = `mudo:${n.num}`;
         if (due(key)) {
           out.push({
             key,
             kind: "mudo",
             name: who,
-            value: Math.floor(horas),
+            value: Math.floor(hours),
             threshold: cfg.silentH,
           });
         }
@@ -107,23 +107,23 @@ export function evalAlerts(
  *  will be soon. It stays quiet when the forecast is unreliable — warning
  *  about a runout derived from an irregular series is worse than not warning. */
 export function evalAutonomia(
-  nodo: { num: number; nombre: string; fav?: boolean },
-  prevision: Prevision | undefined,
+  node: { num: number; nombre: string; fav?: boolean },
+  forecast: Forecast | undefined,
   cfg: AlertCfg,
   lastFired: Map<string, number>,
   now = Date.now(),
 ): Alert | undefined {
-  if (!cfg.on || !cfg.autonomiaH || !nodo.fav) return undefined;
-  const h = prevision?.horasRestantes;
-  if (h === undefined || prevision!.ajuste < 0.5) return undefined;
+  if (!cfg.on || !cfg.autonomiaH || !node.fav) return undefined;
+  const h = forecast?.hoursRemaining;
+  if (h === undefined || forecast!.fit < 0.5) return undefined;
   if (h > cfg.autonomiaH) return undefined;
-  const key = `auto:${nodo.num}`;
+  const key = `auto:${node.num}`;
   if (now - (lastFired.get(key) ?? -Infinity) < COOLDOWN_MS) return undefined;
   lastFired.set(key, now);
   return {
     key,
     kind: "autonomia",
-    name: nodo.nombre,
+    name: node.nombre,
     value: Math.round(h),
     threshold: cfg.autonomiaH,
   };

@@ -8,7 +8,7 @@ import {
 } from "../db";
 import { saveText, stamp } from "../export";
 import { getHourPref, type HourPref, is12h, setHourPref } from "../fmt";
-import { getLang, getLangPref, type Lang, setLang, t } from "../i18n";
+import { t } from "../i18n";
 import {
 	applyRadioParams,
 	applyTxPower,
@@ -58,7 +58,7 @@ function Section(props: {
 						className="primary"
 						disabled={busy}
 						onClick={async () => {
-							setMsg(t("GUARDANDO…"));
+							setMsg(t("SAVING…"));
 							setCls("warn");
 							setBusy(true);
 							try {
@@ -68,12 +68,12 @@ function Section(props: {
 									new Promise((_, rej) =>
 										setTimeout(
 											() =>
-												rej(new Error(t("sin respuesta de la radio (20 s)"))),
+												rej(new Error(t("no response from the radio (20 s)"))),
 											20_000,
 										),
 									),
 								]);
-								setMsg(t("Guardado ✓"));
+								setMsg(t("Saved ✓"));
 								setCls("");
 							} catch (e) {
 								setMsg(`ERROR: ${e instanceof Error ? e.message : e}`);
@@ -109,7 +109,7 @@ export default function Config() {
 	const [chPsks, setChPsks] = useState<Record<number, string>>({}); // base64
 	const [theme, setThemeSel] = useState<Theme>(getTheme);
 	const [hc, setHcSel] = useState(getHiContrast);
-	const [horaFmt, setHoraFmt] = useState<HourPref>(getHourPref);
+	const [timeFmt, setTimeFmt] = useState<HourPref>(getHourPref);
 	const [alerts, setAlerts] = useState<AlertCfg>(getAlertCfg);
 	const saveAlerts = (patch: Partial<AlertCfg>) => {
 		const next = { ...alerts, ...patch };
@@ -184,7 +184,7 @@ export default function Config() {
 	const onPurge = async () => {
 		if (!purgeArm) {
 			setPurgeArm(true);
-			setPurgeMsg(t("pulsa otra vez para confirmar"));
+			setPurgeMsg(t("press again to confirm"));
 			clearTimeout(purgeTimer.current);
 			purgeTimer.current = setTimeout(() => setPurgeArm(false), 3000);
 			return;
@@ -198,7 +198,7 @@ export default function Config() {
 			mutate((st) => {
 				st.messages = st.messages.filter((m) => m.ts >= cut);
 			});
-			setPurgeMsg(t("{0} filas borradas", n));
+			setPurgeMsg(t("{0} rows deleted", n));
 			setStats(await dbStats());
 		} catch (e) {
 			setPurgeMsg(`ERROR: ${e instanceof Error ? e.message : e}`);
@@ -207,12 +207,12 @@ export default function Config() {
 
 	const saveUser = async () => {
 		const name = advertName.trim();
-		if (!name) throw new Error(t("el nombre no puede estar vacío"));
+		if (!name) throw new Error(t("the name cannot be empty"));
 		await setAdvertNameCfg(name);
 	};
 
 	const saveRadio = async () => {
-		if (!self) throw new Error(t("config de radio aún no recibida"));
+		if (!self) throw new Error(t("radio config not received yet"));
 		await applyRadioParams(freq, bw, sf, cr);
 		if (txp !== self.txPower) await applyTxPower(txp);
 	};
@@ -227,7 +227,7 @@ export default function Config() {
 			: new Uint8Array(0);
 		if (bytes.length !== 16) {
 			throw new Error(
-				t("La clave debe tener 16 bytes en base64 ({0} bytes)", bytes.length),
+				t("The key must be 16 base64 bytes ({0} bytes)", bytes.length),
 			);
 		}
 		return bytes;
@@ -235,8 +235,8 @@ export default function Config() {
 
 	const onBackup = async () => {
 		try {
-			await saveText(`meshcore-backup-${stamp()}.json`, exportConfigJson());
-			setBkMsg(t("Backup descargado ✓"));
+			await saveText(`lilyshark-backup-${stamp()}.json`, exportConfigJson());
+			setBkMsg(t("Backup downloaded ✓"));
 			setBkCls("");
 		} catch (e) {
 			setBkMsg(`ERROR: ${e}`);
@@ -248,7 +248,7 @@ export default function Config() {
 		setBkMsg("");
 		try {
 			const n = await importConfigJson(await file.text());
-			setBkMsg(t("{0} ajustes aplicados ✓ (el nodo puede reiniciar)", n));
+			setBkMsg(t("{0} settings applied ✓ (the node may reboot)", n));
 			setBkCls("");
 		} catch (e) {
 			setBkMsg(`ERROR: ${e}`);
@@ -261,7 +261,7 @@ export default function Config() {
 		try {
 			const b64 = await exportPrivateKeyB64();
 			await saveText(`meshcore-privatekey-${stamp()}.txt`, b64);
-			setBkMsg(t("Clave privada descargada ✓"));
+			setBkMsg(t("Private key downloaded ✓"));
 			setBkCls("");
 		} catch (e) {
 			setBkMsg(`ERROR: ${e}`);
@@ -276,7 +276,7 @@ export default function Config() {
 			const name = (chNames[index] ?? cur?.name ?? "").trim();
 			const secret = pskFromB64(chPsks[index] ?? pskToB64(cur?.secret));
 			await setChannelCfg(index, name, secret);
-			setChMsg(t("Canal {0} guardado ✓", index));
+			setChMsg(t("Channel {0} saved ✓", index));
 			setChCls("");
 		} catch (e) {
 			setChMsg(`ERROR: ${e instanceof Error ? e.message : e}`);
@@ -305,7 +305,7 @@ export default function Config() {
 			);
 			const f = `meshcore-channels-${stamp()}.json`;
 			await saveText(f, json);
-			setImportMsg(t("EXPORTADO → {0}", f));
+			setImportMsg(t("EXPORTED → {0}", f));
 			setImportCls("");
 		} catch (e) {
 			setImportMsg(`ERROR: ${e}`);
@@ -318,7 +318,7 @@ export default function Config() {
 			channels?: { index: number; name: string; secret: string }[];
 		};
 		if (!Array.isArray(data.channels) || data.channels.length === 0) {
-			throw new Error(t("el JSON no trae canales"));
+			throw new Error(t("the JSON carries no channels"));
 		}
 		return data.channels;
 	};
@@ -330,12 +330,12 @@ export default function Config() {
 			try {
 				const chans = parseChannelJson(chJson);
 				const names = chans
-					.map((c) => c.name || t("Canal {0}", c.index))
+					.map((c) => c.name || t("Channel {0}", c.index))
 					.join(", ");
 				setImportPending(chJson);
 				setImportMsg(
-					t("Sobrescribirá {0} canales ({1})", chans.length, names) +
-						t(". Pulsa CONFIRMAR."),
+					t("Will overwrite {0} channels ({1})", chans.length, names) +
+						t(". Press CONFIRM."),
 				);
 				setImportCls("warn");
 			} catch (e) {
@@ -351,7 +351,7 @@ export default function Config() {
 				await setChannelCfg(c.index, c.name, pskFromB64(c.secret));
 				n++;
 			}
-			setImportMsg(t("{0} canales importados ✓", n));
+			setImportMsg(t("{0} channels imported ✓", n));
 			setImportCls("");
 			setChJson("");
 		} catch (e) {
@@ -365,7 +365,7 @@ export default function Config() {
 	const onReboot = async () => {
 		if (!rebootArm) {
 			setRebootArm(true);
-			setMaint(t("pulsa otra vez para confirmar"));
+			setMaint(t("press again to confirm"));
 			clearTimeout(rebootTimer.current);
 			rebootTimer.current = setTimeout(() => setRebootArm(false), 3000);
 			return;
@@ -374,7 +374,7 @@ export default function Config() {
 		setRebootArm(false);
 		try {
 			await rebootRadio();
-			setMaint(t("REBOOT enviado · ~8 s offline"));
+			setMaint(t("REBOOT sent · ~8 s offline"));
 		} catch (e) {
 			setMaint(`ERROR: ${e}`);
 		}
@@ -384,31 +384,20 @@ export default function Config() {
 		<main style={{ overflowY: "auto", alignItems: "start" }}>
 			<div className="cfg-grid">
 				<div className="cfg-col">
-					<Section title={t("CONFIG // APLICACIÓN")}>
+					<Section title={t("CONFIG // APPLICATION")}>
 						<div className="form-grid">
-							<label>{t("IDIOMA")}</label>
+							<label>{t("TIME")}</label>
 							<select
-								value={getLangPref()}
-								style={{ width: 140 }}
-								onChange={(e) => setLang(e.target.value as Lang | "auto")}
-							>
-								<option value="auto">
-									{t("AUTOMÁTICO")} · {getLang().toUpperCase()}
-								</option>
-								<option value="en">ENGLISH</option>
-							</select>
-							<label>{t("HORA")}</label>
-							<select
-								value={horaFmt}
+								value={timeFmt}
 								style={{ width: 140 }}
 								onChange={(e) => {
 									const v = e.target.value as HourPref;
 									setHourPref(v);
-									setHoraFmt(v);
+									setTimeFmt(v);
 								}}
 							>
 								<option value="auto">
-									{t("AUTOMÁTICO")} · {is12h() ? "12 H" : "24 H"}
+									{t("AUTOMATIC")} · {is12h() ? "12 H" : "24 H"}
 								</option>
 								<option value="24">24 H · 15:04</option>
 								<option value="12">12 H · 3:04 PM</option>
@@ -437,7 +426,7 @@ export default function Config() {
 										alignItems: "center",
 										whiteSpace: "nowrap",
 									}}
-									title={t("Mismo color, fondo negro puro y trazo más vivo")}
+									title={t("Same color, pure black background and a more vivid stroke")}
 								>
 									<input
 										type="checkbox"
@@ -448,16 +437,15 @@ export default function Config() {
 											setHcSel(e.target.checked);
 										}}
 									/>
-									{t("ALTO CONTRASTE")}
+									{t("HIGH CONTRAST")}
 								</label>
 							</div>
 
 							<label
-								title={t(
-									"Avisos del sistema sobre los nodos marcados favoritos",
+								title={t("System notifications about nodes marked as favorites",
 								)}
 							>
-								{t("ALERTAS FAVORITOS")}
+								{t("FAVORITE ALERTS")}
 							</label>
 							<input
 								type="checkbox"
@@ -465,7 +453,7 @@ export default function Config() {
 								style={{ justifySelf: "start", width: "auto" }}
 								onChange={(e) => saveAlerts({ on: e.target.checked })}
 							/>
-							<label>{t("AVISAR BATERÍA <")}</label>
+							<label>{t("WARN BATTERY <")}</label>
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 								<input
 									type="number"
@@ -480,7 +468,7 @@ export default function Config() {
 								/>
 								<span className="dim">%</span>
 							</div>
-							<label>{t("AVISAR SIN SEÑAL")}</label>
+							<label>{t("WARN NO SIGNAL")}</label>
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 								<input
 									type="number"
@@ -495,11 +483,10 @@ export default function Config() {
 								<span className="dim">{t("h")}</span>
 							</div>
 							<label
-								title={t(
-									"Avisa antes de que la batería esté baja, según el ritmo de descarga. 0 = no avisar",
+								title={t("Warns before the battery is low, based on the discharge rate. 0 = no warning",
 								)}
 							>
-								{t("AVISAR AUTONOMÍA <")}
+								{t("WARN RUNTIME <")}
 							</label>
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 								<input
@@ -516,24 +503,23 @@ export default function Config() {
 							</div>
 						</div>
 						<p className="dim" style={{ padding: "0 14px 12px", fontSize: 11 }}>
-							{t(
-								"Solo avisa de los nodos marcados con ★ en NODOS, y como mucho una vez cada 6 h por nodo y motivo.",
+							{t("Only warns about nodes marked ★ in NODES, and at most once every 6 h per node and reason.",
 							)}
 						</p>
 					</Section>
 
-					<Section title={t("CONFIG // USUARIO")} onSave={saveUser}>
+					<Section title={t("CONFIG // USER")} onSave={saveUser}>
 						<div className="form-grid">
-							<label>{t("NOMBRE ADVERT")}</label>
+							<label>{t("ADVERT NAME")}</label>
 							<input
 								value={advertName}
 								maxLength={31}
 								onChange={(e) => setAdvertName(e.target.value)}
 							/>
-							<label>{t("ID NODO")}</label>
+							<label>{t("NODE ID")}</label>
 							<span className="dim" title={self?.publicKey ?? ""}>
 								{self
-									? `${self.publicKey.slice(0, 16)}… · ${t("SOLO LECTURA")}`
+									? `${self.publicKey.slice(0, 16)}… · ${t("READ ONLY")}`
 									: "—"}
 							</span>
 						</div>
@@ -586,14 +572,13 @@ export default function Config() {
 							/>
 						</div>
 						<p className="dim" style={{ padding: "0 14px 12px", fontSize: 11 }}>
-							{t(
-								"Cambiar FREQ/BW/SF/CR te saca del preset de tu malla: solo se oyen los nodos con los mismos parámetros de radio.",
+							{t("Changing FREQ/BW/SF/CR moves you off your mesh preset: only nodes with the same radio parameters can hear each other.",
 							)}
 						</p>
 					</Section>
 				</div>
 				<div className="cfg-col">
-					<Section title={t("CONFIG // POSICIÓN FIJA")}>
+					<Section title={t("CONFIG // FIXED POSITION")}>
 						<div
 							style={{
 								padding: 14,
@@ -604,8 +589,7 @@ export default function Config() {
 							}}
 						>
 							<span className="dim">
-								{t(
-									"Para nodos sin GPS: el firmware difunde esta posición al mesh.",
+								{t("For nodes without GPS: the firmware broadcasts this position to the mesh.",
 								)}
 							</span>
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -636,13 +620,13 @@ export default function Config() {
 											Math.abs(lat) > 90 ||
 											Math.abs(lon) > 180
 										) {
-											setPosMsg(t("ERROR: coordenadas inválidas"));
+											setPosMsg(t("ERROR: invalid coordinates"));
 											setPosCls("err");
 											return;
 										}
 										try {
 											await setFixedPosition(lat, lon);
-											setPosMsg(t("Posición fija enviada ✓"));
+											setPosMsg(t("Fixed position sent ✓"));
 											setPosCls("");
 										} catch (e) {
 											setPosMsg(`ERROR: ${e}`);
@@ -650,14 +634,14 @@ export default function Config() {
 										}
 									}}
 								>
-									{t("FIJAR")}
+									{t("SET")}
 								</button>
 								<button
 									onClick={async () => {
 										setPosMsg("");
 										try {
 											await clearFixedPosition();
-											setPosMsg(t("Posición fija eliminada ✓"));
+											setPosMsg(t("Fixed position cleared ✓"));
 											setPosCls("");
 										} catch (e) {
 											setPosMsg(`ERROR: ${e}`);
@@ -665,7 +649,7 @@ export default function Config() {
 										}
 									}}
 								>
-									{t("QUITAR")}
+									{t("CLEAR")}
 								</button>
 							</div>
 							{posMsg && (
@@ -676,7 +660,7 @@ export default function Config() {
 						</div>
 					</Section>
 
-					<Section title={t("CONFIG // CANALES")}>
+					<Section title={t("CONFIG // CHANNELS")}>
 						<div
 							style={{
 								padding: 14,
@@ -697,7 +681,7 @@ export default function Config() {
 								}}
 							>
 								<input
-									placeholder={t("PEGA JSON de canales exportado…")}
+									placeholder={t("PASTE exported channels JSON…")}
 									value={chJson}
 									style={{ flex: 1 }}
 									onChange={(e) => {
@@ -710,7 +694,7 @@ export default function Config() {
 									disabled={!chJson.trim()}
 									onClick={onImportChannels}
 								>
-									{importPending ? t("CONFIRMAR") : t("IMPORTAR")}
+									{importPending ? t("CONFIRM") : t("IMPORT")}
 								</button>
 							</div>
 							{importMsg && (
@@ -733,10 +717,10 @@ export default function Config() {
 									disabled={s.channels.size === 0}
 									onClick={onExportChannels}
 								>
-									{t("EXPORTAR JSON")}
+									{t("EXPORT JSON")}
 								</button>
 								<span className="dim" style={{ fontSize: 11 }}>
-									{t("los canales viajan con su clave: compártelo con cuidado")}
+									{t("channels travel with their key: share with care")}
 								</span>
 							</div>
 							{chMsg && (
@@ -764,7 +748,7 @@ export default function Config() {
 											<span style={{ fontWeight: 700 }}>{index}</span>
 											<input
 												placeholder={
-													index === 0 ? "public" : t("— slot libre —")
+													index === 0 ? "public" : t("— free slot —")
 												}
 												value={chNames[index] ?? ch?.name ?? ""}
 												style={{
@@ -777,7 +761,7 @@ export default function Config() {
 												}
 											/>
 											<button onClick={() => saveChannel(index)}>
-												{t("GUARDAR")}
+												{t("SAVE")}
 											</button>
 										</div>
 										<div
@@ -790,7 +774,7 @@ export default function Config() {
 												PSK
 											</span>
 											<input
-												placeholder={t("— sin clave —")}
+												placeholder={t("— no key —")}
 												value={chPsks[index] ?? pskToB64(ch?.secret)}
 												style={{ flex: 1, fontFamily: "inherit", fontSize: 11 }}
 												onChange={(e) =>
@@ -798,7 +782,7 @@ export default function Config() {
 												}
 											/>
 											<button
-												title={t("Generar clave de 128 bits aleatoria")}
+												title={t("Generate a random 128-bit key")}
 												onClick={() => genPsk(index)}
 											>
 												GEN
@@ -811,7 +795,7 @@ export default function Config() {
 					</Section>
 				</div>
 				<div className="cfg-col">
-					<Section title={t("MÓDULO // ADVERT")}>
+					<Section title={t("MODULE // ADVERT")}>
 						<div
 							style={{
 								padding: 14,
@@ -822,8 +806,7 @@ export default function Config() {
 							}}
 						>
 							<span className="dim">
-								{t(
-									"Un advert anuncia tu nodo a la malla. ZERO HOP llega solo a los vecinos directos; FLOOD se repite por los repetidores y cruza toda la malla.",
+								{t("An advert announces your node to the mesh. ZERO HOP reaches only direct neighbors; FLOOD is repeated by repeaters and crosses the whole mesh.",
 								)}
 							</span>
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -833,7 +816,7 @@ export default function Config() {
 										setAdvMsg("");
 										sendAdvert(true)
 											.then(() => {
-												setAdvMsg(t("Advert enviado ✓"));
+												setAdvMsg(t("Advert sent ✓"));
 												setAdvCls("");
 											})
 											.catch((e) => {
@@ -849,7 +832,7 @@ export default function Config() {
 										setAdvMsg("");
 										sendAdvert(false)
 											.then(() => {
-												setAdvMsg(t("Advert enviado ✓"));
+												setAdvMsg(t("Advert sent ✓"));
 												setAdvCls("");
 											})
 											.catch((e) => {
@@ -869,9 +852,9 @@ export default function Config() {
 						</div>
 					</Section>
 
-					<Section title={t("CONFIG // EQUIPO")}>
+					<Section title={t("CONFIG // DEVICE")}>
 						<div className="form-grid">
-							<label>{t("MODELO")}</label>
+							<label>{t("MODEL")}</label>
 							<span className="dim">{s.deviceInfo?.model || "—"}</span>
 							<label>FIRMWARE</label>
 							<span className="dim">
@@ -879,7 +862,7 @@ export default function Config() {
 									? `v${s.deviceInfo.firmwareVer} · ${s.deviceInfo.buildDate}`
 									: "—"}
 							</span>
-							<label>{t("BATERÍA")}</label>
+							<label>{t("BATTERY")}</label>
 							<span className="dim">
 								{s.deviceInfo?.batteryMv !== undefined
 									? `${s.deviceInfo.batteryMv} mV`
@@ -901,10 +884,10 @@ export default function Config() {
 									style={{ width: 180 }}
 									onClick={onReboot}
 								>
-									{rebootArm ? t("[ ¿SEGURO? ]") : "[ REBOOT ]"}
+									{rebootArm ? t("[ SURE? ]") : "[ REBOOT ]"}
 								</button>
 								<span className="dim">
-									{t("reinicia el dispositivo · ~8 s offline")}
+									{t("reboots the device · ~8 s offline")}
 								</span>
 							</div>
 							{maint && <span className="warn">{maint}</span>}
@@ -922,13 +905,12 @@ export default function Config() {
 							}}
 						>
 							<span className="dim">
-								{t(
-									"Config completa del nodo (nombre, radio y canales con clave) a JSON.",
+								{t("Full node config (name, radio and channels with keys) to JSON.",
 								)}
 							</span>
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 								<button className="primary" onClick={onBackup}>
-									{t("GUARDAR BACKUP")}
+									{t("SAVE BACKUP")}
 								</button>
 								<label
 									className="btn"
@@ -938,7 +920,7 @@ export default function Config() {
 										cursor: "pointer",
 									}}
 								>
-									{t("RESTAURAR…")}
+									{t("RESTORE…")}
 									<input
 										type="file"
 										accept=".json,application/json"
@@ -951,12 +933,11 @@ export default function Config() {
 									/>
 								</label>
 								<button onClick={onExportKey}>
-									{t("EXPORTAR CLAVE PRIVADA")}
+									{t("EXPORT PRIVATE KEY")}
 								</button>
 							</div>
 							<span className="dim err" style={{ fontSize: 11 }}>
-								{t(
-									"La clave privada ES la identidad del nodo: quien la tenga puede suplantarlo. Guárdala cifrada.",
+								{t("The private key IS the node's identity: whoever holds it can impersonate it. Store it encrypted.",
 								)}
 							</span>
 							{bkMsg && (
@@ -967,7 +948,7 @@ export default function Config() {
 						</div>
 					</Section>
 
-					<Section title={t("CONFIG // BASE DE DATOS")}>
+					<Section title={t("CONFIG // DATABASE")}>
 						<div
 							style={{
 								padding: 14,
@@ -979,16 +960,15 @@ export default function Config() {
 						>
 							<span className="dim">
 								{stats
-									? t(
-											"{0} mensajes · {1} muestras de telemetría · {2} nodos",
+									? t("{0} messages · {1} telemetry samples · {2} nodes",
 											stats.messages,
 											stats.telemetry,
 											stats.nodes,
 										)
-									: t("leyendo…")}
+									: t("reading…")}
 							</span>
 							<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-								<span>{t("borrar lo anterior a")}</span>
+								<span>{t("delete anything older than")}</span>
 								<input
 									type="number"
 									min={1}
@@ -999,17 +979,17 @@ export default function Config() {
 										setPurgeArm(false);
 									}}
 								/>
-								<span>{t("días")}</span>
+								<span>{t("days")}</span>
 								<button
 									className="danger"
 									style={{ width: 180 }}
 									onClick={onPurge}
 								>
-									{purgeArm ? t("[ ¿SEGURO? ]") : t("[ PURGAR ]")}
+									{purgeArm ? t("[ SURE? ]") : t("[ PURGE ]")}
 								</button>
 							</div>
 							<span className="dim">
-								{t("afecta a mensajes y telemetría · los nodos no se tocan")}
+								{t("affects messages and telemetry · nodes are untouched")}
 							</span>
 							{purgeMsg && <span className="warn">{purgeMsg}</span>}
 							<div
@@ -1033,7 +1013,7 @@ export default function Config() {
 											setAutoPurgeDays(v);
 										}}
 									/>
-									{t("PURGAR AL ARRANCAR")}
+									{t("PURGE ON STARTUP")}
 								</label>
 								<input
 									type="number"
@@ -1047,7 +1027,7 @@ export default function Config() {
 										setAutoPurgeDays(v);
 									}}
 								/>
-								<span>{t("días")}</span>
+								<span>{t("days")}</span>
 							</div>
 						</div>
 					</Section>

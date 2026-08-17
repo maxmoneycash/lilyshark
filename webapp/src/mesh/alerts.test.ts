@@ -1,7 +1,7 @@
 // Self-check: node --experimental-strip-types src/alerts.test.ts
 import assert from "node:assert";
 import { COOLDOWN_MS, evalAlerts, evalAutonomia } from "./alerts.ts";
-import type { Prevision } from "./battery.ts";
+import type { Forecast } from "./battery.ts";
 import type { NodeEntry } from "./store.ts";
 
 const NOW = 1_700_000_000_000;
@@ -120,11 +120,11 @@ assert.equal(dos.length, 2);
 
 // ── evalAutonomia ────────────────────────────────────────────────────────
 const fav = { num: 9, nombre: "Repetidor", fav: true };
-const prev = (horasRestantes?: number, ajuste = 0.9): Prevision => ({
-	pendiente: -2,
-	horasRestantes,
-	ajuste,
-	muestras: 20,
+const prev = (hoursRemaining?: number, fit = 0.9): Forecast => ({
+	slope: -2,
+	hoursRemaining,
+	fit,
+	samples: 20,
 	ultimo: 40,
 });
 

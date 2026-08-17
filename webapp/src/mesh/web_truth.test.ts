@@ -77,7 +77,7 @@ assert.match(terminal, /bindAnalyzerMesh/);
 assert.match(terminal, /void connectDeviceLink\(\)/);
 assert.match(nodes, /DEMO MESH IN PALO ALTO/);
 assert.match(mapView, /DEMO MAP · PALO ALTO/);
-assert.match(terminal, /setTab\("TELEMETRÍA"\)/);
+assert.match(terminal, /setTab\("TELEMETRY"\)/);
 assert.match(telemetry, /ThisDevicePanel/);
 assert.match(nodes, /ThisDeviceRow/);
 assert.match(mapView, /useDeviceLink/);

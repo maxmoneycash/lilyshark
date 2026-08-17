@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { type Prevision, preverBateria, textoPrevision } from "../battery";
+import { type Forecast, forecastBattery, forecastText } from "../battery";
 import { loadHopChanges, loadTelemetry, loadTraceroutes } from "../db";
 import {
 	ago,
@@ -42,7 +42,7 @@ function Copy({ text, children }: { text: string; children: React.ReactNode }) {
 	useEffect(() => () => clearTimeout(flash.current), []);
 	return (
 		<span
-			title={t("Clic para copiar")}
+			title={t("Click to copy")}
 			style={{ cursor: "pointer" }}
 			onClick={() => {
 				navigator.clipboard?.writeText(text).then(
@@ -226,7 +226,7 @@ function Detail(props: {
 	const posBase = useRef<number | undefined>(undefined);
 	const [history, setHistory] = useState<Traceroute[]>([]);
 	const [showHistory, setShowHistory] = useState(false);
-	const [bat, setBat] = useState<Prevision>();
+	const [bat, setBat] = useState<Forecast>();
 	const [hops, setHops] = useState<
 		{ ts: number; hops: number; antes?: number }[]
 	>([]);
@@ -249,7 +249,7 @@ function Detail(props: {
 		setBat(undefined);
 		loadTelemetry(n.num, "batteryLevel", Date.now() - 6 * 3_600_000)
 			.then((rows) => {
-				if (!cancelled) setBat(preverBateria(rows));
+				if (!cancelled) setBat(forecastBattery(rows));
 			})
 			.catch(() => {});
 		return () => {
@@ -302,14 +302,14 @@ function Detail(props: {
 	const onResetPath = () => {
 		setAdminMsg("");
 		resetPath(n.num)
-			.then(() => setAdminMsg(t("Ruta reiniciada ✓")))
+			.then(() => setAdminMsg(t("Path reset ✓")))
 			.catch((e: unknown) => setAdminMsg(`ERROR: ${e}`));
 	};
 
 	const onShare = () => {
 		setAdminMsg("");
 		shareContact(n.num)
-			.then(() => setAdminMsg(t("Contacto compartido en la malla ✓")))
+			.then(() => setAdminMsg(t("Contact shared with the mesh ✓")))
 			.catch((e: unknown) => setAdminMsg(`ERROR: ${e}`));
 	};
 
@@ -330,7 +330,7 @@ function Detail(props: {
 		// the reply arrives by event; we wait up to 60 s whatever the ack does
 		timer.current = setTimeout(() => {
 			setTracing(false);
-			setTraceErr(t("SIN RESPUESTA (60 s)"));
+			setTraceErr(t("NO REPLY (60 s)"));
 		}, 60_000);
 		try {
 			await runTraceroute(n.num);
@@ -346,11 +346,11 @@ function Detail(props: {
 			"ID",
 			<Copy text={`!${n.num.toString(16)}`}>{`!${n.num.toString(16)}`}</Copy>,
 		],
-		[t("TIPO"), hwName(n.type)],
+		[t("TYPE"), hwName(n.type)],
 		...(n.publicKey
 			? ([
 					[
-						t("CLAVE"),
+						t("KEY"),
 						<Copy text={n.publicKey}>
 							<span title={n.publicKey}>{`${n.publicKey.slice(0, 16)}…`}</span>
 						</Copy>,
@@ -364,31 +364,30 @@ function Detail(props: {
 			</span>,
 		],
 		[
-			t("BATERÍA"),
+			t("BATTERY"),
 			<>
 				{asciiBattery(n.batteryLevel)}
 				{bat && (
 					<div
 						className={
-							bat.horasRestantes !== undefined && bat.horasRestantes < 24
+							bat.hoursRemaining !== undefined && bat.hoursRemaining < 24
 								? "warn"
 								: "dim"
 						}
 						style={{ fontSize: 10, letterSpacing: 0 }}
-						title={t(
-							"Estimado con los últimos {0} puntos de batería · ajuste {1}",
-							bat.muestras,
-							bat.ajuste.toFixed(2),
+						title={t("Estimated from the last {0} battery points · fit {1}",
+							bat.samples,
+							bat.fit.toFixed(2),
 						)}
 					>
-						{t(...textoPrevision(bat))}
+						{t(...forecastText(bat))}
 					</div>
 				)}
 			</>,
 		],
-		[t("VOLTAJE"), n.voltage !== undefined ? `${n.voltage.toFixed(2)} V` : "—"],
+		[t("VOLTAGE"), n.voltage !== undefined ? `${n.voltage.toFixed(2)} V` : "—"],
 		[
-			t("SALTOS"),
+			t("HOPS"),
 			<>
 				{n.hopsAway !== undefined ? String(n.hopsAway) : "—"}
 				{hops[0] && (
@@ -400,8 +399,7 @@ function Detail(props: {
 							.join("\n")}
 					>
 						{" "}
-						{t(
-							"· cambió hace {0} (antes {1})",
+						{t("· changed {0} ago (was {1})",
 							ago(hops[0].ts / 1000),
 							hops[0].antes ?? "?",
 						)}
@@ -412,7 +410,7 @@ function Detail(props: {
 		...(n.outPath?.length
 			? ([
 					[
-						t("RUTA"),
+						t("PATH"),
 						<span className="dim" style={{ fontSize: 11 }}>
 							{n.outPath
 								.map((h) => h.toString(16).padStart(2, "0"))
@@ -421,9 +419,9 @@ function Detail(props: {
 					],
 				] as [string, React.ReactNode][])
 			: []),
-		[t("CIFRADO DM"), n.publicKey ? "PKI 🔒" : t("sólo PSK del canal")],
+		[t("DM ENCRYPTION"), n.publicKey ? "PKI 🔒" : t("channel PSK only")],
 		[
-			t("POSICIÓN"),
+			t("POSITION"),
 			n.lat !== undefined && n.lon !== undefined ? (
 				<>
 					<Copy text={`${n.lat}, ${n.lon}`}>
@@ -432,11 +430,11 @@ function Detail(props: {
 					{distDesde(n, props.me, props.isMe)}
 				</>
 			) : (
-				t("SIN GPS FIX")
+				t("NO GPS FIX")
 			),
 		],
 		[
-			t("VISTO HACE"),
+			t("LAST SEEN"),
 			<span title={fechaHora(n.lastHeard * 1000)}>{ago(n.lastHeard)}</span>,
 		],
 	];
@@ -444,7 +442,7 @@ function Detail(props: {
 		<div className="panel hot" style={{ width: 300, flexShrink: 0 }}>
 			<div className="panel-title">
 				<span>
-					{t("DETALLE // NODO")} {n.shortName}
+					{t("DETAIL // NODE")} {n.shortName}
 				</span>
 				<button
 					onClick={props.onClose}
@@ -468,14 +466,14 @@ function Detail(props: {
 				}}
 			>
 				{n.longName}
-				{props.isMe && ` · (${t("YO")})`}
+				{props.isMe && ` · (${t("ME")})`}
 			</div>
 			<div
 				className="dim"
 				style={{ padding: "2px 12px 12px", fontSize: 11 }}
 				title={fechaHora(n.lastHeard * 1000)}
 			>
-				{t("ÚLTIMO PAQUETE HACE {0}", ago(n.lastHeard))}
+				{t("LAST PACKET {0} AGO", ago(n.lastHeard))}
 			</div>
 			<div className="kv" style={{ borderTop: "1px solid var(--border)" }}>
 				{rows.map(([k, v]) => (
@@ -501,7 +499,7 @@ function Detail(props: {
 					</div>
 					{tracing && (
 						<span className="warn" style={{ fontSize: 11 }}>
-							{t("EN CURSO_")}
+							{t("IN PROGRESS_")}
 						</span>
 					)}
 					{traceErr && (
@@ -512,19 +510,19 @@ function Detail(props: {
 					{props.trace && (
 						<>
 							<RouteLine
-								label={t("IDA")}
+								label={t("OUT")}
 								hops={props.trace.route}
 								snrs={props.trace.snrTowards}
-								from={t("YO")}
+								from={t("ME")}
 								to={n.shortName}
 								short={props.short}
 							/>
 							<RouteLine
-								label={t("VUELTA")}
+								label={t("BACK")}
 								hops={props.trace.routeBack}
 								snrs={props.trace.snrBack}
 								from={n.shortName}
-								to={t("YO")}
+								to={t("ME")}
 								short={props.short}
 							/>
 						</>
@@ -535,7 +533,7 @@ function Detail(props: {
 								style={{ fontSize: 10, padding: "2px 6px", marginTop: 8 }}
 								onClick={() => setShowHistory((v) => !v)}
 							>
-								{showHistory ? "▼" : "▶"} {t("HISTORIAL")} ({history.length})
+								{showHistory ? "▼" : "▶"} {t("HISTORY")} ({history.length})
 							</button>
 							{showHistory && (
 								<div
@@ -545,13 +543,13 @@ function Detail(props: {
 										<div key={h.ts} style={{ marginBottom: 6 }}>
 											<div className="dim" style={{ fontSize: 10 }}>
 												{fechaHora(h.ts)} ·{" "}
-												{t("{0} saltos", h.route.length + 1)}
+												{t("{0} hops", h.route.length + 1)}
 											</div>
 											<RouteLine
-												label={t("IDA")}
+												label={t("OUT")}
 												hops={h.route}
 												snrs={h.snrTowards}
-												from={t("YO")}
+												from={t("ME")}
 												to={n.shortName}
 												short={props.short}
 											/>
@@ -574,21 +572,21 @@ function Detail(props: {
 						className="dim"
 						style={{ fontSize: 10, letterSpacing: 2, marginBottom: 4 }}
 					>
-						{t("PETICIÓN DE TELEMETRÍA")}
+						{t("TELEMETRY REQUEST")}
 					</div>
 					{posState === "waiting" && (
 						<span className="warn" style={{ fontSize: 11 }}>
-							{t("EN CURSO_")}
+							{t("IN PROGRESS_")}
 						</span>
 					)}
 					{posState === "ok" && (
 						<span style={{ fontSize: 11 }}>
-							{t("RECIBIDA ✓ · ver pestaña TELEMETRÍA")}
+							{t("RECEIVED ✓ · see TELEMETRY tab")}
 						</span>
 					)}
 					{posState === "timeout" && (
 						<span className="err" style={{ fontSize: 11 }}>
-							{t("SIN RESPUESTA (60 s)")}
+							{t("NO REPLY (60 s)")}
 						</span>
 					)}
 					{!["waiting", "ok", "timeout"].includes(posState) && (
@@ -626,8 +624,8 @@ function Detail(props: {
 						className={n.fav ? "primary" : ""}
 						title={
 							n.fav
-								? t("Quitar de favoritos")
-								: t("Marcar favorito (arriba en la lista)")
+								? t("Remove from favorites")
+								: t("Mark favorite (top of the list)")
 						}
 						onClick={() => toggleFav(n.num)}
 					>
@@ -637,17 +635,17 @@ function Detail(props: {
 						style={{ flex: 1, padding: "6px 0" }}
 						title={
 							n.ignored
-								? t("Dejar de ignorar")
-								: t("Ignorar: descartar sus mensajes")
+								? t("Stop ignoring")
+								: t("Ignore: discard its messages")
 						}
 						onClick={() => toggleIgnored(n.num)}
 					>
-						{n.ignored ? t("🚫 IGNORADO") : t("IGNORAR")}
+						{n.ignored ? t("🚫 IGNORED") : t("IGNORE")}
 					</button>
 					<button
 						className="danger"
 						style={{ flex: 1, padding: "6px 0" }}
-						title={t("Borrar de la radio y de la BD local")}
+						title={t("Delete from the radio and the local DB")}
 						onClick={() => {
 							if (confirmDel) {
 								deleteNode(n.num).catch(() => {});
@@ -662,7 +660,7 @@ function Detail(props: {
 							}
 						}}
 					>
-						{confirmDel ? t("¿SEGURO?") : t("BORRAR")}
+						{confirmDel ? t("SURE?") : t("DELETE")}
 					</button>
 				</div>
 			)}
@@ -679,19 +677,18 @@ function Detail(props: {
 					<div style={{ display: "flex", gap: 8 }}>
 						<button
 							style={{ flex: 1, padding: "6px 0" }}
-							title={t(
-								"Olvidar la ruta guardada: el siguiente intercambio la reaprende",
+							title={t("Forget the stored path: the next exchange re-learns it",
 							)}
 							onClick={onResetPath}
 						>
-							{t("RESET RUTA")}
+							{t("RESET PATH")}
 						</button>
 						<button
 							style={{ flex: 1, padding: "6px 0" }}
-							title={t("Difundir la tarjeta de este contacto a la malla")}
+							title={t("Broadcast this contact's card to the mesh")}
 							onClick={onShare}
 						>
-							{t("COMPARTIR")}
+							{t("SHARE")}
 						</button>
 					</div>
 					{adminMsg && (
@@ -722,7 +719,7 @@ function Detail(props: {
 					</button>
 					<button
 						style={{ flex: 1, padding: "8px 0", minWidth: 0 }}
-						title={t("Traceroute: trazar ruta de saltos hasta el nodo")}
+						title={t("Traceroute: trace the hop route to the node")}
 						disabled={tracing}
 						onClick={onTrace}
 					>
@@ -730,7 +727,7 @@ function Detail(props: {
 					</button>
 					<button
 						style={{ flex: 1, padding: "8px 0", minWidth: 0 }}
-						title={t("Pedir telemetría de sensores al nodo")}
+						title={t("Request sensor telemetry from the node")}
 						disabled={posState === "waiting"}
 						onClick={onAskTelem}
 					>
@@ -797,14 +794,14 @@ export default function Nodes({
 			<div className="panel" style={{ flex: 1, minWidth: 0 }}>
 				<div className="panel-title">
 					<span>
-						{t("PANEL // NODOS")} · {nodes.length}
-						{q ? t(" DE {0}", all.length) : ""} {t("DETECTADOS")}
+						{t("PANEL // NODES")} · {nodes.length}
+						{q ? t(" OF {0}", all.length) : ""} {t("DETECTED")}
 						{isDemo() ? " · DEMO PALO ALTO" : ""}
 					</span>
 					<input
 						value={filter}
 						onChange={(e) => setFilter(e.target.value)}
-						placeholder={t("filtrar nombre / id_")}
+						placeholder={t("filter name / id_")}
 						style={{ width: 180, fontSize: 11 }}
 					/>
 				</div>
@@ -819,24 +816,24 @@ export default function Nodes({
 					<table className="grid">
 						<thead>
 							<tr>
-								<Th label={t("NODO")} k="nombre" sort={sort} onSort={onSort} />
-								<Th label={t("CORTO")} k="corto" sort={sort} onSort={onSort} />
+								<Th label={t("NODE")} k="nombre" sort={sort} onSort={onSort} />
+								<Th label={t("SHORT")} k="corto" sort={sort} onSort={onSort} />
 								<Th label="SNR" k="snr" sort={sort} onSort={onSort} />
 								<Th
-									label={t("BATERÍA")}
+									label={t("BATTERY")}
 									k="bateria"
 									sort={sort}
 									onSort={onSort}
 								/>
 								<Th
-									label={t("SALTOS")}
+									label={t("HOPS")}
 									k="saltos"
 									sort={sort}
 									onSort={onSort}
 								/>
-								<Th label={t("POSICIÓN")} k="pos" sort={sort} onSort={onSort} />
+								<Th label={t("POSITION")} k="pos" sort={sort} onSort={onSort} />
 								<Th
-									label={t("VISTO HACE")}
+									label={t("LAST SEEN")}
 									k="visto"
 									sort={sort}
 									onSort={onSort}
@@ -866,7 +863,7 @@ export default function Nodes({
 										{n.fav && <span className="warn">★ </span>}!
 										{n.num.toString(16)} · {n.longName}
 										{n.num === s.myNodeNum &&
-											(isDemo() ? " (DEMO)" : ` (${t("YO")})`)}
+											(isDemo() ? " (DEMO)" : ` (${t("ME")})`)}
 										{n.type === ContactType.Repeater && " ⇄"}
 										{n.publicKey && " 🔒"}
 										{n.ignored && " 🚫"}
@@ -896,7 +893,7 @@ export default function Nodes({
 												</span>
 											</>
 										) : (
-											t("SIN GPS FIX")
+											t("NO GPS FIX")
 										)}
 									</td>
 									<td title={fechaHora(n.lastHeard * 1000)}>
@@ -909,7 +906,7 @@ export default function Nodes({
 					{nodes.length === 0 && (
 						<p className="dim" style={{ padding: 12 }}>
 							{q
-								? t('SIN COINCIDENCIAS PARA "{0}"_', filter)
+								? t("NO MATCHES FOR \"{0}\"_", filter)
 								: link.status === "linked"
 									? "T-Deck is listening on this radio profile. Other nodes appear here when they transmit. Nothing has been heard yet."
 									: "NO NODES DETECTED — AWAITING SIGNAL_"}
@@ -917,12 +914,12 @@ export default function Nodes({
 					)}
 				</div>
 				<div className="panel-foot">
-					<span>{t("{0} NODOS EN BD", all.length)}</span>
+					<span>{t("{0} NODES IN DB", all.length)}</span>
 					<span className="spacer" />
 					<span>
 						SNR: <span className="ok">≥5 dB OK</span> ·{" "}
-						<span className="warn">{t("0–5 dB REG")}</span> ·{" "}
-						<span className="err">{t("<0 dB MAL")}</span>
+						<span className="warn">{t("0–5 dB FAIR")}</span> ·{" "}
+						<span className="err">{t("<0 dB BAD")}</span>
 					</span>
 				</div>
 			</div>

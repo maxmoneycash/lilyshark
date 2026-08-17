@@ -55,7 +55,7 @@ const DECK_METRICS: DeckMetric[] = [
 
 function DeckTrend() {
 	const link = useDeviceLink();
-	const tema = useThemeTick();
+	const themeTick = useThemeTick();
 	const [metricId, setMetricId] = useState("voltage");
 	const plotDiv = useRef<HTMLDivElement>(null);
 	const plotRef = useRef<uPlot | null>(null);
@@ -117,7 +117,7 @@ function DeckTrend() {
 			plotRef.current?.destroy();
 			plotRef.current = null;
 		};
-	}, [rows.length, metric.id, tema, link.history[link.history.length - 1]?.atMs]);
+	}, [rows.length, metric.id, themeTick, link.history[link.history.length - 1]?.atMs]);
 
 	useEffect(() => {
 		const box = plotDiv.current;
@@ -255,19 +255,19 @@ const teleLoad = async (
 };
 
 // pseudo-metric: ChUtil + AirUtilTx on the same chart
-const CHANNEL = "__canal";
+const CHANNEL = "__channel";
 
 // A function, not a constant: at module scope the labels would be translated
 // once, on first import, and a language switch would leave them in the old one.
 const metricLabels = (): Record<string, string> => ({
-	[CHANNEL]: t("CANAL OCUPADO (%)"),
-	batteryLevel: t("NIVEL BATERÍA (%)"),
-	voltage: t("TENSIÓN BATERÍA (V)"),
-	channelUtilization: t("UTIL. CANAL (%)"),
-	airUtilTx: t("AIRE TX (%)"),
-	temperature: t("TEMPERATURA (°C)"),
-	relativeHumidity: t("HUMEDAD (%)"),
-	barometricPressure: t("PRESIÓN (hPa)"),
+	[CHANNEL]: t("CHANNEL BUSY (%)"),
+	batteryLevel: t("BATTERY LEVEL (%)"),
+	voltage: t("BATTERY VOLTAGE (V)"),
+	channelUtilization: t("CHANNEL UTIL. (%)"),
+	airUtilTx: t("TX AIRTIME (%)"),
+	temperature: t("TEMPERATURE (°C)"),
+	relativeHumidity: t("HUMIDITY (%)"),
+	barometricPressure: t("PRESSURE (hPa)"),
 });
 
 const RANGES: [string, number][] = [
@@ -299,8 +299,8 @@ export default function Telemetry() {
 	const link = useDeviceLink();
 	const s = useSyncExternalStore(subscribe, getSnapshot);
 	// uPlot draws on canvas with fg(): the chart is rebuilt on a theme change
-	const tema = useThemeTick();
-	const idioma = useLangTick();
+	const themeTick = useThemeTick();
+	const langTick = useLangTick();
 	const [node, setNode] = useState<number | undefined>();
 	const [compare, setCompare] = useState<number[]>([]);
 	const [csvMsg, setCsvMsg] = useState("");
@@ -439,7 +439,7 @@ export default function Telemetry() {
 						{},
 						{
 							label: dual
-								? t("UTIL. CANAL (%)")
+								? t("CHANNEL UTIL. (%)")
 								: compare.length > 0
 									? shortName(effectiveNode)
 									: (LABELS[metric] ?? metric),
@@ -451,7 +451,7 @@ export default function Telemetry() {
 						...(dual
 							? [
 									{
-										label: t("AIRE TX (%)"),
+										label: t("TX AIRTIME (%)"),
 										stroke: accent(),
 										width: 2,
 										points: { show: false },
@@ -491,7 +491,7 @@ export default function Telemetry() {
 		// `tick` is deliberately absent: it fires every 10 s and rebuilding the
 		// plot on it threw away the reader's cursor and zoom four times a minute.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [effectiveNode, metric, days, compare, tema, idioma]);
+	}, [effectiveNode, metric, days, compare, themeTick, langTick]);
 
 	// The plot is a canvas: it is sized in pixels once and would otherwise keep
 	// its first size through a window resize, an orientation change, or the
@@ -536,7 +536,7 @@ export default function Telemetry() {
 				`meshcore-${realMetric}-${stamp()}.csv`,
 				rows.join("\n"),
 			);
-			setCsvMsg(path ? t("EXPORTADO → {0}", path) : "");
+			setCsvMsg(path ? t("EXPORTED → {0}", path) : "");
 		} catch (e) {
 			setCsvMsg(t("ERROR: {0}", String(e)));
 		} finally {
@@ -571,14 +571,14 @@ export default function Telemetry() {
 				}}
 			>
 				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
-					{t("TELEMETRÍA //")}
+					{t("TELEMETRY //")}
 				</span>
 				<select
 					value={effectiveNode ?? ""}
 					onChange={(e) => setNode(Number(e.target.value))}
 				>
 					{nodes.length === 0 && (
-						<option value="">{t("SIN DATOS DE TELEMETRÍA")}</option>
+						<option value="">{t("NO TELEMETRY DATA")}</option>
 					)}
 					{nodes.map((n) => (
 						<option key={n.num} value={n.num}>
@@ -588,7 +588,7 @@ export default function Telemetry() {
 				</select>
 				<select value={metric} onChange={(e) => setMetric(e.target.value)}>
 					{metrics.length === 0 && (
-						<option value="">{t("SIN MÉTRICAS")}</option>
+						<option value="">{t("NO METRICS")}</option>
 					)}
 					{metrics.map((m) => (
 						<option key={m} value={m}>
@@ -599,7 +599,7 @@ export default function Telemetry() {
 
 				<select
 					value=""
-					title={t("Añadir otro nodo a la misma gráfica")}
+					title={t("Add another node to the same chart")}
 					disabled={compare.length >= SERIES_MAX}
 					onChange={(e) => {
 						const n = Number(e.target.value);
@@ -608,8 +608,8 @@ export default function Telemetry() {
 				>
 					<option value="">
 						{compare.length >= SERIES_MAX
-							? t("MÁXIMO {0}", SERIES_MAX)
-							: t("+ COMPARAR")}
+							? t("MAX {0}", SERIES_MAX)
+							: t("+ COMPARE")}
 					</option>
 					{nodes
 						.filter((n) => n.num !== effectiveNode && !compare.includes(n.num))
@@ -628,7 +628,7 @@ export default function Telemetry() {
 							borderColor: seriesColors()[i % SERIES_MAX],
 							color: seriesColors()[i % SERIES_MAX],
 						}}
-						title={t("Quitar de la comparación")}
+						title={t("Remove from the comparison")}
 						onClick={() => setCompare((c) => c.filter((x) => x !== n))}
 					>
 						{shortName(n)} ✕
@@ -648,7 +648,7 @@ export default function Telemetry() {
 				<span className="spacer" />
 				<button
 					style={{ fontSize: 10, padding: "0 6px" }}
-					title={t("Exportar a CSV lo que se ve en la gráfica")}
+					title={t("Export what the chart shows to CSV")}
 					disabled={!stats || exporting}
 					onClick={onExportCsv}
 				>
@@ -658,7 +658,7 @@ export default function Telemetry() {
 					className={csvMsg.startsWith("ERROR") ? "err" : "dim"}
 					style={{ fontSize: 11 }}
 				>
-					{csvMsg || (stats ? t("{0} MUESTRAS", stats.n) : t("SIN DATOS"))}
+					{csvMsg || (stats ? t("{0} SAMPLES", stats.n) : t("NO DATA"))}
 				</span>
 			</div>
 
@@ -677,7 +677,7 @@ export default function Telemetry() {
 				    its 200 px basis on desktop and only widens once it has wrapped */}
 				<div className="panel" style={{ flex: "999 1 320px", minWidth: 0 }}>
 					<div className="panel-title">
-						{t("GRÁFICA")} // {nodeLabel}
+						{t("CHART")} // {nodeLabel}
 						{compare.length > 0 && ` + ${compare.map(shortName).join(" + ")}`} ·{" "}
 						{LABELS[metric] ?? (metric || "—")}
 					</div>
@@ -690,8 +690,7 @@ export default function Telemetry() {
 					>
 						{!stats && (
 							<p className="dim" style={{ position: "absolute" }}>
-								{t(
-									"NO DATA — la telemetría se acumula mientras la app está conectada_",
+								{t("NO DATA — telemetry accumulates while the app is connected_",
 								)}
 							</p>
 						)}
@@ -719,7 +718,7 @@ export default function Telemetry() {
 				>
 					{compare.length > 0 && (
 						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
-							{t("SOLO DE {0}", nodeLabel)}
+							{t("{0} ONLY", nodeLabel)}
 						</span>
 					)}
 					{(
@@ -746,11 +745,11 @@ export default function Telemetry() {
 						}}
 					>
 						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
-							{t("MUESTREO PASIVO —")}
+							{t("PASSIVE SAMPLING —")}
 							<br />
-							{t("SE GUARDA TODO LO")}
+							{t("EVERYTHING THE MESH")}
 							<br />
-							{t("QUE EMITE LA MALLA")}
+							{t("TRANSMITS IS STORED")}
 						</span>
 					</div>
 				</div>

@@ -38,9 +38,9 @@ export default function MapView({
 			? { lat: deviceLink.telemetry.lat, lon: deviceLink.telemetry.lon }
 			: undefined;
 	// the markers are drawn with fg(): they have to be redrawn on a theme change
-	const tema = useThemeTick();
-	const horaFmt = useHourTick();
-	const idioma = useLangTick();
+	const themeTick = useThemeTick();
+	const timeFmt = useHourTick();
+	const langTick = useLangTick();
 	const divRef = useRef<HTMLDivElement>(null);
 	const mapRef = useRef<L.Map | null>(null);
 	const layerRef = useRef<L.LayerGroup | null>(null);
@@ -127,14 +127,14 @@ export default function MapView({
 
 		const nodeRows = (n: (typeof positioned)[number]) =>
 			`<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 2px;">` +
-			`<span style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("NODO")} // ${n.shortName}</span>` +
+			`<span style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("NODE")} // ${n.shortName}</span>` +
 			`<button data-num="${n.num}" style="font-size:10px;padding:0 6px;">[ +INFO ]</button>` +
 			`</div>` +
 			`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;">` +
 			`<span style="opacity:.85;">ID</span><span>!${n.num.toString(16)}</span>` +
 			`<span style="opacity:.85;">SNR</span><span>${n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : "—"}</span>` +
 			`<span style="opacity:.85;">BAT</span><span>${asciiBattery(n.batteryLevel)}</span>` +
-			`<span style="opacity:.85;">${t("VISTO")}</span><span title="${fechaHora(n.lastHeard * 1000)}">${t("hace {0}", ago(n.lastHeard))}</span>` +
+			`<span style="opacity:.85;">${t("SEEN")}</span><span title="${fechaHora(n.lastHeard * 1000)}">${t("{0} ago", ago(n.lastHeard))}</span>` +
 			`</div>`;
 
 		for (const group of byCoord.values()) {
@@ -149,7 +149,7 @@ export default function MapView({
 			// Popup built in the DOM (not a string) so the [+INFO] onclick can be attached
 			const box = document.createElement("div");
 			box.innerHTML =
-				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">POS ${lat.toFixed(4)}N ${lon.toFixed(4)}E · ${group.length} ${t("NODO")}${group.length > 1 ? "S" : ""}</div>` +
+				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">POS ${lat.toFixed(4)}N ${lon.toFixed(4)}E · ${group.length} ${t("NODE")}${group.length > 1 ? "S" : ""}</div>` +
 				group.map(nodeRows).join("");
 			for (const btn of box.querySelectorAll<HTMLButtonElement>(
 				"button[data-num]",
@@ -194,19 +194,19 @@ export default function MapView({
 			const box = document.createElement("div");
 			box.innerHTML =
 				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">WAYPOINT · ${w.lat.toFixed(4)}N ${w.lon.toFixed(4)}E</div>` +
-				`<div style="font-weight:700;margin:4px 0;">${emoji} ${w.name || t("(sin nombre)")}</div>` +
+				`<div style="font-weight:700;margin:4px 0;">${emoji} ${w.name || t("(unnamed)")}</div>` +
 				(w.description
 					? `<div style="margin-bottom:4px;">${w.description}</div>`
 					: "") +
-				`<div style="opacity:.85;font-size:11px;">${t("de {0}", getSnapshot().nodes.get(w.from)?.shortName ?? w.from.toString(16))}` +
+				`<div style="opacity:.85;font-size:11px;">${t("from {0}", getSnapshot().nodes.get(w.from)?.shortName ?? w.from.toString(16))}` +
 				(w.expire
-					? ` · ${t("caduca {0}", fechaHora(w.expire * 1000))}`
-					: ` · ${t("sin caducidad")}`) +
+					? ` · ${t("expires {0}", fechaHora(w.expire * 1000))}`
+					: ` · ${t("no expiry")}`) +
 				`</div>`;
 			const row = document.createElement("div");
 			row.style.cssText = "display:flex;gap:8px;margin-top:8px;";
 			const edit = document.createElement("button");
-			edit.textContent = t("[ EDITAR ]");
+			edit.textContent = t("[ EDIT ]");
 			edit.onclick = () => {
 				map.closePopup();
 				setWpMsg("");
@@ -222,7 +222,7 @@ export default function MapView({
 			};
 			const del = document.createElement("button");
 			del.className = "danger";
-			del.textContent = t("[ BORRAR ]");
+			del.textContent = t("[ DELETE ]");
 			del.onclick = () => {
 				map.closePopup();
 				deleteWaypoint(w.id).catch((e: unknown) => setWpMsg(`ERROR: ${e}`));
@@ -286,9 +286,9 @@ export default function MapView({
 		s.nodes,
 		s.waypoints,
 		s.myNodeNum,
-		tema,
-		horaFmt,
-		idioma,
+		themeTick,
+		timeFmt,
+		langTick,
 		filter,
 		focusNode,
 		deviceFix?.lat,
@@ -341,17 +341,17 @@ export default function MapView({
 			<div className="panel" style={{ flex: 1 }}>
 				<div className="panel-title">
 					<span>
-						{t("PANEL // MAPA TÁCTICO")} · {t("{0} NODOS", s.nodes.size)} ·{" "}
-						{t("{0} CON FIX", withFix)}
-						{junk > 0 && ` · ${t("{0} DESCARTADOS (0,0)", junk)}`}
+						{t("PANEL // TACTICAL MAP")} · {t("{0} NODES", s.nodes.size)} ·{" "}
+						{t("{0} WITH FIX", withFix)}
+						{junk > 0 && ` · ${t("{0} DISCARDED (0,0)", junk)}`}
 						{s.waypoints.size > 0 && ` · ${s.waypoints.size} WAYPOINTS`}
 					</span>
 					<span style={{ display: "flex", gap: 6, alignItems: "center" }}>
 						{(
 							[
-								["all", t("TODOS")],
+								["all", t("ALL")],
 								["fav", t("★ FAV")],
-								["active", t("ACTIVOS 1H")],
+								["active", t("ACTIVE 1H")],
 							] as const
 						).map(([key, label]) => (
 							<button
@@ -366,7 +366,7 @@ export default function MapView({
 						{/* The tiles are recolored to whatever the theme is; the label was
 						    hardcoded to the dark terminal's and lied on the light one. */}
 						<span style={{ marginLeft: 4 }}>
-							{isLight() ? t("CAPA: CLARA") : t("CAPA: OSCURA")}
+							{isLight() ? t("LAYER: LIGHT") : t("LAYER: DARK")}
 						</span>
 					</span>
 				</div>
@@ -415,7 +415,7 @@ export default function MapView({
 						</div>
 					)}
 					<div className="map-hud" style={{ right: 10, top: 8 }}>
-						{t("{0} NODOS · {1} PUNTOS", drawn.length, puntos)} · TILES © OSM
+						{t("{0} NODES · {1} POINTS", drawn.length, puntos)} · TILES © OSM
 						{deviceLink.status === "linked" && !deviceFix && (
 							<>
 								{" · "}
@@ -437,7 +437,7 @@ export default function MapView({
 						{wpMsg ||
 							(deviceLink.status === "linked" && drawn.length === 0
 								? "Listening. Your T-Deck plots when GPS has a fix. Other nodes plot when they transmit a position."
-								: t("CLIC DERECHO = NUEVO WAYPOINT"))}
+								: t("RIGHT CLICK = NEW WAYPOINT"))}
 					</div>
 					{draft && (
 						<div
@@ -452,7 +452,7 @@ export default function MapView({
 							}}
 						>
 							<div className="panel-title">
-								{draft.id ? t("EDITAR WAYPOINT") : t("NUEVO WAYPOINT")}
+								{draft.id ? t("EDIT WAYPOINT") : t("NEW WAYPOINT")}
 							</div>
 							<div
 								style={{
@@ -466,13 +466,13 @@ export default function MapView({
 									{draft.lat.toFixed(5)}N {draft.lon.toFixed(5)}E
 								</span>
 								<input
-									placeholder={t("nombre")}
+									placeholder={t("name")}
 									maxLength={30}
 									value={draft.name}
 									onChange={(e) => setDraft({ ...draft, name: e.target.value })}
 								/>
 								<input
-									placeholder={t("descripción")}
+									placeholder={t("description")}
 									maxLength={100}
 									value={draft.desc}
 									onChange={(e) => setDraft({ ...draft, desc: e.target.value })}
@@ -497,7 +497,7 @@ export default function MapView({
 											setDraft({ ...draft, expireH: Number(e.target.value) })
 										}
 									/>
-									<span className="dim">{t("h (0 = nunca)")}</span>
+									<span className="dim">{t("h (0 = never)")}</span>
 								</div>
 								<div style={{ display: "flex", gap: 8 }}>
 									<button
@@ -517,17 +517,17 @@ export default function MapView({
 														: 0,
 													lockedTo: 0,
 												});
-												setWpMsg(t("WAYPOINT EMITIDO ✓"));
+												setWpMsg(t("WAYPOINT SENT ✓"));
 												setDraft(undefined);
 											} catch (e) {
 												setWpMsg(`ERROR: ${e}`);
 											}
 										}}
 									>
-										{t("[ EMITIR ]")}
+										{t("[ SEND ]")}
 									</button>
 									<button onClick={() => setDraft(undefined)}>
-										{t("[ CANCELAR ]")}
+										{t("[ CANCEL ]")}
 									</button>
 								</div>
 							</div>

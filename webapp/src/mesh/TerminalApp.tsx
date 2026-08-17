@@ -12,7 +12,7 @@ import {
 } from "./radio";
 import { evalAlerts, evalAutonomia, getAlertCfg } from "./alerts";
 import { clearDemo, seedDemo } from "./demo";
-import { preverBateria } from "./battery";
+import { forecastBattery } from "./battery";
 import { addLog, DeviceStatus, fmtLog, getSnapshot, subscribe } from "./store";
 import { getAutoPurgeDays, loadTelemetry, purgeOlderThan } from "./db";
 import Chat from "./screens/Chat";
@@ -35,7 +35,6 @@ import { fmtFreq, useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
 import {
-  autoLinkDeviceLink,
   connectDeviceLink,
   disconnectDeviceLink,
   useDeviceLink,
@@ -52,10 +51,10 @@ const TABS = [
   "TRAFFIC",
   "SHELBY",
   "CHAT",
-  "NODOS",
-  "MAPA",
-  "MALLA",
-  "TELEMETRÍA",
+  "NODES",
+  "MAP",
+  "MESH",
+  "TELEMETRY",
   "CONFIG",
   "DEBUG",
 ] as const;
@@ -102,7 +101,7 @@ class ScreenBoundary extends Component<
         <main>
           <div className="panel" style={{ flex: 1 }}>
             <div className="panel-title">
-              <span>{t("ERROR EN PANTALLA")}</span>
+              <span>{t("SCREEN ERROR")}</span>
             </div>
             <pre className="err" style={{ padding: 16, whiteSpace: "pre-wrap" }}>
               {String(this.state.err?.stack ?? this.state.err)}
@@ -136,7 +135,7 @@ function Titlebar() {
         <button
           className="tb-btn"
           onClick={toggleFullscreen}
-          title={fs ? t("Salir de pantalla completa") : t("Pantalla completa")}
+          title={fs ? t("Exit fullscreen") : t("Fullscreen")}
         >
           ⛶
         </button>
@@ -286,7 +285,7 @@ function App() {
 
   // Leaving the map drops the focus: the ring shouldn't outlive the jump
   useEffect(() => {
-    if (tab !== "MAPA") setMapFocus(undefined);
+    if (tab !== "MAP") setMapFocus(undefined);
   }, [tab]);
 
   // Ctrl+1…9 and Ctrl+0 (the tenth tab) switch tabs · Ctrl+F searches the chat
@@ -338,13 +337,13 @@ function App() {
       )) {
         if (a.kind === "bateria") {
           void notify(
-            t("{0} · batería {1}%", a.name, a.value),
-            t("Por debajo del umbral ({0}%)", a.threshold),
+            t("{0} · battery {1}%", a.name, a.value),
+            t("Below the threshold ({0}%)", a.threshold),
           );
         } else {
           void notify(
-            t("{0} · sin señal", a.name),
-            t("{0} h sin dar señal", a.value),
+            t("{0} · no signal", a.name),
+            t("{0} h without a signal", a.value),
           );
         }
       }
@@ -371,14 +370,14 @@ function App() {
           );
           const a = evalAutonomia(
             { num: n.num, nombre: n.longName || n.shortName, fav: n.fav },
-            preverBateria(rows),
+            forecastBattery(rows),
             cfg,
             fired,
           );
           if (a) {
             void notify(
-              t("{0} · autonomía ~{1} h", a.name, a.value),
-              t("Al ritmo actual se agota por debajo de {0} h", a.threshold),
+              t("{0} · runtime ~{1} h", a.name, a.value),
+              t("At the current rate it runs out in under {0} h", a.threshold),
             );
           }
         } catch {
@@ -397,7 +396,7 @@ function App() {
     (days > 0
       ? purgeOlderThan(days)
           .then((n) => {
-            if (n > 0) addLog("Purga automática: {0} filas borradas", n);
+            if (n > 0) addLog("Automatic purge: {0} rows deleted", n);
           })
           .catch(() => {})
       : Promise.resolve()
@@ -413,15 +412,15 @@ function App() {
       // clears `device` first and never gets this far), so reaching this
       // point already means we want to be back.
       if (!canReconnect()) {
-        addLog("RECONEXION: no hay conexión previa que reintentar");
+        addLog("RECONNECT: no previous connection to retry");
         return;
       }
       wantRef.current = true;
       // A node that just dropped is either rebooting or out of range. Either
       // way it takes 10-20 s to answer again, so retrying immediately only
       // burns the first attempt.
-      setError(t("Enlace perdido · reconectando en {0}s", RECONNECT_WAIT_MS / 1000));
-      addLog("RECONEXION: programada en {0}s", RECONNECT_WAIT_MS / 1000);
+      setError(t("Link lost · reconnecting in {0}s", RECONNECT_WAIT_MS / 1000));
+      addLog("RECONNECT: scheduled in {0}s", RECONNECT_WAIT_MS / 1000);
       scheduleReconnect(RECONNECT_WAIT_MS);
     });
     return () => setConnectionLostHandler(undefined);
@@ -476,32 +475,32 @@ function App() {
   // reuses the chosen device, both without reopening the picker.
   const tryReconnect = async () => {
     if (!wantRef.current) {
-      addLog("RECONEXION: cancelada (desconexión manual)");
+      addLog("RECONNECT: cancelled (manual disconnect)");
       return;
     }
     if (reconnectBusyRef.current) {
-      addLog("RECONEXION: ya hay un intento en curso");
+      addLog("RECONNECT: an attempt is already in progress");
       return;
     }
     reconnectBusyRef.current = true;
     setConnecting(true);
-    setError(t("Reconectando… (intento {0})", attemptRef.current + 1));
-    addLog("RECONEXION: intento {0}", attemptRef.current + 1);
+    setError(t("Reconnecting… (attempt {0})", attemptRef.current + 1));
+    addLog("RECONNECT: attempt {0}", attemptRef.current + 1);
     try {
       await reconnectLast();
       if (!wantRef.current) return; // the user cancelled while reconnecting
       setConnectedAt(Date.now());
       setError("");
       attemptRef.current = 0;
-      addLog("RECONEXION: conectado");
+      addLog("RECONNECT: connected");
     } catch (e) {
       if (!wantRef.current) return;
       // Swallowing this was why a failed reconnect left no trace anywhere:
       // the header string is the next thing to overwrite itself.
-      addLog("RECONEXION: intento {0} fallido: {1}", attemptRef.current + 1, String(e));
+      addLog("RECONNECT: attempt {0} failed: {1}", attemptRef.current + 1, String(e));
       attemptRef.current++;
       const delay = Math.min(15000, 2000 * 2 ** (attemptRef.current - 1));
-      setError(t("Reconexión fallida, reintento en {0}s", delay / 1000));
+      setError(t("Reconnect failed, retrying in {0}s", delay / 1000));
       scheduleReconnect(delay);
     } finally {
       reconnectBusyRef.current = false;
@@ -522,7 +521,7 @@ function App() {
   const onCancel = async () => {
     canceledRef.current = true;
     setConnecting(false);
-    setError(t("Conexión cancelada"));
+    setError(t("Connection cancelled"));
     await stopAndForget();
   };
 
@@ -547,19 +546,15 @@ function App() {
         : "NO LINK";
   const pillLive = connected || lilyLinked;
 
-  // A granted T-Deck should light the header from any screen, not only TRAFFIC.
-  useEffect(() => {
-    void autoLinkDeviceLink();
-  }, []);
-
   // Only the header/sheet connect should steal the tab. Auto-link on a
-  // granted port must not yank someone off INTRO or a deep link.
+  // granted port used to steal the CDC port, fail the USB-reset handshake,
+  // and snap the header back to CONNECT with no error.
   const landOnLilyRef = useRef(false);
   useEffect(() => {
     if (deviceLink.status === "linked" && landOnLilyRef.current) {
       landOnLilyRef.current = false;
       setConnectOpen(false);
-      setTab("TELEMETRÍA");
+      setTab("TELEMETRY");
     }
     if (deviceLink.status === "error" || deviceLink.status === "off") {
       landOnLilyRef.current = false;
@@ -620,7 +615,7 @@ function App() {
         <span className="spacer" />
         {connected ? (
           <button className="primary" onClick={stopAndForget}>
-            {t("DESCONECTAR")}
+            {t("DISCONNECT")}
           </button>
         ) : lilyLinked ? (
           <button className="primary" onClick={() => void onLilyDisconnect()}>
@@ -634,7 +629,7 @@ function App() {
               else void onCancel();
             }}
           >
-            {t("CANCELAR")}
+            {t("CANCEL")}
           </button>
         ) : (
           <button
@@ -644,7 +639,7 @@ function App() {
               void connectDeviceLink();
             }}
           >
-            {t("CONECTAR")}
+            {t("CONNECT")}
           </button>
         )}
         {!connected && !lilyLinked && !connecting && !lilyConnecting && (
@@ -760,6 +755,12 @@ function App() {
       {(error || (deviceLink.status === "error" && deviceLink.error)) && (
         <p className="error">{error || deviceLink.error}</p>
       )}
+      {deviceLink.status === "connecting" && (
+        <p className="error">
+          Waiting for the T-Deck after USB reset
+          {deviceLink.lastRx ? ` · heard: ${deviceLink.lastRx}` : " · no serial yet"}
+        </p>
+      )}
 
       <ScreenBoundary key={tab}>
       <Suspense
@@ -785,15 +786,15 @@ function App() {
           focusSearch={focusSearch}
           onViewNode={(num) => {
             setNodeFocus(num);
-            setTab("NODOS");
+            setTab("NODES");
           }}
           onViewOnMap={(num) => {
             setMapFocus(num);
-            setTab("MAPA");
+            setTab("MAP");
           }}
         />
       )}
-      {tab === "NODOS" && (
+      {tab === "NODES" && (
         <Nodes
           initialSelected={nodeFocus}
           onOpenDm={(num) => {
@@ -802,18 +803,18 @@ function App() {
           }}
         />
       )}
-      {tab === "MAPA" && (
+      {tab === "MAP" && (
         <MapView
           focusNode={mapFocus}
           onOpenNode={(num) => {
             setNodeFocus(num);
-            setTab("NODOS");
+            setTab("NODES");
           }}
         />
       )}
-      {tab === "MALLA" && <Mesh />}
+      {tab === "MESH" && <Mesh />}
       {tab === "CONFIG" && <Config />}
-      {tab === "TELEMETRÍA" && <Telemetry />}
+      {tab === "TELEMETRY" && <Telemetry />}
       {tab === "DEBUG" && (
         <main>
           {/* no background of its own: hardcoding a near-black left the light
@@ -824,17 +825,17 @@ function App() {
               <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <button
                   style={{ fontSize: 10, padding: "0 6px" }}
-                  title={t("Exportar el log a un archivo de texto")}
+                  title={t("Export the log to a text file")}
                   disabled={s.log.length === 0}
                   onClick={() =>
                     saveText(`meshcore-log-${stamp()}.txt`, s.log.map(fmtLog).join("\n"))
-                      .then((p) => p && setError(t("EXPORTADO → {0}", p)))
-                      .catch((e) => setError(t("FALLO EXPORT: {0}", String(e))))
+                      .then((p) => p && setError(t("EXPORTED → {0}", p)))
+                      .catch((e) => setError(t("EXPORT FAILED: {0}", String(e))))
                   }
                 >
-                  {t("⭳ EXPORTAR")}
+                  {t("⭳ EXPORT")}
                 </button>
-                {t("{0} LÍNEAS", s.log.length)}
+                {t("{0} LINES", s.log.length)}
               </span>
             </div>
             <pre className="debuglog">
@@ -857,13 +858,13 @@ function App() {
             {t("FREQ")} {fmtFreq(s.selfInfo.radioFreq)} · SF{s.selfInfo.radioSf}
           </span>
         )}
-        {ch0 && <span>{t("CANAL")} 0 #{ch0.name}</span>}
+        {ch0 && <span>{t("CHANNEL")} 0 #{ch0.name}</span>}
         {(() => {
           const nowS = Date.now() / 1000;
           const act = [...s.nodes.values()].filter(
             (n) => nowS - n.lastHeard < 3600,
           ).length;
-          return <span>{t("{0} NODOS · {1} ACTIVOS 1H", s.nodes.size, act)}</span>;
+          return <span>{t("{0} NODES · {1} ACTIVE 1H", s.nodes.size, act)}</span>;
         })()}
         <span className="spacer" />
         {/* Uplink duration and host battery moved down from the header: they

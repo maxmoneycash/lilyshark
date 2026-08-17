@@ -26,12 +26,38 @@ const ESPRESSIF_USB_VENDOR = 0x303a;
 const KNOWN_USB_VENDORS = [ESPRESSIF_USB_VENDOR, 0x1a86, 0x10c4, 0x0403];
 const PORT_FILTERS = KNOWN_USB_VENDORS.map((usbVendorId) => ({ usbVendorId }));
 
-/** How long a port gets to answer LSK HELLO before we move on. Generous: the
- *  device may be mid-boot when we attach. */
-const HANDSHAKE_TIMEOUT_MS = 8000;
-/** A reboot costs the device its USB enumeration; this is the wait before
- *  reopening after an unexpected drop. */
-const REENUMERATE_WAIT_MS = 9000;
+/** How long a single open port gets to answer LSK HELLO. Opening ESP32-S3
+ *  native USB almost always resets the board, and Lilyshark only reads the
+ *  serial line after setup() finishes (display, GPS, radio). */
+export const HANDSHAKE_TIMEOUT_MS = 20000;
+/** Wait after a CDC drop before reopening. The T-Deck re-enumerates here. */
+export const REENUMERATE_WAIT_MS = 4000;
+/** Opens that may reboot the chip. First drop is expected, not a failure. */
+export const HANDSHAKE_MAX_ATTEMPTS = 3;
+/** Let the board come out of reset before the first HELLO on this open. */
+const HELLO_AFTER_OPEN_MS = 800;
+
+export type SerialLinkAction = 'ignore' | 'retry' | 'fail';
+
+/** Decide what a dropped CDC stream or handshake timeout means. */
+export function nextSerialAction(input: {
+  event: 'stream-drop' | 'timeout';
+  deliberate: boolean;
+  attempt: number;
+  maxAttempts?: number;
+}): SerialLinkAction {
+  if (input.deliberate) return 'ignore';
+  const max = input.maxAttempts ?? HANDSHAKE_MAX_ATTEMPTS;
+  return input.attempt + 1 < max ? 'retry' : 'fail';
+}
+
+export function isLilysharkBanner(line: string): boolean {
+  return (
+    line.startsWith('Lilyshark starting') ||
+    line.includes('Lilyshark UI ready') ||
+    line.startsWith('LSK ')
+  );
+}
 
 /** ~10 minutes at one sample every 2 s. Older points fall off the front. */
 export const TELEMETRY_HISTORY_LIMIT = 300;
@@ -92,6 +118,8 @@ export interface DeviceLinkState {
   error?: string;
   /** True when the error can be cleared by picking a different port. */
   canPick?: boolean;
+  /** Latest serial line, shown while connecting so a silent fail is visible. */
+  lastRx?: string;
   telemetry?: DeviceTelemetry;
   /** Newest last. Bounded by TELEMETRY_HISTORY_LIMIT. */
   history: DeviceTelemetry[];
@@ -235,7 +263,8 @@ let activeReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 let pumpDone: Promise<void> | undefined;
 /** False means a disconnect was asked for, so a read ending is not a fault. */
 let reading = false;
-let identified: ((ok: boolean) => void) | undefined;
+let identified: (() => void) | undefined;
+let streamEnded: (() => void) | undefined;
 
 let onAnalyzerLink: (() => void) | undefined;
 let onAnalyzerUnlink: (() => void) | undefined;
@@ -273,28 +302,34 @@ async function send(line: string): Promise<void> {
   await writer?.write(new TextEncoder().encode(line + '\n'));
 }
 
+function markLinked(firmware?: string): void {
+  const wasLinked = state.status === 'linked';
+  set({
+    status: 'linked',
+    firmware: firmware || state.firmware,
+    error: undefined,
+    canPick: undefined,
+  });
+  identified?.();
+  if (!wasLinked) onAnalyzerLink?.();
+}
+
 function handleLine(line: string): void {
+  if (line) set({ lastRx: line.slice(0, 160) });
   const parsed = parseLskLine(line);
   if (!parsed) return;
   if (parsed.kind === 'ID') {
-    set({
-      status: 'linked',
-      firmware: parsed.firmware,
-      error: undefined,
-      canPick: undefined,
-    });
-    identified?.(true);
-    onAnalyzerLink?.();
+    markLinked(parsed.firmware);
   } else if (parsed.kind === 'T') {
+    markLinked(state.firmware);
     set({
-      status: 'linked',
       telemetry: parsed.telemetry,
       history: appendTelemetryHistory(state.history, parsed.telemetry),
     });
     onAnalyzerTelemetry?.(parsed.telemetry);
   } else if (parsed.kind === 'F') {
+    markLinked(state.firmware);
     set({
-      status: 'linked',
       frames: appendHeardFrame(state.frames, parsed.frame),
     });
     onAnalyzerFrame?.(parsed.frame);
@@ -331,14 +366,31 @@ async function teardown(): Promise<void> {
   pumpDone = undefined;
 }
 
-/** Stream lines until the port ends, then recover a reboot or report the drop. */
-async function pump(candidate: SerialPort, attempt: number): Promise<void> {
+async function readAvailable(candidate: SerialPort): Promise<void> {
   const decoder = new TextDecoder();
   let pending = '';
-  try {
-    while (reading && activeReader) {
+  while (reading) {
+    if (!activeReader) {
+      const readable = candidate.readable;
+      if (!readable) return;
+      try {
+        activeReader = readable.getReader();
+      } catch {
+        return;
+      }
+    }
+    try {
       const { value, done } = await activeReader.read();
-      if (done) break;
+      if (done) {
+        try {
+          activeReader.releaseLock();
+        } catch {
+          /* already released */
+        }
+        activeReader = undefined;
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
       pending += decoder.decode(value, { stream: true });
       let nl = pending.indexOf('\n');
       while (nl >= 0) {
@@ -346,43 +398,57 @@ async function pump(candidate: SerialPort, attempt: number): Promise<void> {
         pending = pending.slice(nl + 1);
         nl = pending.indexOf('\n');
       }
+    } catch {
+      try {
+        activeReader.releaseLock();
+      } catch {
+        /* already released */
+      }
+      activeReader = undefined;
+      await new Promise((r) => setTimeout(r, 200));
     }
+  }
+}
+
+/** Stream lines until the port ends. A drop during handshake is a reboot, not
+ *  a failed identity check — the opener decides whether to retry. */
+async function pump(candidate: SerialPort): Promise<void> {
+  try {
+    await readAvailable(candidate);
   } catch {
     /* unplugged or rebooted mid-read */
   }
-  if (!reading) return; // deliberate disconnect
-  identified?.(false);
-
-  // Opening a CDC port can flick the ESP32-S3's reset lines, so a drop right
-  // after connecting usually means the device is rebooting, not missing.
-  void (async () => {
-    await teardown();
-    if (attempt >= 2) {
-      set({ status: 'error', error: 'link dropped — replug the device and retry', canPick: true });
-      return;
-    }
-    set({ status: 'connecting', error: undefined });
-    await new Promise((r) => setTimeout(r, REENUMERATE_WAIT_MS));
-    if (!(await attemptPort(candidate, attempt + 1))) {
-      set({
-        status: 'error',
-        error: 'the device stopped answering — replug it and retry',
-        canPick: true,
-      });
-    }
-  })();
+  if (!reading) return;
+  streamEnded?.();
 }
 
-/** Open one port and ask it to identify. True only if Lilyshark answered. */
-async function attemptPort(candidate: SerialPort, attempt = 0): Promise<boolean> {
+async function openCandidate(candidate: SerialPort): Promise<boolean> {
   try {
     await candidate.open({ baudRate: 115200 });
+    return true;
   } catch {
-    return false; // busy (another tab) or gone
+    /* already open in this origin, or held by another tab */
   }
   try {
-    // Hold reset and boot lines released; without this the open itself can
-    // restart the device, or worse, drop it into the bootloader.
+    await candidate.close();
+  } catch {
+    /* was not ours */
+  }
+  try {
+    await candidate.open({ baudRate: 115200 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+type HandshakeResult = 'linked' | 'drop' | 'timeout' | 'busy';
+
+async function openAndWait(candidate: SerialPort): Promise<HandshakeResult> {
+  if (!(await openCandidate(candidate))) return 'busy';
+  try {
+    // Release reset/boot after the host has opened. Too late to prevent the
+    // first CDC reset, but it keeps the board out of the bootloader.
     await candidate.setSignals({ dataTerminalReady: false, requestToSend: false });
   } catch {
     /* not every platform exposes setSignals */
@@ -393,27 +459,47 @@ async function attemptPort(candidate: SerialPort, attempt = 0): Promise<boolean>
   activeReader = candidate.readable?.getReader();
   if (!writer || !activeReader) {
     await teardown();
-    return false;
+    return 'busy';
   }
   reading = true;
-  pumpDone = pump(candidate, attempt);
+  pumpDone = pump(candidate);
 
-  const answered = await new Promise<boolean>((resolve) => {
-    // The firmware may be mid-line or mid-boot, so the hello repeats.
+  return await new Promise<HandshakeResult>((resolve) => {
     const hello = setInterval(() => void send('LSK HELLO'), 1200);
-    const timer = setTimeout(() => finish(false), HANDSHAKE_TIMEOUT_MS);
-    const finish = (ok: boolean) => {
+    const firstHello = setTimeout(() => void send('LSK HELLO'), HELLO_AFTER_OPEN_MS);
+    const timer = setTimeout(() => finish('timeout'), HANDSHAKE_TIMEOUT_MS);
+    const finish = (result: HandshakeResult) => {
       clearInterval(hello);
+      clearTimeout(firstHello);
       clearTimeout(timer);
       identified = undefined;
-      resolve(ok);
+      streamEnded = undefined;
+      resolve(result);
     };
-    identified = finish;
-    void send('LSK HELLO');
+    identified = () => finish('linked');
+    streamEnded = () => finish('drop');
   });
+}
 
-  if (!answered) await teardown();
-  return answered;
+/** Open one port and ask it to identify. Survives the ESP32-S3 USB reboot
+ *  that almost always happens on the first open. */
+async function attemptPort(candidate: SerialPort): Promise<boolean> {
+  for (let attempt = 0; attempt < HANDSHAKE_MAX_ATTEMPTS; attempt++) {
+    if (state.status === 'off') return false;
+    const result = await openAndWait(candidate);
+    if (result === 'linked') return true;
+    await teardown();
+    if (state.status === 'off') return false;
+    const action = nextSerialAction({
+      event: result === 'timeout' ? 'timeout' : 'stream-drop',
+      deliberate: false,
+      attempt,
+    });
+    if (action !== 'retry') return false;
+    set({ status: 'connecting', error: undefined });
+    await new Promise((r) => setTimeout(r, REENUMERATE_WAIT_MS));
+  }
+  return false;
 }
 
 async function grantedCandidates(vendors: number[] = KNOWN_USB_VENDORS): Promise<SerialPort[]> {
@@ -434,8 +520,10 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
     set({ status: 'error', error: 'this browser has no Web Serial — use Chrome, Edge or Arc' });
     return;
   }
-  if (state.status === 'connecting') return;
-  set({ status: 'connecting', error: undefined, canPick: undefined });
+  if (state.status === 'connecting' || state.status === 'linked') {
+    await disconnectDeviceLink();
+  }
+  set({ status: 'connecting', error: undefined, canPick: undefined, lastRx: undefined });
 
   try {
     if (!options.picker) {
@@ -449,7 +537,8 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
     if (await attemptPort(chosen)) return;
     set({
       status: 'error',
-      error: 'that port never answered — is the T-Deck powered on and running Lilyshark?',
+      error:
+        'that port never answered — close every other Lilyshark tab, leave the T-Deck plugged in, and retry. Opening USB reboots the board; wait until the header says T-DECK LINKED.',
       canPick: true,
     });
   } catch (e) {
@@ -472,18 +561,10 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
  * there is nothing to link — an unasked-for attempt must not raise errors.
  */
 export async function autoLinkDeviceLink(): Promise<void> {
-  if (!('serial' in navigator) || state.status !== 'off') return;
-  // Unprompted, only the T-Deck's own USB controller is fair game. The wider
-  // bridge-chip list belongs to the deliberate path: writing HELLO into
-  // whatever Arduino or CNC controller this origin was once granted is not
-  // something a page should do on its own.
-  const candidates = await grantedCandidates([ESPRESSIF_USB_VENDOR]);
-  if (candidates.length === 0) return;
-  set({ status: 'connecting', error: undefined });
-  for (const candidate of candidates) {
-    if (await attemptPort(candidate)) return;
-  }
-  set({ status: 'off', error: undefined });
+  // Deliberate CONNECT owns the port. An unprompted retry here used to steal
+  // the CDC handle, fail the reboot handshake, and snap the header back to
+  // CONNECT with no error.
+  return;
 }
 
 export async function disconnectDeviceLink(): Promise<void> {
