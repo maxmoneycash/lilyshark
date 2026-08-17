@@ -15,7 +15,7 @@ off-grid pointer** (`SHLB`) riding behind a 16-byte protocol header.
 
 Try it:
 
-- **Web analyzer** — open the TRÁFICO screen at the deployed web app and
+- **Web analyzer** — open the TRAFFIC screen at the deployed web app and
   press **Sample** (the app bundles this file), or choose *Open .lscap* and
   pick it yourself. Frame 9 is marked `◆ SHLB`; selecting it shows the
   decoded pointer beside the hex dump.

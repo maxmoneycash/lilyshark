@@ -68,7 +68,7 @@ Lilyshark is firmware plus a web analyzer that reads what the firmware records.
 | | Where | What it does |
 | --- | --- | --- |
 | **Firmware** | `src/`, `include/` | Captures LoRa frames off the SX1262 with their radio measurements. Writes `.lscap` and LoRaTap PCAP to microSD. |
-| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app (ported from the [bundled meshcore-terminal source](webapp/src/mesh/), MIT, recolored Lilyshark pink): the **TRAFFIC** screen opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, capture statistics, inline Shelby-pointer decode — the **SHELBY** screen shows the off-grid storage design with an airtime model derived from bundled synthetic sample metadata, and CHAT/NODES/MAP/MESH/TELEMETRY drive a real radio over USB or Bluetooth. Without a radio attached, the app seeds an explicitly synthetic demo mesh around Palo Alto so every screen shows useful, moving data. |
+| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app: the **TRAFFIC** screen opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, capture statistics, inline Shelby-pointer decode — the **SHELBY** screen shows the off-grid storage design with an airtime model derived from bundled synthetic sample metadata, and CHAT/NODES/MAP/MESH/TELEMETRY drive a real radio over USB or Bluetooth. Without a radio attached, the app seeds an explicitly synthetic demo mesh around Palo Alto so every screen shows useful, moving data. |
 
 Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAMPLE** on the TRAFFIC screen, and select frame 9 — it carries a Shelby pointer, decoded inline.
 
@@ -749,7 +749,7 @@ src/export/                   Capture encoders
 src/shelby/                   Shelby pointer encode, decode, and in-frame detection
 webapp/                       Terminal-style web app: analyzer, mesh client, Shelby explorer (Vite + React)
 webapp/src/lib/lscap.ts       .lscap and Shelby-pointer readers, matching the firmware
-webapp/src/mesh/              meshcore-terminal port: radio link, store, screens, theme
+webapp/src/mesh/              Terminal analyzer: radio link, store, screens, theme
 webapp/src/mesh/screens/      Terminal screens: TRAFFIC (analyzer), SHELBY, PAPER, mesh client
 samples/                      Deterministic demo capture with a Shelby pointer at sequence 9
 src/ui/                       Shared packet labels and UI admission rules
@@ -834,8 +834,6 @@ The standalone C++ tests compile with warnings as errors and run under AddressSa
 
 Lilyshark is licensed under [GPL-3.0](LICENSE). Barlow Condensed and IBM Plex Mono are distributed under the SIL Open Font License; their license texts are included in [assets/fonts](assets/fonts).
 
-Lilyshark incorporates [SigurdOS](https://github.com/hermes-gadget/SigurdOS-tdeck) (GPL-3.0-or-later, Copyright (C) 2025 Ben) under `third_party/sigurdos/` — standalone MeshCore messaging firmware for this same board, vendored verbatim with its license intact. The analyzer, the capture formats, and the Shelby layer are Lilyshark's; the MeshCore client, companion bridge, and board HAL underneath them are SigurdOS's. See [`NOTICE.md`](NOTICE.md) and [`third_party/sigurdos/ATTRIBUTION.md`](third_party/sigurdos/ATTRIBUTION.md). Support for that work belongs upstream: SigurdOS's maintainer asks that it go to [MeshCore](https://meshcore.co.uk).
-
-The web app's terminal interface is ported from the [bundled meshcore-terminal source](webapp/src/mesh/) (MIT), whose UI was itself ported from perereus/meshtastic-terminal (MIT); both are recolored and extended here under their licenses. The web terminal's JetBrains Mono build is distributed under the SIL Open Font License (`webapp/src/mesh/assets/fonts/OFL.txt`).
+The web app's terminal interface descends from perereus/meshtastic-terminal (MIT), recolored, rewritten, and extended here under that license. The web terminal's JetBrains Mono build is distributed under the SIL Open Font License (`webapp/src/mesh/assets/fonts/OFL.txt`). Lilyshark speaks the [MeshCore](https://meshcore.co.uk) protocol (MIT); its authors ask that support go to them rather than downstream projects, and we pass that request along. See [`NOTICE.md`](NOTICE.md).
 
 Meshtastic, MeshCore, Reticulum, RNode, Wireshark, and LILYGO are referenced to describe compatibility, protocol coverage, and target hardware. Lilyshark is an independent project and is not an official release from those projects.

@@ -3,7 +3,7 @@ import type { Message, NodeEntry, Traceroute, Waypoint } from "./store";
 /** Same API as the original SQLite layer, on IndexedDB: the browser has no
  *  SQLite, and everything the app persists is key/range lookups anyway. */
 
-const DB_NAME = "meshcore-terminal";
+const DB_NAME = "lilyshark";
 const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBDatabase> | undefined;

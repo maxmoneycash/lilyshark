@@ -1,5 +1,11 @@
 [
   {
+    "id": "what-you-can-see",
+    "title": "What you can actually see",
+    "path": "/docs/what-you-can-see.md",
+    "source": "docs/what-you-can-see.md"
+  },
+  {
     "id": "quickstart",
     "title": "Quickstart \u2014 evaluate Lilyshark in ten minutes",
     "path": "/docs/quickstart.md",

@@ -1,8 +1,6 @@
 # Lilyshark web app
 
-The cloud half of Lilyshark: a terminal-style web app — ported from the
-[bundled meshcore-terminal source](src/mesh/) (MIT)
-and recolored Lilyshark pink — that reads the `.lscap` captures the T-Deck
+The cloud half of Lilyshark: a terminal-style web app that reads the `.lscap` captures the T-Deck
 firmware writes, drives a real radio over USB or Bluetooth, and explores the
 Shelby network live. Deployed on Vercel.
 
@@ -10,14 +8,14 @@ Shelby network live. Deployed on Vercel.
 
 ```
 browser (Vite + React)
-  ├─ src/mesh/ ............ the meshcore-terminal port
+  ├─ src/mesh/ ............ the terminal analyzer
   │    ├─ radio.ts / store.ts / db.ts ... Web Serial + BLE link, state, history
-  │    ├─ screens/ ........ TRÁFICO (the .lscap analyzer), SHELBY, WHITEPAPER,
-  │    │                    CHAT, NODOS, MAPA, MALLA, TELEMETRÍA, CONFIG, DEBUG
+  │    ├─ screens/ ........ TRAFFIC (the .lscap analyzer), SHELBY, WHITEPAPER,
+  │    │                    CHAT, NODES, MAP, MESH, TELEMETRY, CONFIG, DEBUG
   │    ├─ theme.ts ........ one-line color themes; "lilyshark" pink is default
   │    └─ meshterm.css .... the terminal stylesheet, scoped under .meshterm
   ├─ src/lib/lscap.ts ..... .lscap + Shelby pointer reader (byte-exact vs firmware)
-  ├─ TRÁFICO ── fetch by blob name ──▶ /api/share/view/... ──▶ pulse-api ──▶ Shelby
+  ├─ TRAFFIC ── fetch by blob name ──▶ /api/share/view/... ──▶ pulse-api ──▶ Shelby
   └─ SHELBY screen ── /api/[...path] ── CORS proxy (Vercel serverless)
                                           └─ services/pulse-api ── indexer + API
                                                  └─ SQLite cache ◀── Shelby RPC /
@@ -27,7 +25,7 @@ browser (Vite + React)
 - **`src/lib/lscap.ts`** — the `.lscap` reader and the Shelby off-grid
   pointer decoder, byte-compatible with the firmware (pinned by the golden
   vector in `../docs/shelby-pointer-format.md`). Covered by `node:test`.
-- **`src/mesh/screens/Traffic.tsx`** — the TRÁFICO screen: open a capture
+- **`src/mesh/screens/Traffic.tsx`** — the TRAFFIC screen: open a capture
   from disk, from the bundled sample, or from Shelby by blob name; readouts,
   frame table, RF detail, hex dump, and inline Shelby-pointer decode.
 - **`src/mesh/screens/`** — the rest of the terminal: a full MeshCore client
@@ -71,12 +69,12 @@ proxy target in `api/[...path].ts` points at it.
 
 ## Shelby touchpoints
 
-- Capture fetch by blob name on the TRÁFICO screen (`/api/share/view/...`).
+- Capture fetch by blob name on the TRAFFIC screen (`/api/share/view/...`).
 - The SHELBY screen is a live read index of Shelby storage activity and the
   ShelbyUSD economy.
 - `scripts/shelby-upload.ts` and friends (`npm run shelby:upload`, …) push
   assets to Shelby through the SDK.
 - The Shelby off-grid pointer (`../docs/shelby-pointer-format.md`) is
   decoded inline when a capture's frames carry one — press **Sample** on the
-  TRÁFICO screen and select frame 9.
+  TRAFFIC screen and select frame 9.
 

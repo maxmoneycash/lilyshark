@@ -4,6 +4,7 @@ import type Connection from "@liamcottle/meshcore.js/src/connection/connection.j
 import Constants from "@liamcottle/meshcore.js/src/constants.js";
 import CayenneLpp from "@liamcottle/meshcore.js/src/cayenne_lpp.js";
 import { COOLDOWN_MS, getAlertCfg } from "./alerts";
+import { getDeviceLinkState } from "../lib/deviceLink";
 import { DEMO_NODE_FLOOR, demoSendText, isDemo } from "./demo";
 import { t } from "./i18n";
 import {
@@ -1102,7 +1103,7 @@ export function exportConfigJson(): string {
   return JSON.stringify(
     {
       v: 1,
-      kind: "meshcore-terminal-backup",
+      kind: "lilyshark-backup",
       name: selfInfo?.name,
       advLat: selfInfo?.advLat,
       advLon: selfInfo?.advLon,
@@ -1345,6 +1346,11 @@ export async function sendText(
   if (!device && isDemo()) {
     demoSendText(text, convo, replyId);
     return;
+  }
+  if (!device && getDeviceLinkState().status === "linked") {
+    throw new Error(
+      "This T-Deck is a listener. It hears Meshtastic nodes but cannot send messages.",
+    );
   }
   if (!device) throw new Error(t("Sin conexión"));
   const isDm = convo.startsWith("dm:");

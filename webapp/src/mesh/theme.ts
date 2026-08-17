@@ -1,6 +1,5 @@
 /** Color themes: they only change --fg/--bg/--panel/--map-tint; the rest of
- *  the theme (dim, border, glow) derives from --fg via color-mix in meshterm.css.
- *  Ported from meshcore-terminal (MIT). */
+ *  the theme (dim, border, glow) derives from --fg via color-mix in meshterm.css. */
 import { useEffect, useState } from "react";
 
 /** `tint` colours the map tiles. CSS hue-rotate is a matrix approximation, not

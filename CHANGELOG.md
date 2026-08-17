@@ -39,13 +39,13 @@ pre-release, so versions are dates, not semver.
 
 ### Added — web app, rebuilt as a terminal
 
-- The web app is now a terminal-style interface ported from
-  meshcore-terminal (MIT; UI itself ported from perereus/meshtastic-terminal),
-  recolored Lilyshark pink by a one-line theme. It includes a full MeshCore
+- The web app is now a terminal-style interface descending from
+  perereus/meshtastic-terminal (MIT), recolored Lilyshark pink by a one-line
+  theme. It includes a full MeshCore
   client — chat, nodes, map, mesh graph, telemetry, config, and a debug log —
   driving a real radio over Web Serial or BLE; nothing routes through a
   server.
-- The `.lscap` analyzer is the TRÁFICO screen: open from disk, from the
+- The `.lscap` analyzer is the TRAFFIC screen: open from disk, from the
   bundled sample, or from Shelby by blob name; readouts, frame table with
   the SHLB marker, RF detail, hex dump, and an inline Shelby-pointer decode.
 - The SHELBY screen indexes the live network, WHITEPAPER embeds the

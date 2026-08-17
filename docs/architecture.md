@@ -86,11 +86,11 @@ Vite + React, deployed on Vercel. The interface is a terminal-style app
 ported from meshcore-terminal (MIT) and recolored Lilyshark pink; see
 `webapp/README.md` for the full map.
 
-- **TRÁFICO** (`src/mesh/screens/Traffic.tsx`) opens `.lscap` captures —
+- **TRAFFIC** (`src/mesh/screens/Traffic.tsx`) opens `.lscap` captures —
   from disk, from the bundled sample, or fetched from Shelby by blob name —
   and presents them Wireshark-style: frame list, decoded RF metadata, hex
   dump, capture statistics, and inline decoding of Shelby off-grid pointers.
-- **Mesh client screens** (CHAT, NODOS, MAPA, MALLA, TELEMETRÍA, CONFIG,
+- **Mesh client screens** (CHAT, NODES, MAP, MESH, TELEMETRY, CONFIG,
   DEBUG) drive a real radio over Web Serial or BLE — nothing routes through
   a server.
 - **SHELBY** reads the network itself — blobs, storage, providers, and the

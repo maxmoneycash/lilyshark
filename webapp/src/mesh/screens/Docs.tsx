@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { t, useLangTick } from "../i18n";
 
 /**
  * DOCS — the repository's documentation, published into the app.
@@ -52,7 +51,6 @@ function resolveLink(
 }
 
 export default function Docs() {
-	useLangTick();
 	const [docs, setDocs] = useState<DocEntry[]>([]);
 	const [current, setCurrent] = useState<DocEntry | null>(null);
 	const [text, setText] = useState<string>("");
@@ -89,38 +87,27 @@ export default function Docs() {
 	};
 
 	return (
-		<div
-			style={{
-				display: "grid",
-				gridTemplateColumns: "minmax(180px, 240px) minmax(0, 1fr)",
-				gap: 8,
-				minHeight: 0,
-				flex: 1,
-			}}
-		>
-			<div className="panel" style={{ alignSelf: "start" }}>
+		<div className="docs-grid">
+			<div className="panel docs-nav-panel">
 				<div className="panel-title">
-					<span>{t("DOCUMENTACIÓN")}</span>
+					<span>DOCUMENTATION</span>
 				</div>
-				<div style={{ display: "flex", flexDirection: "column", maxHeight: "62vh", overflowY: "auto" }}>
+				<nav className="docs-nav">
 					{docs.map((d) => (
 						<button
 							key={d.id}
 							type="button"
 							onClick={() => open(d)}
 							aria-selected={current?.id === d.id}
-							style={{
-								textAlign: "left",
-								background: current?.id === d.id ? "var(--glow)" : undefined,
-							}}
+							className={current?.id === d.id ? "is-current" : undefined}
 						>
 							{d.title}
 						</button>
 					))}
-				</div>
+				</nav>
 			</div>
 
-			<div className="panel" style={{ minHeight: 0 }}>
+			<div className="panel docs-doc-panel">
 				<div className="panel-title">
 					<span>{current?.title ?? "DOCS"}</span>
 					{current && (
@@ -129,12 +116,10 @@ export default function Docs() {
 						</span>
 					)}
 				</div>
-				<div
-					className="docs-body"
-					style={{ padding: "4px 16px 16px", maxHeight: "62vh", overflowY: "auto", fontSize: 13 }}
-				>
-					{error && <span className="err">{t("NO SE PUDO CARGAR: {0}", error)}</span>}
-					{!error && !text && <span className="dim">{t("CARGANDO…")}</span>}
+				<div className="docs-scroll">
+					<div className="docs-body">
+					{error && <span className="err">COULD NOT LOAD: {error}</span>}
+					{!error && !text && <span className="dim">LOADING…</span>}
 					{text && current && (
 						<ReactMarkdown
 							remarkPlugins={[remarkGfm]}
@@ -166,11 +151,19 @@ export default function Docs() {
 										/>
 									);
 								},
+								// A wide comparison table must scroll in its own box rather
+								// than stretching the prose column past a readable measure.
+								table: ({ children }) => (
+									<div className="docs-table-wrap">
+										<table>{children}</table>
+									</div>
+								),
 							}}
 						>
 							{text}
 						</ReactMarkdown>
 					)}
+					</div>
 				</div>
 			</div>
 		</div>

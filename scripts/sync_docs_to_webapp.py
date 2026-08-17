@@ -24,6 +24,7 @@ DEST = REPO_ROOT / "webapp" / "public" / "docs"
 
 # (source relative to repo root, doc id, destination relative to DEST)
 DOCS = [
+    ("docs/what-you-can-see.md", "what-you-can-see", "what-you-can-see.md"),
     ("docs/quickstart.md", "quickstart", "quickstart.md"),
     ("docs/hardware.md", "hardware", "hardware.md"),
     ("docs/architecture.md", "architecture", "architecture.md"),

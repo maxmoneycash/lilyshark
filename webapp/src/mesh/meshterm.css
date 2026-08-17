@@ -874,6 +874,34 @@
 .meshterm .map-wrap .leaflet-tooltip::before {
 	display: none;
 }
+.meshterm .demo-mesh-banner {
+	margin: 8px 10px 0;
+	padding: 8px 10px;
+	border: 1px solid var(--warn);
+	color: var(--warn);
+	font-size: 11px;
+	letter-spacing: 0.04em;
+	line-height: 1.4;
+}
+.meshterm .map-wait {
+	position: absolute;
+	z-index: 500;
+	left: 12px;
+	right: 12px;
+	top: 12px;
+	max-width: 520px;
+}
+.meshterm .map-wait-body {
+	padding: 10px 12px 12px;
+	font-size: 12px;
+	line-height: 1.45;
+}
+.meshterm .map-wait-body p {
+	margin: 0 0 8px;
+}
+.meshterm .map-wait-body p:last-child {
+	margin-bottom: 0;
+}
 .meshterm .map-hud {
 	position: absolute;
 	font-size: 11px;
@@ -986,6 +1014,12 @@ body {
 }
 /* A row filled with the pink selection colour flips its text to paper —
    `tr.sel` and hover, not only `tr.primary`. */
+:root.light .meshterm table.grid tbody tr.this-device-row:hover td,
+:root.light .meshterm table.grid tbody tr.this-device-row.sel td,
+:root.light .meshterm table.grid tbody tr.this-device-row:hover td *,
+:root.light .meshterm table.grid tbody tr.this-device-row.sel td * {
+	color: inherit;
+}
 :root.light .meshterm table.grid tbody tr:hover td,
 :root.light .meshterm table.grid tbody tr.sel td,
 :root.light .meshterm table.grid tbody tr:hover td *,
@@ -1609,6 +1643,91 @@ body:has(.meshterm .app.menu-open) {
 	max-width: 200px;
 }
 
+.meshterm .this-device {
+	flex-shrink: 0;
+}
+.meshterm .this-device .device-readout {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 10px 12px 12px;
+}
+.meshterm .this-device .stat-tile {
+	flex: 1 1 140px;
+	max-width: none;
+	min-width: 120px;
+	padding: 8px 10px;
+	border: 1px solid var(--border);
+}
+.meshterm .this-device .stat-tile .value {
+	font-size: 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 4px;
+}
+.meshterm .device-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 0 12px 10px;
+}
+.meshterm .device-note {
+	margin: 0;
+	padding: 0 12px 10px;
+	font-size: 11px;
+	max-width: 72ch;
+}
+.meshterm .device-heard {
+	padding: 0 12px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.meshterm .device-heard .label {
+	font-size: 10px;
+	letter-spacing: 2px;
+	color: var(--fg-dim);
+}
+.meshterm .heard-line {
+	display: grid;
+	grid-template-columns: 92px 1fr auto;
+	gap: 8px;
+	font-size: 11px;
+}
+.meshterm .spark {
+	color: var(--fg);
+	display: block;
+}
+.meshterm .sim-badge {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 1px 6px;
+	border: 1px solid var(--warn);
+	color: var(--warn);
+	letter-spacing: 1px;
+	font-size: 10px;
+	font-weight: 700;
+	vertical-align: middle;
+}
+.meshterm table.grid tbody tr.this-device-row {
+	background: color-mix(in srgb, var(--fg) 10%, transparent);
+	cursor: default;
+}
+.meshterm table.grid tbody tr.this-device-row:hover,
+.meshterm table.grid tbody tr.this-device-row.sel {
+	background: color-mix(in srgb, var(--fg) 16%, transparent);
+	color: inherit;
+}
+.meshterm table.grid tbody tr.this-device-row:hover .ok,
+.meshterm table.grid tbody tr.this-device-row:hover .warn,
+.meshterm table.grid tbody tr.this-device-row:hover .err,
+.meshterm table.grid tbody tr.this-device-row.sel .ok,
+.meshterm table.grid tbody tr.this-device-row.sel .warn,
+.meshterm table.grid tbody tr.this-device-row.sel .err {
+	color: inherit;
+}
+
 /* ── iOS paper window ─────────────────────────────────────────────────────
    On the phone the document-scroll model is right for panel screens, but for
    the paper it let 63 pages run underneath the sticky header and behind the
@@ -2200,6 +2319,278 @@ body:has(.meshterm .app.menu-open) {
    so it is the first thing to go when the row gets tight. */
 @media (min-width: 861px) and (max-width: 1180px) {
 	.meshterm header > .conn-pill {
+		display: none;
+	}
+}
+
+/* ── DOCS ─────────────────────────────────────────────────────────────────
+   The published repository documentation. Two panels that own the full
+   height of main: a nav that wraps its titles instead of clipping them, and
+   a prose column held to a readable measure while tables, code and charts
+   are allowed to break out to the full width. */
+.meshterm .docs-grid {
+	flex: 1;
+	display: grid;
+	grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+	gap: 12px;
+	min-height: 0;
+}
+.meshterm .docs-nav-panel,
+.meshterm .docs-doc-panel {
+	min-height: 0;
+}
+.meshterm .docs-nav {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 4px;
+	gap: 1px;
+}
+/* Titles wrap. A doc called "Why Shelby — and why not the alternatives" must
+   read as that, not as "Why Shelby — and why not the…". */
+/* These override the global button styling, which inverts to a solid --fg
+   background on hover. A list of fourteen titles is not a row of keys: it
+   gets a quiet tint, and it must always set background and color together
+   or the text lands on its own colour and vanishes. */
+.meshterm .docs-nav button:not(.tab) {
+	text-align: left;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.35;
+	padding: 7px 9px;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--fg-dim);
+	letter-spacing: 0;
+	box-shadow: none;
+	cursor: pointer;
+}
+/* Mixed from --fg rather than using --glow: the light themes set --glow to
+   transparent, which would leave the row with no hover affordance at all. */
+.meshterm .docs-nav button:not(.tab):hover:not(:disabled) {
+	background: color-mix(in srgb, var(--fg) 12%, transparent);
+	color: var(--fg);
+	border-color: var(--border);
+	box-shadow: none;
+}
+.meshterm .docs-nav button:not(.tab):active:not(:disabled) {
+	transform: none;
+	box-shadow: none;
+}
+.meshterm .docs-nav button:not(.tab).is-current,
+.meshterm .docs-nav button:not(.tab).is-current:hover:not(:disabled) {
+	color: var(--fg);
+	background: color-mix(in srgb, var(--fg) 20%, transparent);
+	border-color: var(--fg);
+	font-weight: 700;
+}
+.meshterm .docs-scroll {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 10px 20px 32px;
+}
+
+/* ── docs prose ── */
+.meshterm .docs-body {
+	font-size: 13.5px;
+	line-height: 1.65;
+	color: var(--fg);
+}
+.meshterm .docs-body > * {
+	max-width: 82ch;
+}
+/* Wide artefacts ignore the reading measure. */
+.meshterm .docs-body > .docs-table-wrap,
+.meshterm .docs-body > pre,
+.meshterm .docs-body > figure {
+	max-width: 100%;
+}
+.meshterm .docs-body > *:first-child {
+	margin-top: 0;
+}
+.meshterm .docs-body h1,
+.meshterm .docs-body h2,
+.meshterm .docs-body h3,
+.meshterm .docs-body h4 {
+	line-height: 1.25;
+	margin: 1.6em 0 0.55em;
+	color: var(--fg);
+}
+.meshterm .docs-body h1 {
+	font-size: 1.65em;
+	padding-bottom: 0.3em;
+	border-bottom: 1px solid var(--border);
+}
+.meshterm .docs-body h2 {
+	font-size: 1.3em;
+	padding-bottom: 0.25em;
+	border-bottom: 1px solid var(--border);
+}
+.meshterm .docs-body h3 {
+	font-size: 1.1em;
+}
+.meshterm .docs-body h4 {
+	font-size: 1em;
+	color: var(--fg-dim);
+}
+.meshterm .docs-body p,
+.meshterm .docs-body ul,
+.meshterm .docs-body ol,
+.meshterm .docs-body blockquote {
+	margin: 0 0 1em;
+}
+.meshterm .docs-body ul,
+.meshterm .docs-body ol {
+	padding-left: 1.5em;
+}
+.meshterm .docs-body li {
+	margin: 0.3em 0;
+}
+.meshterm .docs-body li > ul,
+.meshterm .docs-body li > ol {
+	margin: 0.3em 0;
+}
+.meshterm .docs-body blockquote {
+	border-left: 2px solid var(--border);
+	padding: 0.2em 0 0.2em 1em;
+	color: var(--fg-dim);
+}
+.meshterm .docs-body hr {
+	border: none;
+	border-top: 1px solid var(--border);
+	margin: 2em 0;
+}
+.meshterm .docs-body a {
+	color: var(--fg);
+	text-underline-offset: 2px;
+}
+/* Charts and diagrams sit centred in the column with air around them, not
+   flush left against the prose. */
+.meshterm .docs-body img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin: 1.75em auto;
+}
+.meshterm .docs-body p:has(> img:only-child) {
+	max-width: 100%;
+	text-align: center;
+	margin: 1.75em 0;
+}
+.meshterm .docs-body p > img:only-child {
+	margin: 0 auto;
+}
+
+/* ── docs code ── */
+.meshterm .docs-body code {
+	background: var(--glow);
+	border: 1px solid var(--border);
+	padding: 0.05em 0.35em;
+	font-size: 0.92em;
+	overflow-wrap: anywhere;
+}
+.meshterm .docs-body pre {
+	background: var(--panel);
+	border: 1px solid var(--border);
+	padding: 12px 14px;
+	overflow-x: auto;
+	margin: 0 0 1.2em;
+	line-height: 1.5;
+}
+.meshterm .docs-body pre code {
+	background: none;
+	border: none;
+	padding: 0;
+	font-size: 0.95em;
+	white-space: pre;
+}
+
+/* ── docs tables ──
+   Without this a GFM table renders as unstyled rows and the columns run
+   together into one line of text. */
+.meshterm .docs-table-wrap {
+	overflow-x: auto;
+	margin: 0 0 1.2em;
+	border: 1px solid var(--border);
+}
+.meshterm .docs-body table {
+	border-collapse: collapse;
+	width: 100%;
+	font-size: 0.95em;
+	font-variant-numeric: tabular-nums;
+}
+.meshterm .docs-body thead th {
+	background: var(--glow);
+	color: var(--fg);
+	text-align: left;
+	font-weight: 700;
+	white-space: nowrap;
+	border-bottom: 1px solid var(--border);
+}
+.meshterm .docs-body th,
+.meshterm .docs-body td {
+	padding: 7px 12px;
+	border-right: 1px solid var(--border);
+	vertical-align: top;
+}
+.meshterm .docs-body th:last-child,
+.meshterm .docs-body td:last-child {
+	border-right: none;
+}
+.meshterm .docs-body tbody tr + tr td {
+	border-top: 1px solid var(--border);
+}
+.meshterm .docs-body tbody tr:hover td {
+	background: var(--glow);
+}
+
+/* Phones: the contents list stacks above the document instead of stealing
+   half the width from it. It stays short so the document is what you see
+   after picking something. */
+@media (max-width: 860px) {
+	.meshterm .docs-grid {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
+		gap: 8px;
+	}
+	.meshterm .docs-nav {
+		max-height: 26vh;
+	}
+	.meshterm .docs-nav button:not(.tab) {
+		padding: 9px 10px;
+	}
+	.meshterm .docs-scroll {
+		padding: 12px 14px 32px;
+	}
+	.meshterm .docs-body {
+		font-size: 14px;
+		line-height: 1.6;
+	}
+	/* The measure is the viewport on a phone; nothing may force sideways
+	   scrolling of the page itself. */
+	.meshterm .docs-body > * {
+		max-width: 100%;
+	}
+	.meshterm .docs-body h1 {
+		font-size: 1.4em;
+	}
+	.meshterm .docs-body h2 {
+		font-size: 1.2em;
+	}
+	.meshterm .docs-body pre {
+		padding: 10px;
+		font-size: 0.86em;
+	}
+	.meshterm .docs-body th,
+	.meshterm .docs-body td {
+		padding: 6px 9px;
+	}
+	/* The source path in the header is the first thing to go when the title
+	   needs the room. */
+	.meshterm .docs-doc-panel .panel-title .dim {
 		display: none;
 	}
 }
