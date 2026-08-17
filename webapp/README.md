@@ -62,7 +62,23 @@ Format and lint with Biome (`npm run fmt`, `npm run lint`).
 
 ## Deploy
 
-The app deploys to Vercel from the repository root's `webapp/` directory;
+**Pushing to `main` deploys lilyshark.com. Nothing else does.**
+
+The Vercel project is connected to `maxmoneycash/lilyshark`, so a push to
+`main` builds and promotes to production and a push to any other branch gets
+a preview URL. Two settings make that work, and both matter:
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Root Directory | `webapp` | The repository root is a PlatformIO firmware tree with no `package.json`. Left at the default, every Git build fails immediately. |
+| Ignored Build Step | `git diff --quiet HEAD^ HEAD -- .` | Most commits here are firmware. Exit 0 skips the build, so only changes under `webapp/` spend a build. |
+
+Do **not** deploy with `vercel --prod`. It works, which is the problem: it
+publishes whatever is in the working tree, so production stops matching any
+commit and the drift is invisible until someone checks. This project sat 19
+hours behind `main` that way. If you ever need a one-off, deploy from a
+clean tree at the commit you intend to ship.
+
 `api/` becomes serverless functions. `services/pulse-api/` runs as a
 long-lived Node process (any VM; `npm run build && npm start`) and the
 proxy target in `api/[...path].ts` points at it.
