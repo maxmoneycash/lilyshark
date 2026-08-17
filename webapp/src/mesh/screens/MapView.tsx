@@ -1,11 +1,13 @@
 import L from "leaflet";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import "leaflet/dist/leaflet.css";
-import { DEMO_CENTER } from "../demo";
+import { DEMO_CENTER, isDemo } from "../demo";
 import { ago, asciiBattery, fechaHora, useHourTick } from "../fmt";
 import { t, useLangTick } from "../i18n";
+import { useDeviceLink } from "../../lib/deviceLink";
 import { deleteWaypoint, sendWaypoint } from "../radio";
 import { getSnapshot, subscribe } from "../store";
+import { SimulateBadge } from "../ThisDevice";
 import { accent, fg, isLight, useThemeTick } from "../theme";
 
 interface Draft {
@@ -26,6 +28,15 @@ export default function MapView({
 	focusNode?: number;
 }) {
 	const s = useSyncExternalStore(subscribe, getSnapshot);
+	const deviceLink = useDeviceLink();
+	const deviceFix =
+		deviceLink.status === "linked" &&
+		deviceLink.telemetry?.lat !== undefined &&
+		deviceLink.telemetry.lon !== undefined &&
+		(Math.abs(deviceLink.telemetry.lat) > 0.1 ||
+			Math.abs(deviceLink.telemetry.lon) > 0.1)
+			? { lat: deviceLink.telemetry.lat, lon: deviceLink.telemetry.lon }
+			: undefined;
 	// the markers are drawn with fg(): they have to be redrawn on a theme change
 	const tema = useThemeTick();
 	const horaFmt = useHourTick();
@@ -231,12 +242,39 @@ export default function MapView({
 				.addTo(layer);
 		}
 
-		if (!fittedRef.current && positioned.length > 0) {
-			map.fitBounds(
-				L.latLngBounds(
-					positioned.map((n) => [n.lat as number, n.lon as number]),
-				).pad(0.3),
-			);
+		if (deviceFix) {
+			const color = accent();
+			const box = document.createElement("div");
+			box.innerHTML =
+				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">THIS DEVICE</div>` +
+				`<div style="font-weight:700;margin:4px 0;">LILYSHARK USB</div>` +
+				`<div>${deviceFix.lat.toFixed(5)}N ${deviceFix.lon.toFixed(5)}E</div>` +
+				`<div style="opacity:.85;margin-top:4px;">${deviceLink.telemetry?.gps ?? ""} · ${deviceLink.telemetry?.bat ?? ""}</div>` +
+				(deviceLink.telemetry?.sim
+					? `<div style="margin-top:4px;letter-spacing:1px;">SIMULATE MODE · SYNTHETIC</div>`
+					: "");
+			L.circleMarker([deviceFix.lat, deviceFix.lon], {
+				radius: 9,
+				color,
+				fillColor: color,
+				fillOpacity: 0.2,
+				weight: 3,
+				dashArray: "4 3",
+			})
+				.bindPopup(box)
+				.bindTooltip("THIS DEVICE", {
+					permanent: true,
+					direction: "right",
+				})
+				.addTo(layer);
+		}
+
+		const fitPoints = [
+			...positioned.map((n) => [n.lat as number, n.lon as number] as [number, number]),
+			...(deviceFix ? ([[deviceFix.lat, deviceFix.lon]] as [number, number][]) : []),
+		];
+		if (!fittedRef.current && fitPoints.length > 0) {
+			map.fitBounds(L.latLngBounds(fitPoints).pad(0.3));
 			fittedRef.current = true;
 		}
 		// What the map is drawing is stated in the HUD below rather than logged:
@@ -253,6 +291,11 @@ export default function MapView({
 		idioma,
 		filter,
 		focusNode,
+		deviceFix?.lat,
+		deviceFix?.lon,
+		deviceLink.telemetry?.gps,
+		deviceLink.telemetry?.bat,
+		deviceLink.telemetry?.sim,
 	]);
 
 	// A focused node must be visible: drop any active filter when one arrives
@@ -329,11 +372,72 @@ export default function MapView({
 				</div>
 				<div className="map-wrap">
 					<div ref={divRef} style={{ height: "100%" }} />
+					{isDemo() && (
+						<div className="panel map-wait">
+							<div className="panel-title">DEMO MAP · PALO ALTO</div>
+							<div className="map-wait-body">
+								<p>
+									These pins are invented. They are not your T-Deck. Your
+									device last locked at a real GPS fix on its own screen.
+									This website only plots that fix after USB says{" "}
+									<strong>T-DECK LINKED</strong> and telemetry includes lat/lon.
+								</p>
+								<p>
+									Press CONNECT in the header. Pick the T-Deck. The demo mesh
+									clears. The map jumps to the coordinates on the device.
+								</p>
+							</div>
+						</div>
+					)}
+					{deviceLink.status === "linked" && !deviceFix && (
+						<div className="panel map-wait">
+							<div className="panel-title">THIS T-DECK IS NOT ON THE MAP YET</div>
+							<div className="map-wait-body">
+								<p>
+									USB is linked. The map will not invent a pin. It plots this
+									radio only after GPS reads <strong>GPS FIX</strong> (not SEARCH).
+								</p>
+								<p>
+									Right now: <strong>{deviceLink.telemetry?.gps ?? "GPS"}</strong>
+									{deviceLink.telemetry?.sat !== undefined
+										? ` · ${deviceLink.telemetry.sat} satellites`
+										: ""}
+									. Put this T-Deck by a window or outside, leave the USB
+									link alone, and wait. A cold start after a flash can take a
+									few minutes with sky.
+								</p>
+								<p>
+									The second T-Deck shows up here only if this one hears it on
+									the air (it must be transmitting Meshtastic, including a
+									position). Two Lilyshark listeners do not see each other.
+								</p>
+							</div>
+						</div>
+					)}
 					<div className="map-hud" style={{ right: 10, top: 8 }}>
 						{t("{0} NODOS · {1} PUNTOS", drawn.length, puntos)} · TILES © OSM
+						{deviceLink.status === "linked" && !deviceFix && (
+							<>
+								{" · "}
+								THIS DEVICE · {deviceLink.telemetry?.gps ?? "GPS"} ·{" "}
+								{deviceLink.telemetry?.gps?.includes("SEARCH")
+									? "WAITING FOR SATELLITES · NO MAP DOT UNTIL FIX"
+									: "NO FIX · NO MAP DOT"}
+							</>
+						)}
+						{deviceFix && (
+							<>
+								{" · "}
+								THIS DEVICE
+								<SimulateBadge on={deviceLink.telemetry?.sim} />
+							</>
+						)}
 					</div>
 					<div className="map-hud" style={{ left: 10, bottom: 10 }}>
-						{wpMsg || t("CLIC DERECHO = NUEVO WAYPOINT")}
+						{wpMsg ||
+							(deviceLink.status === "linked" && drawn.length === 0
+								? "Listening. Your T-Deck plots when GPS has a fix. Other nodes plot when they transmit a position."
+								: t("CLIC DERECHO = NUEVO WAYPOINT"))}
 					</div>
 					{draft && (
 						<div

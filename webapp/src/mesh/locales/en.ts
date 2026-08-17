@@ -245,6 +245,7 @@ const en: Record<string, string> = {
   CANAL: "CHANNEL",
 
   // Debug log (addLog messages, shown in the DEBUG panel and the footer)
+  "T-Deck linked over USB": "T-Deck linked over USB",
   "BD: fallo al guardar {0}: {1}": "DB: failed to save {0}: {1}",
   // ── what dbFail() names in "DB: failed to save {0}" ──
   // These are interpolated as {0}, so they are NOT translated by the key

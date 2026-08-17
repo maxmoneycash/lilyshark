@@ -81,6 +81,24 @@ int main()
     assert(status.snapshot().gps.state == lilyshark::GpsState::Fix);
     assert(status.snapshot().gps.position_valid);
 
+    // Official T-Deck Plus GPSShield firmware writes these before listening.
+    // A silent listener never re-enables GGA/RMC after another image disabled
+    // them, so SEARCH can last forever with only TXT checksums.
+    HardwareSerial configured{};
+    lilyshark::TDeckHardwareStatus bringup{configured};
+    bringup.begin(true);
+    assert(configured.written.find("$PCAS04,5*1C") != std::string::npos);
+    assert(configured.written.find("$PCAS03,1,1,1,1,1,1,1,1,1,1,,,0,0*02") !=
+           std::string::npos);
+    assert(configured.written.find("$PCAS11,3*1E") != std::string::npos);
+    const std::size_t after_begin = configured.written.size();
+    configured.push('S');
+    hardware_status_fake::now_ms = 500U;
+    bringup.poll();
+    assert(configured.written.size() > after_begin);
+    assert(configured.written.find("$PCAS03,1,1,1,1,1,1,1,1,1,1,,,0,0*02", after_begin) !=
+           std::string::npos);
+
     std::puts("hardware status GPS session tests passed");
     return 0;
 }

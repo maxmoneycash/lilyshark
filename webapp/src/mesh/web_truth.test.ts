@@ -53,18 +53,35 @@ const traffic = readFileSync(
 );
 const terminal = readFileSync(new URL("./TerminalApp.tsx", import.meta.url), "utf8");
 const shelby = readFileSync(new URL("./screens/Shelby.tsx", import.meta.url), "utf8");
+const telemetry = readFileSync(new URL("./screens/Telemetry.tsx", import.meta.url), "utf8");
+const nodes = readFileSync(new URL("./screens/Nodes.tsx", import.meta.url), "utf8");
+const mapView = readFileSync(new URL("./screens/MapView.tsx", import.meta.url), "utf8");
 
 assert.match(traffic, /startTrafficDemoInterval\(\s*simulatedLive,/);
 assert.match(traffic, /SYNTHETIC · NOT OTA/);
 assert.match(traffic, /SIM DISABLED/);
 assert.match(
   terminal,
-  /demoActive=\{!connected && !everConnectedRef\.current\}/,
+  /demoActive=\{!connected && !lilyLinked && !everConnectedRef\.current\}/,
 );
 
 assert.doesNotMatch(shelby, /\bmeasured\b/i);
 assert.match(shelby, />DEMO RATE</);
 assert.match(shelby, /from synthetic sample metadata/);
 assert.match(shelby, /DECODED FROM SYNTHETIC SAMPLE/);
+
+assert.match(terminal, /disconnectDeviceLink/);
+assert.match(terminal, /lilyLinked \? \(/);
+assert.match(terminal, /T-DECK LINKED/);
+assert.match(terminal, /bindAnalyzerMesh/);
+assert.match(terminal, /void connectDeviceLink\(\)/);
+assert.match(nodes, /DEMO MESH IN PALO ALTO/);
+assert.match(mapView, /DEMO MAP · PALO ALTO/);
+assert.match(terminal, /setTab\("TELEMETRÍA"\)/);
+assert.match(telemetry, /ThisDevicePanel/);
+assert.match(nodes, /ThisDeviceRow/);
+assert.match(mapView, /useDeviceLink/);
+assert.match(mapView, /THIS DEVICE/);
+assert.match(traffic, /sim-badge/);
 
 console.log("web_truth.test.ts OK");

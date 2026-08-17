@@ -72,6 +72,8 @@ class TDeckHardwareStatus
     void sampleBattery(std::uint32_t now_ms) noexcept;
     void pollGps(std::uint32_t now_ms) noexcept;
     void refreshLabels() noexcept;
+    void startGpsUart() noexcept;
+    void configureGpsReceiver() noexcept;
 
     HardwareSerial &gps_serial_;
 #if LILYSHARK_HAS_TINYGPSPLUS
@@ -94,6 +96,7 @@ class TDeckHardwareStatus
     std::uint8_t battery_sample_index_ = 0;
     bool gps_enabled_ = false;
     bool gps_receiver_seen_ = false;
+    bool gps_configured_after_detect_ = false;
 };
 
 #endif

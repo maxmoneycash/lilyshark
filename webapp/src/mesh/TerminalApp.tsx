@@ -34,7 +34,13 @@ const Docs = lazy(() => import("./screens/Docs"));
 import { fmtFreq, useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
-import { connectDeviceLink, useDeviceLink } from "../lib/deviceLink";
+import {
+  autoLinkDeviceLink,
+  connectDeviceLink,
+  disconnectDeviceLink,
+  useDeviceLink,
+} from "../lib/deviceLink";
+import { bindAnalyzerMesh } from "./analyzerMesh";
 import "./meshterm.css";
 
 const VERSION = "0.1.0";
@@ -256,13 +262,27 @@ function App() {
   // nothing about what the instrument does. Seed a demo mesh instead, and drop
   // it the instant real hardware appears so the two can never be confused.
   useEffect(() => {
-    if (connected) {
+    bindAnalyzerMesh();
+    const onTab = (e: Event) => {
+      const next = (e as CustomEvent<string>).detail;
+      if ((TABS as readonly string[]).includes(next)) setTab(next as Tab);
+    };
+    window.addEventListener("lilyshark-tab", onTab);
+    return () => window.removeEventListener("lilyshark-tab", onTab);
+  }, []);
+
+  const deviceLink = useDeviceLink();
+  const lilyConnecting = deviceLink.status === "connecting";
+  const lilyLinked = deviceLink.status === "linked";
+
+  useEffect(() => {
+    if (connected || lilyLinked) {
       everConnectedRef.current = true;
       clearDemo();
     } else if (!everConnectedRef.current) {
       seedDemo();
     }
-  }, [connected]);
+  }, [connected, lilyLinked]);
 
   // Leaving the map drops the focus: the ring shouldn't outlive the jump
   useEffect(() => {
@@ -510,18 +530,45 @@ function App() {
   // The pill reports whichever link exists. MeshCore's states win when that
   // flow is active; otherwise a Lilyshark analyzer link is just as much a
   // radio on the other end of the cable, and "NO LINK" would be a lie.
-  const deviceLink = useDeviceLink();
-  const lilyLinked = !connected && !connecting && !configuring && deviceLink.status === "linked";
-  const ledClass = connected || lilyLinked ? "on" : connecting || configuring ? "connecting" : "";
+  const ledClass =
+    connected || lilyLinked
+      ? "on"
+      : connecting || configuring || lilyConnecting
+        ? "connecting"
+        : "";
   const connText = connected
     ? s.status === DeviceStatus.Configured
       ? "DEVICE CONFIGURED"
       : "LINK UP"
     : lilyLinked
       ? "LILYSHARK USB"
-      : connecting || configuring
+      : connecting || configuring || lilyConnecting
         ? "ESTABLISHING LINK…"
         : "NO LINK";
+  const pillLive = connected || lilyLinked;
+
+  // A granted T-Deck should light the header from any screen, not only TRAFFIC.
+  useEffect(() => {
+    void autoLinkDeviceLink();
+  }, []);
+
+  // Only the header/sheet connect should steal the tab. Auto-link on a
+  // granted port must not yank someone off INTRO or a deep link.
+  const landOnLilyRef = useRef(false);
+  useEffect(() => {
+    if (deviceLink.status === "linked" && landOnLilyRef.current) {
+      landOnLilyRef.current = false;
+      setConnectOpen(false);
+      setTab("TELEMETRÍA");
+    }
+    if (deviceLink.status === "error" || deviceLink.status === "off") {
+      landOnLilyRef.current = false;
+    }
+  }, [deviceLink.status]);
+
+  const onLilyDisconnect = async () => {
+    await disconnectDeviceLink();
+  };
 
   let totalUnread = 0;
   for (const n of s.unread.values()) totalUnread += n;
@@ -575,20 +622,39 @@ function App() {
           <button className="primary" onClick={stopAndForget}>
             {t("DESCONECTAR")}
           </button>
-        ) : connecting ? (
-          <button className="primary" onClick={onCancel}>
+        ) : lilyLinked ? (
+          <button className="primary" onClick={() => void onLilyDisconnect()}>
+            T-DECK LINKED
+          </button>
+        ) : connecting || lilyConnecting ? (
+          <button
+            className="primary"
+            onClick={() => {
+              if (lilyConnecting) void onLilyDisconnect();
+              else void onCancel();
+            }}
+          >
             {t("CANCELAR")}
           </button>
         ) : (
-          <button className="primary" onClick={() => setConnectOpen(true)}>
+          <button
+            className="primary"
+            onClick={() => {
+              landOnLilyRef.current = true;
+              void connectDeviceLink();
+            }}
+          >
             {t("CONECTAR")}
           </button>
+        )}
+        {!connected && !lilyLinked && !connecting && !lilyConnecting && (
+          <button onClick={() => setConnectOpen(true)}>OTHER RADIO</button>
         )}
         <div className="conn-pill">
           <span className={`led ${ledClass}`} />
           <span
             className={
-              connected ? "" : connecting || configuring ? "txt-connecting" : "txt-off"
+              pillLive ? "" : connecting || configuring || lilyConnecting ? "txt-connecting" : "txt-off"
             }
           >
             {connText}
@@ -639,10 +705,10 @@ function App() {
             <button
               className="primary"
               disabled={!hasSerial}
-              title="For a T-Deck running Lilyshark firmware: live device telemetry and Shelby pointer hand-off on the TRAFFIC screen"
+              title="For a T-Deck running Lilyshark firmware: live device telemetry on TELEMETRY, your node on NODES, and Shelby pointer hand-off on TRAFFIC"
               onClick={() => {
+                landOnLilyRef.current = true;
                 setConnectOpen(false);
-                setTab("TRAFFIC");
                 void connectDeviceLink();
               }}
             >
@@ -671,8 +737,8 @@ function App() {
           </div>
           <p className="sheet-note">
             Pick by firmware, not by cable. A T-Deck running Lilyshark links
-            with the first button — its status appears on the TRAFFIC screen
-            and in the device's own event log. The MeshCore buttons speak the
+            with the first button — the header turns into DISCONNECT, and the
+            live readout opens on TELEMETRY. The MeshCore buttons speak the
             companion protocol and will sit at ESTABLISHING LINK forever
             against a Lilyshark radio.
           </p>
@@ -691,7 +757,9 @@ function App() {
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {(error || (deviceLink.status === "error" && deviceLink.error)) && (
+        <p className="error">{error || deviceLink.error}</p>
+      )}
 
       <ScreenBoundary key={tab}>
       <Suspense
@@ -704,7 +772,7 @@ function App() {
         }
       >
       {tab === "TRAFFIC" && (
-        <TrafficTab demoActive={!connected && !everConnectedRef.current} />
+        <TrafficTab demoActive={!connected && !lilyLinked && !everConnectedRef.current} />
       )}
       {tab === "SHELBY" && <ShelbyScreen />}
       {tab === "INTRO" && <IntroTab onOpen={(next) => setTab(next as Tab)} />}
@@ -802,6 +870,9 @@ function App() {
             are session status, which is what this strip is for, and the
             header stays down to identity, navigation, and the connect act. */}
         {connected && connectedAt && <span>UPLINK {hms(now - connectedAt)}</span>}
+        {lilyLinked && deviceLink.firmware && (
+          <span>LILYSHARK {deviceLink.firmware}</span>
+        )}
         {hostBat && !hostBat.charging && (
           <span className={hostBat.level <= 0.2 ? "err" : "dim"}>
             BAT {Math.round(hostBat.level * 100)}%

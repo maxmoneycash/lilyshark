@@ -33,6 +33,9 @@ const HANDSHAKE_TIMEOUT_MS = 8000;
  *  reopening after an unexpected drop. */
 const REENUMERATE_WAIT_MS = 9000;
 
+/** ~10 minutes at one sample every 2 s. Older points fall off the front. */
+export const TELEMETRY_HISTORY_LIMIT = 300;
+
 export interface DeviceTelemetry {
   bat: string;
   gps: string;
@@ -41,7 +44,39 @@ export interface DeviceTelemetry {
   rssiX10: number;
   snrX10: number;
   sim: boolean;
+  /** Present only when the firmware sent a GPS fix. */
+  lat?: number;
+  lon?: number;
+  mv?: number;
+  pct?: number;
+  sat?: number;
+  freqHz?: number;
+  sf?: number;
+  bwHz?: number;
+  rx?: number;
+  crc?: number;
+  atMs: number;
 }
+
+export interface HeardFrame {
+  src: number;
+  dst: number;
+  proto: string;
+  port: number;
+  hops?: number;
+  rssiX10: number;
+  snrX10: number;
+  kind: string;
+  sim: boolean;
+  lat?: number;
+  lon?: number;
+  name?: string;
+  short?: string;
+  text?: string;
+  atMs: number;
+}
+
+export const HEARD_FRAME_LIMIT = 40;
 
 export interface DevicePointer {
   sizeBytes: number;
@@ -58,10 +93,140 @@ export interface DeviceLinkState {
   /** True when the error can be cleared by picking a different port. */
   canPick?: boolean;
   telemetry?: DeviceTelemetry;
+  /** Newest last. Bounded by TELEMETRY_HISTORY_LIMIT. */
+  history: DeviceTelemetry[];
+  /** Newest last. Bounded by HEARD_FRAME_LIMIT. */
+  frames: HeardFrame[];
   pointer?: DevicePointer;
 }
 
-let state: DeviceLinkState = { status: 'off' };
+export type ParsedLsk =
+  | { kind: 'ID'; firmware: string }
+  | { kind: 'T'; telemetry: DeviceTelemetry }
+  | { kind: 'F'; frame: HeardFrame }
+  | { kind: 'P'; pointer: DevicePointer };
+
+function optionalCoord(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function optionalNum(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function optionalStr(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const s = value.trim();
+  return s.length > 0 ? s : undefined;
+}
+
+/** Pure parse of one newline-stripped analyzer line. Undefined if it is not LSK. */
+export function parseLskLine(line: string): ParsedLsk | undefined {
+  const sp = line.indexOf(' ', 4);
+  if (!line.startsWith('LSK ') || sp < 0) return undefined;
+  const kind = line.slice(4, sp);
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(line.slice(sp + 1)) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+  if (kind === 'ID') {
+    return { kind: 'ID', firmware: String(body.fw ?? '') };
+  }
+  if (kind === 'T') {
+    const lat = optionalCoord(body.lat);
+    const lon = optionalCoord(body.lon);
+    return {
+      kind: 'T',
+      telemetry: {
+        bat: String(body.bat ?? ''),
+        gps: String(body.gps ?? ''),
+        profile: String(body.profile ?? ''),
+        frames: Number(body.frames ?? 0),
+        rssiX10: Number(body.rssi_x10 ?? 0),
+        snrX10: Number(body.snr_x10 ?? 0),
+        sim: body.sim === true,
+        ...(lat !== undefined ? { lat } : {}),
+        ...(lon !== undefined ? { lon } : {}),
+        ...(optionalNum(body.mv) !== undefined ? { mv: optionalNum(body.mv) } : {}),
+        ...(optionalNum(body.pct) !== undefined ? { pct: optionalNum(body.pct) } : {}),
+        ...(optionalNum(body.sat) !== undefined ? { sat: optionalNum(body.sat) } : {}),
+        ...(optionalNum(body.freq_hz) !== undefined ? { freqHz: optionalNum(body.freq_hz) } : {}),
+        ...(optionalNum(body.sf) !== undefined ? { sf: optionalNum(body.sf) } : {}),
+        ...(optionalNum(body.bw_hz) !== undefined ? { bwHz: optionalNum(body.bw_hz) } : {}),
+        ...(optionalNum(body.rx) !== undefined ? { rx: optionalNum(body.rx) } : {}),
+        ...(optionalNum(body.crc) !== undefined ? { crc: optionalNum(body.crc) } : {}),
+        atMs: Date.now(),
+      },
+    };
+  }
+  if (kind === 'F') {
+    const lat = optionalCoord(body.lat);
+    const lon = optionalCoord(body.lon);
+    const hops = optionalNum(body.hops);
+    return {
+      kind: 'F',
+      frame: {
+        src: Number(body.src ?? 0),
+        dst: Number(body.dst ?? 0),
+        proto: String(body.proto ?? 'Unknown'),
+        port: Number(body.port ?? 0),
+        ...(hops !== undefined && hops >= 0 ? { hops } : {}),
+        rssiX10: Number(body.rssi_x10 ?? 0),
+        snrX10: Number(body.snr_x10 ?? 0),
+        kind: String(body.kind ?? 'RAW'),
+        sim: body.sim === true,
+        ...(lat !== undefined ? { lat } : {}),
+        ...(lon !== undefined ? { lon } : {}),
+        ...(optionalStr(body.name) ? { name: optionalStr(body.name) } : {}),
+        ...(optionalStr(body.short) ? { short: optionalStr(body.short) } : {}),
+        ...(optionalStr(body.text) ? { text: optionalStr(body.text) } : {}),
+        atMs: Date.now(),
+      },
+    };
+  }
+  if (kind === 'P') {
+    return {
+      kind: 'P',
+      pointer: {
+        sizeBytes: Number(body.size ?? 0),
+        expiresAtUnix: Number(body.expires ?? 0),
+        owner: String(body.owner ?? ''),
+        commitment: String(body.commit ?? ''),
+        atMs: Date.now(),
+      },
+    };
+  }
+  return undefined;
+}
+
+export function appendTelemetryHistory(
+  history: DeviceTelemetry[],
+  sample: DeviceTelemetry,
+): DeviceTelemetry[] {
+  const next =
+    history.length >= TELEMETRY_HISTORY_LIMIT
+      ? history.slice(history.length - TELEMETRY_HISTORY_LIMIT + 1)
+      : history.slice();
+  next.push(sample);
+  return next;
+}
+
+export function appendHeardFrame(frames: HeardFrame[], frame: HeardFrame): HeardFrame[] {
+  const next =
+    frames.length >= HEARD_FRAME_LIMIT
+      ? frames.slice(frames.length - HEARD_FRAME_LIMIT + 1)
+      : frames.slice();
+  next.push(frame);
+  return next;
+}
+
+let state: DeviceLinkState = { status: 'off', history: [], frames: [] };
+
+export function getDeviceLinkState(): DeviceLinkState {
+  return state;
+}
 const listeners = new Set<() => void>();
 
 let port: SerialPort | undefined;
@@ -71,6 +236,23 @@ let pumpDone: Promise<void> | undefined;
 /** False means a disconnect was asked for, so a read ending is not a fault. */
 let reading = false;
 let identified: ((ok: boolean) => void) | undefined;
+
+let onAnalyzerLink: (() => void) | undefined;
+let onAnalyzerUnlink: (() => void) | undefined;
+let onAnalyzerTelemetry: ((sample: DeviceTelemetry) => void) | undefined;
+let onAnalyzerFrame: ((frame: HeardFrame) => void) | undefined;
+
+export function setAnalyzerMeshSink(sink: {
+  onLink?: () => void;
+  onUnlink?: () => void;
+  onTelemetry?: (sample: DeviceTelemetry) => void;
+  onFrame?: (frame: HeardFrame) => void;
+}): void {
+  onAnalyzerLink = sink.onLink;
+  onAnalyzerUnlink = sink.onUnlink;
+  onAnalyzerTelemetry = sink.onTelemetry;
+  onAnalyzerFrame = sink.onFrame;
+}
 
 function set(next: Partial<DeviceLinkState>): void {
   state = { ...state, ...next };
@@ -92,46 +274,32 @@ async function send(line: string): Promise<void> {
 }
 
 function handleLine(line: string): void {
-  const sp = line.indexOf(' ', 4);
-  if (!line.startsWith('LSK ') || sp < 0) return;
-  const kind = line.slice(4, sp);
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(line.slice(sp + 1)) as Record<string, unknown>;
-  } catch {
-    return;
-  }
-  if (kind === 'ID') {
+  const parsed = parseLskLine(line);
+  if (!parsed) return;
+  if (parsed.kind === 'ID') {
     set({
       status: 'linked',
-      firmware: String(body.fw ?? ''),
+      firmware: parsed.firmware,
       error: undefined,
       canPick: undefined,
     });
     identified?.(true);
-  } else if (kind === 'T') {
+    onAnalyzerLink?.();
+  } else if (parsed.kind === 'T') {
     set({
       status: 'linked',
-      telemetry: {
-        bat: String(body.bat ?? ''),
-        gps: String(body.gps ?? ''),
-        profile: String(body.profile ?? ''),
-        frames: Number(body.frames ?? 0),
-        rssiX10: Number(body.rssi_x10 ?? 0),
-        snrX10: Number(body.snr_x10 ?? 0),
-        sim: body.sim === true,
-      },
+      telemetry: parsed.telemetry,
+      history: appendTelemetryHistory(state.history, parsed.telemetry),
     });
-  } else if (kind === 'P') {
+    onAnalyzerTelemetry?.(parsed.telemetry);
+  } else if (parsed.kind === 'F') {
     set({
-      pointer: {
-        sizeBytes: Number(body.size ?? 0),
-        expiresAtUnix: Number(body.expires ?? 0),
-        owner: String(body.owner ?? ''),
-        commitment: String(body.commit ?? ''),
-        atMs: Date.now(),
-      },
+      status: 'linked',
+      frames: appendHeardFrame(state.frames, parsed.frame),
     });
+    onAnalyzerFrame?.(parsed.frame);
+  } else if (parsed.kind === 'P') {
+    set({ pointer: parsed.pointer });
   }
 }
 
@@ -328,9 +496,12 @@ export async function disconnectDeviceLink(): Promise<void> {
   set({
     status: 'off',
     telemetry: undefined,
+    history: [],
+    frames: [],
     pointer: undefined,
     firmware: undefined,
     error: undefined,
     canPick: undefined,
   });
+  onAnalyzerUnlink?.();
 }

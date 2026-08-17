@@ -13,26 +13,18 @@ const LANG_EVENT = "langchange";
 /** What the selector shows: "auto" while nothing has been chosen by hand. */
 export function getLangPref(): Lang | "auto" {
   const saved = localStorage.getItem(LANG_KEY);
-  return saved === "es" || saved === "en" ? saved : "auto";
+  // Spanish is not a shipped language. A leftover "es" in storage must not
+  // flip the UI; treat it as unset.
+  return saved === "en" ? "en" : "auto";
 }
 
 export function getLang(): Lang {
-  const pref = getLangPref();
-  if (pref !== "auto") return pref;
-  // English-only product: this app was ported from a Spanish codebase, where
-  // the keys are the Spanish text and en.ts maps them to English. Sniffing
-  // navigator.language used to resolve "auto" to "es" on a Spanish browser,
-  // which shipped a Spanish UI to users who never asked for one — and any key
-  // missing from en.ts silently leaks Spanish on top of that. "auto" therefore
-  // resolves to English regardless of the browser locale. The machinery below
-  // is intact and the selector still honours an explicit choice, so restoring
-  // locale detection is a one-line change if the product ever ships Spanish.
   return "en";
 }
 
 export function setLang(l: Lang | "auto"): void {
-  if (l === "auto") localStorage.removeItem(LANG_KEY);
-  else localStorage.setItem(LANG_KEY, l);
+  if (l === "en") localStorage.setItem(LANG_KEY, l);
+  else localStorage.removeItem(LANG_KEY);
   // Switch live instead of reloading: a reload would drop the radio connection.
   lang = getLang();
   window.dispatchEvent(new Event(LANG_EVENT));

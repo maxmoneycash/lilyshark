@@ -420,8 +420,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             )}
             {link.status === 'linked' && (
               <span className="v ok">
-                Lilyshark {link.firmware} over USB
-                {link.telemetry?.sim ? ' · SIMULATE MODE (SYNTHETIC)' : ''}{' '}
+                Lilyshark {link.firmware} over USB{' '}
+                {link.telemetry?.sim ? <span className="sim-badge">SIMULATE MODE · SYNTHETIC</span> : null}{' '}
                 <button onClick={() => void disconnectDeviceLink()}>UNLINK</button>
               </span>
             )}

@@ -20,6 +20,8 @@ import {
 	toggleFav,
 	toggleIgnored,
 } from "../radio";
+import { getDeviceLinkState, useDeviceLink } from "../../lib/deviceLink";
+import { ANALYZER_SELF_NUM } from "../analyzerMesh";
 import {
 	ContactType,
 	getSnapshot,
@@ -27,6 +29,8 @@ import {
 	subscribe,
 	type Traceroute,
 } from "../store";
+import { isDemo } from "../demo";
+import { ThisDeviceRow } from "../ThisDevice";
 
 // Click to copy the underlying text; a ✓ flashes for ~1 s. The visible label
 // and the copied value can differ (coords show 4 decimals, copy full precision).
@@ -595,7 +599,20 @@ function Detail(props: {
 				</div>
 			)}
 			<div style={{ flex: 1 }} />
-			{!props.isMe && (
+			{getDeviceLinkState().status === "linked" && !n.publicKey && (
+				<div
+					style={{
+						padding: "10px 12px",
+						borderTop: "1px solid var(--border)",
+						fontSize: 11,
+					}}
+					className="dim"
+				>
+					Heard on the air. This T-Deck is a listener and cannot send
+					Meshtastic messages.
+				</div>
+			)}
+			{!props.isMe && getDeviceLinkState().status !== "linked" && (
 				<div
 					style={{
 						padding: "8px 12px",
@@ -649,7 +666,7 @@ function Detail(props: {
 					</button>
 				</div>
 			)}
-			{!props.isMe && (
+			{!props.isMe && n.publicKey && (
 				<div
 					style={{
 						padding: "8px 12px",
@@ -687,7 +704,7 @@ function Detail(props: {
 					)}
 				</div>
 			)}
-			{!props.isMe && (
+			{!props.isMe && n.publicKey && (
 				<div
 					style={{
 						padding: 12,
@@ -733,6 +750,7 @@ export default function Nodes({
 	initialSelected?: number;
 }) {
 	const s = useSyncExternalStore(subscribe, getSnapshot);
+	const link = useDeviceLink();
 	const [selected, setSelected] = useState<number | undefined>(initialSelected);
 	const rootRef = useRef<HTMLElement>(null);
 
@@ -759,7 +777,7 @@ export default function Nodes({
 	const [filter, setFilter] = useState("");
 	const me = s.myNodeNum !== undefined ? s.nodes.get(s.myNodeNum) : undefined;
 	const q = filter.trim().toLowerCase().replace(/^!/, "");
-	const all = [...s.nodes.values()];
+	const all = [...s.nodes.values()].filter((n) => n.num !== ANALYZER_SELF_NUM);
 	const matching = q
 		? all.filter(
 				(n) =>
@@ -781,6 +799,7 @@ export default function Nodes({
 					<span>
 						{t("PANEL // NODOS")} · {nodes.length}
 						{q ? t(" DE {0}", all.length) : ""} {t("DETECTADOS")}
+						{isDemo() ? " · DEMO PALO ALTO" : ""}
 					</span>
 					<input
 						value={filter}
@@ -790,6 +809,13 @@ export default function Nodes({
 					/>
 				</div>
 				<div className="scroll-y">
+					{isDemo() && (
+						<p className="demo-mesh-banner">
+							DEMO MESH IN PALO ALTO — NOT YOUR T-DECK. Connect with the header
+							CONNECT button (Lilyshark USB). These invented nodes drop the
+							moment the radio answers.
+						</p>
+					)}
 					<table className="grid">
 						<thead>
 							<tr>
@@ -818,6 +844,7 @@ export default function Nodes({
 							</tr>
 						</thead>
 						<tbody>
+							<ThisDeviceRow />
 							{nodes.map((n) => (
 								<tr
 									key={n.num}
@@ -838,7 +865,8 @@ export default function Nodes({
 									>
 										{n.fav && <span className="warn">★ </span>}!
 										{n.num.toString(16)} · {n.longName}
-										{n.num === s.myNodeNum && ` (${t("YO")})`}
+										{n.num === s.myNodeNum &&
+											(isDemo() ? " (DEMO)" : ` (${t("YO")})`)}
 										{n.type === ContactType.Repeater && " ⇄"}
 										{n.publicKey && " 🔒"}
 										{n.ignored && " 🚫"}
@@ -882,7 +910,9 @@ export default function Nodes({
 						<p className="dim" style={{ padding: 12 }}>
 							{q
 								? t('SIN COINCIDENCIAS PARA "{0}"_', filter)
-								: "NO NODES DETECTED — AWAITING SIGNAL_"}
+								: link.status === "linked"
+									? "T-Deck is listening on this radio profile. Other nodes appear here when they transmit. Nothing has been heard yet."
+									: "NO NODES DETECTED — AWAITING SIGNAL_"}
 						</p>
 					)}
 				</div>
@@ -900,7 +930,7 @@ export default function Nodes({
 			{selectedNode && (
 				<Detail
 					node={selectedNode}
-					isMe={selectedNode.num === s.myNodeNum}
+					isMe={selectedNode.num === s.myNodeNum && !isDemo()}
 					me={me}
 					trace={s.traceroutes.get(selectedNode.num)}
 					posTs={s.posUpdates.get(selectedNode.num)}

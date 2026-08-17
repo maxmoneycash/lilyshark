@@ -104,10 +104,10 @@ for (const loc of [
 	stub(loc);
 	assert.equal(getLang(), "en", `${loc} debe resolver a inglés`);
 }
-// the selector still works: an explicit choice wins over the default
+// A leftover Spanish preference must not surface Spanish in the UI.
 guardado.set("lang", "es");
-assert.equal(getLangPref(), "es");
-assert.equal(getLang(), "es", "español elegido a mano sigue mandando");
+assert.equal(getLangPref(), "auto");
+assert.equal(getLang(), "en", "saved es must not resolve to Spanish");
 guardado.set("lang", "en");
 assert.equal(getLang(), "en");
 guardado.set("lang", "basura");

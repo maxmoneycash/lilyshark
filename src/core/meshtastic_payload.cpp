@@ -14,7 +14,149 @@ constexpr std::size_t kMaxCiphertext = 256;
 
 /// Protobuf wire types this parser accepts.
 constexpr std::uint8_t kWireVarint = 0;
+constexpr std::uint8_t kWire64 = 1;
 constexpr std::uint8_t kWireLengthDelimited = 2;
+constexpr std::uint8_t kWire32 = 5;
+
+bool readVarint(const std::uint8_t *bytes, std::size_t length, std::size_t &cursor,
+                std::uint32_t &value) noexcept;
+
+bool readFixed32(const std::uint8_t *bytes, std::size_t length, std::size_t &cursor,
+                 std::uint32_t &value) noexcept
+{
+    if (cursor + 4U > length) return false;
+    value = static_cast<std::uint32_t>(bytes[cursor]) |
+            (static_cast<std::uint32_t>(bytes[cursor + 1U]) << 8U) |
+            (static_cast<std::uint32_t>(bytes[cursor + 2U]) << 16U) |
+            (static_cast<std::uint32_t>(bytes[cursor + 3U]) << 24U);
+    cursor += 4U;
+    return true;
+}
+
+bool skipField(const std::uint8_t *bytes, std::size_t length, std::size_t &cursor,
+               std::uint8_t wire) noexcept
+{
+    if (wire == kWireVarint) {
+        std::uint32_t unused = 0;
+        return readVarint(bytes, length, cursor, unused);
+    }
+    if (wire == kWire64) {
+        if (cursor + 8U > length) return false;
+        cursor += 8U;
+        return true;
+    }
+    if (wire == kWireLengthDelimited) {
+        std::uint32_t size = 0;
+        if (!readVarint(bytes, length, cursor, size)) return false;
+        if (size > length - cursor) return false;
+        cursor += size;
+        return true;
+    }
+    if (wire == kWire32) {
+        if (cursor + 4U > length) return false;
+        cursor += 4U;
+        return true;
+    }
+    return false;
+}
+
+double meshtasticDegrees(std::uint32_t raw) noexcept
+{
+    return static_cast<double>(static_cast<std::int32_t>(raw)) * 1e-7;
+}
+
+bool parsePosition(const std::uint8_t *bytes, std::size_t length, MeshtasticPayload &parsed) noexcept
+{
+    std::size_t cursor = 0;
+    bool have_lat = false;
+    bool have_lon = false;
+    std::uint32_t lat_i = 0;
+    std::uint32_t lon_i = 0;
+    while (cursor < length) {
+        std::uint32_t tag = 0;
+        if (!readVarint(bytes, length, cursor, tag)) return false;
+        const std::uint32_t field = tag >> 3U;
+        const std::uint8_t wire = static_cast<std::uint8_t>(tag & 0x07U);
+        if (field == 1U && wire == kWire32) {
+            if (!readFixed32(bytes, length, cursor, lat_i)) return false;
+            have_lat = true;
+        } else if (field == 2U && wire == kWire32) {
+            if (!readFixed32(bytes, length, cursor, lon_i)) return false;
+            have_lon = true;
+        } else if (!skipField(bytes, length, cursor, wire)) {
+            return false;
+        }
+    }
+    if (!have_lat || !have_lon) return true;
+    parsed.latitude_degrees = meshtasticDegrees(lat_i);
+    parsed.longitude_degrees = meshtasticDegrees(lon_i);
+    parsed.has_position = true;
+    return true;
+}
+
+bool copyName(char *out, std::size_t cap, const std::uint8_t *bytes, std::size_t length) noexcept
+{
+    if (cap == 0) return false;
+    const std::size_t n = length + 1U > cap ? cap - 1U : length;
+    for (std::size_t i = 0; i < n; ++i) {
+        const std::uint8_t byte = bytes[i];
+        if (byte < 0x20U || byte >= 0x7fU) return false;
+        out[i] = static_cast<char>(byte);
+    }
+    out[n] = '\0';
+    return n > 0;
+}
+
+bool parseUser(const std::uint8_t *bytes, std::size_t length, MeshtasticPayload &parsed) noexcept
+{
+    std::size_t cursor = 0;
+    while (cursor < length) {
+        std::uint32_t tag = 0;
+        if (!readVarint(bytes, length, cursor, tag)) return false;
+        const std::uint32_t field = tag >> 3U;
+        const std::uint8_t wire = static_cast<std::uint8_t>(tag & 0x07U);
+        if (wire == kWireLengthDelimited) {
+            std::uint32_t size = 0;
+            if (!readVarint(bytes, length, cursor, size)) return false;
+            if (size > length - cursor) return false;
+            if (field == 2U) {
+                (void)copyName(parsed.long_name, sizeof(parsed.long_name), bytes + cursor, size);
+            } else if (field == 3U) {
+                (void)copyName(parsed.short_name, sizeof(parsed.short_name), bytes + cursor, size);
+            }
+            cursor += size;
+        } else if (!skipField(bytes, length, cursor, wire)) {
+            return false;
+        }
+    }
+    parsed.has_names = parsed.long_name[0] != '\0' || parsed.short_name[0] != '\0';
+    return true;
+}
+
+bool parseNodeInfo(const std::uint8_t *bytes, std::size_t length, MeshtasticPayload &parsed) noexcept
+{
+    std::size_t cursor = 0;
+    while (cursor < length) {
+        std::uint32_t tag = 0;
+        if (!readVarint(bytes, length, cursor, tag)) return false;
+        const std::uint32_t field = tag >> 3U;
+        const std::uint8_t wire = static_cast<std::uint8_t>(tag & 0x07U);
+        if (wire == kWireLengthDelimited) {
+            std::uint32_t size = 0;
+            if (!readVarint(bytes, length, cursor, size)) return false;
+            if (size > length - cursor) return false;
+            if (field == 2U) {
+                (void)parseUser(bytes + cursor, size, parsed);
+            } else if (field == 4U) {
+                (void)parsePosition(bytes + cursor, size, parsed);
+            }
+            cursor += size;
+        } else if (!skipField(bytes, length, cursor, wire)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 /// Read a base-128 varint. False when it runs off the end or overruns 32 bits,
 /// which is how a wrong key usually announces itself.
@@ -147,6 +289,13 @@ bool readMeshtasticPayload(const std::uint8_t *ciphertext,
         parsed.text[copy] = '\0';
         parsed.text_length = static_cast<std::uint16_t>(copy);
         parsed.has_text = true;
+    }
+    if (payload_bytes != nullptr && payload_length > 0) {
+        if (parsed.portnum == static_cast<std::uint16_t>(MeshtasticPort::Position)) {
+            (void)parsePosition(payload_bytes, payload_length, parsed);
+        } else if (parsed.portnum == static_cast<std::uint16_t>(MeshtasticPort::NodeInfo)) {
+            (void)parseNodeInfo(payload_bytes, payload_length, parsed);
+        }
     }
 
     out = parsed;

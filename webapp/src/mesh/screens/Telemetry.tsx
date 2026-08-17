@@ -5,8 +5,235 @@ import { listMetrics, listTelemetryNodes, loadTelemetry } from "../db";
 import { demoTelemetry, demoTelemetryMetrics, demoTelemetryNodes } from "../demo";
 import { saveText, stamp } from "../export";
 import { t, useLangTick } from "../i18n";
+import { useDeviceLink, type DeviceTelemetry } from "../../lib/deviceLink";
 import { getSnapshot, subscribe } from "../store";
+import { ThisDevicePanel } from "../ThisDevice";
 import { accent, fg, isLight, useThemeTick } from "../theme";
+
+type DeckMetric = {
+	id: string;
+	label: string;
+	pick: (sample: DeviceTelemetry) => number | undefined;
+};
+
+const DECK_METRICS: DeckMetric[] = [
+	{
+		id: "voltage",
+		label: "BATTERY VOLTAGE (V)",
+		pick: (s) => (s.mv !== undefined ? s.mv / 1000 : undefined),
+	},
+	{
+		id: "battery",
+		label: "BATTERY (%)",
+		pick: (s) => {
+			if (s.pct !== undefined) return s.pct;
+			const m = s.bat.match(/(\d+)\s*%/);
+			return m ? Number(m[1]) : undefined;
+		},
+	},
+	{
+		id: "sats",
+		label: "GPS SATELLITES",
+		pick: (s) => s.sat,
+	},
+	{
+		id: "rx",
+		label: "FRAMES HEARD",
+		pick: (s) => s.rx,
+	},
+	{
+		id: "rssi",
+		label: "LAST PACKET RSSI (dBm)",
+		pick: (s) => ((s.rx ?? 0) > 0 || s.frames > 0 ? s.rssiX10 / 10 : undefined),
+	},
+	{
+		id: "snr",
+		label: "LAST PACKET SNR (dB)",
+		pick: (s) => ((s.rx ?? 0) > 0 || s.frames > 0 ? s.snrX10 / 10 : undefined),
+	},
+];
+
+function DeckTrend() {
+	const link = useDeviceLink();
+	const tema = useThemeTick();
+	const [metricId, setMetricId] = useState("voltage");
+	const plotDiv = useRef<HTMLDivElement>(null);
+	const plotRef = useRef<uPlot | null>(null);
+	const metric = DECK_METRICS.find((m) => m.id === metricId) ?? DECK_METRICS[0];
+	const rows = link.history
+		.map((sample) => {
+			const value = metric.pick(sample);
+			return value === undefined ? null : { ts: sample.atMs, value };
+		})
+		.filter((row): row is { ts: number; value: number } => row !== null);
+
+	useEffect(() => {
+		const box = plotDiv.current;
+		if (!box) return;
+		plotRef.current?.destroy();
+		plotRef.current = null;
+		if (rows.length === 0) return;
+		let min = Infinity;
+		let max = -Infinity;
+		let sum = 0;
+		for (const row of rows) {
+			if (row.value < min) min = row.value;
+			if (row.value > max) max = row.value;
+			sum += row.value;
+		}
+		plotRef.current = new uPlot(
+			{
+				...plotSize(box),
+				series: [
+					{},
+					{
+						label: metric.label,
+						stroke: fg(),
+						width: 2,
+						points: { show: rows.length < 3 },
+						spanGaps: true,
+					},
+				],
+				axes: [
+					{
+						stroke: fg("88"),
+						grid: { stroke: fg("22"), dash: [2, 6] },
+						ticks: { stroke: fg("44") },
+						font: "11px JetBrains Mono",
+					},
+					{
+						stroke: fg("88"),
+						grid: { stroke: fg("22"), dash: [2, 6] },
+						ticks: { stroke: fg("44") },
+						font: "11px JetBrains Mono",
+					},
+				],
+				legend: { show: false },
+			},
+			[rows.map((r) => r.ts / 1000), rows.map((r) => r.value)],
+			box,
+		);
+		return () => {
+			plotRef.current?.destroy();
+			plotRef.current = null;
+		};
+	}, [rows.length, metric.id, tema, link.history[link.history.length - 1]?.atMs]);
+
+	useEffect(() => {
+		const box = plotDiv.current;
+		if (!box || typeof ResizeObserver === "undefined") return;
+		const ro = new ResizeObserver(() => {
+			plotRef.current?.setSize(plotSize(box));
+		});
+		ro.observe(box);
+		return () => ro.disconnect();
+	}, []);
+
+	const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(3));
+	let min = Infinity;
+	let max = -Infinity;
+	let sum = 0;
+	for (const row of rows) {
+		if (row.value < min) min = row.value;
+		if (row.value > max) max = row.value;
+		sum += row.value;
+	}
+
+	return (
+		<>
+			<div
+				style={{
+					display: "flex",
+					gap: 10,
+					alignItems: "center",
+					flexShrink: 0,
+				}}
+			>
+				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
+					T-DECK // LIVE
+				</span>
+				<select value={metric.id} onChange={(e) => setMetricId(e.target.value)}>
+					{DECK_METRICS.map((m) => (
+						<option key={m.id} value={m.id}>
+							{m.label}
+						</option>
+					))}
+				</select>
+				<span className="spacer" />
+				<span className="dim" style={{ fontSize: 11 }}>
+					{rows.length} SAMPLES · EVERY 2s
+				</span>
+			</div>
+			<div
+				style={{
+					flex: 1,
+					display: "flex",
+					gap: 12,
+					minHeight: 0,
+					flexWrap: "wrap",
+				}}
+			>
+				<div className="panel" style={{ flex: "999 1 320px", minWidth: 0 }}>
+					<div className="panel-title">
+						CHART // T-DECK · {metric.label}
+					</div>
+					<div className="scroll-y" style={{ padding: 14, position: "relative" }}>
+						{rows.length === 0 && (
+							<p className="dim" style={{ position: "absolute" }}>
+								Waiting for the next USB sample_
+							</p>
+						)}
+						<div
+							ref={plotDiv}
+							style={{ width: "100%", height: "100%", minHeight: 248 }}
+						/>
+					</div>
+				</div>
+				<div
+					style={{
+						flex: "1 1 200px",
+						minWidth: 200,
+						display: "flex",
+						flexDirection: "column",
+						gap: 12,
+					}}
+				>
+					{(
+						[
+							["MIN", rows.length ? min : undefined],
+							["MAX", rows.length ? max : undefined],
+							["AVG", rows.length ? sum / rows.length : undefined],
+						] as [string, number | undefined][]
+					).map(([label, v]) => (
+						<div key={label} className="panel stat-tile">
+							<div className="label">{label}</div>
+							<div className="value">{v !== undefined ? fmt(v) : "—"}</div>
+						</div>
+					))}
+					<div
+						style={{
+							flex: 1,
+							border: "1px dashed var(--border)",
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "center",
+							padding: 12,
+							textAlign: "center",
+						}}
+					>
+						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+							USB SAMPLES FROM THIS T-DECK
+							<br />
+							HEARD-NODE TRENDS APPEAR
+							<br />
+							WHEN THE AIR IS BUSY
+						</span>
+					</div>
+				</div>
+			</div>
+		</>
+	);
+}
 
 // The database is the source of truth; the demo mesh rides on top of it the
 // same way it does on the node list, so this screen is never empty on a first
@@ -69,6 +296,7 @@ const plotSize = (box: HTMLElement) => ({
 });
 
 export default function Telemetry() {
+	const link = useDeviceLink();
 	const s = useSyncExternalStore(subscribe, getSnapshot);
 	// uPlot draws on canvas with fg(): the chart is rebuilt on a theme change
 	const tema = useThemeTick();
@@ -322,8 +550,18 @@ export default function Telemetry() {
 			: "—";
 	const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2));
 
+	if (link.status === "linked") {
+		return (
+			<main style={{ flexDirection: "column" }}>
+				<ThisDevicePanel />
+				<DeckTrend />
+			</main>
+		);
+	}
+
 	return (
 		<main style={{ flexDirection: "column" }}>
+			<ThisDevicePanel />
 			<div
 				style={{
 					display: "flex",

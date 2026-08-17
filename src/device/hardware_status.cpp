@@ -5,6 +5,7 @@
 #include "lilyshark/tdeck.h"
 
 #include <cstdio>
+#include <cstring>
 
 namespace lilyshark {
 
@@ -32,6 +33,7 @@ void TDeckHardwareStatus::begin(bool enable_gps) noexcept
     last_valid_sentence_ms_ = 0;
     last_passed_checksum_count_ = 0;
     gps_receiver_seen_ = false;
+    gps_configured_after_detect_ = false;
 
     gps_enabled_ = enable_gps;
     snapshot_.gps = GpsStatus{};
@@ -40,8 +42,7 @@ void TDeckHardwareStatus::begin(bool enable_gps) noexcept
     if (gps_enabled_) {
         gps_baud_index_ = 0;
         gps_baud_started_ms_ = millis();
-        gps_serial_.begin(gps_baud_candidates_[gps_baud_index_], SERIAL_8N1, tdeck::gps_rx_pin,
-                          tdeck::gps_tx_pin);
+        startGpsUart();
     }
 
     const std::uint32_t now_ms = millis();
@@ -69,6 +70,62 @@ void TDeckHardwareStatus::sampleBattery(std::uint32_t now_ms) noexcept
     last_battery_sample_ms_ = now_ms;
 }
 
+void TDeckHardwareStatus::startGpsUart() noexcept
+{
+    gps_serial_.setRxBufferSize(1024);
+    gps_serial_.begin(gps_baud_candidates_[gps_baud_index_], SERIAL_8N1, tdeck::gps_rx_pin,
+                      tdeck::gps_tx_pin);
+    configureGpsReceiver();
+}
+
+void TDeckHardwareStatus::configureGpsReceiver() noexcept
+{
+    // LILYGO T-Deck GPSShield / T-Deck Plus bring-up. A listener-only UART
+    // reports SEARCH forever when the module is still emitting TXT/GSV after
+    // another firmware disabled GGA/RMC or left GNSS in a single-constellation
+    // mode. These $PCAS commands are ignored by a u-blox M10Q; the UBX-CFG-MSG
+    // frames are ignored by an L76K.
+    static constexpr char kPcas04[] = "$PCAS04,5*1C\r\n";
+    static constexpr char kPcas03[] = "$PCAS03,1,1,1,1,1,1,1,1,1,1,,,0,0*02\r\n";
+    static constexpr char kPcas11[] = "$PCAS11,3*1E\r\n";
+    gps_serial_.write(reinterpret_cast<const std::uint8_t *>(kPcas04), sizeof(kPcas04) - 1U);
+    gps_serial_.write(reinterpret_cast<const std::uint8_t *>(kPcas03), sizeof(kPcas03) - 1U);
+    gps_serial_.write(reinterpret_cast<const std::uint8_t *>(kPcas11), sizeof(kPcas11) - 1U);
+
+    const auto write_ubx = [this](std::uint8_t msg_class, std::uint8_t msg_id,
+                                  const std::uint8_t *payload, std::uint16_t payload_len) {
+        std::uint8_t frame[16];
+        if (payload_len + 8U > sizeof(frame)) {
+            return;
+        }
+        frame[0] = 0xB5;
+        frame[1] = 0x62;
+        frame[2] = msg_class;
+        frame[3] = msg_id;
+        frame[4] = static_cast<std::uint8_t>(payload_len & 0xFFU);
+        frame[5] = static_cast<std::uint8_t>((payload_len >> 8) & 0xFFU);
+        if (payload_len > 0U) {
+            std::memcpy(frame + 6, payload, payload_len);
+        }
+        std::uint8_t ck_a = 0;
+        std::uint8_t ck_b = 0;
+        for (std::uint16_t index = 2; index < static_cast<std::uint16_t>(6U + payload_len); ++index) {
+            ck_a = static_cast<std::uint8_t>(ck_a + frame[index]);
+            ck_b = static_cast<std::uint8_t>(ck_b + ck_a);
+        }
+        frame[6U + payload_len] = ck_a;
+        frame[7U + payload_len] = ck_b;
+        gps_serial_.write(frame, static_cast<std::size_t>(8U + payload_len));
+    };
+
+    // NMEA GGA / RMC on UART1 only. Do not send CFG-CFG — that wipes the
+    // almanac and forces another cold start.
+    const std::uint8_t gga_uart1[] = {0xF0, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00};
+    const std::uint8_t rmc_uart1[] = {0xF0, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00};
+    write_ubx(0x06, 0x01, gga_uart1, sizeof(gga_uart1));
+    write_ubx(0x06, 0x01, rmc_uart1, sizeof(rmc_uart1));
+}
+
 void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
 {
     if (!gps_enabled_) {
@@ -92,6 +149,10 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
         last_passed_checksum_count_ = passed_checksums;
         last_valid_sentence_ms_ = now_ms;
         gps_receiver_seen_ = true;
+        if (!gps_configured_after_detect_) {
+            configureGpsReceiver();
+            gps_configured_after_detect_ = true;
+        }
     }
 
     // No valid sentence yet: after a probe window, try the next baud. A wrong
@@ -103,8 +164,7 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
             (gps_baud_index_ + 1U) %
             (sizeof(gps_baud_candidates_) / sizeof(gps_baud_candidates_[0])));
         gps_serial_.end();
-        gps_serial_.begin(gps_baud_candidates_[gps_baud_index_], SERIAL_8N1, tdeck::gps_rx_pin,
-                          tdeck::gps_tx_pin);
+        startGpsUart();
         gps_baud_started_ms_ = now_ms;
     }
 

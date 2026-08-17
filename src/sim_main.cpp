@@ -2545,6 +2545,15 @@ void build_map(lv_obj_t * parent)
     } else if(gps.state == GpsState::Searching) {
         put_label(parent, "GPS RECEIVER FOUND - WAITING FOR FIX", 38, 42,
                   theme::amber(), &font_mono_10);
+        char line[72]{};
+        std::snprintf(line, sizeof(line), "SAT %u  HDOP %.1f  NMEA %u ms AGO",
+                      static_cast<unsigned>(gps.satellites), static_cast<double>(gps.hdop),
+                      gps.last_sentence_age_ms == UINT32_MAX
+                          ? 0U
+                          : static_cast<unsigned>(gps.last_sentence_age_ms));
+        put_label(parent, line, 70, 60, theme::cyan(), &font_mono_10);
+        put_label(parent, "HOLD OUTDOORS UNTIL THIS SAYS LOCAL FIX", 46, 78,
+                  theme::text_muted(), &font_mono_10);
     } else if(gps.state == GpsState::Disabled) {
         put_label(parent, "OPTIONAL GPS IS OFF", 88, 42,
                   theme::text_muted(), &font_mono_semibold_12);
@@ -4437,6 +4446,67 @@ bool decode_frame_shelby_pointer(const FrameRecord &record, ShelbyPointer &out) 
                                out) == ShelbyPointerResult::Ok;
 }
 
+#if defined(LILYSHARK_DEVICE)
+void json_copy_ascii(char *out, std::size_t cap, const char *in) noexcept
+{
+    if (cap == 0) return;
+    std::size_t o = 0;
+    for (std::size_t i = 0; in[i] != '\0' && o + 1U < cap; ++i) {
+        const char c = in[i];
+        if (c == '"' || c == '\\' || static_cast<unsigned char>(c) < 0x20U) continue;
+        out[o++] = c;
+    }
+    out[o] = '\0';
+}
+
+void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
+{
+    if (!analyzer_link_active || !contributesToNodeSummary(record)) return;
+    const DecodedPacket &packet = record.decoded;
+    char text[88]{};
+    char long_name[40]{};
+    char short_name[8]{};
+    bool have_pos = false;
+    double lat = 0.0;
+    double lon = 0.0;
+    if (packet.protocol == ProtocolId::Meshtastic &&
+        packet.hasAttribute(AttributeDefaultKeyReadable) && packet.payload_length > 0U &&
+        record.raw.captured_length >=
+            static_cast<std::uint16_t>(packet.payload_offset + packet.payload_length)) {
+        MeshtasticPayload payload{};
+        if (readMeshtasticPayload(record.raw.bytes + packet.payload_offset, packet.payload_length,
+                                  packet.source, packet.packet_id, payload)) {
+            if (payload.has_text) json_copy_ascii(text, sizeof(text), payload.text);
+            if (payload.has_names) {
+                json_copy_ascii(long_name, sizeof(long_name), payload.long_name);
+                json_copy_ascii(short_name, sizeof(short_name), payload.short_name);
+            }
+            if (payload.has_position) {
+                have_pos = true;
+                lat = payload.latitude_degrees;
+                lon = payload.longitude_degrees;
+            }
+        }
+    }
+    const int hops = packet.hasField(FieldHopStart) && packet.hop_start >= packet.hop_limit
+                         ? static_cast<int>(packet.hop_start - packet.hop_limit)
+                         : -1;
+    Serial.printf(
+        "LSK F {\"src\":%lu,\"dst\":%lu,\"proto\":\"%s\",\"port\":%u,\"hops\":%d,"
+        "\"rssi_x10\":%d,\"snr_x10\":%d,\"kind\":\"%s\",\"sim\":%s",
+        static_cast<unsigned long>(packet.source), static_cast<unsigned long>(packet.destination),
+        protocolName(packet.protocol), static_cast<unsigned>(packet.application_port), hops,
+        static_cast<int>(record.raw.rf.rssi_dbm_x10), static_cast<int>(record.raw.rf.snr_db_x10),
+        packetKindLabel(packet),
+        record.raw.rf.origin == FrameOrigin::Synthetic ? "true" : "false");
+    if (have_pos) Serial.printf(",\"lat\":%.6f,\"lon\":%.6f", lat, lon);
+    if (long_name[0] != '\0') Serial.printf(",\"name\":\"%s\"", long_name);
+    if (short_name[0] != '\0') Serial.printf(",\"short\":\"%s\"", short_name);
+    if (text[0] != '\0') Serial.printf(",\"text\":\"%s\"", text);
+    Serial.printf("}\n");
+}
+#endif
+
 void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                            bool allow_capture) noexcept
 {
@@ -4455,6 +4525,9 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
     }
     const FrameRecord *stored = capture_runtime.frames().newest();
     if(stored != nullptr) (void)rolling_diagnostics.ingest(*stored);
+#if defined(LILYSHARK_DEVICE)
+    if(stored != nullptr) emit_analyzer_heard_frame(*stored);
+#endif
     if(!first_frame_event_recorded) {
         char message[80]{};
         std::snprintf(message, sizeof(message), "First %s%s frame  RSSI %.1f  SNR %.1f",
@@ -8176,14 +8249,46 @@ void loop()
         const HardwareStatusSnapshot &hardware = hardware_status.snapshot();
         const FrameRecord *newest = capture_runtime.frames().newest();
         const RadioProfile &link_profile = radio_service.activeProfile();
-        Serial.printf(
-            "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
-            "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s}\n",
-            hardware.battery_label, hardware.gps_label, link_profile.name,
-            static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
-            newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
-            newest != nullptr ? static_cast<int>(newest->raw.rf.snr_db_x10) : 0,
-            app_settings.simulate_mode ? "true" : "false");
+        if(hardware.gps.state == GpsState::Fix && hardware.gps.position_valid) {
+            Serial.printf(
+                "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
+                "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s,\"lat\":%.6f,\"lon\":%.6f,"
+                "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"
+                "\"rx\":%lu,\"crc\":%lu}\n",
+                hardware.battery_label, hardware.gps_label, link_profile.name,
+                static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
+                newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
+                newest != nullptr ? static_cast<int>(newest->raw.rf.snr_db_x10) : 0,
+                app_settings.simulate_mode ? "true" : "false",
+                hardware.gps.latitude_degrees, hardware.gps.longitude_degrees,
+                static_cast<unsigned long>(hardware.battery.voltage_millivolts),
+                static_cast<unsigned>(hardware.battery.approximate_percent),
+                static_cast<unsigned>(hardware.gps.satellites),
+                static_cast<unsigned long>(link_profile.center_frequency_hz),
+                static_cast<unsigned>(link_profile.spreading_factor),
+                static_cast<unsigned long>(link_profile.bandwidth_hz),
+                static_cast<unsigned long>(radio_service.status().received_frames),
+                static_cast<unsigned long>(radio_service.status().crc_errors));
+        } else {
+            Serial.printf(
+                "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
+                "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s,"
+                "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"
+                "\"rx\":%lu,\"crc\":%lu}\n",
+                hardware.battery_label, hardware.gps_label, link_profile.name,
+                static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
+                newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
+                newest != nullptr ? static_cast<int>(newest->raw.rf.snr_db_x10) : 0,
+                app_settings.simulate_mode ? "true" : "false",
+                static_cast<unsigned long>(hardware.battery.voltage_millivolts),
+                static_cast<unsigned>(hardware.battery.approximate_percent),
+                static_cast<unsigned>(hardware.gps.satellites),
+                static_cast<unsigned long>(link_profile.center_frequency_hz),
+                static_cast<unsigned>(link_profile.spreading_factor),
+                static_cast<unsigned long>(link_profile.bandwidth_hz),
+                static_cast<unsigned long>(radio_service.status().received_frames),
+                static_cast<unsigned long>(radio_service.status().crc_errors));
+        }
     }
     // Synthetic traffic exercises the real decoder, analyzer and native
     // capture path. The live radio is stopped, and PCAP explicitly excludes

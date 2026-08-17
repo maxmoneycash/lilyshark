@@ -48,6 +48,12 @@ struct MeshtasticPayload {
     bool has_text = false;
     std::uint16_t text_length = 0;
     char text[kMeshtasticMaxTextBytes + 1]{};
+    bool has_position = false;
+    double latitude_degrees = 0.0;
+    double longitude_degrees = 0.0;
+    bool has_names = false;
+    char long_name[40]{};
+    char short_name[8]{};
 };
 
 /// Short label for a port number, or "PORT n" when this build has no name.

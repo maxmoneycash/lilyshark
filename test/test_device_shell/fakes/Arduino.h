@@ -128,6 +128,8 @@ class HardwareSerial {
     }
 
     void flush() noexcept {}
+    void setRxBufferSize(std::size_t) noexcept {}
+    std::size_t write(const std::uint8_t *, std::size_t size) noexcept { return size; }
     int available() const noexcept { return 0; }
     int read() noexcept { return -1; }
 

@@ -395,7 +395,6 @@ export default function Config() {
 								<option value="auto">
 									{t("AUTOMÁTICO")} · {getLang().toUpperCase()}
 								</option>
-								<option value="es">{t("ESPAÑOL")}</option>
 								<option value="en">ENGLISH</option>
 							</select>
 							<label>{t("HORA")}</label>

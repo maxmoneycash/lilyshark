@@ -108,6 +108,51 @@ void testGarbageIsRejected()
     assert(!payload.has_text);
 }
 
+void writeLe32(std::uint8_t *out, std::uint32_t value) noexcept
+{
+    out[0] = static_cast<std::uint8_t>(value);
+    out[1] = static_cast<std::uint8_t>(value >> 8U);
+    out[2] = static_cast<std::uint8_t>(value >> 16U);
+    out[3] = static_cast<std::uint8_t>(value >> 24U);
+}
+
+void testReadsPositionPayload()
+{
+    const std::int32_t lat_i = 374419000;
+    const std::int32_t lon_i = -1221430000;
+    std::uint8_t data[14]{};
+    data[0] = 0x08;
+    data[1] = 0x03; // portnum = POSITION
+    data[2] = 0x12;
+    data[3] = 10; // inner Position length
+    data[4] = 0x0d;
+    writeLe32(data + 5, static_cast<std::uint32_t>(lat_i));
+    data[9] = 0x15;
+    writeLe32(data + 10, static_cast<std::uint32_t>(lon_i));
+
+    std::uint8_t nonce[16]{};
+    const std::uint32_t from = 0x11223344U;
+    const std::uint32_t id = 0x55667788U;
+    nonce[0] = 0x88;
+    nonce[1] = 0x77;
+    nonce[2] = 0x66;
+    nonce[3] = 0x55;
+    nonce[8] = 0x44;
+    nonce[9] = 0x33;
+    nonce[10] = 0x22;
+    nonce[11] = 0x11;
+
+    std::uint8_t cipher[sizeof(data)]{};
+    crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, data, sizeof(data), cipher);
+
+    MeshtasticPayload payload{};
+    assert(readMeshtasticPayload(cipher, sizeof(cipher), from, id, payload));
+    assert(payload.portnum == static_cast<std::uint16_t>(MeshtasticPort::Position));
+    assert(payload.has_position);
+    assert(payload.latitude_degrees > 37.441 && payload.latitude_degrees < 37.443);
+    assert(payload.longitude_degrees < -122.142 && payload.longitude_degrees > -122.144);
+}
+
 void testEmptyAndOversizedInputsAreRefused()
 {
     MeshtasticPayload payload{};
@@ -126,6 +171,7 @@ int main()
     testReadsTextMessageFromRealFrame();
     testWrongNonceIsRejectedRatherThanGuessed();
     testGarbageIsRejected();
+    testReadsPositionPayload();
     testEmptyAndOversizedInputsAreRefused();
     std::printf("meshtastic payload tests passed\n");
     return 0;
