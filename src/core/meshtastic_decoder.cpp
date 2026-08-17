@@ -1,5 +1,7 @@
 #include "lilyshark/protocols/meshtastic_decoder.h"
 
+#include "lilyshark/protocols/meshtastic_payload.h"
+
 #include <cstdint>
 
 namespace lilyshark {
@@ -83,6 +85,20 @@ DecodeResult MeshtasticDecoder::decode(const RawFrame &frame, const RadioProfile
     if (output.source == 0) {
         output.state = DecodeState::Malformed;
         return DecodeResult::Malformed;
+    }
+
+    // Default-channel traffic is readable with a key every radio ships with,
+    // so try it. Success means the payload was never private; failure leaves
+    // the packet opaque, which is the honest outcome for a real PSK.
+    if (output.payload_length > 0) {
+        MeshtasticPayload payload{};
+        if (readMeshtasticPayload(&frame.bytes[output.payload_offset], output.payload_length,
+                                  output.source, output.packet_id, payload)) {
+            output.application_port = payload.portnum;
+            output.attributes |= AttributeDefaultKeyReadable;
+            output.kind = PacketKind::Data;
+            output.state = DecodeState::PayloadDecoded;
+        }
     }
 
     return DecodeResult::Matched;

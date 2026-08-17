@@ -33,6 +33,7 @@
 #if !defined(LILYSHARK_DEVICE)
 #include "lilyshark/protocols/meshcore_decoder.h"
 #include "lilyshark/protocols/meshtastic_decoder.h"
+#include "lilyshark/protocols/meshtastic_payload.h"
 #include "lilyshark/protocols/reticulum_decoder.h"
 #include "lilyshark/ui/packet_presentation.h"
 #endif
@@ -55,6 +56,7 @@
 #include "lilyshark/export/pcap_loratap.h"
 #include "lilyshark/protocols/meshcore_decoder.h"
 #include "lilyshark/protocols/meshtastic_decoder.h"
+#include "lilyshark/protocols/meshtastic_payload.h"
 #include "lilyshark/protocols/reticulum_decoder.h"
 #include "lilyshark/shelby/shelby_pointer_decoder.h"
 #include "lilyshark/tdeck.h"
@@ -2187,6 +2189,31 @@ void build_packet_detail(lv_obj_t * parent)
                   &font_mono_semibold_12);
         std::snprintf(line, sizeof(line), "KIND   %s", packetKindLabel(record->decoded));
         put_label(parent, line, 49, 134, theme::text(), &font_mono_10);
+        // A message sent under the published default key gives its rows to the
+        // message: the port it was addressed to, and the text itself. The key
+        // is stated on screen so nobody mistakes this for broken encryption.
+        MeshtasticPayload readable{};
+        const bool has_readable =
+            record->decoded.hasAttribute(AttributeDefaultKeyReadable) &&
+            readMeshtasticPayload(&record->raw.bytes[record->decoded.payload_offset],
+                                  record->decoded.payload_length, record->decoded.source,
+                                  record->decoded.packet_id, readable);
+        if(has_readable) {
+            std::snprintf(line, sizeof(line), "PORT   %s  ·  DEFAULT KEY",
+                          meshtasticPortLabel(readable.portnum));
+            put_label(parent, line, 49, 153, theme::lime(), &font_mono_semibold_12);
+            if(readable.has_text) {
+                put_label(parent, "MESSAGE", 49, 174, theme::text_muted(), &font_mono_10);
+                lv_obj_t *message = put_label(parent, readable.text, 49, 190, theme::cyan(),
+                                              &font_mono_semibold_12);
+                lv_obj_set_width(message, theme::screen_width - 58);
+                lv_label_set_long_mode(message, LV_LABEL_LONG_WRAP);
+            } else {
+                std::snprintf(line, sizeof(line), "%u B application payload",
+                              static_cast<unsigned>(readable.payload_length));
+                put_label(parent, line, 49, 174, theme::text(), &font_mono_10);
+            }
+        }
         // A pointer frame gives its diagnostics rows to the pointer itself:
         // the same commitment the web analyzer resolves, decoded from the raw
         // bytes on the device, is the story this tab exists to tell.

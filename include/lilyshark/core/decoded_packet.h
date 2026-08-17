@@ -51,6 +51,11 @@ enum PacketAttribute : std::uint16_t {
     // secondary application metadata: the packet's protocol remains the
     // enclosing Meshtastic, MeshCore, Reticulum, or custom protocol.
     AttributeShelbyPointer = 1U << 5,
+    // The payload was readable under a protocol's published default key —
+    // no secret was needed and none was broken. Worth stating outright,
+    // because it is the difference between traffic that merely looks
+    // protected and traffic that is.
+    AttributeDefaultKeyReadable = 1U << 6,
 };
 
 struct DecodedPacket {
@@ -66,6 +71,11 @@ struct DecodedPacket {
     std::uint16_t payload_offset = 0;
     std::uint16_t payload_length = 0;
     std::uint16_t channel = 0;
+    // Application port inside a readable payload (Meshtastic portnum). Only
+    // meaningful with AttributeDefaultKeyReadable; the text itself is not
+    // kept here — it is read back from the stored frame on demand, so a
+    // 64-frame buffer does not carry 64 message bodies.
+    std::uint16_t application_port = 0;
     std::uint8_t hop_limit = 0;
     std::uint8_t hop_start = 0;
     std::uint8_t next_hop = 0;

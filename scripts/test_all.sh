@@ -76,6 +76,8 @@ cd "${repo_dir}"
 build_and_run core_runtime \
   src/core/decoder_registry.cpp \
   src/core/meshtastic_decoder.cpp \
+  src/core/meshtastic_payload.cpp \
+  src/crypto/aes128.cpp \
   src/core/meshcore_decoder.cpp \
   src/core/reticulum_decoder.cpp \
   test/core_runtime/test_core_runtime.cpp
@@ -83,6 +85,8 @@ build_and_run core_runtime \
 build_and_run decoder_stress \
   src/core/decoder_registry.cpp \
   src/core/meshtastic_decoder.cpp \
+  src/core/meshtastic_payload.cpp \
+  src/crypto/aes128.cpp \
   src/core/meshcore_decoder.cpp \
   src/core/reticulum_decoder.cpp \
   test/decoder_stress/test_decoder_stress.cpp
@@ -118,6 +122,8 @@ build_and_run live_telemetry \
   -DLILYSHARK_LIVE_TELEMETRY_DECODER_CROSSCHECK=1 \
   src/simulator/live_telemetry.cpp \
   src/core/meshtastic_decoder.cpp \
+  src/core/meshtastic_payload.cpp \
+  src/crypto/aes128.cpp \
   src/core/meshcore_decoder.cpp \
   src/core/reticulum_decoder.cpp \
   test/live_telemetry/test_live_telemetry.cpp
@@ -132,6 +138,8 @@ build_and_run survey_accumulator \
 
 build_and_run packet_presentation \
   src/core/meshtastic_decoder.cpp \
+  src/core/meshtastic_payload.cpp \
+  src/crypto/aes128.cpp \
   src/core/meshcore_decoder.cpp \
   src/core/reticulum_decoder.cpp \
   src/ui/packet_presentation.cpp \
@@ -161,6 +169,11 @@ build_and_run simulate_source \
   src/shelby/shelby_pointer.cpp \
   test/simulate_source/test_simulate_source.cpp
 
+build_and_run meshtastic_payload \
+  src/crypto/aes128.cpp \
+  src/core/meshtastic_payload.cpp \
+  test/meshtastic_payload/test_meshtastic_payload.cpp
+
 build_and_run shelby_pointer \
   src/shelby/shelby_pointer.cpp \
   src/shelby/shelby_pointer_decoder.cpp \
@@ -169,6 +182,8 @@ build_and_run shelby_pointer \
 build_and_run shelby_registry \
   src/core/decoder_registry.cpp \
   src/core/meshtastic_decoder.cpp \
+  src/core/meshtastic_payload.cpp \
+  src/crypto/aes128.cpp \
   src/core/meshcore_decoder.cpp \
   src/core/reticulum_decoder.cpp \
   src/shelby/shelby_pointer.cpp \
