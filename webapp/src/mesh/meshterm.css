@@ -2399,11 +2399,17 @@ body:has(.meshterm .app.menu-open) {
    what put a page of documentation in pink. Headings, links and rules stay
    pink as chrome; the reading text is ink. */
 .meshterm .docs-body {
-	font-size: 13.5px;
-	line-height: 1.65;
+	font-size: 14px;
+	/* Monospace sets wider than a proportional face at the same size, so prose
+	   needs both a looser leading and a tighter measure to stay readable. */
+	line-height: 1.75;
 }
+/* rem, not ch: `ch` resolves against each element's own font-size, so a 1.55em
+   heading would take a measure half again as wide as the paragraphs and its
+   box-drawn rule would overshoot the text column. One rem value lines every
+   block up on the same right edge. */
 .meshterm .docs-body > * {
-	max-width: 82ch;
+	max-width: 43rem;
 }
 /* Wide artefacts ignore the reading measure. */
 .meshterm .docs-body > .docs-table-wrap,
@@ -2418,53 +2424,114 @@ body:has(.meshterm .app.menu-open) {
 .meshterm .docs-body h2,
 .meshterm .docs-body h3,
 .meshterm .docs-body h4 {
-	line-height: 1.25;
-	margin: 1.6em 0 0.55em;
+	line-height: 1.3;
 	color: var(--fg);
+	font-weight: 700;
+}
+
+/* Rules drawn with box characters rather than a border: in a monospace face
+   they sit on the text grid and read as terminal output instead of as a web
+   heading. They are ::after blocks, not flex siblings — a heading here can
+   contain inline code ("format (`SHLB`)") and flex would split it into
+   separate items. overflow:hidden clips the run to the column width. */
+.meshterm .docs-body h1::after,
+.meshterm .docs-body h2::after {
+	display: block;
+	overflow: hidden;
+	white-space: nowrap;
+	opacity: 0.5;
+	font-weight: 400;
+	margin-top: 0.3em;
 }
 .meshterm .docs-body h1 {
-	font-size: 1.65em;
-	padding-bottom: 0.3em;
-	border-bottom: 1px solid var(--border);
+	font-size: 1.55em;
+	margin: 0 0 0.9em;
+	letter-spacing: 0.01em;
+}
+.meshterm .docs-body h1::after {
+	content: "════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════";
 }
 .meshterm .docs-body h2 {
-	font-size: 1.3em;
-	padding-bottom: 0.25em;
-	border-bottom: 1px solid var(--border);
+	font-size: 1.22em;
+	margin: 2.4em 0 0.8em;
+}
+.meshterm .docs-body h2::after {
+	content: "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────";
 }
 .meshterm .docs-body h3 {
-	font-size: 1.1em;
+	font-size: 1.05em;
+	margin: 1.9em 0 0.6em;
+}
+.meshterm .docs-body h3::before {
+	content: "▸ ";
+	opacity: 0.7;
 }
 .meshterm .docs-body h4 {
 	font-size: 1em;
-	color: var(--fg-dim);
+	margin: 1.5em 0 0.5em;
+	opacity: 0.85;
+}
+.meshterm .docs-body h4::before {
+	content: "· ";
+	opacity: 0.7;
 }
 .meshterm .docs-body p,
 .meshterm .docs-body ul,
 .meshterm .docs-body ol,
 .meshterm .docs-body blockquote {
-	margin: 0 0 1em;
+	margin: 0 0 1.15em;
 }
-.meshterm .docs-body ul,
+
+/* Terminal bullets on the text grid: the glyph is pink chrome, the item is ink. */
+.meshterm .docs-body ul {
+	list-style: none;
+	padding-left: 0;
+}
+.meshterm .docs-body ul > li {
+	position: relative;
+	padding-left: 2.5ch;
+}
+.meshterm .docs-body ul > li::before {
+	content: "▸";
+	position: absolute;
+	left: 0;
+	color: var(--fg);
+	opacity: 0.75;
+}
 .meshterm .docs-body ol {
-	padding-left: 1.5em;
+	padding-left: 3ch;
+}
+.meshterm .docs-body ol > li::marker {
+	color: var(--fg);
 }
 .meshterm .docs-body li {
-	margin: 0.3em 0;
+	margin: 0.45em 0;
 }
 .meshterm .docs-body li > ul,
 .meshterm .docs-body li > ol {
-	margin: 0.3em 0;
+	margin: 0.45em 0;
 }
+/* A callout, not a pull quote: a solid bar and a wash of the theme colour so
+   it reads as a boxed note in terminal output. */
 .meshterm .docs-body blockquote {
-	border-left: 2px solid var(--border);
-	padding: 0.2em 0 0.2em 1em;
-	opacity: 0.82;
+	border-left: 3px solid var(--fg);
+	background: color-mix(in srgb, var(--fg) 7%, transparent);
+	padding: 0.7em 1em;
+}
+.meshterm .docs-body blockquote > *:last-child {
+	margin-bottom: 0;
 }
 .meshterm .docs-body hr {
 	border: none;
-	border-top: 1px solid var(--border);
-	margin: 2em 0;
+	height: 1em;
+	overflow: hidden;
+	white-space: nowrap;
+	opacity: 0.4;
+	margin: 2.2em 0;
+	color: var(--fg);
+}
+.meshterm .docs-body hr::before {
+	content: "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────";
 }
 .meshterm .docs-body a {
 	color: var(--fg);
@@ -2497,12 +2564,13 @@ body:has(.meshterm .app.menu-open) {
 	overflow-wrap: anywhere;
 }
 .meshterm .docs-body pre {
-	background: var(--panel);
+	background: color-mix(in srgb, var(--fg) 6%, var(--panel));
 	border: 1px solid var(--border);
-	padding: 12px 14px;
+	border-left: 3px solid color-mix(in srgb, var(--fg) 45%, transparent);
+	padding: 12px 16px;
 	overflow-x: auto;
-	margin: 0 0 1.2em;
-	line-height: 1.5;
+	margin: 0 0 1.4em;
+	line-height: 1.55;
 }
 .meshterm .docs-body pre code {
 	background: none;
