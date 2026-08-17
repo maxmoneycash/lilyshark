@@ -82,9 +82,8 @@ Python 3, standard library only, tested the same way as the firmware
 
 ## Web app (`webapp/`)
 
-Vite + React, deployed on Vercel. The interface is a terminal-style app
-ported from meshcore-terminal (MIT) and recolored Lilyshark pink; see
-`webapp/README.md` for the full map.
+Vite + React, deployed on Vercel. The interface is a terminal-style app in
+Lilyshark pink; see `webapp/README.md` for the full map.
 
 - **TRAFFIC** (`src/mesh/screens/Traffic.tsx`) opens `.lscap` captures —
   from disk, from the bundled sample, or fetched from Shelby by blob name —

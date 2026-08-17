@@ -2394,10 +2394,13 @@ body:has(.meshterm .app.menu-open) {
 }
 
 /* ── docs prose ── */
+/* No colour of its own: the light themes set .meshterm to --ink and the dark
+   ones to --fg, which is exactly the split prose wants. Setting --fg here was
+   what put a page of documentation in pink. Headings, links and rules stay
+   pink as chrome; the reading text is ink. */
 .meshterm .docs-body {
 	font-size: 13.5px;
 	line-height: 1.65;
-	color: var(--fg);
 }
 .meshterm .docs-body > * {
 	max-width: 82ch;
@@ -2456,7 +2459,7 @@ body:has(.meshterm .app.menu-open) {
 .meshterm .docs-body blockquote {
 	border-left: 2px solid var(--border);
 	padding: 0.2em 0 0.2em 1em;
-	color: var(--fg-dim);
+	opacity: 0.82;
 }
 .meshterm .docs-body hr {
 	border: none;
@@ -2485,8 +2488,9 @@ body:has(.meshterm .app.menu-open) {
 }
 
 /* ── docs code ── */
+/* Mixed from --fg, not --glow, which the light themes set to transparent. */
 .meshterm .docs-body code {
-	background: var(--glow);
+	background: color-mix(in srgb, var(--fg) 10%, transparent);
 	border: 1px solid var(--border);
 	padding: 0.05em 0.35em;
 	font-size: 0.92em;

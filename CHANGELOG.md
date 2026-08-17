@@ -39,9 +39,8 @@ pre-release, so versions are dates, not semver.
 
 ### Added — web app, rebuilt as a terminal
 
-- The web app is now a terminal-style interface descending from
-  perereus/meshtastic-terminal (MIT), recolored Lilyshark pink by a one-line
-  theme. It includes a full MeshCore
+- The web app is now a terminal-style interface in Lilyshark pink. It
+  includes a full MeshCore
   client — chat, nodes, map, mesh graph, telemetry, config, and a debug log —
   driving a real radio over Web Serial or BLE; nothing routes through a
   server.

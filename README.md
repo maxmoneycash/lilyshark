@@ -834,6 +834,6 @@ The standalone C++ tests compile with warnings as errors and run under AddressSa
 
 Lilyshark is licensed under [GPL-3.0](LICENSE). Barlow Condensed and IBM Plex Mono are distributed under the SIL Open Font License; their license texts are included in [assets/fonts](assets/fonts).
 
-The web app's terminal interface descends from perereus/meshtastic-terminal (MIT), recolored, rewritten, and extended here under that license. The web terminal's JetBrains Mono build is distributed under the SIL Open Font License (`webapp/src/mesh/assets/fonts/OFL.txt`). Lilyshark speaks the [MeshCore](https://meshcore.co.uk) protocol (MIT); its authors ask that support go to them rather than downstream projects, and we pass that request along. See [`NOTICE.md`](NOTICE.md).
+The web terminal's JetBrains Mono build is distributed under the SIL Open Font License (`webapp/src/mesh/assets/fonts/OFL.txt`). See [`NOTICE.md`](NOTICE.md).
 
 Meshtastic, MeshCore, Reticulum, RNode, Wireshark, and LILYGO are referenced to describe compatibility, protocol coverage, and target hardware. Lilyshark is an independent project and is not an official release from those projects.
