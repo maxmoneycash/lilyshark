@@ -56,6 +56,7 @@
 #include "lilyshark/export/pcap_loratap.h"
 #include "lilyshark/protocols/meshcore_decoder.h"
 #include "lilyshark/protocols/meshtastic_decoder.h"
+#include "lilyshark/protocols/meshtastic_encode.h"
 #include "lilyshark/protocols/meshtastic_payload.h"
 #include "lilyshark/protocols/reticulum_decoder.h"
 #include "lilyshark/shelby/shelby_pointer_decoder.h"
@@ -204,7 +205,8 @@ bool decode_frame_shelby_pointer(const FrameRecord &record, ShelbyPointer &out) 
 // with a serial monitor reads the same protocol the web app does.
 bool analyzer_link_active = false;
 std::uint32_t analyzer_link_last_telemetry_ms = 0;
-char analyzer_link_line[96]{};
+std::uint32_t analyzer_link_last_position_ms = 0;
+char analyzer_link_line[240]{};
 std::size_t analyzer_link_line_length = 0;
 
 bool observed_radio_initialized = false;
@@ -4503,6 +4505,46 @@ void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
     if (long_name[0] != '\0') Serial.printf(",\"name\":\"%s\"", long_name);
     if (short_name[0] != '\0') Serial.printf(",\"short\":\"%s\"", short_name);
     if (text[0] != '\0') Serial.printf(",\"text\":\"%s\"", text);
+    // Everything a faithful .lscap record needs, so the analyzer can rebuild a
+    // capture from the link rather than from a summary. Without the payload and
+    // these measurements a browser-side capture would be a decoded listing
+    // wearing a capture format's name.
+    const RfMetadata &lsk_rf = record.raw.rf;
+    Serial.printf(",\"seq\":%lu,\"ts\":%llu,\"pf\":%lu,\"freq\":%lu,\"bw\":%lu"
+                  ",\"br\":%lu,\"fdev\":%lu,\"air\":%lu,\"ferr\":%ld"
+                  ",\"pre\":%u,\"sync\":%u,\"prof\":%u,\"rstat\":%d,\"txp\":%d"
+                  ",\"sf\":%u,\"cr\":%u,\"ch\":%u,\"ridx\":%u"
+                  ",\"mod\":%u,\"dir\":%u,\"crc\":%u,\"mflags\":%u,\"olen\":%u",
+                  static_cast<unsigned long>(record.sequence),
+                  static_cast<unsigned long long>(lsk_rf.timestamp_us),
+                  static_cast<unsigned long>(lsk_rf.present_fields),
+                  static_cast<unsigned long>(lsk_rf.center_frequency_hz),
+                  static_cast<unsigned long>(lsk_rf.bandwidth_hz),
+                  static_cast<unsigned long>(lsk_rf.bit_rate_bps),
+                  static_cast<unsigned long>(lsk_rf.frequency_deviation_hz),
+                  static_cast<unsigned long>(lsk_rf.airtime_us),
+                  static_cast<long>(lsk_rf.frequency_error_hz),
+                  static_cast<unsigned>(lsk_rf.preamble_symbols),
+                  static_cast<unsigned>(lsk_rf.sync_word),
+                  static_cast<unsigned>(lsk_rf.profile_id),
+                  static_cast<int>(lsk_rf.radio_status),
+                  static_cast<int>(lsk_rf.tx_power_dbm),
+                  static_cast<unsigned>(lsk_rf.spreading_factor),
+                  static_cast<unsigned>(lsk_rf.coding_rate_denominator),
+                  static_cast<unsigned>(lsk_rf.channel_index),
+                  static_cast<unsigned>(lsk_rf.radio_index),
+                  static_cast<unsigned>(lsk_rf.modulation),
+                  static_cast<unsigned>(lsk_rf.direction),
+                  static_cast<unsigned>(lsk_rf.crc),
+                  static_cast<unsigned>((lsk_rf.implicit_header ? 1U : 0U) |
+                                        (lsk_rf.inverted_iq ? 2U : 0U) |
+                                        (lsk_rf.origin == FrameOrigin::Synthetic ? 4U : 0U)),
+                  static_cast<unsigned>(record.raw.original_length));
+    Serial.print(",\"hex\":\"");
+    for (std::uint16_t i = 0; i < record.raw.captured_length; ++i) {
+        Serial.printf("%02x", record.raw.bytes[i]);
+    }
+    Serial.print("\"");
     Serial.printf("}\n");
 }
 #endif
@@ -8199,6 +8241,90 @@ void setup()
                          (app_settings.resume_last_view ? "Last live view ready" : "Home ready"));
 }
 
+#if defined(LILYSHARK_DEVICE)
+std::uint32_t next_meshtastic_packet_id() noexcept
+{
+    static std::uint32_t packet_id = 1;
+    return packet_id++;
+}
+
+bool transmit_meshtastic(MeshtasticPort port, const char *text) noexcept
+{
+    MeshtasticEncodeRequest request{};
+    request.from_node = kLilysharkMeshtasticNodeNum;
+    request.packet_id = next_meshtastic_packet_id();
+    request.port = port;
+    request.text = text;
+    const GpsStatus &gps = hardware_status.snapshot().gps;
+    if (gps.state == GpsState::Fix && gps.position_valid) {
+        request.latitude_degrees = gps.latitude_degrees;
+        request.longitude_degrees = gps.longitude_degrees;
+    }
+    std::uint8_t frame[kMaxFrameBytes]{};
+    const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    if (n == 0) return false;
+    if (!radio_service.transmit(frame, n)) return false;
+
+    RawFrame raw{};
+    (void)raw.assignPayload(frame, n);
+    const RadioProfile &profile = radio_service.activeProfile();
+    raw.rf.direction = FrameDirection::Transmit;
+    raw.rf.origin = FrameOrigin::Radio;
+    raw.rf.modulation = profile.modulation;
+    raw.rf.center_frequency_hz = profile.center_frequency_hz;
+    raw.rf.bandwidth_hz = profile.bandwidth_hz;
+    raw.rf.spreading_factor = profile.spreading_factor;
+    raw.rf.coding_rate_denominator = profile.coding_rate_denominator;
+    raw.rf.sync_word = profile.sync_word;
+    raw.rf.preamble_symbols = profile.preamble_symbols;
+    raw.rf.tx_power_dbm = profile.tx_power_dbm;
+    raw.rf.profile_id = profile.id;
+    raw.rf.crc = CrcStatus::Valid;
+    raw.rf.present_fields = RfFieldFrequency | RfFieldBandwidth | RfFieldSpreadingFactor |
+                            RfFieldCodingRate | RfFieldSyncWord | RfFieldPreamble | RfFieldProfile;
+    ingest_analyzer_frame(raw, profile, true);
+    live_data_dirty = true;
+    if (text != nullptr && text[0] != '\0') {
+        std::snprintf(shell_notice, sizeof(shell_notice), "TX  %.40s", text);
+        char event[80]{};
+        std::snprintf(event, sizeof(event), "TX LongFast  %.48s", text);
+        record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Radio, event);
+    }
+    return true;
+}
+
+void handle_mesh_tx_command(const char *line) noexcept
+{
+    if (std::strncmp(line, "LSK TX meshcore", 15) == 0) {
+        Serial.println("LSK ERR {\"proto\":\"meshcore\",\"reason\":\"identity-pending\"}");
+        return;
+    }
+    if (std::strncmp(line, "LSK TX meshtastic text ", 23) == 0) {
+        const char *text = line + 23;
+        const bool ok = transmit_meshtastic(MeshtasticPort::TextMessage, text);
+        Serial.printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"text\"}\n", ok ? "OK" : "ERR");
+        if (ok) {
+            record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
+                                 "Meshtastic text transmitted");
+        }
+        return;
+    }
+    if (std::strcmp(line, "LSK TX meshtastic position") == 0) {
+        const bool ok = transmit_meshtastic(MeshtasticPort::Position, nullptr);
+        Serial.printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"position\"}\n",
+                      ok ? "OK" : "ERR");
+        return;
+    }
+    if (std::strcmp(line, "LSK TX meshtastic nodeinfo") == 0) {
+        const bool ok = transmit_meshtastic(MeshtasticPort::NodeInfo, nullptr);
+        Serial.printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"nodeinfo\"}\n",
+                      ok ? "OK" : "ERR");
+        return;
+    }
+    Serial.println("LSK ERR {\"reason\":\"bad-tx\"}");
+}
+#endif
+
 void handle_analyzer_link_command(const char *line) noexcept
 {
     if(std::strcmp(line, "LSK HELLO") == 0) {
@@ -8210,6 +8336,12 @@ void handle_analyzer_link_command(const char *line) noexcept
         if(first_link) {
             record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
                                  "Web analyzer linked over USB");
+#if defined(LILYSHARK_DEVICE)
+            (void)transmit_meshtastic(MeshtasticPort::NodeInfo, nullptr);
+            if (hardware_status.snapshot().gps.state == GpsState::Fix) {
+                (void)transmit_meshtastic(MeshtasticPort::Position, nullptr);
+            }
+#endif
         }
     } else if(std::strcmp(line, "LSK BYE") == 0) {
         if(analyzer_link_active) {
@@ -8217,6 +8349,10 @@ void handle_analyzer_link_command(const char *line) noexcept
                                  "Web analyzer link closed");
         }
         analyzer_link_active = false;
+#if defined(LILYSHARK_DEVICE)
+    } else if(std::strncmp(line, "LSK TX ", 7) == 0) {
+        handle_mesh_tx_command(line);
+#endif
     }
 }
 
@@ -8244,6 +8380,17 @@ void loop()
 
     const uint32_t now = millis();
     bool redraw = false;
+
+    if(analyzer_link_active &&
+       hardware_status.snapshot().gps.state == GpsState::Fix &&
+       hardware_status.snapshot().gps.position_valid &&
+       (analyzer_link_last_position_ms == 0 ||
+        static_cast<std::uint32_t>(now - analyzer_link_last_position_ms) >= 120000U)) {
+        analyzer_link_last_position_ms = now;
+#if defined(LILYSHARK_DEVICE)
+        (void)transmit_meshtastic(MeshtasticPort::Position, nullptr);
+#endif
+    }
 
     if(analyzer_link_active &&
        static_cast<std::uint32_t>(now - analyzer_link_last_telemetry_ms) >= 2000U) {

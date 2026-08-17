@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include "lilyshark/crypto/aes128.h"
+#include "lilyshark/protocols/meshtastic_encode.h"
 #include "lilyshark/protocols/meshtastic_payload.h"
 
 using namespace lilyshark;
@@ -153,6 +154,46 @@ void testReadsPositionPayload()
     assert(payload.longitude_degrees < -122.142 && payload.longitude_degrees > -122.144);
 }
 
+void testLongFastHashMatchesKnownFrame()
+{
+    assert(meshtasticChannelHash(kMeshtasticDefaultChannelName, kMeshtasticDefaultPsk,
+                                 sizeof(kMeshtasticDefaultPsk)) == 0x08);
+}
+
+void testEncodeTextRoundTripsThroughDefaultKeyReader()
+{
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0x4c534b01U;
+    request.packet_id = 0x11223344U;
+    request.text = "hello bay";
+    std::uint8_t frame[128]{};
+    const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(n > 16);
+    assert(frame[13] == 0x08);
+    MeshtasticPayload payload{};
+    assert(readMeshtasticPayload(frame + 16, n - 16, request.from_node, request.packet_id, payload));
+    assert(payload.has_text);
+    assert(std::strcmp(payload.text, "hello bay") == 0);
+}
+
+void testEncodePositionRoundTrips()
+{
+    MeshtasticEncodeRequest request{};
+    request.port = MeshtasticPort::Position;
+    request.from_node = 0x4c534b01U;
+    request.packet_id = 7;
+    request.latitude_degrees = 37.91112;
+    request.longitude_degrees = -122.01760;
+    std::uint8_t frame[128]{};
+    const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(n > 16);
+    MeshtasticPayload payload{};
+    assert(readMeshtasticPayload(frame + 16, n - 16, request.from_node, request.packet_id, payload));
+    assert(payload.has_position);
+    assert(payload.latitude_degrees > 37.911 && payload.latitude_degrees < 37.912);
+    assert(payload.longitude_degrees < -122.017 && payload.longitude_degrees > -122.018);
+}
+
 void testEmptyAndOversizedInputsAreRefused()
 {
     MeshtasticPayload payload{};
@@ -172,6 +213,9 @@ int main()
     testWrongNonceIsRejectedRatherThanGuessed();
     testGarbageIsRejected();
     testReadsPositionPayload();
+    testLongFastHashMatchesKnownFrame();
+    testEncodeTextRoundTripsThroughDefaultKeyReader();
+    testEncodePositionRoundTrips();
     testEmptyAndOversizedInputsAreRefused();
     std::printf("meshtastic payload tests passed\n");
     return 0;

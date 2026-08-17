@@ -2666,3 +2666,32 @@ body:has(.meshterm .app.menu-open) {
 		display: none;
 	}
 }
+
+/* Capture provenance under the TRAFFIC toolbar: what was recorded, and where
+   its chain of custody lives. Key/value pairs on two columns so the labels
+   line up like the rest of the instrument. */
+.meshterm .cap-chain {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 4px 12px;
+	align-items: baseline;
+	padding: 8px 12px;
+}
+.meshterm .cap-chain .k {
+	color: var(--fg);
+	opacity: 0.75;
+	white-space: nowrap;
+}
+.meshterm .cap-chain .v {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+	.meshterm .cap-chain {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 2px;
+	}
+	.meshterm .cap-chain .k {
+		margin-top: 6px;
+	}
+}

@@ -215,6 +215,11 @@ class SX1262
         return fake.nextStartReceiveResult();
     }
 
+    std::int16_t transmit(const std::uint8_t *, std::size_t)
+    {
+        return RADIOLIB_ERR_NONE;
+    }
+
     std::size_t getPacketLength()
     {
         auto &fake = radiolib_fake::state();

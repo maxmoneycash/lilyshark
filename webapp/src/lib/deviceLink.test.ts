@@ -61,6 +61,21 @@ test('parseLskLine ignores a missing or invalid line', () => {
   assert.equal(parseLskLine('LSK X {}'), undefined);
 });
 
+test('parseLskLine reads a TX confirmation', () => {
+  const ok = parseLskLine('LSK OK {"proto":"meshtastic","kind":"text"}');
+  assert.ok(ok);
+  assert.equal(ok.kind, 'OK');
+  if (ok.kind !== 'OK') return;
+  assert.equal(ok.proto, 'meshtastic');
+  assert.equal(ok.txKind, 'text');
+
+  const err = parseLskLine('LSK ERR {"proto":"meshcore","reason":"identity-pending"}');
+  assert.ok(err);
+  assert.equal(err.kind, 'ERR');
+  if (err.kind !== 'ERR') return;
+  assert.equal(err.reason, 'identity-pending');
+});
+
 test('parseLskLine reads the handshake and a pointer', () => {
   const id = parseLskLine('LSK ID {"app":"lilyshark","fw":"0.1.0","board":"t-deck"}');
   assert.ok(id);

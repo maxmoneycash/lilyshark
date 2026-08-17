@@ -15,15 +15,30 @@ import { demoNextFrame, isDemo } from '../mesh/demo';
 import { startTrafficDemoInterval } from './trafficDemo';
 import {
   DEMO_BLOB,
+  APTOS_EXPLORER_ACCOUNT,
+  CAPTURE_REGISTRY,
+  CAPTURE_REGISTRY_URL,
   fetchAnchor,
   fetchBlob as fetchBlobBytes,
+  fetchUploadInfo,
   resolveByCommitment,
+  type UploadServiceInfo,
 } from '../lib/shelby';
 import {
   connectDeviceLink,
   disconnectDeviceLink,
   useDeviceLink,
 } from '../lib/deviceLink';
+import {
+  captureByteLength,
+  captureElapsedMs,
+  captureFileName,
+  captureToLscap,
+  clearCapture,
+  startCapture,
+  stopCapture,
+  useCaptureSession,
+} from '../lib/captureSession';
 
 /** The live table stops growing here; old frames age out on the left. */
 const LIVE_CAP = 250;
@@ -103,6 +118,54 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
     }
   };
 
+  // ── capture session ───────────────────────────────────────────────────
+  // Recording keeps the full record of every frame the device streams; on
+  // stop the session becomes a real .lscap and opens in this same viewer,
+  // so the capture is analyzed where it was made.
+  const session = useCaptureSession();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!session.recording) return;
+    const id = setInterval(() => setTick((v) => v + 1), 500);
+    return () => clearInterval(id);
+  }, [session.recording]);
+
+  const onStopCapture = () => {
+    const done = stopCapture();
+    setLive(false);
+    if (done.frames.length === 0) {
+      setError('capture stopped with no frames — nothing was heard on this channel');
+      return;
+    }
+    const bytes = captureToLscap(done);
+    // Copied into a standalone buffer: load() keeps views onto it for the
+    // lifetime of the capture.
+    load(bytes.slice().buffer, captureFileName(done));
+  };
+
+  const onDownloadCapture = () => {
+    const bytes = captureToLscap(session);
+    const url = URL.createObjectURL(
+      new Blob([bytes.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }),
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = captureFileName(session);
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const recSeconds = Math.floor(captureElapsedMs(session) / 1000);
+
+  // Asked once, when there is a capture to publish. The answer decides whether
+  // PUBLISH is an action or an explanation.
+  const [uploadInfo, setUploadInfo] = useState<UploadServiceInfo | null>(null);
+  const haveCapture = !session.recording && session.frames.length > 0;
+  useEffect(() => {
+    if (!haveCapture || uploadInfo) return;
+    void fetchUploadInfo().then(setUploadInfo);
+  }, [haveCapture, uploadInfo]);
+
   /**
    * Fetch a capture straight from the Shelby RPC. Accepts "owner/blob/name"
    * or a bare blob name, which reads from the demo blob's account.
@@ -143,6 +206,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const [trace, setTrace] = useState<TraceStep[] | null>(null);
   const resolving = trace?.some((t) => t.state === 'run') ?? false;
   const link = useDeviceLink();
+  /** Capturing needs a device on the cable; there is nothing else to record. */
+  const canCapture = link.status === 'linked';
 
   // TerminalApp already auto-links a granted T-Deck once for the whole
   // session. A second attempt here raced the header CONNECT button and
@@ -358,6 +423,33 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
           <button onClick={() => void openSample()} disabled={busy}>
             SAMPLE
           </button>
+          {/* Record what the linked radio hears, then open it right here. */}
+          {session.recording ? (
+            <button className="primary" onClick={onStopCapture} title="Stop and open the capture">
+              ■ STOP · {session.frames.length}f · {recSeconds}s
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                clearCapture();
+                startCapture();
+                setLive(false);
+              }}
+              disabled={!canCapture || busy}
+              title={
+                canCapture
+                  ? 'Record every frame the linked device hears'
+                  : 'Connect a Lilyshark device to capture'
+              }
+            >
+              ● CAPTURE
+            </button>
+          )}
+          {!session.recording && session.frames.length > 0 && (
+            <button onClick={onDownloadCapture} title="Save the .lscap file">
+              ⭳ {(captureByteLength(session) / 1024).toFixed(1)} kB
+            </button>
+          )}
           <button
             className={simulatedLive ? 'primary' : ''}
             title={
@@ -394,6 +486,53 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
         </div>
 
         {error && <div className="panel-foot err">{error}</div>}
+
+        {/* What the capture is, and where its chain of custody would live. */}
+        {haveCapture && (
+          <div className="panel-foot cap-chain">
+            <span className="k">CAPTURE</span>
+            <span className="v">
+              {session.frames.length} frames · {(captureByteLength(session) / 1024).toFixed(1)} kB ·{' '}
+              {recSeconds}s
+              {session.containsSynthetic && (
+                <span className="warn"> · CONTAINS SIMULATE-MODE FRAMES</span>
+              )}
+              {session.skippedNoPayload > 0 && (
+                <span className="warn">
+                  {' '}
+                  · {session.skippedNoPayload} frame(s) had no payload to store
+                </span>
+              )}
+            </span>
+            <span className="k">ON CHAIN</span>
+            <span className="v">
+              <a href={CAPTURE_REGISTRY_URL} target="_blank" rel="noreferrer">
+                {CAPTURE_REGISTRY.split('::')[1]}
+              </a>{' '}
+              is deployed on shelbynet ·{' '}
+              <a href={APTOS_EXPLORER_ACCOUNT} target="_blank" rel="noreferrer">
+                APTOS EXPLORER
+              </a>
+            </span>
+            <span className="k">PUBLISH</span>
+            <span className="v">
+              {uploadInfo === null ? (
+                <span className="dim">checking the share service…</span>
+              ) : uploadInfo.available ? (
+                <>
+                  ready · uploads sign as{' '}
+                  <code>{uploadInfo.uploaderAddress?.slice(0, 10)}…</code>
+                </>
+              ) : (
+                <span className="warn">
+                  unavailable — the share service holds no Shelby signing key, so this
+                  capture cannot be uploaded or anchored from the browser. Download the
+                  .lscap and publish it with <code>webapp/scripts/shelby-put.ts</code>.
+                </span>
+              )}
+            </span>
+          </div>
+        )}
 
         {link.status !== 'off' && (
           <div className="kv">

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "rea
 import { clearUnread, getSnapshot, subscribe, type Message } from "../store";
 import { clearConvo, retryMessage, sendText } from "../radio";
 import { saveText, stamp } from "../export";
+import { getDeviceLinkState } from "../../lib/deviceLink";
 import { t } from "../i18n";
 import { fechaHora, hhmm } from "../fmt";
 
@@ -276,6 +277,13 @@ export default function Chat({
                 : t("──── NO MESSAGES IN {0} — AWAITING SIGNAL_ ────", convoLabel)}
             </div>
           )}
+          {!q && getDeviceLinkState().status === "linked" && (
+            <div className="dim" style={{ fontSize: 11, marginBottom: 8 }}>
+              This T-Deck has no chat screen. Messages you send leave over LoRa
+              (Meshtastic LongFast). They show here and in TRAFFIC. Other people
+              only appear if a nearby Meshtastic radio answers on the air.
+            </div>
+          )}
           {q && msgs.length > 0 && (
             <div className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
               {t("{0} RESULTS · CLICK TO JUMP TO THE CONVERSATION", msgs.length)}
@@ -360,7 +368,7 @@ export default function Chat({
                 <span className="warn">{t("⧗ queued")}</span>
               )}
               {m.mine && m.state === "sent" && (
-                <span className="dim">{t("➤ sent to radio")}</span>
+                <span className="dim">{t("➤ on air LongFast · no reply yet")}</span>
               )}
               {m.mine && m.state === "delivered" && (
                 <span className="dim">{t("✓ delivered")}</span>

@@ -4,7 +4,7 @@ import type Connection from "@liamcottle/meshcore.js/src/connection/connection.j
 import Constants from "@liamcottle/meshcore.js/src/constants.js";
 import CayenneLpp from "@liamcottle/meshcore.js/src/cayenne_lpp.js";
 import { COOLDOWN_MS, getAlertCfg } from "./alerts";
-import { getDeviceLinkState } from "../lib/deviceLink";
+import { getDeviceLinkState, sendDeviceLine } from "../lib/deviceLink";
 import { DEMO_NODE_FLOOR, demoSendText, isDemo } from "./demo";
 import { t } from "./i18n";
 import {
@@ -1348,9 +1348,31 @@ export async function sendText(
     return;
   }
   if (!device && getDeviceLinkState().status === "linked") {
-    throw new Error(
-      "This T-Deck is a listener. It hears Meshtastic nodes but cannot send messages.",
-    );
+    const isDm = convo.startsWith("dm:");
+    const destination = isDm ? Number(convo.slice(3)) : 0xffffffff;
+    const msg: Message = {
+      id: nextMsgId(),
+      convo,
+      from: getSnapshot().myNodeNum ?? 0x4c534b01,
+      to: destination,
+      channel: 0,
+      text,
+      ts: Date.now(),
+      mine: true,
+      state: "queued",
+      replyId,
+    };
+    mutate((s) => {
+      s.messages = [...s.messages, msg];
+    });
+    try {
+      await sendDeviceLine(`LSK TX meshtastic text ${text}`);
+      setMsgState(msg.id, msg.ts, "sent");
+    } catch (e) {
+      setMsgState(msg.id, msg.ts, "failed");
+      throw e;
+    }
+    return;
   }
   if (!device) throw new Error(t("Not connected"));
   const isDm = convo.startsWith("dm:");

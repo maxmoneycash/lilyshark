@@ -17,6 +17,7 @@
  */
 
 import { useSyncExternalStore } from 'react';
+import { recordFrame } from './captureSession';
 
 /** USB vendors that put a serial device on a dev board: Espressif's native
  *  USB (the T-Deck), then the CH34x / CP210x / FTDI bridges other boards use.
@@ -100,6 +101,87 @@ export interface HeardFrame {
   short?: string;
   text?: string;
   atMs: number;
+  /** Everything a .lscap record needs. Absent on firmware older than the
+   *  capture link, in which case the frame still lists but cannot be written
+   *  into a capture. */
+  raw?: RawFrameFields;
+}
+
+/** The record fields the device puts on the wire alongside the decoded view. */
+export interface RawFrameFields {
+  seq: number;
+  timestampUs: bigint;
+  /** Firmware fixed point, kept as-is because that is how .lscap stores it. */
+  rssiX10: number;
+  snrX10: number;
+  presentFields: number;
+  centerFrequencyHz: number;
+  bandwidthHz: number;
+  bitRateBps: number;
+  frequencyDeviationHz: number;
+  airtimeUs: number;
+  frequencyErrorHz: number;
+  preambleSymbols: number;
+  syncWord: number;
+  profileId: number;
+  radioStatus: number;
+  txPowerDbm: number;
+  spreadingFactor: number;
+  codingRateDenominator: number;
+  channelIndex: number;
+  radioIndex: number;
+  modulation: number;
+  direction: number;
+  crc: number;
+  metadataFlags: number;
+  originalLength: number;
+  bytes: Uint8Array;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.length % 2 === 0 ? hex : hex.slice(0, -1);
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+/** Undefined unless the device sent the whole record — a partial one would
+ *  produce a capture that looks complete and is not. */
+export function parseRawFrameFields(
+  body: Record<string, unknown>,
+): RawFrameFields | undefined {
+  if (typeof body.hex !== 'string' || typeof body.seq !== 'number') return undefined;
+  const n = (k: string) => Number(body[k] ?? 0);
+  return {
+    seq: n('seq'),
+    timestampUs: BigInt(Math.max(0, Math.trunc(n('ts')))),
+    rssiX10: n('rssi_x10'),
+    snrX10: n('snr_x10'),
+    presentFields: n('pf'),
+    centerFrequencyHz: n('freq'),
+    bandwidthHz: n('bw'),
+    bitRateBps: n('br'),
+    frequencyDeviationHz: n('fdev'),
+    airtimeUs: n('air'),
+    frequencyErrorHz: n('ferr'),
+    preambleSymbols: n('pre'),
+    syncWord: n('sync'),
+    profileId: n('prof'),
+    radioStatus: n('rstat'),
+    txPowerDbm: n('txp'),
+    spreadingFactor: n('sf'),
+    codingRateDenominator: n('cr'),
+    channelIndex: n('ch'),
+    radioIndex: n('ridx'),
+    modulation: n('mod'),
+    direction: n('dir'),
+    crc: n('crc'),
+    metadataFlags: n('mflags'),
+    originalLength: n('olen'),
+    bytes: hexToBytes(body.hex),
+  };
 }
 
 export const HEARD_FRAME_LIMIT = 40;
@@ -132,7 +214,9 @@ export type ParsedLsk =
   | { kind: 'ID'; firmware: string }
   | { kind: 'T'; telemetry: DeviceTelemetry }
   | { kind: 'F'; frame: HeardFrame }
-  | { kind: 'P'; pointer: DevicePointer };
+  | { kind: 'P'; pointer: DevicePointer }
+  | { kind: 'OK'; proto?: string; txKind?: string }
+  | { kind: 'ERR'; reason?: string; proto?: string };
 
 function optionalCoord(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -193,6 +277,7 @@ export function parseLskLine(line: string): ParsedLsk | undefined {
     const lat = optionalCoord(body.lat);
     const lon = optionalCoord(body.lon);
     const hops = optionalNum(body.hops);
+    const raw = parseRawFrameFields(body);
     return {
       kind: 'F',
       frame: {
@@ -211,7 +296,22 @@ export function parseLskLine(line: string): ParsedLsk | undefined {
         ...(optionalStr(body.short) ? { short: optionalStr(body.short) } : {}),
         ...(optionalStr(body.text) ? { text: optionalStr(body.text) } : {}),
         atMs: Date.now(),
+        ...(raw !== undefined ? { raw } : {}),
       },
+    };
+  }
+  if (kind === 'OK') {
+    return {
+      kind: 'OK',
+      proto: optionalStr(body.proto),
+      txKind: optionalStr(body.kind),
+    };
+  }
+  if (kind === 'ERR') {
+    return {
+      kind: 'ERR',
+      reason: optionalStr(body.reason),
+      proto: optionalStr(body.proto),
     };
   }
   if (kind === 'P') {
@@ -265,6 +365,18 @@ let pumpDone: Promise<void> | undefined;
 let reading = false;
 let identified: (() => void) | undefined;
 let streamEnded: (() => void) | undefined;
+let pendingTx:
+  | { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+  | undefined;
+
+function finishPendingTx(ok: boolean, reason?: string): void {
+  if (!pendingTx) return;
+  clearTimeout(pendingTx.timer);
+  const waiter = pendingTx;
+  pendingTx = undefined;
+  if (ok) waiter.resolve();
+  else waiter.reject(new Error(reason || 'radio rejected TX'));
+}
 
 let onAnalyzerLink: (() => void) | undefined;
 let onAnalyzerUnlink: (() => void) | undefined;
@@ -332,9 +444,16 @@ function handleLine(line: string): void {
     set({
       frames: appendHeardFrame(state.frames, parsed.frame),
     });
+    // A capture session keeps the full record; the list above keeps only the
+    // newest few for display.
+    recordFrame(parsed.frame);
     onAnalyzerFrame?.(parsed.frame);
   } else if (parsed.kind === 'P') {
     set({ pointer: parsed.pointer });
+  } else if (parsed.kind === 'OK') {
+    finishPendingTx(true);
+  } else if (parsed.kind === 'ERR') {
+    finishPendingTx(false, parsed.reason);
   }
 }
 
@@ -565,6 +684,24 @@ export async function autoLinkDeviceLink(): Promise<void> {
   // the CDC handle, fail the reboot handshake, and snap the header back to
   // CONNECT with no error.
   return;
+}
+
+export async function sendDeviceLine(line: string): Promise<void> {
+  if (state.status !== 'linked') {
+    throw new Error('T-Deck is not linked');
+  }
+  await send(line);
+  if (!line.startsWith('LSK TX ')) return;
+  await new Promise<void>((resolve, reject) => {
+    pendingTx = {
+      resolve,
+      reject,
+      timer: setTimeout(() => {
+        pendingTx = undefined;
+        reject(new Error('radio did not confirm TX'));
+      }, 8000),
+    };
+  });
 }
 
 export async function disconnectDeviceLink(): Promise<void> {

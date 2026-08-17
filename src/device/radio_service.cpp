@@ -93,6 +93,24 @@ bool TDeckRadioService::begin(const RadioProfile &profile, FrameHandler handler,
     return configure(profile);
 }
 
+bool TDeckRadioService::transmit(const std::uint8_t *data, std::size_t length) noexcept
+{
+    if (data == nullptr || length == 0 || length > kMaxFrameBytes) {
+        return false;
+    }
+    if (!status_.initialized || spectrum_status_.active()) {
+        return false;
+    }
+    radio_.clearDio1Action();
+    radio_.standby();
+    dio1_pending_ = false;
+    status_.receiving = false;
+    const std::int16_t state = radio_.transmit(data, length);
+    status_.last_error = state;
+    resumeReceive();
+    return state == RADIOLIB_ERR_NONE;
+}
+
 bool TDeckRadioService::setProfile(const RadioProfile &profile) noexcept
 {
     if (spectrum_status_.active()) {

@@ -169,9 +169,9 @@ export function ThisDevicePanel() {
 						<button onClick={() => void disconnectDeviceLink()}>UNLINK</button>
 					</div>
 					<p className="dim device-note">
-						This T-Deck is a listener. It hears Meshtastic, MeshCore and
-						Reticulum on the air. It cannot send Meshtastic messages — use a
-						Meshtastic radio for that. Decoded default-key texts land in CHAT.
+						This firmware now transmits on Meshtastic LongFast (default key)
+						from CHAT. MeshCore send still needs a MeshCore identity — same
+						radio, next encoder. Heard default-key texts also land in CHAT.
 					</p>
 					{link.frames.length > 0 && (
 						<div className="device-heard">

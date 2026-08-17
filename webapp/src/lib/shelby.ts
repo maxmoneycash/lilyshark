@@ -34,6 +34,38 @@ export const SHELBY_FULLNODE = 'https://api.shelbynet.aptoslabs.com/v1';
 /** The Move module that anchors captures on-chain (contracts/capture-registry). */
 export const CAPTURE_REGISTRY = `${DEMO_BLOB.owner}::capture_registry`;
 
+/** The deployed module itself, read straight from the shelbynet fullnode. The
+ *  plainest possible "it is really on chain": it answers with bytecode. */
+export const CAPTURE_REGISTRY_URL = `${SHELBY_FULLNODE}/accounts/${DEMO_BLOB.owner}/module/capture_registry`;
+
+/** shelbynet is not a named Aptos network, so the explorer needs it passed in. */
+export const APTOS_EXPLORER_ACCOUNT = `https://explorer.aptoslabs.com/account/${DEMO_BLOB.owner}?network=custom&api=${encodeURIComponent(SHELBY_FULLNODE)}`;
+
+export interface UploadServiceInfo {
+  available: boolean;
+  uploaderAddress: string | null;
+}
+
+/**
+ * Whether a capture can actually be published to Shelby from here. The browser
+ * holds no Aptos key, so publishing goes through the share service, which can
+ * only sign when it has been given one. Asked rather than assumed: a disabled
+ * button that explains itself beats one that fails at the end of an upload.
+ */
+export async function fetchUploadInfo(): Promise<UploadServiceInfo> {
+  try {
+    const r = await fetch('/api/share/info');
+    if (!r.ok) return { available: false, uploaderAddress: null };
+    const j = (await r.json()) as Partial<UploadServiceInfo>;
+    return {
+      available: j.available === true,
+      uploaderAddress: typeof j.uploaderAddress === 'string' ? j.uploaderAddress : null,
+    };
+  } catch {
+    return { available: false, uploaderAddress: null };
+  }
+}
+
 export interface CaptureAnchor {
   blobName: string;
   sizeBytes: number;

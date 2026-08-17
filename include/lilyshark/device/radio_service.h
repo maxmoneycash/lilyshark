@@ -119,6 +119,7 @@ class TDeckRadioService
 
     bool begin(const RadioProfile &profile, FrameHandler handler, void *context) noexcept;
     bool setProfile(const RadioProfile &profile) noexcept;
+    bool transmit(const std::uint8_t *data, std::size_t length) noexcept;
 
     // Experimental SX1262 facility. An accepted sweep temporarily suspends
     // packet reception and advances only when poll() is called. Completion,

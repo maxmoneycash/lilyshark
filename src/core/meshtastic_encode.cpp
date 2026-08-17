@@ -118,11 +118,9 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
     if (request.port == MeshtasticPort::TextMessage) {
         if (request.text == nullptr || request.text[0] == '\0') return 0;
         const std::size_t text_len = std::strlen(request.text);
-        if (text_len > kMeshtasticMaxTextBytes) return 0;
-        if (!writeBytesField(inner, sizeof(inner), inner_used, 1,
-                             reinterpret_cast<const std::uint8_t *>(request.text), text_len)) {
-            return 0;
-        }
+        if (text_len > kMeshtasticMaxTextBytes || text_len > sizeof(inner)) return 0;
+        std::memcpy(inner, request.text, text_len);
+        inner_used = text_len;
     } else if (request.port == MeshtasticPort::Position) {
         if (!writePositionPayload(inner, sizeof(inner), inner_used, request.latitude_degrees,
                                   request.longitude_degrees)) {

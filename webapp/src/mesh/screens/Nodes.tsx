@@ -606,8 +606,8 @@ function Detail(props: {
 					}}
 					className="dim"
 				>
-					Heard on the air. This T-Deck is a listener and cannot send
-					Meshtastic messages.
+					Heard on the air. Send to LongFast from CHAT. Direct Meshtastic
+					PKI DMs to this node are not available yet.
 				</div>
 			)}
 			{!props.isMe && getDeviceLinkState().status !== "linked" && (

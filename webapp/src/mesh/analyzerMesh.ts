@@ -109,7 +109,7 @@ export function applyHeardFrame(frame: HeardFrame): void {
     lon: frame.lon,
   });
 
-  if (!frame.text) return;
+  if (!frame.text || frame.src === ANALYZER_SELF_NUM) return;
   const BROADCAST = 0xffffffff;
   const isBroadcast = frame.dst === BROADCAST || frame.dst === 0;
   const convo = isBroadcast ? "ch:0" : `dm:${frame.src}`;
