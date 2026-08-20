@@ -47,7 +47,13 @@ const upload = multer({
       "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska",
       "application/pdf",
     ];
-    if (allowedTypes.includes(file.mimetype)) {
+    // Lilyshark captures arrive as octet-stream because no registered mimetype
+    // exists for them. The extension only gates entry here; the upload handler
+    // verifies the LSCP magic on the actual bytes, which a mimetype cannot do.
+    const isLscap =
+      path.extname(file.originalname).toLowerCase() === ".lscap" &&
+      (file.mimetype === "application/octet-stream" || file.mimetype === "");
+    if (allowedTypes.includes(file.mimetype) || isLscap) {
       cb(null, true);
     } else {
       cb(new Error(`File type ${file.mimetype} not allowed`));
@@ -270,6 +276,19 @@ export function createRouter(
       );
 
       const fileBuffer = await fs.promises.readFile(tempPath);
+
+      // A capture is evidence, so a file claiming to be one has to actually
+      // be one: the .lscap header starts with the LSCP magic. Checked on the
+      // bytes because the mimetype and extension are both client-supplied.
+      if (path.extname(file.originalname).toLowerCase() === ".lscap") {
+        if (fileBuffer.length < 24 || fileBuffer.toString("latin1", 0, 4) !== "LSCP") {
+          cleanup();
+          return res.status(400).json({
+            error: "Not a Lilyshark capture: the LSCP file header is missing",
+          });
+        }
+      }
+
       const result = await uploadService.uploadFile(fileBuffer, file.originalname);
       cleanup();
 
@@ -322,7 +341,7 @@ export function createRouter(
       available: uploadService?.isAvailable() ?? false,
       uploaderAddress: uploadService?.getAddress() ?? null,
       maxFileSize: "2GB",
-      allowedTypes: ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "avif", "mp4", "webm", "mov", "avi", "mkv", "pdf"],
+      allowedTypes: ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "avif", "mp4", "webm", "mov", "avi", "mkv", "pdf", "lscap"],
       expiration: "1 year",
     });
   });

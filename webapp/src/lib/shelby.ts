@@ -39,7 +39,50 @@ export const CAPTURE_REGISTRY = `${DEMO_BLOB.owner}::capture_registry`;
 export const CAPTURE_REGISTRY_URL = `${SHELBY_FULLNODE}/accounts/${DEMO_BLOB.owner}/module/capture_registry`;
 
 /** shelbynet is not a named Aptos network, so the explorer needs it passed in. */
-export const APTOS_EXPLORER_ACCOUNT = `https://explorer.aptoslabs.com/account/${DEMO_BLOB.owner}?network=custom&api=${encodeURIComponent(SHELBY_FULLNODE)}`;
+export function aptosExplorerAccount(owner: string): string {
+  return `https://explorer.aptoslabs.com/account/${owner}?network=custom&api=${encodeURIComponent(SHELBY_FULLNODE)}`;
+}
+export const APTOS_EXPLORER_ACCOUNT = aptosExplorerAccount(DEMO_BLOB.owner);
+
+export interface PublishResult {
+  blobName: string;
+  owner: string;
+  size: number;
+  url: string;
+  expiresAt?: string;
+}
+
+/**
+ * Publish a capture through the share service, which signs the Shelby upload
+ * and its on-chain registration with its own account. Throws with the
+ * server's reason on refusal — including the LSCP magic check.
+ */
+export async function publishCapture(bytes: Uint8Array, fileName: string): Promise<PublishResult> {
+  const form = new FormData();
+  form.append(
+    'file',
+    new File([bytes.slice().buffer as ArrayBuffer], fileName, {
+      type: 'application/octet-stream',
+    }),
+  );
+  const res = await fetch('/api/share/upload', { method: 'POST', body: form });
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || body.success !== true) {
+    throw new Error(String(body.error ?? body.message ?? `upload HTTP ${res.status}`));
+  }
+  const blobName = String(body.blobName ?? fileName);
+  // The service builds the URL from its own account; recover the owner from it
+  // rather than trusting a field that may be absent.
+  const url = String(body.url ?? '');
+  const owner = /\/blobs\/(0x[0-9a-fA-F]+)\//.exec(url)?.[1] ?? '';
+  return {
+    blobName,
+    owner,
+    size: Number(body.size ?? bytes.length),
+    url,
+    expiresAt: typeof body.expiresAt === 'string' ? body.expiresAt : undefined,
+  };
+}
 
 export interface UploadServiceInfo {
   available: boolean;

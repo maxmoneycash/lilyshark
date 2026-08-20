@@ -16,11 +16,14 @@ import { startTrafficDemoInterval } from './trafficDemo';
 import {
   DEMO_BLOB,
   APTOS_EXPLORER_ACCOUNT,
+  aptosExplorerAccount,
   CAPTURE_REGISTRY,
   CAPTURE_REGISTRY_URL,
   fetchAnchor,
   fetchBlob as fetchBlobBytes,
   fetchUploadInfo,
+  publishCapture,
+  type PublishResult,
   resolveByCommitment,
   type UploadServiceInfo,
 } from '../lib/shelby';
@@ -160,6 +163,53 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   // Asked once, when there is a capture to publish. The answer decides whether
   // PUBLISH is an action or an explanation.
   const [uploadInfo, setUploadInfo] = useState<UploadServiceInfo | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [published, setPublished] = useState<{
+    publish: PublishResult;
+    /** 'pending' while the read-back runs; 'ok' or the mismatch reason after. */
+    verified: 'pending' | 'ok' | string;
+  } | null>(null);
+
+  // A new recording is a new artifact; the previous publish no longer
+  // describes what is on screen.
+  const sessionStart = session.startedAtMs;
+  useEffect(() => {
+    setPublished(null);
+    setPublishError(null);
+  }, [sessionStart]);
+
+  const onPublish = async () => {
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const bytes = captureToLscap(session);
+      const res = await publishCapture(bytes, captureFileName(session));
+      setPublished({ publish: res, verified: 'pending' });
+      // Prove the loop instead of asserting it: read the blob back from the
+      // Shelby RPC and compare every byte with what was just sent.
+      try {
+        const back = new Uint8Array(await fetchBlobBytes(res.owner, res.blobName));
+        const same =
+          back.length === bytes.length && back.every((b, i) => b === bytes[i]);
+        setPublished({
+          publish: res,
+          verified: same
+            ? 'ok'
+            : `Shelby served ${back.length} bytes, we sent ${bytes.length}`,
+        });
+      } catch (e) {
+        setPublished({
+          publish: res,
+          verified: `read-back failed: ${e instanceof Error ? e.message : e}`,
+        });
+      }
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPublishing(false);
+    }
+  };
   const haveCapture = !session.recording && session.frames.length > 0;
   useEffect(() => {
     if (!haveCapture || uploadInfo) return;
@@ -518,17 +568,45 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             <span className="v">
               {uploadInfo === null ? (
                 <span className="dim">checking the share service…</span>
-              ) : uploadInfo.available ? (
-                <>
-                  ready · uploads sign as{' '}
-                  <code>{uploadInfo.uploaderAddress?.slice(0, 10)}…</code>
-                </>
-              ) : (
+              ) : !uploadInfo.available ? (
                 <span className="warn">
                   unavailable — the share service holds no Shelby signing key, so this
                   capture cannot be uploaded or anchored from the browser. Download the
                   .lscap and publish it with <code>webapp/scripts/shelby-put.ts</code>.
                 </span>
+              ) : published ? (
+                <>
+                  <a href={published.publish.url} target="_blank" rel="noreferrer">
+                    {published.publish.blobName}
+                  </a>{' '}
+                  · {published.publish.size.toLocaleString()} B on Shelby ·{' '}
+                  {published.verified === 'ok' ? (
+                    <span className="ok">
+                      served back byte-identical — the network holds exactly this capture
+                    </span>
+                  ) : published.verified === 'pending' ? (
+                    <span className="dim">reading it back from Shelby…</span>
+                  ) : (
+                    <span className="warn">read-back mismatch: {published.verified}</span>
+                  )}{' '}
+                  ·{' '}
+                  <a
+                    href={aptosExplorerAccount(published.publish.owner)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    OWNER ON APTOS EXPLORER
+                  </a>
+                </>
+              ) : (
+                <>
+                  <button disabled={publishing} onClick={() => void onPublish()}>
+                    {publishing ? 'PUBLISHING…' : '⇡ PUBLISH TO SHELBY'}
+                  </button>{' '}
+                  signs as <code>{uploadInfo.uploaderAddress?.slice(0, 10)}…</code> · the
+                  upload registers the blob on shelbynet under that account
+                  {publishError && <span className="err"> · {publishError}</span>}
+                </>
               )}
             </span>
           </div>

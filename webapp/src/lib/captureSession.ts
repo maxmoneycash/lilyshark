@@ -116,6 +116,31 @@ export function captureToLscap(s: CaptureSessionState): Uint8Array {
   return buildLscap(s.frames);
 }
 
+// Dev only: the store is module state inside the app bundle, so a browser
+// test cannot reach it by importing the module — Vite hands the test a second
+// instance. This exposes the app's own instance for driving the UI without a
+// radio on the cable. Absent from production builds and inert under node.
+declare global {
+  interface Window {
+    __lilysharkCapture?: {
+      startCapture: typeof startCapture;
+      stopCapture: typeof stopCapture;
+      clearCapture: typeof clearCapture;
+      recordFrame: typeof recordFrame;
+      getCaptureSession: typeof getCaptureSession;
+    };
+  }
+}
+if (typeof window !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
+  window.__lilysharkCapture = {
+    startCapture,
+    stopCapture,
+    clearCapture,
+    recordFrame,
+    getCaptureSession,
+  };
+}
+
 /** `lilyshark-capture-20260817-142530.lscap` */
 export function captureFileName(s: CaptureSessionState): string {
   const d = new Date(s.startedAtMs ?? Date.now());

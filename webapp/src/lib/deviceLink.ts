@@ -723,3 +723,15 @@ export async function disconnectDeviceLink(): Promise<void> {
   });
   onAnalyzerUnlink?.();
 }
+
+// Dev only: companion to window.__lilysharkCapture (see captureSession.ts) —
+// lets a browser test feed the app's own parser the exact lines the firmware
+// prints, so the whole capture UI can be exercised without a radio.
+declare global {
+  interface Window {
+    __lilysharkParseLsk?: typeof parseLskLine;
+  }
+}
+if (typeof window !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
+  window.__lilysharkParseLsk = parseLskLine;
+}
