@@ -819,11 +819,25 @@ The standalone C++ tests compile with warnings as errors and run under AddressSa
 - [ ] Add sync-word/preamble editing, key management, deeper payload decoders, and more regional presets.
 - [ ] Publish a hardware-validated tagged release with checksums and a field-test report.
 
+Beyond the stable release, the working backlog lives on the
+[task board](tasks/README.md) — 48 tasks across the analyzer, firmware, the
+[Field Receipts protocol](docs/protocol/field-receipts.md), contracts, growth,
+and whitepaper alignment, each with its own acceptance rubric and, where
+checkable, its own eval commands (`python3 scripts/tasks.py board`). The
+strategic case for what's on it — where the mesh community moved in 2025–26,
+why the focus is multi-protocol observability, and how the project pays for
+itself — is argued with sources in
+[docs/strategy/2026-q3-direction.md](docs/strategy/2026-q3-direction.md).
+
 ## Documentation
 
 - [docs/quickstart.md](docs/quickstart.md) — evaluate the project in ten minutes, no radio required
 - [docs/architecture.md](docs/architecture.md) — the whole system on one page
 - [docs/shelby-off-grid.md](docs/shelby-off-grid.md) — the off-grid design: blobs over a 200-byte pipe
+- [docs/protocol/field-receipts.md](docs/protocol/field-receipts.md) — Field Receipts: witness attestation and on-chain points (v0 draft)
+- [docs/strategy/2026-q3-direction.md](docs/strategy/2026-q3-direction.md) — where the mesh moved, where we focus, how this pays
+- [docs/whitepaper-traceability.md](docs/whitepaper-traceability.md) — every whitepaper claim mapped to code, evidence, or an honest gap
+- [tasks/README.md](tasks/README.md) — the evaluable task board
 - [docs/shelby-pointer-format.md](docs/shelby-pointer-format.md) — the 82-byte `SHLB` pointer wire format
 - [docs/lilyshark-capture-format.md](docs/lilyshark-capture-format.md) — the `.lscap` capture format
 - [docs/FLASHING.md](docs/FLASHING.md) — flash a T-Deck · [docs/RECORDING_UI.md](docs/RECORDING_UI.md) — record the UI
