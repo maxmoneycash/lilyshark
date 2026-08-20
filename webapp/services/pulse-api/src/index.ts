@@ -5,6 +5,7 @@ import { loadConfig } from "./config";
 import { logger } from "./logger";
 import { DataService } from "./data-service";
 import { UploadService } from "./upload-service";
+import { AnchorService } from "./anchor-service";
 import { createRouter } from "./routes";
 
 async function main() {
@@ -31,6 +32,20 @@ async function main() {
     logger.warn("SHELBY_PRIVATE_KEY not set - Shelby Share disabled");
   }
 
+  // On-chain anchoring for published captures (UI-002): signs
+  // lilyshark::capture_registry::register with the same service key that
+  // pays uploads. Constructed even without a key so the routes can answer
+  // with an explicit "skipped" instead of silently omitting the anchor.
+  const anchorService = new AnchorService({
+    privateKey: config.SHELBY_PRIVATE_KEY || undefined,
+    nodeUrl: config.APTOS_NODE_URL,
+    registryAddress: config.CAPTURE_REGISTRY_ADDRESS,
+    dryRun: config.ANCHOR_DRY_RUN === "true" || config.ANCHOR_DRY_RUN === "1",
+  });
+  if (!anchorService.isAvailable()) {
+    logger.warn("Capture anchoring disabled - uploads will report anchor: skipped");
+  }
+
   // Middleware
   app.use(cors());
   app.use(express.json());
@@ -54,7 +69,7 @@ async function main() {
   });
 
   // Routes
-  app.use("/api", createRouter(dataService, uploadService));
+  app.use("/api", createRouter(dataService, uploadService, anchorService));
 
   // Root endpoint
   app.get("/", (req, res) => {

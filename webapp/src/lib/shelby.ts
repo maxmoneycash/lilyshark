@@ -42,7 +42,54 @@ export const CAPTURE_REGISTRY_URL = `${SHELBY_FULLNODE}/accounts/${DEMO_BLOB.own
 export function aptosExplorerAccount(owner: string): string {
   return `https://explorer.aptoslabs.com/account/${owner}?network=custom&api=${encodeURIComponent(SHELBY_FULLNODE)}`;
 }
+
+/** Explorer link for one transaction — e.g. a capture_registry::register. */
+export function aptosExplorerTxn(txHash: string): string {
+  return `https://explorer.aptoslabs.com/txn/${txHash}?network=custom&api=${encodeURIComponent(SHELBY_FULLNODE)}`;
+}
 export const APTOS_EXPLORER_ACCOUNT = aptosExplorerAccount(DEMO_BLOB.owner);
+
+/**
+ * The share service's word on the on-chain anchor it wrote (or didn't) for a
+ * freshly published capture. Anchoring never blocks the publish server-side,
+ * so a publish can succeed while the anchor reports `failed` or `skipped` —
+ * render that as an honest not-anchored state, never as a publish error.
+ */
+export type PublishAnchor =
+  | {
+      status: 'anchored';
+      /** Null when this commitment was already anchored by an earlier publish. */
+      txHash: string | null;
+      publisher: string;
+      alreadyAnchored: boolean;
+    }
+  | { status: 'skipped'; reason: string }
+  | { status: 'failed'; reason: string };
+
+/**
+ * Shape-check the `anchor` field of an upload response. Returns undefined for
+ * anything malformed — an absent anchor and a garbled one read the same to
+ * the UI: not anchored, say so.
+ */
+export function parsePublishAnchor(value: unknown): PublishAnchor | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const v = value as Record<string, unknown>;
+  if (v.status === 'anchored' && typeof v.publisher === 'string') {
+    return {
+      status: 'anchored',
+      txHash: typeof v.txHash === 'string' ? v.txHash : null,
+      publisher: v.publisher,
+      alreadyAnchored: v.alreadyAnchored === true,
+    };
+  }
+  if (v.status === 'skipped' || v.status === 'failed') {
+    return {
+      status: v.status,
+      reason: typeof v.reason === 'string' ? v.reason : 'no reason given',
+    };
+  }
+  return undefined;
+}
 
 export interface PublishResult {
   blobName: string;
@@ -50,6 +97,10 @@ export interface PublishResult {
   size: number;
   url: string;
   expiresAt?: string;
+  /** 32-byte blob commitment the service read back on-chain, if it could. */
+  commitment?: string;
+  /** On-chain anchor outcome; undefined when the server predates UI-002. */
+  anchor?: PublishAnchor;
 }
 
 /**
@@ -81,6 +132,8 @@ export async function publishCapture(bytes: Uint8Array, fileName: string): Promi
     size: Number(body.size ?? bytes.length),
     url,
     expiresAt: typeof body.expiresAt === 'string' ? body.expiresAt : undefined,
+    commitment: typeof body.commitment === 'string' ? body.commitment : undefined,
+    anchor: parsePublishAnchor(body.anchor),
   };
 }
 
