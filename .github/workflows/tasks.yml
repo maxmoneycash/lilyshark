@@ -1,0 +1,24 @@
+name: Task board
+
+on:
+  push:
+    branches: [main]
+    paths: ['tasks/**', 'scripts/tasks.py', '.github/workflows/tasks.yml']
+  pull_request:
+    paths: ['tasks/**', 'scripts/tasks.py', '.github/workflows/tasks.yml']
+
+jobs:
+  board:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install board tooling
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Validate the board
+        run: python3 scripts/tasks.py validate
+
+      - name: Sweep for regressions on done tasks
+        run: python3 scripts/tasks.py eval --all
