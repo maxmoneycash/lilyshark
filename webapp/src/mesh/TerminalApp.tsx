@@ -211,7 +211,9 @@ function App() {
   // The intro opens first: the device, its screens, and why it exists —
   // unless a deep link asked for a specific screen.
   const [tab, setTab] = useState<Tab>(
-    () => HASH_TAB[window.location.hash.toLowerCase()] ?? "INTRO",
+    // The entry token may carry a query (TrafficTab keeps its display
+    // filter in `#traffic?filter=…`); only the part before `?` routes.
+    () => HASH_TAB[window.location.hash.toLowerCase().split("?")[0]] ?? "INTRO",
   );
   // Phone nav: the ten tabs live behind a hamburger instead of a side-scroll.
   const [menuOpen, setMenuOpen] = useState(false);

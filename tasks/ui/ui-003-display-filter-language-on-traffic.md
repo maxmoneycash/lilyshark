@@ -4,7 +4,7 @@ title: Display filter language on TRAFFIC
 area: ui
 size: L
 priority: P0
-status: todo
+status: done
 eval:
   auto:
   - test -f webapp/src/lib/frameFilter.ts
