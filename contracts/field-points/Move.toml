@@ -1,0 +1,15 @@
+[package]
+name = "LilysharkFieldPoints"
+version = "0.1.0"
+authors = ["Lilyshark"]
+
+[addresses]
+lilyshark = "_"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "aptos-release-v1.27"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dependencies.LilysharkCaptureRegistry]
+local = "../capture-registry"
