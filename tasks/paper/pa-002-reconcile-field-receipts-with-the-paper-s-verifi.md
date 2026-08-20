@@ -4,7 +4,7 @@ title: Reconcile Field Receipts with the paper's verification ladder
 area: paper
 size: M
 priority: P1
-status: todo
+status: done
 depends_on:
 - PR-001
 eval:

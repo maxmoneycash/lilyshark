@@ -8,7 +8,7 @@ status: todo
 eval:
   auto:
   - test -f webapp/src/lib/frameFilter.ts
-  - cd webapp && pnpm vitest run --reporter=basic src/lib/frameFilter.test.ts
+  - cd webapp && node --import tsx --test src/lib/frameFilter.test.ts
   rubric:
   - Grammar covers proto, freq, sf, cr, rssi, snr, crc, len, dir, has:pointer, has:synthetic with ==,
     !=, <, >, &&, ||, parentheses.

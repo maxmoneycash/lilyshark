@@ -4,7 +4,7 @@ title: Freeze the witness-key derivation and its test vector
 area: protocol
 size: S
 priority: P0
-status: todo
+status: done
 eval:
   auto:
   - grep -q 'WITNESS-VECTOR-1' docs/protocol/field-receipts.md

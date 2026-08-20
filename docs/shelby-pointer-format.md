@@ -13,6 +13,8 @@ mesh spends R = 7.36 transmissions per delivered message at realistic
 density, and delivery reach falls from 68.6% to 25.8% as nodes are added,
 because every relay consumes shared channel time. Airtime is the scarce
 resource; the pointer is the smallest object that preserves the reference.
+The scaling model built on these measurements is
+[`analysis/results.md`](../analysis/results.md).
 
 ## Carriage
 

@@ -8,7 +8,7 @@ status: todo
 eval:
   auto:
   - test -d webapp/src/lib/dissect
-  - cd webapp && pnpm vitest run --reporter=basic src/lib/dissect
+  - cd webapp && node --import tsx --test src/lib/dissect/*.test.ts
   rubric:
   - Meshtastic, MeshCore, and RNode structural fields shown as an expandable tree above the hex dump,
     with byte-range highlight on hover.

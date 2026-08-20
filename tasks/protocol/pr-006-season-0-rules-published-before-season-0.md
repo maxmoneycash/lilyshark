@@ -4,7 +4,7 @@ title: Season 0 rules, published before Season 0
 area: protocol
 size: S
 priority: P1
-status: todo
+status: done
 depends_on:
 - PR-001
 eval:

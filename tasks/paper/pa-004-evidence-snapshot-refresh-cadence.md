@@ -4,7 +4,7 @@ title: Evidence snapshot refresh cadence
 area: paper
 size: S
 priority: P2
-status: todo
+status: done
 eval:
   auto:
   - test -f scripts/refresh_evidence.sh

@@ -536,8 +536,10 @@ TypeScript decoder are cross-checked byte for byte.
 Keeping the over-the-air object small is a measured decision, not a stylistic one:
 against Meshtastic's own discrete-event simulator a flooded mesh spends **R = 7.36**
 transmissions per delivered message at realistic density, and reach falls from 68.6%
-to 25.8% as nodes are added. Airtime is the scarce resource, so send a reference and
-let a connected node carry the payload.
+to 25.8% as nodes are added — the whitepaper's measurements (the PAPER tab ships it);
+the scaling model built on them is [analysis/results.md](analysis/results.md).
+Airtime is the scarce resource, so send a reference and let a connected node carry
+the payload.
 
 The loop is live, not planned. A field capture is stored on shelbynet right now —
 object `captures/field-capture-0846.lscap`, owner

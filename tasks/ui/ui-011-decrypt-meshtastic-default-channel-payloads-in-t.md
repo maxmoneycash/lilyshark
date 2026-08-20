@@ -9,7 +9,7 @@ depends_on:
 - UI-004
 eval:
   auto:
-  - cd webapp && pnpm vitest run --reporter=basic src/lib/dissect/meshtasticCrypto.test.ts
+  - cd webapp && node --import tsx --test src/lib/dissect/meshtasticCrypto.test.ts
   rubric:
   - Frames under the published default key decrypt and dissect in the browser, matching the firmware decoder's
     output on the same fixtures.

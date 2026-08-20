@@ -21,6 +21,40 @@ Deterministic; Python 3.10+, standard library only. The evidence script
 pins its snapshot to `fixtures/shelby_network_snapshot.json` so the numbers
 in `results_evidence.md` are reproducible and tests never touch the network.
 
+## Refreshing the snapshot
+
+One command re-fetches the live evidence, pins the new fixture, regenerates
+`results_evidence.md` + `chart_blob_sizes.svg` with a fresh date stamp, and
+republishes the docs copies the webapp serves:
+
+```sh
+scripts/refresh_evidence.sh
+```
+
+It needs network access and fails loudly without it — a refresh that read
+the pinned fixture would put today's date on old numbers. Offline,
+`shelby_network_evidence.py --offline` regenerates the report from the
+existing snapshot, which keeps its original date stamp.
+
+Two rules keep the evidence honest:
+
+- **Every citation carries its date.** The snapshot date is stamped in the
+  report header, the chart caption, and the fixture itself; any prose that
+  quotes a headline number ("393k blobs") must quote the date it was
+  measured ("as of 2026-08-15") and be updated — or at least re-dated —
+  when the snapshot refreshes. An undated evidence number is a claim, not
+  a measurement.
+- **Shelbynet resets.** The measured network is an Early Access prototype
+  chain that is wiped roughly weekly
+  ([strategy memo §3](../docs/strategy/2026-q3-direction.md)), so these
+  numbers are scale-of-testnet, can go *down* between snapshots, and can
+  reset to near zero. A refresh that returns smaller numbers is the
+  network being what we said it is, not a bug.
+
+There is no fixed refresh interval; refresh before any surface that quotes
+the numbers ships, and treat a snapshot older than the wipe cadence
+(~a week) as historical rather than current.
+
 ## What each one shows
 
 | Scenario | Question | Answer in one line |
@@ -30,7 +64,7 @@ in `results_evidence.md` are reproducible and tests never touch the network.
 | C. The asymmetry | Why not send the payload over the air? | A 200 KB blob costs ~12,600 channel-seconds under today's flood; its 82-byte pointer costs 6.2 s, and falls as R falls. |
 | D. Capture survival | Why not leave it on the card? | 57% odds a capture survives 5 years on microSD vs 95% replicated — and only the replica is verified on read. |
 | E. Gateway resolution | How many gateways make off-grid work? | ~5% of nodes as gateways puts resolution under a day; a gateway is any node with connectivity, even a phone. |
-| F. Live evidence | Is any of this real yet? | 393k blobs / 108 GB / 48k owners / 8.09M ShelbyUSD transactions on the running testnet; its average object (275 KB) is already capture-sized. |
+| F. Live evidence | Is any of this real yet? | 393k blobs / 108 GB / 48k owners / 8.09M ShelbyUSD transactions on the running testnet (snapshot 2026-08-15); its average object (275 KB) is already capture-sized. |
 
 ## Provenance and honesty
 

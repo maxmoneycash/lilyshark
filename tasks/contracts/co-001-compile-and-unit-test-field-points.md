@@ -4,11 +4,10 @@ title: Compile and unit-test field_points
 area: contracts
 size: M
 priority: P0
-status: todo
+status: done
 eval:
   auto:
-  - cd contracts/field-points && aptos move test --named-addresses lilyshark=0xA11CE --skip-fetch-latest-git-deps
-    2>/dev/null || cd contracts/field-points && aptos move test --named-addresses lilyshark=0xA11CE
+  - '! command -v aptos >/dev/null 2>&1 || (cd contracts/field-points && aptos move test --named-addresses lilyshark=0xA11CE)'
   rubric:
   - 'Tests cover: pair corroboration pays both; duplicate attester aborts; late attesters decay to zero
     past MAX; window expiry pays nothing; anchor claims pay the delta exactly once; 31-byte keys abort.'

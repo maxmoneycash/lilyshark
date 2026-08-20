@@ -4,7 +4,7 @@ title: Correct the SHELBY tab's device-payment claim
 area: ui
 size: S
 priority: P0
-status: todo
+status: done
 eval:
   auto:
   - '! grep -rn "device''s own Aptos account" webapp/src'

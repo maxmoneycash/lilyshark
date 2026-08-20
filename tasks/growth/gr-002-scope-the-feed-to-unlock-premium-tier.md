@@ -4,7 +4,7 @@ title: Scope the feed-to-unlock premium tier
 area: growth
 size: M
 priority: P1
-status: todo
+status: done
 eval:
   auto:
   - test -f docs/strategy/premium-tier.md

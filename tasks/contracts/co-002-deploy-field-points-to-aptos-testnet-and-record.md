@@ -4,7 +4,7 @@ title: Deploy field_points to Aptos testnet and record it
 area: contracts
 size: S
 priority: P0
-status: todo
+status: blocked
 depends_on:
 - CO-001
 eval:

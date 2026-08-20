@@ -9,7 +9,7 @@ depends_on:
 - PR-001
 eval:
   auto:
-  - cd webapp && pnpm vitest run --reporter=basic src/lib/witnessKey.test.ts
+  - cd webapp && node --import tsx --test src/lib/witnessKey.test.ts
   rubric:
   - Same golden vector as PR-002; keys computed from opened captures via WebCrypto.
   - Synthetic provenance blocks key computation in the library, not just the UI.

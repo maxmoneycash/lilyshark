@@ -4,7 +4,7 @@ title: State the MERIDIAN gap
 area: paper
 size: L
 priority: P2
-status: todo
+status: done
 depends_on:
 - PA-001
 eval:

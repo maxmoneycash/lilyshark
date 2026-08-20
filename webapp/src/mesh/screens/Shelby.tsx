@@ -181,9 +181,9 @@ export function ShelbyScreen() {
               A LoRa mesh moves on the order of a kilobit per second and is capped
               by duty-cycle rules on top of that. A day of captured traffic will
               never fit down it. So the T-Deck does not send the capture — it
-              writes the <code>.lscap</code> to Shelby, and puts an{" "}
-              {SHELBY_POINTER_SIZE}-byte receipt on the air instead. The receipt
-              fits in a single packet.
+              keeps the <code>.lscap</code> on microSD, a connected host writes
+              it to Shelby, and an {SHELBY_POINTER_SIZE}-byte receipt goes on
+              the air instead. The receipt fits in a single packet.
             </p>
             <p>
               Every node in radio range decodes that receipt with no internet at
@@ -196,7 +196,7 @@ export function ShelbyScreen() {
           <div className="flow">
             {[
               ["01", "CAPTURE", "T-Deck logs Meshtastic, MeshCore and Reticulum frames with their radio measurements to microSD"],
-              ["02", "STORE", "the .lscap blob is written to Shelby and paid for from the device's own Aptos account"],
+              ["02", "STORE", "a connected host — the share service or shelby-put.ts — uploads the .lscap to Shelby and pays with its own Aptos account; the device never holds keys, by design"],
               ["03", "BROADCAST", `an ${SHELBY_POINTER_SIZE}-byte pointer carrying the commitment goes out over LoRa — one packet, no internet`],
               ["04", "RESOLVE", "any listener decodes it offline; anyone with a connection fetches the blob by commitment"],
             ].map(([n, k, v]) => (

@@ -4,7 +4,7 @@ title: One set of numbers everywhere
 area: paper
 size: S
 priority: P1
-status: todo
+status: done
 eval:
   rubric:
   - R=7.36, reach 68.6%→25.8%, saturation 6,721 nodes, and the airtime figures are cited identically across

@@ -26,6 +26,41 @@ reward tracks evidence quality, not hardware presence.** Helium paid for
 being there and got spoofed by simulated hotspots; we pay for receipts that
 independent parties corroborate.
 
+## Where this sits on the whitepaper's verification ladder
+
+The [whitepaper](../whitepaper-traceability.md) ranks proof-of-physical-work
+networks by a verification ladder — coverage ("I was there"), delivery
+("I moved your data"), observation ("I measured something checkable") —
+shows revenue tracks the tier, and **declines to fund any incentive layer
+on managed-flood routing**, because paying for coverage or relaying on a
+flooded mesh subsidizes the exact airtime consumption that collapses it
+(R = 7.36 transmissions per delivered message; reach 68.6% → 25.8%).
+
+Field Receipts is designed to comply with that finding, not to work around
+it:
+
+- **Witness attestation is observation-tier.** A corroborated witness key
+  is a measurement — "this transmission occurred, and two independently
+  operated receivers heard the same bytes" — checkable by anyone against
+  the anchored captures. It pays for *hearing*, never for relaying, and a
+  receiver is passive: rewarding more listeners adds zero airtime.
+- **Anchored captures are the evidence floor**, priced by real storage and
+  gas costs rather than emissions.
+- **Coverage cells are the one coverage-tier element**, and they are
+  deliberately the lowest-weighted reward in every season schedule
+  ([Season 0](season-0.md) fixes the cell bonus below the anchor floor),
+  because the paper's coverage-tier skepticism is measured, not stylistic.
+- **No routing rewards, ever.** Nothing in this protocol pays a node to
+  forward, rebroadcast, or beacon. If a future version is tempted to, the
+  paper's §29–§31 measurements are the standing counterargument.
+
+Where the paper and this protocol part ways: the paper's funded
+recommendation (MERIDIAN, §19–20) is a GNSS-interference observation
+network with a token; this repo builds neither (see
+[meridian-gap.md](../meridian-gap.md)). Field Receipts instead applies the
+paper's *method* — observation-tier verification, the genesis gate, prover
+discipline — to the instrument this repo actually ships.
+
 ## The primitives
 
 ### 1. Capture receipt (exists today)
@@ -43,28 +78,114 @@ metadata differs* (RSSI, SNR, frequency error are receiver-local) but whose
 anti-spoof primitive: it is cheap to fabricate a capture alone, and hard to
 fabricate the same frame into two independently operated receivers.
 
-A **witness key** identifies one over-the-air transmission:
+A **witness key** identifies one over-the-air transmission. The derivation
+is frozen below — three implementations (Python, TypeScript, C++) compute
+it, and each is checked byte-exact against `WITNESS-VECTOR-1`.
+`scripts/field_receipts.py` is the reference implementation.
+
+The key deliberately contains **no location and no node identity** — a
+witness proves "this transmission happened and ≥2 parties heard it",
+nothing about who sent it. Capture files remain where the full context
+lives.
+
+#### Witness key derivation (normative)
 
 ```
-witness_key = SHA-256(
-    frame payload bytes ||
-    center frequency, rounded to 25 kHz, uint32 LE Hz ||
-    time bucket, uint32 LE = unix_seconds / 60
-)
+witness_key     = SHA-256( payload_bytes || u32le(rounded_freq_hz) || u32le(time_bucket) )
+rounded_freq_hz = ((freq_hz + 12500) // 25000) * 25000
+time_bucket     = unix_seconds // 60
 ```
 
-- Payload bytes are the frame as captured, after CRC — not the radio
-  metadata, which legitimately differs per receiver.
-- The 25 kHz rounding absorbs crystal offset between receivers; the 60 s
-  bucket absorbs clock skew while keeping replayed old frames out. A frame
-  straddling a bucket boundary may produce two candidate keys; devices
-  submit the bucket of their own receive timestamp, and a missed match is
-  an accepted loss (the schedule prices witnessing as a bonus, not a
-  requirement).
-- The key deliberately contains **no location and no node identity** — a
-  witness proves "this transmission happened and ≥2 parties heard it",
-  nothing about who sent it. Capture files remain where the full context
-  lives.
+`//` is integer floor division on non-negative integers, so the frequency
+rounding is round-half-up to the nearest 25 kHz step: an offset of exactly
+12,500 Hz above a step rounds to the step above. `u32le(x)` is `x` encoded
+as an unsigned 32-bit little-endian integer — the byte order every
+multi-byte integer in this repository already uses. The hashed preimage is
+the payload followed by exactly 8 bytes, and the key is the raw 32-byte
+SHA-256 digest.
+
+The inputs, in terms of the `.lscap` record that captured the frame
+([capture format](../lilyshark-capture-format.md)):
+
+- `payload_bytes` — the record's `captured_length` payload bytes exactly as
+  stored after the record header: the frame payload after CRC, with no
+  radio metadata, no length prefix, no padding. Radio metadata (RSSI, SNR,
+  frequency error) legitimately differs per receiver and is excluded.
+- `freq_hz` — the record's `center frequency` field, which `.lscap` already
+  stores as an unsigned 32-bit integer count of hertz; no unit conversion
+  is applied before rounding. The 25 kHz rounding absorbs crystal offset
+  between receivers.
+- `unix_seconds` — the receiver's wall-clock receive time in unix seconds.
+  No version 1 `.lscap` field carries wall time: the record `timestamp` is
+  a boot-relative tick count. Deriving a key therefore requires a clock
+  anchor from outside the record — either a future capture-format field
+  that anchors tick 0 to wall time, or an anchor supplied at derivation
+  time (`field_receipts.py keys --epoch`, the unix time of tick 0), in
+  which case `unix_seconds = anchor + timestamp // ticks_per_second` using
+  the file header's tick rate. A frame with no wall-clock anchor is
+  **ineligible**. The 60 s bucket absorbs clock skew while keeping replayed
+  old frames out.
+
+**Eligibility (normative).** A record yields a witness key iff all of the
+following hold. An ineligible record yields no key — never a placeholder:
+
+1. CRC state is `valid` (2). `unknown`, `not present`, and `invalid`
+   frames never produce keys; a payload that cannot be checked cannot
+   corroborate anything.
+2. Captured length is at least 1 and equals the original length. A
+   truncated payload is not the transmitted frame, so its key could never
+   match a witness's.
+3. `present_fields` has the timestamp (bit 0) and center frequency (bit 1)
+   bits set.
+4. A wall-clock anchor is available (see `unix_seconds` above).
+5. The record is not synthetic (metadata flag bit 2 clear). Simulated
+   frames **never** produce keys; tooling must refuse them loudly rather
+   than skip them silently. A version 1.0 file's clear bit does not prove
+   radio origin — it only fails to mark simulation — so provenance beyond
+   the flag remains the operator's claim, priced by the threat model
+   below.
+
+**Bucket edges.** Each device derives exactly one key per frame, from the
+bucket of its own receive timestamp; implementations must not also submit
+the adjacent bucket. Two real receivers of one transmission can land in
+adjacent 60 s buckets and miss each other — an accepted loss, because the
+schedule prices witnessing as a bonus, not a requirement. The same holds in
+principle for the 25 kHz rounding boundary, though receivers tuned to the
+same channel report the same configured center frequency, so in practice
+the time bucket is where the losses are.
+
+**Validity.** Readers and the chain reject nothing: a witness key is an
+opaque 32-byte value with no internal structure to validate. A key is
+*valid* — capable of corroboration by an honest second receiver — iff it
+was derived per this section; any other 32 bytes are merely an attestation
+nothing will ever match.
+
+#### Test vector `WITNESS-VECTOR-1`
+
+Every implementation in this repository is tested byte-exact against this
+vector. `python3 scripts/field_receipts.py vector` recomputes and asserts
+it.
+
+| Input | Value |
+| --- | --- |
+| `payload_bytes` | bytes `A0`–`BF` in order (32 bytes) |
+| `freq_hz` | `906862500` (exactly half-way; exercises round-half-up) |
+| `rounded_freq_hz` | `906875000` → `u32le` `78 d0 0d 36` |
+| `unix_seconds` | `1893456000` (2030-01-01T00:00:00Z) |
+| `time_bucket` | `31557600` → `u32le` `e0 87 e1 01` |
+
+The exact 40-byte preimage hashed:
+
+```
+a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5
+b6b7b8b9babbbcbdbebf78d00d36e087e101
+```
+
+The resulting witness key:
+
+```
+94ed6915ddbbfb1b5c2557f5ecb61cfe3783f40be380323af53beb8c3b610125
+```
 
 `lilyshark::field_points::attest_witness(witness_key)` records the caller
 against the key. When a second *distinct* account attests the same key
@@ -155,7 +276,8 @@ shows real usage.
   witnessing uses frames the mesh already carries. A protocol that demanded
   new airtime would be spending the resource the whole design economizes
   (R = 7.36 transmissions per delivered flood message — the whitepaper's
-  central measurement).
+  central measurement; the scaling model built on it is
+  [analysis/results.md](../../analysis/results.md)).
 - **Device:** the firmware computes witness keys for frames it captures
   (payload hash it already has; frequency and timestamp it already
   records) and queues them in the capture sidecar; attestation happens

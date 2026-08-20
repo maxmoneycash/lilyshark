@@ -19,25 +19,48 @@ instrument. Season scoring and any redemption read this module's events;
 they never write it. The design rationale, point schedule, and threat
 model live in the protocol doc.
 
-> [!WARNING]
-> **Draft — not compiled, not tested, not deployed.** This module was
-> authored in an environment without the Aptos CLI. Until task **CO-001**
-> (compile + unit tests) and **CO-002** (Aptos testnet deployment) on the
-> [task board](../../tasks/README.md) are done, treat every line as a
-> specification of intent, not working code. `tests/field_points_tests.move`
-> states the intended semantics and must pass unchanged in spirit — if
-> making it compile changes behavior, the protocol doc is the arbiter.
+## Status: tested, proven on devnet, awaiting a durable testnet deployment
 
-## Where this deploys
+`aptos move test` (CLI 9.0.0, framework `aptos-release-v1.27`) passes all
+seven unit tests in `tests/field_points_tests.move`: pair corroboration
+pays both, duplicate attesters abort, late attesters decay, the window
+expires credit, anchor claims pay the delta exactly once, and short keys
+abort.
 
-Not shelbynet. Shelbynet is a prototype chain wiped roughly weekly — the
-blobs' home, not the scoreboard's. `field_points` and a durable
-`capture_registry` deployment belong on Aptos testnet now (CO-002/CO-003)
-and mainnet only when the score is worth its gas.
+The full loop has run end-to-end on **Aptos devnet** (2026-08-20, account
+`0xbc7bb07ff506b1b78567db545ecd4492cc94ca42315eb018e6885ef6b6002e2b`),
+attesting the witness key from `WITNESS-VECTOR-1` in the protocol spec:
 
-## Reproduce (once CO-001 lands)
+| Step | Tx |
+| --- | --- |
+| Publish `capture_registry` | `0x…` (see note) |
+| Publish `field_points` | `0xdea76b510474c1364aad0a8d4868132e9f077d1105b8414e2918b90f43e8349d` |
+| `capture_registry::register` (one anchor) | `0x3537f1e96ba7e2decbb567b1b10bc0790f59a4c6223b5babab7d959a6af41284` |
+| `claim_anchor_points` → 10 points | `0x2a447b1d27f4951b689acae3b6d9f4a7427d996bd28e60efd8929e0112769c70` |
+| `attest_witness` (opener, unpaid) | `0xed3ecd46520d070726cc695536fcce9121feffafde021929033558d8758aec25` |
+| `attest_witness` (second account → both paid 25) | `0x731b8bd50bf589baab622293a2d85711ea1e1456bf4e7973386f486c3012e772` |
+| `points_breakdown(opener)` | `(35, 10, 25, 1)` — total, anchor, witness, anchors claimed |
+
+Devnet is wiped periodically, so these transactions are a dated proof of
+the path, not a durable deployment.
+
+## Where this deploys (task CO-002)
+
+Not shelbynet — that prototype chain is wiped roughly weekly; it is the
+blobs' home, not the scoreboard's. And not devnet, for the same reason.
+The durable home is **Aptos testnet**, which requires one human step: the
+testnet faucet is web-gated. To complete CO-002:
+
+1. `aptos init --profile lilyshark-testnet --network testnet --skip-faucet`
+2. Fund the printed address at https://aptos.dev/network/faucet
+3. `cd contracts/capture-registry && aptos move publish --profile lilyshark-testnet --named-addresses lilyshark=<addr>`
+4. `cd contracts/field-points && aptos move publish --profile lilyshark-testnet --named-addresses lilyshark=<addr>`
+5. Exercise one anchor + claim + witness pair as above; record the
+   addresses and txs here.
+
+## Reproduce
 
 ```sh
-aptos move test    --package-dir contracts/field-points --named-addresses lilyshark=0xA11CE
-aptos move compile --package-dir contracts/field-points --named-addresses lilyshark=<your-address>
+cd contracts/field-points
+aptos move test --named-addresses lilyshark=0xA11CE
 ```

@@ -59,7 +59,7 @@ const SECTIONS: Section[] = [
   {
     screens: ['utilization', 'timeline-live', 'traffic-filter'].map(fw),
     head: 'Flooded meshes deliver less as they grow. We measured it.',
-    body: 'A LongFast channel moves about 987 bit/s and flood routing repeats everything: we measured 7.36 transmissions per delivered message, reach collapsing from 68.6% to 25.8% as the mesh grows, saturation near 6,721 nodes. Growth is exactly what breaks it.',
+    body: "A LongFast channel moves about 987 bit/s and flood routing repeats everything: against Meshtastic's own simulator we measured R = 7.36 transmissions per delivered message, reach collapsing from 68.6% to 25.8% as the mesh grows, saturation near 6,721 nodes — the measurements are in the paper on the PAPER tab. Growth is exactly what breaks it.",
   },
   {
     screens: ['spectrum-live', 'spectrum-warning'].map(fw),
