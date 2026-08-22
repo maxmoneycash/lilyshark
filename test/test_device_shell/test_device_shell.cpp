@@ -330,7 +330,7 @@ bool healthyScenario()
                 "loop did not service LVGL timers and display flushes")) return false;
 
     constexpr const char *primary_titles[] = {
-        "TRAFFIC", "SPECTRUM", "NODES", "MAP", "SURVEY", "AIRTIME", "EVENTS",
+        "RADIO", "SPECTRUM", "NODES", "MAP", "SURVEY", "AIRTIME", "EVENTS",
     };
     for(std::size_t index = 0; index < 7U; ++index) {
         sendKeyboard(static_cast<std::uint8_t>('1' + index));
@@ -438,7 +438,7 @@ bool healthyScenario()
                     labelWithPrefix(lv_screen_active(), "FNV32 ") != nullptr,
                 "Packet Detail did not render the RAW capture-provenance tab")) return false;
     sendKeyboard(0x08U);
-    if(!require(hasLabel(lv_screen_active(), "TRAFFIC"),
+    if(!require(hasLabel(lv_screen_active(), "RADIO"),
                 "Back did not return Packet Detail to Traffic")) return false;
 
     sendKeyboard('9');
@@ -456,7 +456,7 @@ bool healthyScenario()
     if(!require(hasLabel(lv_screen_active(), "MESHCORE"),
                 "Protocol Detail did not move to the next protocol class")) return false;
     sendKeyboard('\r');
-    if(!require(hasLabel(lv_screen_active(), "TRAFFIC *"),
+    if(!require(hasLabel(lv_screen_active(), "RADIO *"),
                 "Protocol Detail Enter did not apply a Traffic filter")) return false;
 
     sendKeyboard('X');
@@ -481,8 +481,8 @@ bool healthyScenario()
                     hasLabel(lv_screen_active(), "SHOWING ALL FRAMES"),
                 "Traffic filter reset did not restore all predicates")) return false;
     sendKeyboard('\r');
-    if(!require(hasLabel(lv_screen_active(), "TRAFFIC") &&
-                    !hasLabel(lv_screen_active(), "TRAFFIC *"),
+    if(!require(hasLabel(lv_screen_active(), "RADIO") &&
+                    !hasLabel(lv_screen_active(), "RADIO *"),
                 "Traffic filter apply did not return to unfiltered Traffic")) return false;
 
     // Keep only structurally decoded header rows, then inject a newer raw frame. The
@@ -493,7 +493,7 @@ bool healthyScenario()
     sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
     sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
     sendKeyboard('\r');
-    if(!require(hasLabel(lv_screen_active(), "TRAFFIC *") &&
+    if(!require(hasLabel(lv_screen_active(), "RADIO *") &&
                     hasLabel(lv_screen_active(), "12345678"),
                 "header filter did not retain the decoded Meshtastic frame")) return false;
 
@@ -519,7 +519,8 @@ bool healthyScenario()
                     hasLabel(lv_screen_active(), "12345678"),
                 "the injected source did not reach the Nodes route")) return false;
     sendKeyboard('\r');
-    if(!require(hasLabel(lv_screen_active(), "NODE DETAIL"),
+    if(!require(hasLabel(lv_screen_active(), "NODE") &&
+                    hasLabel(lv_screen_active(), "CHAT C"),
                 "Enter did not open Node Detail for the injected source")) return false;
     sendKeyboard(0x08U);
     if(!require(hasLabel(lv_screen_active(), "NODES"),
@@ -1099,7 +1100,7 @@ bool persistedSimulateModeScenario()
     sendKeyboard('1');
     device_shell_fake::advance_ms(2400U);
     loop();
-    if(!require(hasLabel(lv_screen_active(), "TRAFFIC") &&
+    if(!require(hasLabel(lv_screen_active(), "RADIO") &&
                     hasLabel(lv_screen_active(), "SIM MODE") &&
                     hasLabel(lv_screen_active(), "SIM 1") &&
                     !hasLabel(lv_screen_active(), "LISTENING FOR FRAMES"),

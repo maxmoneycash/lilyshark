@@ -71,6 +71,13 @@ inline void attachInterrupt(std::uint8_t pin, void (*handler)(), int)
     device_shell_fake::record("interrupt.attach." + std::to_string(pin));
 }
 
+class EspClass {
+public:
+    std::uint64_t getEfuseMac() const noexcept { return 0x112233445566ULL; }
+};
+
+inline EspClass ESP;
+
 inline void analogReadResolution(int) noexcept {}
 inline void analogSetPinAttenuation(std::uint8_t, int) noexcept {}
 inline std::uint32_t analogReadMilliVolts(std::uint8_t) noexcept

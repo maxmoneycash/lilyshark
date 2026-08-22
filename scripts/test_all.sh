@@ -173,6 +173,7 @@ build_and_run meshtastic_payload \
   src/crypto/aes128.cpp \
   src/core/meshtastic_payload.cpp \
   src/core/meshtastic_encode.cpp \
+  src/core/mesh_identity.cpp \
   test/meshtastic_payload/test_meshtastic_payload.cpp
 
 build_and_run shelby_pointer \

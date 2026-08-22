@@ -210,6 +210,11 @@ char shell_notice[64]{};
 // A message banner should fade on its own; a stale "NEW MESSAGE" is worse than
 // none. Zero means nothing is pending.
 std::uint32_t chat_notice_until_ms = 0;
+// Nodes we have already announced. The capture store is bounded, so a node
+// can drop out of it and come back; without this the same neighbour would be
+// announced as new over and over.
+std::array<std::uint32_t, 16> announced_nodes{};
+std::size_t announced_node_count = 0;
 lv_obj_t * root = nullptr;
 #if defined(LILYSHARK_DEVICE)
 static uint8_t * spectrum_buffer = nullptr;
@@ -1914,10 +1919,15 @@ struct MapMark {
     int node_index = -1;
 };
 
-double map_meters_per_pixel(double latitude_degrees) noexcept
+double map_meters_per_pixel_at(double latitude_degrees, int zoom) noexcept
 {
     return 156543.03392804097 * std::cos(latitude_degrees * 0.017453292519943295) /
-           static_cast<double>(1 << map_zoom);
+           static_cast<double>(1 << zoom);
+}
+
+double map_meters_per_pixel(double latitude_degrees) noexcept
+{
+    return map_meters_per_pixel_at(latitude_degrees, map_zoom);
 }
 
 std::uint32_t map_hash2(int x, int y) noexcept
@@ -2165,6 +2175,70 @@ bool fetch_map_cell(double cell_lat, double cell_lon, std::uint16_t *dest) noexc
 #endif
 }
 
+#if defined(LILYSHARK_DEVICE)
+/// Cover the view with baked imagery even when the view has walked away from
+/// the tile it was baked for.
+///
+/// A tile is a fixed 320x204 window on the ground, so the deeper the zoom the
+/// less ground it spans: at z20 it is 37 m across. Standing 46 m from where
+/// the tiles were baked put every fine tile entirely off screen and the map
+/// fell back to a bare chart. This walks out to coarser zooms until it finds a
+/// tile wide enough to contain the view, then magnifies it into place. Coarser
+/// means blurrier, never blank.
+bool blit_baked_coverage(std::uint16_t *pixels, double view_lat, double view_lon,
+                         double mpp) noexcept
+{
+    if (pixels == nullptr || !::lilyshark::hasBakedMapTiles()) return false;
+    const char *kind = map_chart ? "cht" : (map_satellite ? "sat" : "dark");
+    if (map_chart) return false;
+
+    const double baked_lat = ::lilyshark::bakedMapTileLat();
+    const double baked_lon = ::lilyshark::bakedMapTileLon();
+    const double lat_rad = view_lat * 0.017453292519943295;
+    // Offset of the tile centre from the view centre, in metres.
+    const double de = (baked_lon - view_lon) * 111320.0 * std::cos(lat_rad);
+    const double dn = (baked_lat - view_lat) * 110540.0;
+
+    const double view_half_w = mpp * kSatelliteWidth * 0.5;
+    const double view_half_h = mpp * kSatelliteHeight * 0.5;
+
+    for (int zoom = map_zoom; zoom >= kMapZoomMin; --zoom) {
+        const std::uint16_t *tile =
+            ::lilyshark::bakedMapTile(kind, baked_lat, baked_lon, zoom);
+        if (tile == nullptr) continue;
+        const double tile_mpp = map_meters_per_pixel_at(view_lat, zoom);
+        const double tile_half_w = tile_mpp * kSatelliteWidth * 0.5;
+        const double tile_half_h = tile_mpp * kSatelliteHeight * 0.5;
+        // Require the tile to contain the whole view, not merely overlap it,
+        // so the screen never ends up half imagery and half nothing.
+        if (std::fabs(de) + view_half_w > tile_half_w) continue;
+        if (std::fabs(dn) + view_half_h > tile_half_h) continue;
+
+        for (lv_coord_t y = 0; y < kSatelliteHeight; ++y) {
+            // Ground metres north of the view centre for this screen row.
+            const double north_m = (static_cast<double>(kSatelliteHeight) * 0.5 -
+                                    static_cast<double>(y)) * mpp;
+            const int sy = static_cast<int>(std::lround(
+                static_cast<double>(kSatelliteHeight) * 0.5 - (north_m - dn) / tile_mpp));
+            if (sy < 0 || sy >= kSatelliteHeight) continue;
+            for (lv_coord_t x = 0; x < kSatelliteWidth; ++x) {
+                const double east_m = (static_cast<double>(x) -
+                                       static_cast<double>(kSatelliteWidth) * 0.5) * mpp;
+                const int sx = static_cast<int>(std::lround(
+                    static_cast<double>(kSatelliteWidth) * 0.5 + (east_m - de) / tile_mpp));
+                if (sx < 0 || sx >= kSatelliteWidth) continue;
+                pixels[static_cast<std::size_t>(y) * kSatelliteWidth +
+                       static_cast<std::size_t>(x)] =
+                    tile[static_cast<std::size_t>(sy) * kSatelliteWidth +
+                         static_cast<std::size_t>(sx)];
+            }
+        }
+        return true;
+    }
+    return false;
+}
+#endif
+
 bool ensure_field_map(double latitude_degrees, double longitude_degrees) noexcept
 {
     std::uint16_t *pixels = satellite_pixel_ptr();
@@ -2232,6 +2306,14 @@ bool ensure_field_map(double latitude_degrees, double longitude_degrees) noexcep
     blit_cell(::lilyshark::bakedMapTileLat(), ::lilyshark::bakedMapTileLon());
 #endif
     blit_cell(cell_lat, cell_lon);
+
+#if defined(LILYSHARK_DEVICE)
+    if (!map_using_imagery &&
+        blit_baked_coverage(pixels, latitude_degrees, longitude_degrees, mpp)) {
+        map_using_imagery = true;
+        map_imagery_edge = true;
+    }
+#endif
 
     std::snprintf(satellite_cache_key, sizeof(satellite_cache_key), "%s", key);
     satellite_ready = true;
@@ -7503,6 +7585,39 @@ void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
 }
 #endif
 
+#if defined(LILYSHARK_DEVICE)
+/// True the first time a given node is heard. Someone arriving on the mesh is
+/// the event an operator is waiting for, and it was only ever visible by
+/// happening to be on the Nodes screen when it landed.
+bool announce_new_node(std::uint32_t id, const char *name) noexcept
+{
+    if (id == 0U || id == 0xffffffffU || id == localMeshtasticNodeNum()) return false;
+    for (std::size_t index = 0; index < announced_node_count; ++index) {
+        if (announced_nodes[index] == id) return false;
+    }
+    if (announced_node_count < announced_nodes.size()) {
+        announced_nodes[announced_node_count++] = id;
+    } else {
+        // Oldest out. Sixteen neighbours is far past what one channel carries.
+        for (std::size_t index = 1; index < announced_nodes.size(); ++index) {
+            announced_nodes[index - 1] = announced_nodes[index];
+        }
+        announced_nodes[announced_nodes.size() - 1] = id;
+    }
+    if (name != nullptr && name[0] != '\0') {
+        std::snprintf(shell_notice, sizeof(shell_notice), "%s IS ON THE MESH", name);
+    } else {
+        std::snprintf(shell_notice, sizeof(shell_notice), "NODE !%08lx IS ON THE MESH",
+                      static_cast<unsigned long>(id));
+    }
+    chat_notice_until_ms = millis() + 12000U;
+    live_data_dirty = true;
+    record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
+                         "New node heard");
+    return true;
+}
+#endif
+
 void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                            bool allow_capture) noexcept
 {
@@ -7539,6 +7654,13 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 stored->decoded.source != localMeshtasticNodeNum()) {
                 chat_remember_peer(stored->decoded.source, chat_payload.short_name);
             }
+#if defined(LILYSHARK_DEVICE)
+            if (stored->raw.rf.direction != FrameDirection::Transmit) {
+                (void)announce_new_node(stored->decoded.source,
+                                        chat_payload.has_names ? chat_payload.short_name
+                                                               : nullptr);
+            }
+#endif
             if (chat_payload.has_text) {
                 const std::uint32_t dest = stored->decoded.destination;
                 const bool broadcast = dest == 0xffffffffU;

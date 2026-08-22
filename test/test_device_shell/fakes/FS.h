@@ -35,6 +35,17 @@ class File {
         return length;
     }
 
+    std::size_t read(std::uint8_t *destination, std::size_t length)
+    {
+        if(!*this || destination == nullptr || length == 0) return 0;
+        if(position_ > data_->bytes.size()) return 0;
+        const std::size_t available = data_->bytes.size() - position_;
+        const std::size_t got = length < available ? length : available;
+        if(got != 0) std::memcpy(destination, data_->bytes.data() + position_, got);
+        position_ += got;
+        return got;
+    }
+
     void flush() noexcept
     {
         if(*this) ++data_->flush_calls;

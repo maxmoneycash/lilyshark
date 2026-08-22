@@ -24,6 +24,12 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--lat", type=float, required=True, help="cell latitude, 3dp")
     ap.add_argument("--lon", type=float, required=True, help="cell longitude, 3dp")
+    # The filenames are on the 0.001-degree cell grid, but a cell is ~55 m by
+    # ~87 m while a z20 tile spans only 37 m. Baking on the cell centre can put
+    # the imagery entirely outside the view. These carry the true centre the
+    # tiles were fetched for so the firmware can place them exactly.
+    ap.add_argument("--centre-lat", type=float, default=None)
+    ap.add_argument("--centre-lon", type=float, default=None)
     args = ap.parse_args()
 
     want_lat = f"{args.lat:.3f}"
@@ -101,8 +107,10 @@ def main() -> int:
     out.append("")
     out.append("} // namespace")
     out.append("")
-    out.append(f"const double kBakedTileLat = {want_lat};")
-    out.append(f"const double kBakedTileLon = {want_lon};")
+    centre_lat = args.centre_lat if args.centre_lat is not None else float(want_lat)
+    centre_lon = args.centre_lon if args.centre_lon is not None else float(want_lon)
+    out.append(f"const double kBakedTileLat = {centre_lat:.6f};")
+    out.append(f"const double kBakedTileLon = {centre_lon:.6f};")
     out.append("")
     out.append("/// Where the baked imagery is, so a device with no GPS fix can still")
     out.append("/// show its operating area instead of an empty grid.")
@@ -117,8 +125,8 @@ def main() -> int:
     out.append("                              double cell_lon, int zoom) noexcept")
     out.append("{")
     out.append("    if (kind == nullptr) return 0;")
-    out.append("    if (cell_lat < kBakedTileLat - 0.0005 || cell_lat > kBakedTileLat + 0.0005) return 0;")
-    out.append("    if (cell_lon < kBakedTileLon - 0.0005 || cell_lon > kBakedTileLon + 0.0005) return 0;")
+    out.append("    if (cell_lat < kBakedTileLat - 1e-6 || cell_lat > kBakedTileLat + 1e-6) return 0;")
+    out.append("    if (cell_lon < kBakedTileLon - 1e-6 || cell_lon > kBakedTileLon + 1e-6) return 0;")
     out.append("    int best = 0;")
     out.append("    for (std::size_t i = 0; i < sizeof(kBakedTiles) / sizeof(kBakedTiles[0]); ++i) {")
     out.append("        const BakedTile &tile = kBakedTiles[i];")
@@ -135,8 +143,8 @@ def main() -> int:
     out.append("{")
     out.append("    if (kind == nullptr) return nullptr;")
     out.append("    // Cell coordinates are already rounded to 3dp by the caller.")
-    out.append("    if (cell_lat < kBakedTileLat - 0.0005 || cell_lat > kBakedTileLat + 0.0005) return nullptr;")
-    out.append("    if (cell_lon < kBakedTileLon - 0.0005 || cell_lon > kBakedTileLon + 0.0005) return nullptr;")
+    out.append("    if (cell_lat < kBakedTileLat - 1e-6 || cell_lat > kBakedTileLat + 1e-6) return nullptr;")
+    out.append("    if (cell_lon < kBakedTileLon - 1e-6 || cell_lon > kBakedTileLon + 1e-6) return nullptr;")
     out.append("    for (std::size_t i = 0; i < sizeof(kBakedTiles) / sizeof(kBakedTiles[0]); ++i) {")
     out.append("        const BakedTile &tile = kBakedTiles[i];")
     out.append("        if (tile.zoom != zoom) continue;")
