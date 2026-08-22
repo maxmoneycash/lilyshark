@@ -255,11 +255,13 @@ std::uint32_t analyzer_link_last_position_ms = 0;
 // Mesh beacons run off the radio, independent of any USB link.
 std::uint32_t mesh_beacon_last_position_ms = 0;
 std::uint32_t mesh_beacon_last_nodeinfo_ms = 0;
-// One minute between positions keeps peers' dots fresh while staying far
-// under any sane duty cycle: a LongFast position is well under a second of
-// airtime. NodeInfo is names and rarely changes, so it goes out every five.
+// A LongFast position is well under a second of airtime, so a minute between
+// them keeps peers' dots fresh at a negligible duty cycle. NodeInfo carries
+// the name a peer is listed under, and waiting five minutes to appear in
+// someone's node list reads as "it is not working" — ninety seconds is still
+// almost no airtime and a device shows up while you are still looking at it.
 constexpr std::uint32_t kPositionBeaconMs = 60000U;
-constexpr std::uint32_t kNodeInfoBeaconMs = 300000U;
+constexpr std::uint32_t kNodeInfoBeaconMs = 90000U;
 
 char analyzer_link_line[240]{};
 std::size_t analyzer_link_line_length = 0;
@@ -2602,6 +2604,17 @@ struct LiveNodeSummary {
     char label[9]{};
 };
 
+/// A frame is evidence of a *peer* only if we did not send it. The device
+/// beacons its own position and NodeInfo, and those frames are ingested like
+/// any other, so without this every device lists itself as a node and draws a
+/// second dot on top of YOU.
+bool frameIsFromAnotherNode(const FrameRecord &record) noexcept
+{
+    if(record.raw.rf.direction == FrameDirection::Transmit) return false;
+    if(record.decoded.source == localMeshtasticNodeNum()) return false;
+    return true;
+}
+
 std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexcept
 {
     std::size_t count = 0;
@@ -2613,6 +2626,7 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
     for(std::size_t offset = 0; offset < store.size(); ++offset) {
         const FrameRecord *record = store.newest(offset);
         if(record == nullptr || !contributesToNodeSummary(*record)) continue;
+        if(!frameIsFromAnotherNode(*record)) continue;
 
         std::size_t index = 0;
         for(; index < count; ++index) {
@@ -2639,7 +2653,7 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
         if(index == count) continue;
 
         LiveNodeSummary &summary = summaries[index];
-        if(contributesToNodeSummary(*record)) {
+        if(contributesToNodeSummary(*record) && frameIsFromAnotherNode(*record)) {
             summary.last_seen_us = record->raw.rf.timestamp_us;
             summary.latest_snr_x10 = record->raw.rf.snr_db_x10;
             summary.latest_rssi_x10 = record->raw.rf.rssi_dbm_x10;
