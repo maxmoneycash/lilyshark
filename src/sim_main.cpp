@@ -489,7 +489,10 @@ bool map_last_origin_valid = false;
 
 constexpr lv_coord_t kPopX = 26;
 constexpr lv_coord_t kPopY = 58;
-constexpr lv_coord_t kPopW = 268;
+// Ends before the chip column at x=278 so the close target and the layer
+// chips never share pixels. The tap handler already ordered them; this
+// stops them looking like they overlap.
+constexpr lv_coord_t kPopW = 248;
 constexpr lv_coord_t kPopH = 118;
 constexpr lv_coord_t kPopBtnY = kPopY + kPopH - 30;
 constexpr lv_coord_t kPopBtnH = 22;
@@ -2378,56 +2381,6 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
         put_centered_label(parent, "NO FIX", 108, theme::amber(), &font_pixel_18x24);
     }
 
-    // The node card. Drawn last so nothing on the map can overlap it.
-    if (map_popup.open) {
-        theme::rect(parent, kPopX, kPopY, kPopW, kPopH, lv_color_hex(0x05080C));
-        draw_outline_rect(parent, kPopX, kPopY, kPopW, kPopH, theme::pink());
-
-        put_clipped_label(parent, map_popup.name[0] != '\0' ? map_popup.name : "NODE",
-                          kPopX + 10, kPopY + 8, 190, theme::pink(),
-                          &font_condensed_bold_16);
-        // Close is a real target, not a decoration: 22x18 with the glyph centred.
-        draw_outline_rect(parent, kPopCloseX, kPopCloseY, kPopCloseW, 18, theme::text_muted());
-        put_label(parent, "X", kPopCloseX + 8, kPopCloseY + 5, theme::text_muted(),
-                  &font_pixel_6x8);
-
-        char id_line[24]{};
-        std::snprintf(id_line, sizeof(id_line), "!%08lx",
-                      static_cast<unsigned long>(map_popup.id));
-        put_label(parent, id_line, kPopX + 10, kPopY + 30, theme::text_muted(),
-                  &font_pixel_6x8);
-
-        char range_line[40]{};
-        if (map_popup.has_position) {
-            char range[12]{};
-            format_map_range(range, sizeof(range), map_popup.range_m);
-            std::snprintf(range_line, sizeof(range_line), "%s  BRG %03.0f",
-                          range, map_popup.bearing_deg);
-        } else {
-            std::snprintf(range_line, sizeof(range_line), "NO POSITION REPORTED");
-        }
-        put_clipped_label(parent, range_line, kPopX + 10, kPopY + 44, 244,
-                          theme::lime(), &font_mono_semibold_12);
-
-        if (map_popup.has_position) {
-            char coord_line[44]{};
-            std::snprintf(coord_line, sizeof(coord_line), "%.5f %c  %.5f %c",
-                          map_popup.lat < 0.0 ? -map_popup.lat : map_popup.lat,
-                          map_popup.lat < 0.0 ? 'S' : 'N',
-                          map_popup.lon < 0.0 ? -map_popup.lon : map_popup.lon,
-                          map_popup.lon < 0.0 ? 'W' : 'E');
-            put_clipped_label(parent, coord_line, kPopX + 10, kPopY + 62, 244,
-                              theme::text(), &font_pixel_6x8);
-        }
-
-        draw_outline_rect(parent, kPopMsgX, kPopBtnY, kPopMsgW, kPopBtnH, theme::pink());
-        put_label(parent, "MESSAGE", kPopMsgX + 24, kPopBtnY + 7, theme::pink(),
-                  &font_pixel_6x8);
-        draw_outline_rect(parent, kPopTelX, kPopBtnY, kPopTelW, kPopBtnH, theme::cyan());
-        put_label(parent, "TELEMETRY", kPopTelX + 26, kPopBtnY + 7, theme::cyan(),
-                  &font_pixel_6x8);
-    }
-
     const auto project = [georef, cx, cy, meters_per_pixel](const MapMark &mark,
                                                             lv_coord_t &x,
                                                             lv_coord_t &y) {
@@ -2558,6 +2511,57 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
     chip(kMapCtrlX, kMapSatY, "SAT I", map_satellite && !map_chart);
     chip(kMapCtrlX, kMapMapY, "MAP D", !map_satellite && !map_chart);
     chip(kMapCtrlX, kMapChartY, "CHT G", map_chart);
+
+    // The card is drawn after every mark and label, so it is opaque: the
+    // YOU marker and the peer dots used to punch through it.
+    if (map_popup.open) {
+        theme::rect(parent, kPopX, kPopY, kPopW, kPopH, lv_color_hex(0x05080C));
+        draw_outline_rect(parent, kPopX, kPopY, kPopW, kPopH, theme::pink());
+
+        put_clipped_label(parent, map_popup.name[0] != '\0' ? map_popup.name : "NODE",
+                          kPopX + 10, kPopY + 8, kPopCloseX - kPopX - 18, theme::pink(),
+                          &font_condensed_bold_16);
+        // Close is a real target, not a decoration: 22x18 with the glyph centred.
+        draw_outline_rect(parent, kPopCloseX, kPopCloseY, kPopCloseW, 18, theme::text_muted());
+        put_label(parent, "X", kPopCloseX + 8, kPopCloseY + 5, theme::text_muted(),
+                  &font_pixel_6x8);
+
+        char id_line[24]{};
+        std::snprintf(id_line, sizeof(id_line), "!%08lx",
+                      static_cast<unsigned long>(map_popup.id));
+        put_label(parent, id_line, kPopX + 10, kPopY + 30, theme::text_muted(),
+                  &font_pixel_6x8);
+
+        char range_line[40]{};
+        if (map_popup.has_position) {
+            char range[12]{};
+            format_map_range(range, sizeof(range), map_popup.range_m);
+            std::snprintf(range_line, sizeof(range_line), "%s  BRG %03.0f",
+                          range, map_popup.bearing_deg);
+        } else {
+            std::snprintf(range_line, sizeof(range_line), "NO POSITION REPORTED");
+        }
+        put_clipped_label(parent, range_line, kPopX + 10, kPopY + 44, kPopW - 20,
+                          theme::lime(), &font_mono_semibold_12);
+
+        if (map_popup.has_position) {
+            char coord_line[44]{};
+            std::snprintf(coord_line, sizeof(coord_line), "%.5f %c  %.5f %c",
+                          map_popup.lat < 0.0 ? -map_popup.lat : map_popup.lat,
+                          map_popup.lat < 0.0 ? 'S' : 'N',
+                          map_popup.lon < 0.0 ? -map_popup.lon : map_popup.lon,
+                          map_popup.lon < 0.0 ? 'W' : 'E');
+            put_clipped_label(parent, coord_line, kPopX + 10, kPopY + 62, kPopW - 20,
+                              theme::text(), &font_pixel_6x8);
+        }
+
+        draw_outline_rect(parent, kPopMsgX, kPopBtnY, kPopMsgW, kPopBtnH, theme::pink());
+        put_label(parent, "MESSAGE", kPopMsgX + 24, kPopBtnY + 7, theme::pink(),
+                  &font_pixel_6x8);
+        draw_outline_rect(parent, kPopTelX, kPopBtnY, kPopTelW, kPopBtnH, theme::cyan());
+        put_label(parent, "TELEMETRY", kPopTelX + 26, kPopBtnY + 7, theme::cyan(),
+                  &font_pixel_6x8);
+    }
 }
 
 #if defined(LILYSHARK_DEVICE)
@@ -10698,6 +10702,50 @@ bool run_simulator_render_test() noexcept
     events_scroll_offset = 0U;
     packet_detail_byte_offset = 0U;
     packet_detail_tab = 0U;
+    // The map node card: a screen state with no other coverage, and the
+    // one an operator uses to reach a peer's numbers or message them.
+    app_shell.closeToAnalyzer();
+    current_screen = Screen::map;
+    field_tab = FieldTab::Map;
+    app_settings.gps_enabled = true;
+    build_current_screen();
+    int card_row = -1;
+    lv_coord_t card_x = 0;
+    lv_coord_t card_y = 0;
+    while (map_zoom > kMapZoomMin && card_row < 0) {
+        for (std::size_t index = 0; index < map_hit_count; ++index) {
+            if (map_hits[index].node_index < 0) continue;
+            card_row = map_hits[index].node_index;
+            card_x = map_hits[index].x;
+            card_y = map_hits[index].y;
+            break;
+        }
+        if (card_row < 0) handle_navigation_key('-');
+    }
+    if (card_row >= 0) {
+        handle_touch_tap(static_cast<std::uint16_t>(card_x),
+                         static_cast<std::uint16_t>(card_y));
+        lv_refr_now(display);
+        if (render_directory != nullptr) {
+                (void)write_simulator_frame(render_directory, "field", 1);
+            }
+        // Hashed as well as written: the marks used to draw over the card,
+        // and no behavioural test noticed because every assertion about it
+        // passed while it was being painted through.
+        constexpr std::uint64_t kMapNodeCardHash = 0xb351a2d05fa8876aULL;
+        const std::uint64_t card_hash = hash_simulator_frame();
+        std::fprintf(stderr, "Lilyshark render MAP NODE CARD: fnv1a=%016llx\n",
+                     static_cast<unsigned long long>(card_hash));
+        if(card_hash != kMapNodeCardHash) {
+            std::fprintf(stderr,
+                         "Simulator render failed: MAP NODE CARD expected %016llx\n",
+                         static_cast<unsigned long long>(kMapNodeCardHash));
+            passed = false;
+        }
+        map_popup.open = false;
+        build_current_screen();
+    }
+
     if(passed) std::fprintf(stderr, "Lilyshark simulator render test passed\n");
     if (render_directory != nullptr) {
         chat_remember_peer(0x11223344U, "FJELL");
@@ -10716,7 +10764,9 @@ bool run_simulator_render_test() noexcept
         lv_refr_now(display);
         (void)write_simulator_frame(render_directory, "field", 0);
         chat_open = false;
+
     }
+
     return passed;
 }
 
