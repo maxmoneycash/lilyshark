@@ -1213,7 +1213,7 @@ void add_simulator_live_status_bar(lv_obj_t *parent, const char *title,
     char packet_rate[20]{};
     std::snprintf(packet_rate, sizeof(packet_rate), "%u PKT/MIN",
                   static_cast<unsigned>(simulator_live_telemetry.traffic().packets_per_minute));
-    const char *gps = app_settings.gps_enabled ? "GPS 3D" : "GPS OFF";
+    const char *gps = app_settings.gps_enabled ? "GPS ON" : "GPS OFF";
     add_status_bar(parent, title, "BAT 87%", middle == nullptr ? gps : middle, packet_rate);
 }
 
@@ -2752,24 +2752,23 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
                   &font_mono_semibold_12);
 
     if (fix_line != nullptr && fix_line[0] != '\0') {
-        put_map_label(parent, fix_line, 8, top + 4, 200, theme::lime(),
+        put_map_label(parent, fix_line, 8, bottom - 32, 240, theme::lime(),
                       &font_mono_semibold_12);
     }
     char hud[24]{};
     if (detail_line != nullptr && detail_line[0] != '\0') {
         std::snprintf(hud, sizeof(hud), "Z%d %s%s", map_zoom, detail_line,
-                      map_using_imagery ? (map_imagery_edge ? " EDGE" : "") : " CHART");
+                      map_using_imagery ? (map_imagery_edge ? "  BLURRY" : "")
+                                        : "  NO IMAGERY");
     } else {
         std::snprintf(hud, sizeof(hud), "Z%d%s", map_zoom,
-                      map_using_imagery ? (map_imagery_edge ? " EDGE" : "") : " CHART");
+                      map_using_imagery ? (map_imagery_edge ? "  BLURRY" : "")
+                                        : "  NO IMAGERY");
     }
     if (hud[0] != '\0') {
-        // Right-aligned against the control column so it never collides with
-        // the position, however long either of them runs.
-        const lv_coord_t hud_w = static_cast<lv_coord_t>(std::strlen(hud) * 7);
-        lv_coord_t hud_x = kMapCtrlX - 6 - hud_w;
-        if (hud_x < 8) hud_x = 8;
-        put_map_label(parent, hud, hud_x, top + 4, hud_w + 8, theme::text(),
+        // Top-left on its own. The position sits in the bottom stack, so the
+        // two can each be as long as they need to be.
+        put_map_label(parent, hud, 8, top + 4, 200, theme::text(),
                       &font_mono_semibold_12);
     }
 
@@ -2795,8 +2794,8 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
         format_map_range(acc, sizeof(acc), you_accuracy_m);
         std::snprintf(bearing_line, sizeof(bearing_line), "YOU  +/-%s", acc);
     }
-    if (bearing_line[0] != '\0') {
-        put_map_label(parent, bearing_line, 8, bottom - 34, 256, theme::pink(),
+    if (bearing_line[0] != '\0' && !map_popup.open) {
+        put_map_label(parent, bearing_line, 8, bottom - 46, 256, theme::pink(),
                       &font_mono_semibold_12);
     }
 
@@ -2965,7 +2964,8 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
         if (map_popup.has_position) {
             char range[12]{};
             format_map_range(range, sizeof(range), map_popup.range_m);
-            std::snprintf(range_line, sizeof(range_line), "%s  BRG %03.0f",
+            // "BRG" is chart shorthand. The card has the width for the word.
+            std::snprintf(range_line, sizeof(range_line), "%s AWAY  BEARING %03.0f",
                           range, map_popup.bearing_deg);
         } else {
             std::snprintf(range_line, sizeof(range_line), "NO POSITION REPORTED");
@@ -3940,7 +3940,7 @@ void draw_this_device_row(lv_obj_t *parent) noexcept
     put_clipped_label(parent, call, 8, y, 76, theme::cyan(), &font_mono_10);
     put_label(parent, "YOU", 88, y, theme::cyan(), &font_mono_10);
     put_label(parent, "NOW", 146, y, theme::text_muted(), &font_mono_10);
-    put_label(parent, "--", 190, y, theme::text_muted(), &font_mono_10);
+    put_label(parent, "--", 184, y, theme::text_muted(), &font_mono_10);
 
 #if defined(LILYSHARK_DEVICE)
     const GpsStatus &self_gps = hardware_status.snapshot().gps;
@@ -3948,7 +3948,7 @@ void draw_this_device_row(lv_obj_t *parent) noexcept
 #else
     const bool fixed = app_settings.gps_enabled;
 #endif
-    if (fixed) theme::rect(parent, 230, y + 4, 5, 5, theme::cyan());
+    put_label(parent, fixed ? "HERE" : "--", 226, y, theme::cyan(), &font_mono_10);
     char id_line[20]{};
 #if defined(LILYSHARK_DEVICE)
     std::snprintf(id_line, sizeof(id_line), "!%08lx",
@@ -3968,8 +3968,8 @@ void build_nodes(lv_obj_t * parent)
     put_label(parent, "CALL", 8, 27, theme::pink(), &font_pixel_6x8);
     put_label(parent, "PROTO", 88, 27, theme::pink(), &font_pixel_6x8);
     put_label(parent, "LAST", 146, 27, theme::pink(), &font_pixel_6x8);
-    put_label(parent, "SNR", 192, 27, theme::pink(), &font_pixel_6x8);
-    put_label(parent, "POS", 224, 27, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "SNR", 186, 27, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "RANGE", 224, 27, theme::pink(), &font_pixel_6x8);
     theme::rule_line(parent, 6, 43, 308, 1, theme::pink());
     draw_this_device_row(parent);
 
@@ -4005,12 +4005,28 @@ void build_nodes(lv_obj_t * parent)
                   selected ? theme::pink() : theme::cyan(), &font_mono_10);
         put_label(parent, age, 146, y,
                   node_age_color(live_nodes[node_index].last_seen_us), &font_mono_10);
-        put_label(parent, snr, 190, y,
+        put_label(parent, snr, 184, y,
                   selected ? theme::pink() : theme::lime(), &font_mono_10);
-        if (live_nodes[node_index].has_position) {
-            theme::rect(parent, 230, y + 4, 5, 5, theme::pink());
+        // How far away a neighbour is, not merely whether they said. In the
+        // field that is the question this screen exists to answer.
+        char range[12]{};
+        {
+            const GpsStatus &here = hardware_status.snapshot().gps;
+            if (here.state == GpsState::Fix && here.position_valid &&
+                live_nodes[node_index].has_position) {
+                double east_m = 0.0;
+                double north_m = 0.0;
+                field_local_meters(here.latitude_degrees, here.longitude_degrees,
+                                   live_nodes[node_index].latitude_degrees,
+                                   live_nodes[node_index].longitude_degrees, east_m, north_m);
+                format_map_range(range, sizeof(range), std::hypot(east_m, north_m));
+            } else {
+                std::snprintf(range, sizeof(range), "--");
+            }
         }
-        draw_live_node_history(parent, live_nodes[node_index], 240, y, 70, 14, false,
+        put_label(parent, range, 226, y,
+                  selected ? theme::pink() : theme::text(), &font_mono_10);
+        draw_live_node_history(parent, live_nodes[node_index], 268, y, 44, 14, false,
                                selected ? theme::pink() : theme::lime());
         theme::rule_line(parent, 6, y + 18, 308, 1, theme::grid());
     }
@@ -4022,8 +4038,8 @@ void build_nodes(lv_obj_t * parent)
     put_label(parent, "CALL", 8, 27, theme::pink(), &font_pixel_6x8);
     put_label(parent, "PROTO", 88, 27, theme::pink(), &font_pixel_6x8);
     put_label(parent, "LAST", 146, 27, theme::pink(), &font_pixel_6x8);
-    put_label(parent, "SNR", 192, 27, theme::pink(), &font_pixel_6x8);
-    put_label(parent, "POS", 224, 27, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "SNR", 186, 27, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "RANGE", 224, 27, theme::pink(), &font_pixel_6x8);
     theme::rule_line(parent, 6, 43, 308, 1, theme::pink());
     draw_this_device_row(parent);
 
@@ -4061,14 +4077,25 @@ void build_nodes(lv_obj_t * parent)
                   selected ? theme::pink() : theme::cyan(), &font_mono_10);
         put_label(parent, age, 146, y, node_age_color_seconds(node.last_seen_seconds),
                   &font_mono_10);
-        put_label(parent, snr, 190, y,
+        put_label(parent, snr, 184, y,
                   selected ? theme::pink() : theme::lime(), &font_mono_10);
+        char range[12]{};
         double pin_lat = 0.0;
         double pin_lon = 0.0;
         if (field_peer_fix(raw_index, pin_lat, pin_lon)) {
-            theme::rect(parent, 230, y + 4, 5, 5, theme::pink());
+            double you_lat = 0.0;
+            double you_lon = 0.0;
+            simulator_you_latlon(you_lat, you_lon);
+            double east_m = 0.0;
+            double north_m = 0.0;
+            field_local_meters(you_lat, you_lon, pin_lat, pin_lon, east_m, north_m);
+            format_map_range(range, sizeof(range), std::hypot(east_m, north_m));
+        } else {
+            std::snprintf(range, sizeof(range), "--");
         }
-        draw_simulator_node_history(parent, node, 240, y, 70, 14,
+        put_label(parent, range, 226, y,
+                  selected ? theme::pink() : theme::text(), &font_mono_10);
+        draw_simulator_node_history(parent, node, 268, y, 44, 14,
                                     selected ? theme::pink() :
                                     (node.active ? theme::lime() : theme::text_muted()));
         theme::rule_line(parent, 6, y + 18, 308, 1, theme::grid());
@@ -4882,7 +4909,7 @@ void build_packet_detail(lv_obj_t * parent)
     format_simulator_clock(packet_time, sizeof(packet_time),
                            selected_packet.timestamp_seconds_of_day);
     add_status_bar(parent, "PACKET", "BAT 87%",
-                   app_settings.gps_enabled ? "GPS 3D" : "GPS OFF", packet_time);
+                   app_settings.gps_enabled ? "GPS ON" : "GPS OFF", packet_time);
     add_packet_detail_tabs(parent);
 
     char detail_line[72]{};
@@ -6809,8 +6836,8 @@ void build_home(lv_obj_t * parent)
         ++heard_listed;
     }
     const GpsStatus &gps = hardware_status.snapshot().gps;
-    const char *gps_value = gps.state == GpsState::Fix ? "FIX" :
-                            (gps.state == GpsState::Searching ? "SEARCH" : "OFF");
+    const char *gps_value = gps.state == GpsState::Fix ? "ON" :
+                            (gps.state == GpsState::Searching ? "FINDING" : "OFF");
     std::snprintf(gps_text, sizeof(gps_text), "%s", gps_value);
     if (gps.state == GpsState::Fix && gps.position_valid) {
         std::snprintf(gps_lat, sizeof(gps_lat), "%.4f %c",
@@ -6820,9 +6847,11 @@ void build_home(lv_obj_t * parent)
                       std::abs(gps.longitude_degrees),
                       gps.longitude_degrees >= 0.0 ? 'E' : 'W');
         if (gps.hdop > 0.05f) {
-            std::snprintf(gps_sv, sizeof(gps_sv), "SAT %u H%.1f",
-                          static_cast<unsigned>(gps.satellites),
-                          static_cast<double>(gps.hdop));
+            char accuracy[12]{};
+            format_map_range(accuracy, sizeof(accuracy),
+                             map_fix_accuracy_m(gps.hdop, gps.satellites));
+            std::snprintf(gps_sv, sizeof(gps_sv), "SAT %u  +/-%s",
+                          static_cast<unsigned>(gps.satellites), accuracy);
         } else {
             std::snprintf(gps_sv, sizeof(gps_sv), "SAT %u",
                           static_cast<unsigned>(gps.satellites));
@@ -6928,12 +6957,12 @@ void build_home(lv_obj_t * parent)
                       "%s", call);
         ++heard_listed;
     }
-    const char *gps_value = app_settings.gps_enabled ? "FIX" : "OFF";
+    const char *gps_value = app_settings.gps_enabled ? "ON" : "OFF";
     std::snprintf(gps_text, sizeof(gps_text), "%s", gps_value);
     if (app_settings.gps_enabled) {
         std::snprintf(gps_lat, sizeof(gps_lat), "37.7749 N");
         std::snprintf(gps_lon, sizeof(gps_lon), "122.419 W");
-        std::snprintf(gps_sv, sizeof(gps_sv), "SAT 11 H0.9");
+        std::snprintf(gps_sv, sizeof(gps_sv), "SAT 11  +/-3M");
         if (rx != nullptr && rx->source_node != simulator::kNoNode) {
             double you_lat = 0.0;
             double you_lon = 0.0;
@@ -6988,9 +7017,15 @@ void build_home(lv_obj_t * parent)
     {
         char short_name[8]{};
         formatLocalMeshtasticShortName(short_name, sizeof(short_name));
-        std::snprintf(line, sizeof(line), "%.3f  LORA",
+        // "906.875  LORA" measured 78 px in a 76 px slot and clipped mid-glyph
+        // to "LORf". Every frequency on this device is LoRa; the unit is the
+        // part worth the pixels.
+        std::snprintf(line, sizeof(line), "%.3f MHZ",
                       static_cast<double>(profile.center_frequency_hz) / 1000000.0);
         put_clipped_label(parent, line, 120, 60, 76, theme::text_muted(), &font_pixel_6x8);
+        // Without this caption the button is four hex digits in a box, which
+        // is exactly the kind of control nobody can guess the purpose of.
+        put_label(parent, "CALL SIGN", 128, kHomeIdY + 6, theme::pink(), &font_pixel_6x8);
         draw_outline_rect(parent, kHomeIdX, kHomeIdY, kHomeIdW, kHomeIdH, theme::pink());
         const lv_coord_t id_w = static_cast<lv_coord_t>(std::strlen(short_name) * 6);
         put_label(parent, short_name, kHomeIdX + (kHomeIdW - id_w) / 2, kHomeIdY + 6,
@@ -7058,12 +7093,14 @@ void build_home(lv_obj_t * parent)
     draw_outline_rect(parent, 184, 140, 132, 82, theme::pink());
     put_label(parent, "GPS", 188, 144, theme::pink(), &font_pixel_6x8);
     put_label(parent, gps_text, 188, 154,
-              std::strcmp(gps_text, "FIX") == 0 ? theme::pink() : theme::text_muted(),
+              std::strcmp(gps_text, "ON") == 0 ? theme::lime() :
+                  (std::strcmp(gps_text, "FINDING") == 0 ? theme::amber() : theme::fault()),
               &font_pixel_18x24);
     put_label(parent, gps_lat, 188, 180, theme::text(), &font_pixel_6x8);
     put_label(parent, gps_lon, 188, 190, theme::text(), &font_pixel_6x8);
     if (gps_sv[0] != '\0') {
-        put_clipped_label(parent, gps_sv, 188, 208, 70, theme::text_muted(),
+        // 13 characters at 6 px needs 78, and the panel has room to 316.
+        put_clipped_label(parent, gps_sv, 188, 208, 100, theme::text_muted(),
                           &font_pixel_6x8);
     }
     draw_home_compass(parent, 294, 174, heading_ok, heading_deg);
@@ -7554,19 +7591,27 @@ void build_chat(lv_obj_t * parent)
         for (std::size_t index = 0; index < visible; ++index) {
             const ChatLine &line = chat_log[match_slots[first + index]];
             const lv_coord_t y = kChatMsgY + static_cast<lv_coord_t>(index) * kChatRowH;
-            if (line.mine) {
-                theme::rect(parent, 308, y, 8, 24, theme::pink());
-            }
+            // Your own lines are indented and edged in pink, theirs are flush
+            // left and edged in cyan. The only mark before was an 8 px bar at
+            // the far right, which reads as a scrollbar, so a conversation
+            // looked like one voice talking to itself.
+            const lv_coord_t text_x = line.mine ? 58 : 14;
+            const lv_coord_t text_w = line.mine ? 248 : 292;
+            theme::rect(parent, line.mine ? 310 : 4, y, 6, 24,
+                        line.mine ? theme::pink() : theme::cyan());
             char who[28]{};
-            const char *kind = line.peer == 0xffffffffU ? "ALL" : "PRIVATE";
+            // The destination is already stated once above the log; repeating
+            // ALL or PRIVATE on every line was noise, and the operator's own
+            // call sign told them nothing they did not know.
             if (line.when[0] != '\0') {
-                std::snprintf(who, sizeof(who), "%s  %s  %s", line.when, line.from, kind);
+                std::snprintf(who, sizeof(who), "%s  %s", line.when,
+                              line.mine ? "YOU" : line.from);
             } else {
-                std::snprintf(who, sizeof(who), "%s  %s", line.from, kind);
+                std::snprintf(who, sizeof(who), "%s", line.mine ? "YOU" : line.from);
             }
-            put_label(parent, who, 10, y,
+            put_label(parent, who, text_x, y,
                       line.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
-            put_clipped_label(parent, line.text, 10, y + 11, 296, theme::text(),
+            put_clipped_label(parent, line.text, text_x, y + 11, text_w, theme::text(),
                               &font_mono_semibold_12);
         }
     }
@@ -11250,11 +11295,11 @@ bool run_simulator_render_test() noexcept
     // make a "deterministic pixel" test depend on the machine it runs on.
     map_bundled_tiles_only = true;
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
-        0x828b667afee2650bULL, 0x10b28279c7d286e0ULL, 0x1ee0a49f124aae4cULL,
-        0x1d5dbffece45216fULL, 0x347df7d2e0f891ebULL, 0xf491645734525017ULL,
-        0x21555e1c8309998cULL, 0xff854a52e9cc13ccULL, 0xade0149dc990fb01ULL,
-        0xa3e5a0a80a54d6e8ULL, 0x952266efe4ead3dfULL, 0x0c9946d284d94185ULL,
-        0x61427c1db2261862ULL,
+        0x94e0d8ed548ceccfULL, 0xecbc56006f845c28ULL, 0xccd8b894535dae6cULL,
+        0xfb2f9dd0ce3781c7ULL, 0x0fe2c7ca3c3c9acfULL, 0xf2450661f86715f8ULL,
+        0x8a362b0a336d1188ULL, 0xbe6c5ef8280e2540ULL, 0xe5ee58c10f6e6f51ULL,
+        0x8c60b2f528f43eb8ULL, 0x62aacb8756fb5fefULL, 0x9ea5c2f1c78e6f21ULL,
+        0x4f3923ba585eca9eULL,
     }};
     constexpr std::array<ShellRoute, 17> shell_routes = {{
         ShellRoute::Splash,
@@ -11284,9 +11329,9 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xcad6c4dbec790876ULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
-        0x0e8d5caa0f3b18beULL, 0x80f98c462058b6fcULL, 0xe474104bb075865aULL,
-        0xa8ab2f3f69354bb0ULL, 0xb7d41c5b6be5b7f3ULL, 0x221d4c65ba6abb96ULL,
-        0x4e393dd17e2a1a42ULL, 0x953b99aa82e9d7abULL, 0x8c79ac0279437533ULL,
+        0x0e8d5caa0f3b18beULL, 0x84216ca975971329ULL, 0x4e401f5cbfc7bc7eULL,
+        0x216fdba2274b7f08ULL, 0x749b62a25c09011bULL, 0xb7c8c756f163e40aULL,
+        0xcaec929ddcd51cf2ULL, 0x646c5eb9e382d2c3ULL, 0xff17183a941ae14bULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
     }};
 
@@ -11409,9 +11454,9 @@ bool run_simulator_render_test() noexcept
         "PACKET RAW", "PACKET HEX PAGE 2", "PACKET HEX PAGE 3", "EVENT DETAIL",
     }};
     constexpr std::array<std::uint64_t, interaction_names.size()> interaction_expected_hashes = {{
-        0xff854a52e9cc13ccULL, 0xa2e01dc7e031afa2ULL, 0x56631520006052eeULL,
-        0x19d6557a52616c3bULL, 0xeb6671001795a45aULL, 0x682d491045fc4edcULL,
-        0x87f2a05137e1e458ULL, 0xeb0200befe71eff4ULL,
+        0xbe6c5ef8280e2540ULL, 0xec827b67acbe1216ULL, 0x737e78fa615cc8a2ULL,
+        0x84b417853ecec707ULL, 0xa3430b469fdbcd86ULL, 0x19f1470c24acd650ULL,
+        0xaf0e843e9adb1004ULL, 0x3baf5954707c0890ULL,
     }};
     traffic_filter = TrafficFilter{};
     focus_simulator_inspector_packet();
@@ -11487,7 +11532,7 @@ bool run_simulator_render_test() noexcept
         // Hashed as well as written: the marks used to draw over the card,
         // and no behavioural test noticed because every assertion about it
         // passed while it was being painted through.
-        constexpr std::uint64_t kMapNodeCardHash = 0xa72bbc6c3cd08b73ULL;
+        constexpr std::uint64_t kMapNodeCardHash = 0xd7b433868423c58eULL;
         const std::uint64_t card_hash = hash_simulator_frame();
         std::fprintf(stderr, "Lilyshark render MAP NODE CARD: fnv1a=%016llx\n",
                      static_cast<unsigned long long>(card_hash));
@@ -11498,6 +11543,40 @@ bool run_simulator_render_test() noexcept
             passed = false;
         }
         map_popup.open = false;
+        build_current_screen();
+    }
+
+    // Chat had no pixel coverage of any kind, despite being one of the two
+    // screens the device exists to drive. A conversation with lines in it,
+    // hashed like everything else.
+    {
+        chat_push("RANGER", "AT THE GATE, HEADING UP", false, 0xffffffffU, "09:14");
+        chat_push("LILY", "COPY. TEN MINUTES OUT.", true, 0xffffffffU, "09:15");
+        chat_push("RANGER", "TRACK IS WASHED OUT PAST THE CREEK", false, 0xffffffffU, "09:18");
+        open_field_tab(FieldTab::Chat);
+        build_current_screen();
+        lv_refr_now(display);
+        if (render_directory != nullptr) {
+            (void)write_simulator_frame(render_directory, "chat", 0);
+        }
+        constexpr std::uint64_t kChatHash = 0xc65de4cb190c83e0ULL;
+        const std::uint64_t chat_hash = hash_simulator_frame();
+        std::size_t chat_ink = 0U;
+        for(const std::uint16_t pixel : simulator_frame_buffer) {
+            if(pixel != background) ++chat_ink;
+        }
+        std::fprintf(stderr, "Lilyshark render CHAT: fnv1a=%016llx foreground=%zu\n",
+                     static_cast<unsigned long long>(chat_hash), chat_ink);
+        if(chat_ink < 1000U) {
+            std::fprintf(stderr, "Simulator render failed: CHAT is nearly blank\n");
+            passed = false;
+        }
+        if(chat_hash != kChatHash) {
+            std::fprintf(stderr, "Simulator render failed: CHAT expected %016llx\n",
+                         static_cast<unsigned long long>(kChatHash));
+            passed = false;
+        }
+        open_field_tab(FieldTab::Map);
         build_current_screen();
     }
 
