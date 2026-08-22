@@ -44,14 +44,15 @@ struct HardwareStatusSnapshot {
     GpsStatus gps{};
     std::uint32_t updated_at_ms = 0;
     char battery_label[16] = "BAT --";
-    char gps_label[16] = "GPS N/A";
+    char gps_label[16] = "NO GPS CHIP";
 };
 
 #if defined(LILYSHARK_DEVICE)
 
 // Samples the T-Deck battery divider and, when enabled, probes an optional
-// external NMEA GPS on Serial1. The original T-Deck has no onboard GPS, so a
-// silent serial port remains explicitly Absent rather than claiming a lock.
+// NMEA GPS on Serial1 (T-Deck Plus / GPS Shield). A silent UART is Searching
+// (baud hunt), not Absent. Absent is only for a module that talked and then
+// went quiet.
 class TDeckHardwareStatus
 {
   public:
@@ -90,8 +91,10 @@ class TDeckHardwareStatus
     // right there. Until a valid sentence arrives, the poll walks this list.
     static constexpr std::uint32_t gps_baud_candidates_[4] = {9600, 38400, 115200, 4800};
     static constexpr std::uint32_t gps_baud_probe_window_ms_ = 2500;
+    static constexpr std::uint8_t gps_silent_cycles_before_config_ = 8;
     std::uint32_t gps_baud_started_ms_ = 0;
     std::uint8_t gps_baud_index_ = 0;
+    std::uint8_t gps_silent_cycles_ = 0;
     std::uint8_t battery_sample_count_ = 0;
     std::uint8_t battery_sample_index_ = 0;
     bool gps_enabled_ = false;

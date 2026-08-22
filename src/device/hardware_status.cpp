@@ -34,11 +34,12 @@ void TDeckHardwareStatus::begin(bool enable_gps) noexcept
     last_passed_checksum_count_ = 0;
     gps_receiver_seen_ = false;
     gps_configured_after_detect_ = false;
+    gps_silent_cycles_ = 0;
 
     gps_enabled_ = enable_gps;
     snapshot_.gps = GpsStatus{};
     snapshot_.gps.parser_available = LILYSHARK_HAS_TINYGPSPLUS != 0;
-    snapshot_.gps.state = gps_enabled_ ? GpsState::Absent : GpsState::Disabled;
+    snapshot_.gps.state = gps_enabled_ ? GpsState::Searching : GpsState::Disabled;
     if (gps_enabled_) {
         gps_baud_index_ = 0;
         gps_baud_started_ms_ = millis();
@@ -75,7 +76,8 @@ void TDeckHardwareStatus::startGpsUart() noexcept
     gps_serial_.setRxBufferSize(1024);
     gps_serial_.begin(gps_baud_candidates_[gps_baud_index_], SERIAL_8N1, tdeck::gps_rx_pin,
                       tdeck::gps_tx_pin);
-    configureGpsReceiver();
+    // Do not send PCAS/UBX until NMEA checksums prove the baud. Commands at
+    // the wrong rate can leave an L76K/M10Q silent after a factory flash.
 }
 
 void TDeckHardwareStatus::configureGpsReceiver() noexcept
@@ -149,6 +151,7 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
         last_passed_checksum_count_ = passed_checksums;
         last_valid_sentence_ms_ = now_ms;
         gps_receiver_seen_ = true;
+        gps_silent_cycles_ = 0;
         if (!gps_configured_after_detect_) {
             configureGpsReceiver();
             gps_configured_after_detect_ = true;
@@ -166,6 +169,14 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
         gps_serial_.end();
         startGpsUart();
         gps_baud_started_ms_ = now_ms;
+        if (gps_silent_cycles_ < 255U) {
+            ++gps_silent_cycles_;
+        }
+        // Listen-only first. If another firmware left GGA/RMC off, try
+        // config after two full baud walks — still Searching, never Absent.
+        if (gps_silent_cycles_ >= gps_silent_cycles_before_config_) {
+            configureGpsReceiver();
+        }
     }
 
     const bool receiver_active = gps_receiver_seen_ &&
@@ -180,7 +191,9 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
                               gps_parser_.location.age() <= gps_fix_stale_ms_;
     snapshot_.gps.position_valid = fix_is_fresh;
     if (!receiver_active) {
-        snapshot_.gps.state = GpsState::Absent;
+        // Enabled + hunting baud is not "no module". Absent is only after we
+        // once saw NMEA and then lost it.
+        snapshot_.gps.state = gps_receiver_seen_ ? GpsState::Absent : GpsState::Searching;
     } else if (!fix_is_fresh) {
         snapshot_.gps.state = GpsState::Searching;
     } else {
@@ -225,17 +238,17 @@ void TDeckHardwareStatus::refreshLabels() noexcept
         std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "GPS OFF");
         break;
     case GpsState::Absent:
-        std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "GPS N/A");
+        std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "NO GPS CHIP");
         break;
     case GpsState::Searching:
-        std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "GPS SEARCH");
+        std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "FINDING GPS");
         break;
     case GpsState::Fix:
         if (snapshot_.gps.satellites > 0) {
-            std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "GPS FIX %u",
+            std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "GPS ON  %u SAT",
                           static_cast<unsigned>(snapshot_.gps.satellites));
         } else {
-            std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "GPS FIX");
+            std::snprintf(snapshot_.gps_label, sizeof(snapshot_.gps_label), "GPS ON");
         }
         break;
     }

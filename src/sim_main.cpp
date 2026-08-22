@@ -87,6 +87,8 @@ const std::uint16_t *bakedMapTile(const char *kind, double cell_lat,
 double bakedMapTileLat() noexcept;
 double bakedMapTileLon() noexcept;
 bool hasBakedMapTiles() noexcept;
+int bakedMapTileZoomAtOrBelow(const char *kind, double cell_lat, double cell_lon,
+                              int zoom) noexcept;
 }
 #endif
 
@@ -419,13 +421,13 @@ struct ChatLine {
 };
 struct ChatPeer {
     std::uint32_t node = 0xffffffffU;
-    char name[12] = "LONGFAST";
+    char name[12] = "EVERYONE";
     std::uint8_t unread = 0;
 };
 ChatLine chat_log[kChatLogCapacity]{};
 std::size_t chat_log_count = 0;
 std::size_t chat_log_start = 0;
-ChatPeer chat_peers[kChatPeerCapacity] = {{0xffffffffU, "LONGFAST"}};
+ChatPeer chat_peers[kChatPeerCapacity] = {{0xffffffffU, "EVERYONE"}};
 std::size_t chat_peer_count = 1;
 std::size_t chat_peer_index = 0;
 char chat_draft[kChatTextCapacity]{};
@@ -454,8 +456,10 @@ FieldTab field_tab = FieldTab::Lily;
 constexpr int kMapZoomMin = 12;
 // z20 is ~0.12 m/px: two operators standing five metres apart are ~43 px
 // apart on screen, which is the point of zooming in this far.
-constexpr int kMapZoomMax = 20;
-constexpr int kMapZoomDefault = 15;
+constexpr int kMapZoomMax = 23;
+// Open as tight as the imagery is real. Past z20 the picture is
+// magnified rather than sharper, so that is not a useful default.
+constexpr int kMapZoomDefault = 20;
 int map_zoom = kMapZoomDefault;
 bool map_satellite = true;
 bool map_chart = false;
@@ -480,6 +484,12 @@ struct MapPopup {
     bool has_position = false;
 };
 MapPopup map_popup{};
+
+// Dragging the map moves the view off your own position. Held in metres so a
+// zoom change keeps you looking at the same ground.
+double map_pan_east_m = 0.0;
+double map_pan_north_m = 0.0;
+bool map_panned = false;
 
 // The origin the last map render projected from. The popup reuses it so its
 // range and bearing describe the same geometry the dots were drawn with.
@@ -512,6 +522,7 @@ constexpr lv_coord_t kMapMinusY = 66;
 constexpr lv_coord_t kMapSatY = 90;
 constexpr lv_coord_t kMapMapY = 114;
 constexpr lv_coord_t kMapChartY = 138;
+constexpr lv_coord_t kMapHereY = 162;
 constexpr lv_coord_t kHomeGearX = 200;
 constexpr lv_coord_t kHomeGearY = 28;
 constexpr lv_coord_t kHomeGearW = 44;
@@ -1245,9 +1256,9 @@ void draw_mode_chip(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t wid
 void draw_spectrum_mode_chips(lv_obj_t *parent, bool enabled) noexcept
 {
     const bool fast = spectrum_scan_mode == SpectrumScanMode::FastNarrow;
-    draw_mode_chip(parent, kSpecFastX, kToolStripY, kSpecModeW, kToolChipH, "FAST U",
+    draw_mode_chip(parent, kSpecFastX, kToolStripY, kSpecModeW, kToolChipH, "FAST",
                    fast, enabled);
-    draw_mode_chip(parent, kSpecDeepX, kToolStripY, kSpecModeW, kToolChipH, "DEEP D",
+    draw_mode_chip(parent, kSpecDeepX, kToolStripY, kSpecModeW, kToolChipH, "DEEP",
                    !fast, enabled);
 }
 
@@ -1263,8 +1274,8 @@ void draw_start_stop_strip(lv_obj_t *parent, const char *status, lv_color_t stat
     const lv_color_t ink = !enabled ? theme::text_muted() :
                            (armed ? theme::amber() : theme::pink());
     const char *label = chip;
-    if (std::strcmp(chip, "START") == 0) label = "START E";
-    else if (std::strcmp(chip, "STOP") == 0) label = "STOP E";
+    if (std::strcmp(chip, "START") == 0) label = "START";
+    else if (std::strcmp(chip, "STOP") == 0) label = "STOP";
     draw_outline_rect(parent, kToolChipX, kToolStripY, kToolChipW, kToolChipH, ink);
     const lv_coord_t text_w = static_cast<lv_coord_t>(std::strlen(label) * 6);
     put_label(parent, label, kToolChipX + (kToolChipW - text_w) / 2, kToolStripY + 5,
@@ -1283,7 +1294,7 @@ void draw_back_strip(lv_obj_t *parent, const char *note = nullptr) noexcept
 {
     theme::rect(parent, 0, kEventBackY, 320, 20, lv_color_hex(0x050808));
     draw_outline_rect(parent, kEventBackX, kEventBackY, kEventBackW, kEventBackH, theme::pink());
-    put_label(parent, "BACK ESC", kEventBackX + 4, kEventBackY + 5, theme::pink(),
+    put_label(parent, "BACK", kEventBackX + 4, kEventBackY + 5, theme::pink(),
               &font_pixel_6x8);
     if (note != nullptr && note[0] != '\0') {
         put_clipped_label(parent, note, 72, kEventBackY + 6, 240,
@@ -1360,7 +1371,13 @@ void add_status_bar(lv_obj_t * parent, const char * title, const char * left_val
         middle_value = "SIM MODE";
         middle_color = theme::amber();
     } else {
-        middle_value = live_gps_label;
+        // The bar answers one question: do I have a position, yes or no.
+        // "SEARCH" versus "FIX" versus "N/A" made the operator decode radio
+        // states to find that out. Device Status still carries the detail.
+        const GpsStatus &bar_gps = hardware_status.snapshot().gps;
+        const bool located = bar_gps.state == GpsState::Fix && bar_gps.position_valid;
+        middle_value = located ? "GPS ON" : "GPS OFF";
+        middle_color = located ? theme::lime() : theme::fault();
     }
     // The web analyzer is attached to this device right now; say so where the
     // user is already looking, not only in the event log.
@@ -1749,6 +1766,39 @@ void draw_map_chevron(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, double east_
     draw_map_segment(parent, bx, by, x, y, theme::pink());
 }
 
+/// A raw 1 Hz fix wanders by metres even when standing still, and at a zoom
+/// where the screen is forty metres across that wander is the whole picture.
+/// This averages the recent fixes so the marker sits still, and snaps to the
+/// new position when the jump is too large to be noise — that is walking, not
+/// jitter.
+void map_smooth_position(double raw_lat, double raw_lon, double &out_lat,
+                         double &out_lon) noexcept
+{
+    static double smooth_lat = 0.0;
+    static double smooth_lon = 0.0;
+    static bool have_smooth = false;
+
+    if (!have_smooth) {
+        smooth_lat = raw_lat;
+        smooth_lon = raw_lon;
+        have_smooth = true;
+    } else {
+        const double lat_rad = smooth_lat * 0.017453292519943295;
+        const double de = (raw_lon - smooth_lon) * 111320.0 * std::cos(lat_rad);
+        const double dn = (raw_lat - smooth_lat) * 110540.0;
+        if (std::hypot(de, dn) > 15.0) {
+            smooth_lat = raw_lat;
+            smooth_lon = raw_lon;
+        } else {
+            constexpr double kBlend = 0.25;
+            smooth_lat += (raw_lat - smooth_lat) * kBlend;
+            smooth_lon += (raw_lon - smooth_lon) * kBlend;
+        }
+    }
+    out_lat = smooth_lat;
+    out_lon = smooth_lon;
+}
+
 double map_fix_accuracy_m(float hdop, std::uint8_t satellites) noexcept
 {
     double meters = 0.0;
@@ -2056,6 +2106,33 @@ bool try_load_map_cell(double cell_lat, double cell_lon, std::uint16_t *dest) no
                     static_cast<std::size_t>(kSatelliteWidth) *
                         static_cast<std::size_t>(kSatelliteHeight) * sizeof(std::uint16_t));
         return true;
+    }
+    // Past the deepest imagery, magnify the closest tile rather than dropping
+    // to the bare grid. The picture gains no detail — the source has none —
+    // but the marks keep spreading apart, which is the point of zooming in on
+    // two operators standing together.
+    const int deepest =
+        ::lilyshark::bakedMapTileZoomAtOrBelow(kind, cell_lat, cell_lon, map_zoom);
+    if (deepest > 0 && deepest < map_zoom) {
+        const std::uint16_t *coarse =
+            ::lilyshark::bakedMapTile(kind, cell_lat, cell_lon, deepest);
+        if (coarse != nullptr) {
+            const int factor = 1 << (map_zoom - deepest);
+            for (lv_coord_t y = 0; y < kSatelliteHeight; ++y) {
+                // Sample about the tile centre so magnifying does not drift.
+                const int sy = kSatelliteHeight / 2 +
+                               ((static_cast<int>(y) - kSatelliteHeight / 2) / factor);
+                for (lv_coord_t x = 0; x < kSatelliteWidth; ++x) {
+                    const int sx = kSatelliteWidth / 2 +
+                                   ((static_cast<int>(x) - kSatelliteWidth / 2) / factor);
+                    dest[static_cast<std::size_t>(y) * kSatelliteWidth +
+                         static_cast<std::size_t>(x)] =
+                        coarse[static_cast<std::size_t>(sy) * kSatelliteWidth +
+                               static_cast<std::size_t>(sx)];
+                }
+            }
+            return true;
+        }
     }
     return false;
 #endif
@@ -2508,9 +2585,11 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
     };
     chip(kMapCtrlX, kMapPlusY, "+", false, map_zoom < kMapZoomMax);
     chip(kMapCtrlX, kMapMinusY, "-", false, map_zoom > kMapZoomMin);
-    chip(kMapCtrlX, kMapSatY, "SAT I", map_satellite && !map_chart);
-    chip(kMapCtrlX, kMapMapY, "MAP D", !map_satellite && !map_chart);
-    chip(kMapCtrlX, kMapChartY, "CHT G", map_chart);
+    chip(kMapCtrlX, kMapSatY, "SAT", map_satellite && !map_chart);
+    chip(kMapCtrlX, kMapMapY, "ROADS", !map_satellite && !map_chart);
+    chip(kMapCtrlX, kMapChartY, "GRID", map_chart);
+    // Only offered when it would do something.
+    if (map_panned) chip(kMapCtrlX, kMapHereY, "HERE", false);
 
     // The card is drawn after every mark and label, so it is opaque: the
     // YOU marker and the peer dots used to punch through it.
@@ -3217,7 +3296,7 @@ void draw_radio_tools(lv_obj_t *parent) noexcept
     chip(66, "SURV 5");
     chip(128, "AIR 6");
     chip(190, "EVNT 7");
-    chip(252, "FILT X", traffic_filter.active());
+    chip(252, "FILTER", traffic_filter.active());
 }
 
 void open_radio_tool(Screen screen) noexcept
@@ -3440,7 +3519,7 @@ void build_traffic_filter(lv_obj_t *parent)
     }
     theme::rect(parent, 0, kToolStripY, 320, 20, lv_color_hex(0x050808));
     draw_outline_rect(parent, 8, kToolStripY, kEventBackW, kEventBackH, theme::pink());
-    put_label(parent, "BACK ESC", 12, kToolStripY + 5, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "BACK", 12, kToolStripY + 5, theme::pink(), &font_pixel_6x8);
     put_label(parent, traffic_filter.active() ? "ACTIVE" : "ALL",
               72, kToolStripY + 6,
               traffic_filter.active() ? theme::pink() : theme::text_muted(),
@@ -3448,7 +3527,7 @@ void build_traffic_filter(lv_obj_t *parent)
     put_label(parent, "L / R", 148, kToolStripY + 6, theme::text_muted(),
               &font_pixel_6x8);
     draw_outline_rect(parent, kToolChipX, kToolStripY, kToolChipW, kToolChipH, theme::pink());
-    put_label(parent, "CLR R", kToolChipX + 17, kToolStripY + 5, theme::pink(),
+    put_label(parent, "CLEAR", kToolChipX + 17, kToolStripY + 5, theme::pink(),
               &font_pixel_6x8);
 }
 
@@ -4001,10 +4080,10 @@ void build_node_detail(lv_obj_t * parent)
                   static_cast<unsigned>(node.frames));
     put_label(parent, line, 9, 50, theme::text_muted(), &font_pixel_6x8);
     draw_outline_rect(parent, kNodeChatX, kNodeActionY, kNodeActionW, kNodeActionH, theme::pink());
-    put_label(parent, "CHAT C", kNodeChatX + 8, kNodeActionY + 5, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "MESSAGE", kNodeChatX + 8, kNodeActionY + 5, theme::pink(), &font_pixel_6x8);
     draw_outline_rect(parent, kNodeMapX, kNodeActionY, kNodeActionW, kNodeActionH,
                       node.has_position ? theme::pink() : theme::text_muted());
-    put_label(parent, "MAP M", kNodeMapX + 11, kNodeActionY + 5,
+    put_label(parent, "MAP", kNodeMapX + 11, kNodeActionY + 5,
               node.has_position ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
     if (node.has_position) {
         const GpsStatus &gps = hardware_status.snapshot().gps;
@@ -4061,9 +4140,9 @@ void build_node_detail(lv_obj_t * parent)
                   static_cast<unsigned>(live_node.frame_count));
     put_label(parent, node_line, 9, 50, theme::text_muted(), &font_pixel_6x8);
     draw_outline_rect(parent, kNodeChatX, kNodeActionY, kNodeActionW, kNodeActionH, theme::pink());
-    put_label(parent, "CHAT C", kNodeChatX + 8, kNodeActionY + 5, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "MESSAGE", kNodeChatX + 8, kNodeActionY + 5, theme::pink(), &font_pixel_6x8);
     draw_outline_rect(parent, kNodeMapX, kNodeActionY, kNodeActionW, kNodeActionH, theme::pink());
-    put_label(parent, "MAP M", kNodeMapX + 11, kNodeActionY + 5, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "MAP", kNodeMapX + 11, kNodeActionY + 5, theme::pink(), &font_pixel_6x8);
     {
         double fix_lat = 0.0;
         double fix_lon = 0.0;
@@ -4639,8 +4718,15 @@ void build_map(lv_obj_t * parent)
     double origin_lon = 0.0;
     bool have_origin = gps.state == GpsState::Fix && gps.position_valid;
     if (have_origin) {
-        origin_lat = gps.latitude_degrees;
-        origin_lon = gps.longitude_degrees;
+        map_smooth_position(gps.latitude_degrees, gps.longitude_degrees,
+                            origin_lat, origin_lon);
+        if (map_panned) {
+            // Shift the view by the drag, in metres, so the same ground stays
+            // under the finger when the zoom changes.
+            const double pan_rad = origin_lat * 0.017453292519943295;
+            origin_lat += map_pan_north_m / 110540.0;
+            origin_lon += map_pan_east_m / (111320.0 * std::cos(pan_rad));
+        }
     } else {
         std::size_t positioned = 0;
         for (std::size_t index = 0; index < count; ++index) {
@@ -4710,8 +4796,11 @@ void build_map(lv_obj_t * parent)
         plot_field_map(parent, marks.data(), mark_count, fix_line, detail, mpp,
                        origin_lat, origin_lon, accuracy_m, false);
     } else {
-        const char *reason = gps.state == GpsState::Searching ? "SEARCH" :
-                             (gps.state == GpsState::Disabled ? "GPS OFF" : "NO RX");
+        // Same plain language as the status bar: the operator wants to know
+        // whether a position exists, not which internal state the receiver is
+        // in. Device Status still shows the detail.
+        const char *reason = gps.state == GpsState::Disabled ? "GPS OFF"
+                                                             : "FINDING GPS";
         // A black grid tells the operator nothing. While GPS acquires, show
         // the baked imagery for the area the device was provisioned for, and
         // only fall back to the muted grid when there is genuinely no map to
@@ -6533,9 +6622,9 @@ void build_home(lv_obj_t * parent)
                   theme::pink(), &font_pixel_6x8);
     }
     draw_outline_rect(parent, kHomeGearX, kHomeGearY, kHomeGearW, kHomeGearH, theme::pink());
-    put_label(parent, "SET E", kHomeGearX + 7, kHomeGearY + 6, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "SETUP", kHomeGearX + 7, kHomeGearY + 6, theme::pink(), &font_pixel_6x8);
     draw_outline_rect(parent, kHomeHelpX, kHomeHelpY, kHomeHelpW, kHomeHelpH, theme::pink());
-    put_label(parent, "HELP ?", kHomeHelpX + 4, kHomeHelpY + 6, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "HELP", kHomeHelpX + 4, kHomeHelpY + 6, theme::pink(), &font_pixel_6x8);
 
     draw_outline_rect(parent, 248, 24, 68, 68, theme::pink());
     put_label(parent, "RSSI", 252, 27, theme::pink(), &font_pixel_6x8);
@@ -6762,7 +6851,7 @@ void build_storage(lv_obj_t * parent)
     put_label(parent, capture_note, 8, 183,
               theme::text_muted(), &font_pixel_6x8);
 #if defined(LILYSHARK_DEVICE)
-    draw_back_strip(parent, capture_settings_save_failed ? "SAVE FAILED" : "SHOT S");
+    draw_back_strip(parent, capture_settings_save_failed ? "SAVE FAILED" : "SCREENSHOT");
 #else
     draw_back_strip(parent, capture_settings_save_failed ? "SAVE FAILED" : nullptr);
 #endif
@@ -7073,7 +7162,7 @@ void build_chat(lv_obj_t * parent)
                       static_cast<unsigned>(chat_peer_count - shown));
         put_label(parent, extra, 148, kChatOlderY + 4, theme::pink(), &font_pixel_6x8);
     }
-    put_label(parent, broadcast ? "BCAST" : "DIRECT", 262, kChatOlderY + 4,
+    put_label(parent, broadcast ? "TO ALL" : "PRIVATE", 258, kChatOlderY + 4,
               theme::pink(), &font_pixel_6x8);
     theme::rule_line(parent, 0, kChatOlderY + kChatOlderH, 320, 1, theme::pink());
 
@@ -7081,10 +7170,10 @@ void build_chat(lv_obj_t * parent)
         draw_outline_rect(parent, 16, 78, 288, 86, theme::pink());
         put_label(parent, "NO MESSAGES YET", 28, 94, theme::pink(),
                   &font_pixel_6x8);
-        put_label(parent, broadcast ? "LONGFAST BCAST. SEND OR ENTER." :
-                                      "DIRECT. SEND OR ENTER.",
+        put_label(parent, broadcast ? "EVERYONE ON THIS CHANNEL WILL SEE THIS." :
+                                      "ONLY THIS NODE WILL SEE THIS.",
                   28, 116, theme::text_muted(), &font_pixel_6x8);
-        put_label(parent, "TAB CYCLES PEERS. UP/DOWN SCROLLS.", 28, 132,
+        put_label(parent, "TYPE, THEN PRESS ENTER TO SEND.", 28, 132,
                   theme::text_muted(), &font_pixel_6x8);
     } else {
         for (std::size_t index = 0; index < visible; ++index) {
@@ -7094,7 +7183,7 @@ void build_chat(lv_obj_t * parent)
                 theme::rect(parent, 308, y, 8, 24, theme::pink());
             }
             char who[28]{};
-            const char *kind = line.peer == 0xffffffffU ? "ALL" : "DM";
+            const char *kind = line.peer == 0xffffffffU ? "ALL" : "PRIVATE";
             if (line.when[0] != '\0') {
                 std::snprintf(who, sizeof(who), "%s  %s  %s", line.when, line.from, kind);
             } else {
@@ -7127,7 +7216,7 @@ void build_chat(lv_obj_t * parent)
                   left < 10U ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
     }
     draw_outline_rect(parent, kChatSendX, kChatSendY, kChatSendW, kChatSendH, theme::pink());
-    put_label(parent, "SEND E", kChatSendX + 10, kChatSendY + 6, theme::pink(),
+    put_label(parent, "SEND", kChatSendX + 10, kChatSendY + 6, theme::pink(),
               &font_pixel_6x8);
 }
 
@@ -8894,6 +8983,13 @@ void handle_touch_tap(std::uint16_t x, std::uint16_t y)
             if (apply_map_layer(false, true)) build_current_screen();
             return;
         }
+        if (map_panned && inside(x, y, kMapCtrlX, kMapHereY)) {
+            map_pan_east_m = 0.0;
+            map_pan_north_m = 0.0;
+            map_panned = false;
+            build_current_screen();
+            return;
+        }
         for (std::size_t index = 0; index < map_hit_count; ++index) {
             const MapHit &hit = map_hits[index];
             if (hit.node_index < 0) continue;
@@ -10495,10 +10591,10 @@ bool run_simulator_render_test() noexcept
     // make a "deterministic pixel" test depend on the machine it runs on.
     map_bundled_tiles_only = true;
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
-        0x6a496cb7ee71ecc0ULL, 0x874dc7c66cec12a4ULL, 0x1ee0a49f124aae4cULL,
-        0x61f87ea07a2b5a9fULL, 0xce8aa046582613faULL, 0xf21948c5cd52ba19ULL,
-        0xe0cade90b696d3a0ULL, 0xfc377cfa7009a704ULL, 0x58d9a0e50c5bc6cfULL,
-        0x5230a4c5b8ee2760ULL, 0x952266efe4ead3dfULL, 0x0c9946d284d94185ULL,
+        0x828b667afee2650bULL, 0x10b28279c7d286e0ULL, 0x1ee0a49f124aae4cULL,
+        0x1d5dbffece45216fULL, 0x347df7d2e0f891ebULL, 0xf21948c5cd52ba19ULL,
+        0x21555e1c8309998cULL, 0xff854a52e9cc13ccULL, 0x79cb57dec8a26e00ULL,
+        0xa3e5a0a80a54d6e8ULL, 0x952266efe4ead3dfULL, 0x0c9946d284d94185ULL,
         0x61427c1db2261862ULL,
     }};
     constexpr std::array<ShellRoute, 17> shell_routes = {{
@@ -10529,9 +10625,9 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xcad6c4dbec790876ULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
-        0x0e8d5caa0f3b18beULL, 0xea3f956b7401bc94ULL, 0x7710e9db25107f12ULL,
-        0xa330c08740970548ULL, 0x6b64ffa09ea0aad3ULL, 0xfd3c2d1f09a88f9eULL,
-        0xbfd60e0b28fbb5daULL, 0xbf477a1dced4f15bULL, 0xeb1c8d82152fdf13ULL,
+        0x0e8d5caa0f3b18beULL, 0x80f98c462058b6fcULL, 0xe474104bb075865aULL,
+        0xa8ab2f3f69354bb0ULL, 0xb7d41c5b6be5b7f3ULL, 0x221d4c65ba6abb96ULL,
+        0x4e393dd17e2a1a42ULL, 0x953b99aa82e9d7abULL, 0x8c79ac0279437533ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
     }};
 
@@ -10654,9 +10750,9 @@ bool run_simulator_render_test() noexcept
         "PACKET RAW", "PACKET HEX PAGE 2", "PACKET HEX PAGE 3", "EVENT DETAIL",
     }};
     constexpr std::array<std::uint64_t, interaction_names.size()> interaction_expected_hashes = {{
-        0xfc377cfa7009a704ULL, 0xc509fdfe6b35cd0aULL, 0x20a08b7f6d2252a6ULL,
-        0xda96ff5ad26098fbULL, 0x4ec6dbb8653b25a2ULL, 0x058bf9952c8fc194ULL,
-        0xc91f0e13ee2d2360ULL, 0xd6e583a432b64f9cULL,
+        0xff854a52e9cc13ccULL, 0xa2e01dc7e031afa2ULL, 0x56631520006052eeULL,
+        0x19d6557a52616c3bULL, 0xeb6671001795a45aULL, 0x682d491045fc4edcULL,
+        0x87f2a05137e1e458ULL, 0xeb0200befe71eff4ULL,
     }};
     traffic_filter = TrafficFilter{};
     focus_simulator_inspector_packet();
@@ -10732,7 +10828,7 @@ bool run_simulator_render_test() noexcept
         // Hashed as well as written: the marks used to draw over the card,
         // and no behavioural test noticed because every assertion about it
         // passed while it was being painted through.
-        constexpr std::uint64_t kMapNodeCardHash = 0xb351a2d05fa8876aULL;
+        constexpr std::uint64_t kMapNodeCardHash = 0x1ca3153eb1d1d58bULL;
         const std::uint64_t card_hash = hash_simulator_frame();
         std::fprintf(stderr, "Lilyshark render MAP NODE CARD: fnv1a=%016llx\n",
                      static_cast<unsigned long long>(card_hash));
@@ -11610,6 +11706,8 @@ TFT_eSPI device_display;
 alignas(4) std::uint8_t device_draw_buffer[theme::screen_width * 20 * sizeof(std::uint16_t)];
 TouchPoint touch_last_point{};
 TouchPoint touch_start_point{};
+TouchPoint touch_drag_point{};
+bool touch_dragged = false;
 bool touch_was_pressed = false;
 uint32_t touch_started_ms = 0;
 
@@ -11714,6 +11812,32 @@ void poll_touch()
     if(!was_pressed && point.pressed) {
         touch_start_point = point;
         touch_started_ms = now;
+        touch_drag_point = point;
+        touch_dragged = false;
+        return;
+    }
+    // Live drag on the map. Panning has to happen while the finger is down —
+    // waiting for release and turning the gesture into a LEFT/RIGHT key, which
+    // is what used to happen here, navigated away from the map instead of
+    // moving it.
+    if(was_pressed && point.pressed && current_screen == Screen::map &&
+       app_shell.route() == ShellRoute::Analyzer) {
+        const int dx = static_cast<int>(point.x) - static_cast<int>(touch_drag_point.x);
+        const int dy = static_cast<int>(point.y) - static_cast<int>(touch_drag_point.y);
+        if(dx != 0 || dy != 0) {
+            const double mpp = map_meters_per_pixel(
+                hardware_status.snapshot().gps.latitude_degrees);
+            // Drag right moves the world right, so the view centre goes left.
+            map_pan_east_m -= static_cast<double>(dx) * mpp;
+            map_pan_north_m += static_cast<double>(dy) * mpp;
+            map_panned = true;
+            touch_drag_point = point;
+            const int adx = dx < 0 ? -dx : dx;
+            const int ady = dy < 0 ? -dy : dy;
+            if(adx + ady >= 3) touch_dragged = true;
+            map_popup.open = false;
+            build_current_screen();
+        }
         return;
     }
     if(was_pressed && !point.pressed) {
@@ -11723,7 +11847,10 @@ void poll_touch()
                             static_cast<int>(touch_start_point.y);
         const int abs_x = delta_x < 0 ? -delta_x : delta_x;
         const int abs_y = delta_y < 0 ? -delta_y : delta_y;
-        if(abs_x >= 40 && abs_x > abs_y && touch_start_point.x <= 24U && delta_x > 0) {
+        if(touch_dragged) {
+            // The gesture was a pan; it has already been applied.
+            touch_dragged = false;
+        } else if(abs_x >= 40 && abs_x > abs_y && touch_start_point.x <= 24U && delta_x > 0) {
             handle_navigation_key(LV_KEY_ESC);
         } else if(abs_x >= 40 && abs_x > abs_y) {
             handle_navigation_key(delta_x < 0 ? LV_KEY_RIGHT : LV_KEY_LEFT);
@@ -12518,7 +12645,10 @@ void loop()
                                       current_screen == Screen::map ||
                                       current_screen == Screen::utilization ||
                                       current_screen == Screen::timeline));
-    const std::uint32_t dynamic_interval_ms = scan_active ? 150U : 1000U;
+    // The map is dragged and zoomed directly, so a one-second cadence reads
+    // as lag. Everything else is a readout and does not need it.
+    const std::uint32_t dynamic_interval_ms =
+        scan_active ? 150U : (current_screen == Screen::map ? 200U : 1000U);
     if((scan_active || time_driven_screen) &&
        now - last_dynamic_ui_refresh_ms >= dynamic_interval_ms) {
         last_dynamic_ui_refresh_ms = now;
