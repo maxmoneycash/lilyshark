@@ -524,9 +524,11 @@ constexpr lv_coord_t kHomeHelpH = 20;
 constexpr lv_coord_t kSettingsFirstY = 24;
 constexpr lv_coord_t kSettingsRowH = 26;
 constexpr std::size_t kDisplayInputRows = 6;
-constexpr lv_coord_t kNodesFirstY = 48;
+// Peers start below the pinned THIS DEVICE row (y 44..64).
+constexpr lv_coord_t kNodesFirstY = 70;
 constexpr lv_coord_t kNodesRowH = 22;
-constexpr std::size_t kNodesVisible = 7;
+// 70 + 6*22 = 202, which clears the nav bar.
+constexpr std::size_t kNodesVisible = 6;
 constexpr lv_coord_t kNodesFooterY = 204;
 constexpr lv_coord_t kRadioHeadY = 24;
 constexpr lv_coord_t kRadioFirstY = 38;
@@ -3457,6 +3459,46 @@ void draw_nodes_range_footer(lv_obj_t *parent, std::size_t first, std::size_t vi
     draw_up_down_chips(parent, kNodesFooterY + 4, first > 0U, first + visible < count);
 }
 
+/// The local device, pinned above the peers. It is deliberately not part of
+/// the selectable list — you cannot message yourself, and a self entry mixed
+/// into the peer rows was what made every device look like it had a twin.
+void draw_this_device_row(lv_obj_t *parent) noexcept
+{
+    constexpr lv_coord_t y = 46;
+    theme::rect(parent, 0, y - 2, 320, 20, lv_color_hex(0x101820));
+    theme::rect(parent, 0, y - 2, 3, 20, theme::cyan());
+
+    char call[16]{};
+#if defined(LILYSHARK_DEVICE)
+    char short_name[8]{};
+    formatLocalMeshtasticShortName(short_name, sizeof(short_name));
+    std::snprintf(call, sizeof(call), "%s", short_name);
+#else
+    std::snprintf(call, sizeof(call), "LILY");
+#endif
+    put_clipped_label(parent, call, 8, y, 76, theme::cyan(), &font_mono_10);
+    put_label(parent, "YOU", 88, y, theme::cyan(), &font_mono_10);
+    put_label(parent, "NOW", 146, y, theme::text_muted(), &font_mono_10);
+    put_label(parent, "--", 190, y, theme::text_muted(), &font_mono_10);
+
+#if defined(LILYSHARK_DEVICE)
+    const GpsStatus &self_gps = hardware_status.snapshot().gps;
+    const bool fixed = self_gps.state == GpsState::Fix && self_gps.position_valid;
+#else
+    const bool fixed = app_settings.gps_enabled;
+#endif
+    if (fixed) theme::rect(parent, 230, y + 4, 5, 5, theme::cyan());
+    char id_line[20]{};
+#if defined(LILYSHARK_DEVICE)
+    std::snprintf(id_line, sizeof(id_line), "!%08lx",
+                  static_cast<unsigned long>(localMeshtasticNodeNum()));
+#else
+    std::snprintf(id_line, sizeof(id_line), "THIS DEVICE");
+#endif
+    put_clipped_label(parent, id_line, 240, y, 74, theme::text_muted(), &font_pixel_6x8);
+    theme::rule_line(parent, 6, y + 18, 308, 1, theme::cyan());
+}
+
 void build_nodes(lv_obj_t * parent)
 {
 #if defined(LILYSHARK_DEVICE)
@@ -3468,6 +3510,7 @@ void build_nodes(lv_obj_t * parent)
     put_label(parent, "SNR", 192, 27, theme::pink(), &font_pixel_6x8);
     put_label(parent, "POS", 224, 27, theme::pink(), &font_pixel_6x8);
     theme::rule_line(parent, 6, 43, 308, 1, theme::pink());
+    draw_this_device_row(parent);
 
     std::array<LiveNodeSummary, 8> live_nodes{};
     const std::size_t count = collect_live_nodes(live_nodes);
@@ -3521,6 +3564,7 @@ void build_nodes(lv_obj_t * parent)
     put_label(parent, "SNR", 192, 27, theme::pink(), &font_pixel_6x8);
     put_label(parent, "POS", 224, 27, theme::pink(), &font_pixel_6x8);
     theme::rule_line(parent, 6, 43, 308, 1, theme::pink());
+    draw_this_device_row(parent);
 
     const std::size_t count = simulator_established_node_count();
     if(count == 0U) {
@@ -10047,11 +10091,16 @@ bool run_simulator_interaction_test() noexcept
     if(!expect_simulator_state(current_screen == Screen::nodes,
                                "Back must return from Node Detail")) return false;
     const std::size_t visible_node_count = simulator_established_node_count();
-    const std::size_t tapped_node_row = visible_node_count > 5U
-        ? 5U : (visible_node_count == 0U ? 0U : visible_node_count - 1U);
+    const std::size_t last_visible_row =
+        kNodesVisible == 0U ? 0U : kNodesVisible - 1U;
+    const std::size_t tapped_node_row = visible_node_count > last_visible_row
+        ? last_visible_row : (visible_node_count == 0U ? 0U : visible_node_count - 1U);
     const simulator::NodeSnapshot *tapped_node =
         simulator_established_node(tapped_node_row);
-    handle_touch_tap(20U, static_cast<std::uint16_t>(48U + tapped_node_row * 22U));
+    // Derive the row from the layout constants: the pinned THIS DEVICE row
+    // moved the peer list, and a hardcoded 48 silently tapped the wrong row.
+    handle_touch_tap(20U, static_cast<std::uint16_t>(
+        kNodesFirstY + static_cast<lv_coord_t>(tapped_node_row) * kNodesRowH));
     if(!expect_simulator_state(current_screen == Screen::node_detail &&
                                simulator_node_selection == tapped_node_row &&
                                tapped_node != nullptr &&
@@ -10403,7 +10452,7 @@ bool run_simulator_render_test() noexcept
     map_bundled_tiles_only = true;
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0x6a496cb7ee71ecc0ULL, 0x874dc7c66cec12a4ULL, 0x1ee0a49f124aae4cULL,
-        0x61f87ea07a2b5a9fULL, 0xce8aa046582613faULL, 0x7aa1f13d4a3b8545ULL,
+        0x61f87ea07a2b5a9fULL, 0xce8aa046582613faULL, 0xf21948c5cd52ba19ULL,
         0xe0cade90b696d3a0ULL, 0xfc377cfa7009a704ULL, 0x58d9a0e50c5bc6cfULL,
         0x5230a4c5b8ee2760ULL, 0x952266efe4ead3dfULL, 0x0c9946d284d94185ULL,
         0x61427c1db2261862ULL,
