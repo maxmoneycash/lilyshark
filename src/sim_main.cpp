@@ -2640,6 +2640,29 @@ void draw_field_chart(lv_obj_t *parent, lv_coord_t top, lv_coord_t bottom,
     }
 }
 
+/// The layer currently on screen. The chip is labelled with this and tapping
+/// it moves to the next, so one control replaces three and none of them is a
+/// word you have to decode.
+const char *current_map_layer_name() noexcept
+{
+    return map_chart ? "GRID" : (map_satellite ? "SAT" : "ROADS");
+}
+
+/// Text that reads over imagery without a black bar behind it. The map is the
+/// whole point of the map screen, and the full-width plates these replace were
+/// taking a seventh of the picture between them.
+void put_map_label(lv_obj_t *parent, const char *text, lv_coord_t x, lv_coord_t y,
+                   lv_coord_t width, lv_color_t color, const lv_font_t *font) noexcept
+{
+    if (text == nullptr || text[0] == '\0') return;
+    const lv_color_t shadow = lv_color_hex(0x000000);
+    put_clipped_label(parent, text, x - 1, y, width, shadow, font);
+    put_clipped_label(parent, text, x + 1, y, width, shadow, font);
+    put_clipped_label(parent, text, x, y - 1, width, shadow, font);
+    put_clipped_label(parent, text, x, y + 1, width, shadow, font);
+    put_clipped_label(parent, text, x, y, width, color, font);
+}
+
 void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_count,
                     const char *fix_line, const char *detail_line,
                     double meters_per_pixel = 0.0,
@@ -2682,47 +2705,55 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
         }
     }
 
-    theme::rect(parent, 0, top, width, 16, lv_color_hex(0x000000));
-    theme::rect(parent, 2, cy - 5, 11, 9, lv_color_hex(0x000000));
-    put_label(parent, "W", 4, cy - 4, theme::text(), &font_pixel_6x8);
-    theme::rect(parent, 264, cy - 5, 11, 9, lv_color_hex(0x000000));
-    put_label(parent, "E", 266, cy - 4, theme::text(), &font_pixel_6x8);
-    theme::rect(parent, cx - 5, bottom - 30, 11, 9, lv_color_hex(0x000000));
-    put_label(parent, "S", cx - 3, bottom - 29, theme::text(), &font_pixel_6x8);
-    theme::rect(parent, cx - 8, cy, 17, 1, theme::pink());
-    theme::rect(parent, cx, cy - 8, 1, 17, theme::pink());
-    theme::rect(parent, 8, top + 29, 11, 9, lv_color_hex(0x000000));
-    put_label(parent, "N", 10, top + 30, theme::pink(), &font_pixel_6x8);
+    // The N/S/E/W boxes and the black bands they sat in are gone. At the zooms
+    // this map is actually used at -- one house fills the screen at z20 -- a
+    // cardinal tick tells an operator nothing they did not already know, and
+    // between them the chrome was eating a seventh of the picture.
+    if (map_panned) {
+        // Worth drawing only once the view has left the operator: it marks
+        // where the screen is centred, not where anybody is standing.
+        theme::rect(parent, cx - 8, cy, 17, 1, theme::pink());
+        theme::rect(parent, cx, cy - 8, 1, 17, theme::pink());
+    }
 
     double bar_m = 200.0;
-    if (georef) {
-        constexpr double candidates[] = {50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0};
-        double best = 1.0e9;
-        for (double candidate : candidates) {
-            const double px = candidate / meters_per_pixel;
-            const double error = std::abs(px - 56.0);
-            if (px >= 24.0 && px <= 88.0 && error < best) {
-                best = error;
-                bar_m = candidate;
-            }
-        }
+    if (georef && meters_per_pixel > 0.0) {
+        // A 1-2-5 series taken from the scale actually on screen, so the bar
+        // is truthful at every zoom. The fixed candidate list this replaces
+        // bottomed out at 50 m: past about z16 nothing fitted the pixel
+        // window and it fell through to a hardcoded "200 M" printed over a
+        // bar that really measured 34 m at z18 and 8 m at z20.
+        const double target = 56.0 * meters_per_pixel;
+        const double decade = std::pow(10.0, std::floor(std::log10(target)));
+        const double normalised = target / decade;
+        const double step = normalised < 1.5 ? 1.0
+                          : normalised < 3.5 ? 2.0
+                          : normalised < 7.5 ? 5.0
+                                             : 10.0;
+        bar_m = step * decade;
+        if (bar_m < 1.0) bar_m = 1.0;
     } else {
         bar_m = 4800.0 / static_cast<double>(1 << (map_zoom - kMapZoomMin));
         if (bar_m < 200.0) bar_m = 200.0;
     }
     lv_coord_t bar_px = georef ? static_cast<lv_coord_t>(bar_m / meters_per_pixel)
                                : static_cast<lv_coord_t>(56);
+    // The 1-2-5 choice lands between about 38 and 75 px by construction, so
+    // these bounds are a guard against a degenerate scale, not a clamp that
+    // routinely fires and puts the label out of step with the bar again.
     if (bar_px < 18) bar_px = 18;
-    if (bar_px > 72) bar_px = 72;
+    if (bar_px > 96) bar_px = 96;
     char scale[16]{};
     format_map_range(scale, sizeof(scale), bar_m);
     const lv_coord_t scale_w = static_cast<lv_coord_t>(std::strlen(scale) * 6);
-    theme::rect(parent, 6, bottom - 16, bar_px + scale_w + 12, 12, lv_color_hex(0x000000));
-    theme::rect(parent, 8, bottom - 11, bar_px, 2, theme::text());
-    put_label(parent, scale, 12 + bar_px, bottom - 15, theme::text(), &font_pixel_6x8);
+    theme::rect(parent, 7, bottom - 13, bar_px + 2, 4, lv_color_hex(0x000000));
+    theme::rect(parent, 8, bottom - 12, bar_px, 2, theme::text());
+    put_map_label(parent, scale, 14 + bar_px, bottom - 18, 80, theme::text(),
+                  &font_mono_semibold_12);
 
     if (fix_line != nullptr && fix_line[0] != '\0') {
-        put_clipped_label(parent, fix_line, 8, top + 4, 146, theme::lime(), &font_pixel_6x8);
+        put_map_label(parent, fix_line, 8, top + 4, 200, theme::lime(),
+                      &font_mono_semibold_12);
     }
     char hud[24]{};
     if (detail_line != nullptr && detail_line[0] != '\0') {
@@ -2733,7 +2764,13 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
                       map_using_imagery ? (map_imagery_edge ? " EDGE" : "") : " CHART");
     }
     if (hud[0] != '\0') {
-        put_clipped_label(parent, hud, 176, top + 4, 108, theme::text(), &font_pixel_6x8);
+        // Right-aligned against the control column so it never collides with
+        // the position, however long either of them runs.
+        const lv_coord_t hud_w = static_cast<lv_coord_t>(std::strlen(hud) * 7);
+        lv_coord_t hud_x = kMapCtrlX - 6 - hud_w;
+        if (hud_x < 8) hud_x = 8;
+        put_map_label(parent, hud, hud_x, top + 4, hud_w + 8, theme::text(),
+                      &font_mono_semibold_12);
     }
 
     const MapMark *you_mark = nullptr;
@@ -2759,9 +2796,8 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
         std::snprintf(bearing_line, sizeof(bearing_line), "YOU  +/-%s", acc);
     }
     if (bearing_line[0] != '\0') {
-        theme::rect(parent, 0, top + 16, 272, 12, lv_color_hex(0x000000));
-        put_clipped_label(parent, bearing_line, 8, top + 17, 256, theme::pink(),
-                          &font_pixel_6x8);
+        put_map_label(parent, bearing_line, 8, bottom - 34, 256, theme::pink(),
+                      &font_mono_semibold_12);
     }
 
     if (muted) {
@@ -2797,7 +2833,9 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
             }
         }
     }
-    if (you_mark != nullptr && sel_mark != nullptr && georef) {
+    // Only while a node card is actually open. A line permanently slicing the
+    // map corner to corner towards something off screen is noise.
+    if (map_popup.open && you_mark != nullptr && sel_mark != nullptr && georef) {
         lv_coord_t sel_x = cx;
         lv_coord_t sel_y = cy;
         project(*sel_mark, sel_x, sel_y);
@@ -2864,19 +2902,23 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
             }
         }
         if (mark.you) {
-            theme::rect(parent, x - 5, y - 5, 11, 11, lv_color_hex(0x000000));
-            theme::rect(parent, x - 4, y - 4, 9, 9, theme::pink());
-            theme::rect(parent, x - 1, y - 1, 3, 3, theme::text());
+            // A crosshair, not a block. At z20 a 9 px filled square covers
+            // about a metre of ground -- precisely the ground the operator
+            // opened the map to look at.
+            theme::rect(parent, x - 7, y - 1, 15, 3, lv_color_hex(0x000000));
+            theme::rect(parent, x - 1, y - 7, 3, 15, lv_color_hex(0x000000));
+            theme::rect(parent, x - 6, y, 13, 1, theme::pink());
+            theme::rect(parent, x, y - 6, 1, 13, theme::pink());
+            theme::rect(parent, x - 1, y - 1, 3, 3, theme::pink());
         } else {
             const lv_color_t color = mark.selected ? theme::pink() : theme::lime();
             theme::rect(parent, x - 3, y - 3, 7, 7, lv_color_hex(0x000000));
             theme::rect(parent, x - 2, y - 2, 5, 5, color);
         }
-        if (!collide) {
-            theme::rect(parent, tag_x - 2, tag_y - 1, tag_w + 3, 11, lv_color_hex(0x000000));
-            put_label(parent, tag, tag_x, tag_y,
-                      mark.you || mark.selected ? theme::pink() : theme::lime(),
-                      &font_pixel_6x8);
+        if (!collide && !mark.you) {
+            put_map_label(parent, tag, tag_x, tag_y, tag_w + 8,
+                          mark.selected ? theme::pink() : theme::lime(),
+                          &font_pixel_6x8);
             if (label_count < labels.size()) {
                 labels[label_count++] = {tag_x, tag_y, tag_w};
             }
@@ -2895,11 +2937,9 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
     };
     chip(kMapCtrlX, kMapPlusY, "+", false, map_zoom < kMapZoomMax);
     chip(kMapCtrlX, kMapMinusY, "-", false, map_zoom > kMapZoomMin);
-    chip(kMapCtrlX, kMapSatY, "SAT", map_satellite && !map_chart);
-    chip(kMapCtrlX, kMapMapY, "ROADS", !map_satellite && !map_chart);
-    chip(kMapCtrlX, kMapChartY, "GRID", map_chart);
+    chip(kMapCtrlX, kMapSatY, current_map_layer_name(), false);
     // Only offered when it would do something.
-    if (map_panned) chip(kMapCtrlX, kMapHereY, "HERE", false);
+    if (map_panned) chip(kMapCtrlX, kMapMapY, "HERE", false);
 
     // The card is drawn after every mark and label, so it is opaque: the
     // YOU marker and the peer dots used to punch through it.
@@ -3340,6 +3380,14 @@ bool apply_map_layer(bool satellite, bool chart) noexcept
     map_satellite = satellite;
     map_chart = false;
     return true;
+}
+
+/// SAT -> ROADS -> GRID -> SAT. The chip shows where you are in that cycle.
+bool cycle_map_layer() noexcept
+{
+    if (map_chart) return apply_map_layer(true, false);
+    if (map_satellite) return apply_map_layer(false, false);
+    return apply_map_layer(false, true);
 }
 
 bool apply_timeline_filter(std::size_t next) noexcept
@@ -9372,18 +9420,10 @@ void handle_touch_tap(std::uint16_t x, std::uint16_t y)
             return;
         }
         if (inside(x, y, kMapCtrlX, kMapSatY)) {
-            if (apply_map_layer(true, false)) build_current_screen();
+            if (cycle_map_layer()) build_current_screen();
             return;
         }
-        if (inside(x, y, kMapCtrlX, kMapMapY)) {
-            if (apply_map_layer(false, false)) build_current_screen();
-            return;
-        }
-        if (inside(x, y, kMapCtrlX, kMapChartY)) {
-            if (apply_map_layer(false, true)) build_current_screen();
-            return;
-        }
-        if (map_panned && inside(x, y, kMapCtrlX, kMapHereY)) {
+        if (map_panned && inside(x, y, kMapCtrlX, kMapMapY)) {
             map_pan_east_m = 0.0;
             map_pan_north_m = 0.0;
             map_panned = false;
@@ -11212,7 +11252,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0x828b667afee2650bULL, 0x10b28279c7d286e0ULL, 0x1ee0a49f124aae4cULL,
         0x1d5dbffece45216fULL, 0x347df7d2e0f891ebULL, 0xf491645734525017ULL,
-        0x21555e1c8309998cULL, 0xff854a52e9cc13ccULL, 0x79cb57dec8a26e00ULL,
+        0x21555e1c8309998cULL, 0xff854a52e9cc13ccULL, 0xade0149dc990fb01ULL,
         0xa3e5a0a80a54d6e8ULL, 0x952266efe4ead3dfULL, 0x0c9946d284d94185ULL,
         0x61427c1db2261862ULL,
     }};
@@ -11447,7 +11487,7 @@ bool run_simulator_render_test() noexcept
         // Hashed as well as written: the marks used to draw over the card,
         // and no behavioural test noticed because every assertion about it
         // passed while it was being painted through.
-        constexpr std::uint64_t kMapNodeCardHash = 0x1ca3153eb1d1d58bULL;
+        constexpr std::uint64_t kMapNodeCardHash = 0xa72bbc6c3cd08b73ULL;
         const std::uint64_t card_hash = hash_simulator_frame();
         std::fprintf(stderr, "Lilyshark render MAP NODE CARD: fnv1a=%016llx\n",
                      static_cast<unsigned long long>(card_hash));

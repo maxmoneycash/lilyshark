@@ -149,19 +149,35 @@ def contour_interval(zoom):
     return 50.0
 
 
-def punch_imagery(image, contrast=1.38, lift=18):
+KNEE = 200.0
+
+
+def _soft_clip(value):
+    """Compress highlights instead of flattening them.
+
+    A linear stretch drives bright ground -- concrete, pale roofs, dry grass --
+    straight to 255, and once three channels are at 255 the detail is not dim,
+    it is gone. This bends everything above the knee towards white
+    asymptotically, so a bright roof stays a roof with a ridge on it.
+    """
+    if value <= 0.0:
+        return 0
+    if value <= KNEE:
+        return int(value)
+    span = 255.0 - KNEE
+    return int(KNEE + span * (1.0 - math.exp(-(value - KNEE) / span)))
+
+
+def punch_imagery(image, contrast=1.16, lift=4):
     pixels = image.load()
     width, height = image.size
     for y in range(height):
         for x in range(width):
             red, green, blue = pixels[x, y]
-            red = int((red - 128) * contrast + 128 + lift)
-            green = int((green - 128) * contrast + 128 + lift)
-            blue = int((blue - 128) * contrast + 128 + lift)
             pixels[x, y] = (
-                0 if red < 0 else 255 if red > 255 else red,
-                0 if green < 0 else 255 if green > 255 else green,
-                0 if blue < 0 else 255 if blue > 255 else blue,
+                _soft_clip((red - 128) * contrast + 128 + lift),
+                _soft_clip((green - 128) * contrast + 128 + lift),
+                _soft_clip((blue - 128) * contrast + 128 + lift),
             )
     return image
 
