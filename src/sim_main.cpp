@@ -1378,6 +1378,9 @@ void add_status_bar(lv_obj_t * parent, const char * title, const char * left_val
     if(chat_notice_until_ms != 0U) {
         if(static_cast<std::int32_t>(millis() - chat_notice_until_ms) >= 0) {
             chat_notice_until_ms = 0;
+            // One more redraw so the bar returns to battery/GPS/radio rather
+            // than holding an expired alert until something else happens.
+            live_data_dirty = true;
             if(std::strncmp(shell_notice, "NEW MESSAGE", 11) == 0) shell_notice[0] = '\0';
         } else if(std::strncmp(shell_notice, "NEW MESSAGE", 11) == 0) {
             theme::rect(bar, 0, 0, theme::screen_width, theme::status_height - 1,
@@ -7459,6 +7462,11 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                         std::snprintf(shell_notice, sizeof(shell_notice),
                                       "NEW MESSAGE FROM %s", from);
                         chat_notice_until_ms = millis() + 12000U;
+                        // Redraw regardless of which screen is up. Settings,
+                        // Help and About are neither time-driven nor covered
+                        // by the live-data refresh, so without this the alert
+                        // would wait for the operator to touch something.
+                        live_data_dirty = true;
                         record_runtime_event(RuntimeEventSeverity::Info,
                                              RuntimeEventType::System,
                                              "Meshtastic text received");
@@ -8507,6 +8515,17 @@ void handle_touch_tap(std::uint16_t x, std::uint16_t y)
         return;
     }
     if(route == ShellRoute::Home) {
+        // The call-sign chip is drawn in the same pink outline as SET and HELP
+        // beside it, so it reads as a button. It now behaves like one: your own
+        // identity opens the device's own status.
+        if (x >= static_cast<std::uint16_t>(kHomeIdX) &&
+            y >= static_cast<std::uint16_t>(kHomeIdY) &&
+            x < static_cast<std::uint16_t>(kHomeIdX + kHomeIdW) &&
+            y < static_cast<std::uint16_t>(kHomeIdY + kHomeIdH)) {
+            (void)app_shell.open(ShellRoute::DeviceStatus);
+            build_current_screen();
+            return;
+        }
         if (x >= static_cast<std::uint16_t>(kHomeGearX) &&
             y >= static_cast<std::uint16_t>(kHomeGearY) &&
             x < static_cast<std::uint16_t>(kHomeGearX + kHomeGearW) &&
@@ -9753,6 +9772,27 @@ bool run_simulator_interaction_test() noexcept
     handle_navigation_key('M');
     if(!expect_simulator_state(app_shell.route() == ShellRoute::Home,
                                "M must return any diagnostic to Home")) return false;
+    // Every outlined chip on Home must do something. The call sign was drawn
+    // in the same pink box as SET and HELP and was inert.
+    // Already on Home here: M toggles, so pressing it again would leave.
+    if(!expect_simulator_state(app_shell.route() == ShellRoute::Home,
+                               "the Home chip test must start on Home")) return false;
+    handle_touch_tap(static_cast<std::uint16_t>(kHomeIdX + 4),
+                     static_cast<std::uint16_t>(kHomeIdY + 4));
+    if(!expect_simulator_state(app_shell.route() == ShellRoute::DeviceStatus,
+                               "the Home call-sign chip must open Device Status")) return false;
+    handle_navigation_key('M');
+    handle_touch_tap(static_cast<std::uint16_t>(kHomeHelpX + 4),
+                     static_cast<std::uint16_t>(kHomeHelpY + 4));
+    if(!expect_simulator_state(app_shell.route() == ShellRoute::Help,
+                               "the Home HELP chip must open Help")) return false;
+    handle_navigation_key('M');
+    handle_touch_tap(static_cast<std::uint16_t>(kHomeGearX + 4),
+                     static_cast<std::uint16_t>(kHomeGearY + 4));
+    if(!expect_simulator_state(app_shell.route() == ShellRoute::Settings,
+                               "the Home SET chip must open Settings")) return false;
+    handle_navigation_key('M');
+
     handle_navigation_key('8');
     if(!expect_simulator_state(app_shell.route() == ShellRoute::Settings,
                                "8 must open Settings")) return false;
