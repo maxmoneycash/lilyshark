@@ -88,3 +88,48 @@ heard anything, and its receive counter stayed at zero forever.
 
 `test/radio_service_integration` now transmits, raises the interrupt the way
 the radio would, and requires the frame to reach the capture sink.
+
+## Taking the map somewhere new
+
+The firmware carries imagery for one baked location. Away from it the map falls
+back to a drawn field chart. A microSD card fixes that for good:
+
+```sh
+# See what it would cost before downloading anything.
+python3 scripts/build_map_card.py --lat 38.3996 --lon -122.5795 \
+    --radius-km 1 --min-zoom 12 --max-zoom 20 --out /tmp/mapcard --dry-run
+
+# Build it, then copy the directory to the card root as /maps.
+python3 scripts/build_map_card.py --lat 38.3996 --lon -122.5795 \
+    --radius-km 1 --min-zoom 12 --max-zoom 20 --out /tmp/mapcard
+```
+
+Card tiles sit on the Web Mercator pixel grid — tile `(i, j)` at zoom `z` is
+exactly the world pixels `[i*320, i*320+320)` by `[j*204, j*204+204)` — so they
+meet edge to edge with no gaps. Deep zooms cover less ground than shallow ones
+for the same tile budget; the tool prints the actual coverage per zoom and says
+so out loud when `--max-tiles` trimmed it.
+
+The card outranks the baked tiles wherever it has a tile for the view.
+
+## Map controls
+
+- **Trackball**: roll to pan, click to snap back to where you are standing.
+- **`+` / `-`**: zoom. Also the on-screen chips.
+- **`I` / `D` / `G`**: satellite imagery, dark map, drawn chart.
+- **Drag**: pans, same as the trackball, but a fingertip covers about 40 px of a
+  320 px panel — at deep zoom that is most of the gap between two operators
+  standing together, so the trackball is the more precise of the two.
+
+## Alerts
+
+- A message arriving raises a banner across the status bar for twelve seconds
+  **and** plays a rising two-tone through the speaker.
+- A node heard for the first time announces `<NAME> IS ON THE MESH` and plays
+  two short low blips — quieter than a message, because it is not addressed to
+  you.
+- The nodes list colours the `LAST` column by how long ago the node was heard:
+  green within five minutes, amber out to thirty, red beyond. That is the
+  question the list exists to answer.
+- Conversations are saved to NVS and survive a power cycle. The write is
+  debounced by fifteen seconds so a busy channel does not chew through flash.

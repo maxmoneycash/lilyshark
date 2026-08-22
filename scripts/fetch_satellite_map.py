@@ -95,12 +95,21 @@ def fetch_tile(source, zoom, x, y, cache_dir, mode="RGB"):
     return Image.open(path).convert(mode)
 
 
-def composite(lat, lon, width, height, zoom, cache_dir, source, mode="RGB"):
-    cx, cy = deg_to_tile(lat, lon, zoom)
-    center_px = cx * TILE_SIZE
-    center_py = cy * TILE_SIZE
-    left = int(math.floor(center_px - width / 2.0))
-    top = int(math.floor(center_py - height / 2.0))
+def composite(lat, lon, width, height, zoom, cache_dir, source, mode="RGB", origin=None):
+    """Render a width x height patch of `source`.
+
+    Centred on lat/lon by default. Pass `origin` as a (left, top) world-pixel
+    corner to render an exact patch of the Web Mercator grid instead -- that is
+    what the microSD tile pyramid needs, since its tiles must line up edge to
+    edge rather than each being centred on somewhere.
+    """
+    if origin is None:
+        cx, cy = deg_to_tile(lat, lon, zoom)
+        left = int(math.floor(cx * TILE_SIZE - width / 2.0))
+        top = int(math.floor(cy * TILE_SIZE - height / 2.0))
+    else:
+        left = int(origin[0])
+        top = int(origin[1])
     right = left + width
     bottom = top + height
     x0 = int(math.floor(left / float(TILE_SIZE)))
@@ -263,6 +272,39 @@ def to_rgb565(image):
     return bytes(out)
 
 
+def render_view(lat, lon, width, height, zoom, cache, style, origin=None):
+    """The finished picture: imagery under hillshade, contours, and labels."""
+    dark = style == "dark"
+    if dark:
+        image = composite(lat, lon, width, height, zoom, cache, "dark", origin=origin)
+    else:
+        imagery = composite(lat, lon, width, height, zoom, cache, "imagery", origin=origin)
+        hillshade = composite(lat, lon, width, height, zoom, cache, "hillshade", origin=origin)
+        image = punch_imagery(blend_hillshade(imagery, hillshade))
+    # Terrarium elevation stops at z15, so deeper views upsample it.
+    elev_zoom = zoom if zoom <= 15 else 15
+    if elev_zoom == zoom:
+        terrain = composite(lat, lon, width, height, zoom, cache, "terrarium", origin=origin)
+    else:
+        factor = 2 ** (zoom - elev_zoom)
+        src_w = max(1, int(round(width / float(factor))))
+        src_h = max(1, int(round(height / float(factor))))
+        low = None
+        if origin is not None:
+            low = (int(math.floor(origin[0] / float(factor))),
+                   int(math.floor(origin[1] / float(factor))))
+        terrain = composite(
+            lat, lon, src_w, src_h, elev_zoom, cache, "terrarium", origin=low
+        ).resize((width, height), Image.BILINEAR)
+    draw_contours(image, terrarium_elevation(terrain), contour_interval(zoom), dark)
+    if not dark:
+        labels = composite(
+            lat, lon, width, height, zoom, cache, "labels", "RGBA", origin=origin
+        )
+        image = overlay_labels(image, labels)
+    return image
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lat", type=float, required=True)
@@ -284,44 +326,9 @@ def main():
         "a georeferenced field chart instead of a black radar plot."
     )
     args = parser.parse_args()
-    dark = args.style == "dark"
-    if dark:
-        image = composite(
-            args.lat, args.lon, args.width, args.height, args.zoom, args.cache, "dark"
-        )
-    else:
-        imagery = composite(
-            args.lat, args.lon, args.width, args.height, args.zoom, args.cache, "imagery"
-        )
-        hillshade = composite(
-            args.lat, args.lon, args.width, args.height, args.zoom, args.cache, "hillshade"
-        )
-        image = punch_imagery(blend_hillshade(imagery, hillshade))
-    elev_zoom = args.zoom if args.zoom <= 15 else 15
-    if elev_zoom == args.zoom:
-        terrain = composite(
-            args.lat, args.lon, args.width, args.height, args.zoom, args.cache, "terrarium"
-        )
-    else:
-        factor = 2 ** (args.zoom - elev_zoom)
-        src_w = max(1, int(round(args.width / float(factor))))
-        src_h = max(1, int(round(args.height / float(factor))))
-        terrain = composite(
-            args.lat, args.lon, src_w, src_h, elev_zoom, args.cache, "terrarium"
-        ).resize((args.width, args.height), Image.BILINEAR)
-    draw_contours(image, terrarium_elevation(terrain), contour_interval(args.zoom), dark)
-    if not dark:
-        labels = composite(
-            args.lat,
-            args.lon,
-            args.width,
-            args.height,
-            args.zoom,
-            args.cache,
-            "labels",
-            "RGBA",
-        )
-        image = overlay_labels(image, labels)
+    image = render_view(
+        args.lat, args.lon, args.width, args.height, args.zoom, args.cache, args.style
+    )
     payload = to_rgb565(image)
     parent = os.path.dirname(os.path.abspath(args.out))
     if parent:

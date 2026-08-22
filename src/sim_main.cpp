@@ -3,6 +3,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#if !defined(ESP_PLATFORM)
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <cstring>
 
 #if defined(LILYSHARK_DEVICE)
@@ -53,6 +57,7 @@
 #include "lilyshark/core/runtime_event_history.h"
 #include "lilyshark/core/survey_accumulator.h"
 #include "lilyshark/device/hardware_status.h"
+#include "lilyshark/device/tdeck_chime.h"
 #include "lilyshark/device/radio_service.h"
 #include "lilyshark/device/screenshot.h"
 #include "lilyshark/device/tdeck_display_init.h"
@@ -429,6 +434,12 @@ struct ChatPeer {
     char name[12] = "EVERYONE";
     std::uint8_t unread = 0;
 };
+// The log lives in RAM, so a power cycle used to wipe the conversation. NVS is
+// flash with a finite write budget, so saving is debounced rather than done on
+// every line that arrives.
+constexpr std::uint32_t kChatSaveDebounceMs = 15000U;
+bool chat_log_dirty = false;
+std::uint32_t chat_log_save_due_ms = 0;
 ChatLine chat_log[kChatLogCapacity]{};
 std::size_t chat_log_count = 0;
 std::size_t chat_log_start = 0;
@@ -710,6 +721,46 @@ void chat_clear_peer_unread(std::uint32_t peer) noexcept
     chat_sync_unread();
 }
 
+struct ChatArchiveHeader {
+    std::uint32_t magic;
+    std::uint16_t version;
+    std::uint16_t count;
+    std::uint16_t start;
+    std::uint16_t reserved;
+};
+constexpr std::uint32_t kChatArchiveMagic = 0x4C534348UL;  // "LSCH"
+constexpr std::uint16_t kChatArchiveVersion = 1U;
+constexpr std::size_t kChatArchiveSize = sizeof(ChatArchiveHeader) + sizeof(chat_log);
+
+/// The log as bytes. Kept apart from the NVS call so the round trip can be
+/// exercised on the host, where there is no NVS to exercise it against.
+std::size_t encode_chat_archive(std::uint8_t *bytes, std::size_t capacity) noexcept
+{
+    if(bytes == nullptr || capacity < kChatArchiveSize) return 0;
+    ChatArchiveHeader header{};
+    header.magic = kChatArchiveMagic;
+    header.version = kChatArchiveVersion;
+    header.count = static_cast<std::uint16_t>(chat_log_count);
+    header.start = static_cast<std::uint16_t>(chat_log_start);
+    header.reserved = 0U;
+    std::memcpy(bytes, &header, sizeof(header));
+    std::memcpy(bytes + sizeof(header), chat_log, sizeof(chat_log));
+    return kChatArchiveSize;
+}
+
+bool decode_chat_archive(const std::uint8_t *bytes, std::size_t size) noexcept
+{
+    if(bytes == nullptr || size != kChatArchiveSize) return false;
+    ChatArchiveHeader header{};
+    std::memcpy(&header, bytes, sizeof(header));
+    if(header.magic != kChatArchiveMagic || header.version != kChatArchiveVersion) return false;
+    if(header.count > kChatLogCapacity || header.start >= kChatLogCapacity) return false;
+    std::memcpy(chat_log, bytes + sizeof(header), sizeof(chat_log));
+    chat_log_count = header.count;
+    chat_log_start = header.start;
+    return true;
+}
+
 void chat_push(const char *from, const char *text, bool mine,
                std::uint32_t peer = 0xffffffffU, const char *when = nullptr) noexcept
 {
@@ -730,6 +781,10 @@ void chat_push(const char *from, const char *text, bool mine,
     } else {
         chat_log_start = (chat_log_start + 1U) % kChatLogCapacity;
     }
+#if defined(LILYSHARK_DEVICE)
+    chat_log_dirty = true;
+    chat_log_save_due_ms = millis() + kChatSaveDebounceMs;
+#endif
     if (!mine && peer != 0U && peer != 0xffffffffU) {
         chat_remember_peer(peer, from);
     }
@@ -2086,6 +2141,128 @@ void blit_map_tile(const std::uint16_t *src, std::uint16_t *dest, int offset_x,
     }
 }
 
+// A microSD tile pyramid, so the map works away from the baked location.
+//
+// Tiles baked into flash cover one spot. Drive out of it and the imagery is
+// gone, and putting it back means a rebuild and a reflash. Card tiles are laid
+// out on the Web Mercator pixel grid instead: tile (i, j) at zoom z is exactly
+// the world pixels [i*320, i*320+320) by [j*204, j*204+204), so they tile the
+// plane with no gaps and no overlap. The 0.001-degree cell scheme cannot do
+// that -- a cell is 55 m by 87 m while a z20 tile spans only 37 m, so at deep
+// zoom neighbouring cells fall short of each other and leave holes.
+constexpr double kMapBasePx = 256.0;
+
+double map_world_span_px(int zoom) noexcept
+{
+    return kMapBasePx * static_cast<double>(1UL << static_cast<unsigned>(zoom));
+}
+
+double map_world_px_x(double longitude_degrees, int zoom) noexcept
+{
+    return (longitude_degrees + 180.0) / 360.0 * map_world_span_px(zoom);
+}
+
+double map_world_px_y(double latitude_degrees, int zoom) noexcept
+{
+    const double sine = std::sin(latitude_degrees * 0.017453292519943295);
+    const double clamped = sine > 0.9999 ? 0.9999 : (sine < -0.9999 ? -0.9999 : sine);
+    return (0.5 - std::log((1.0 + clamped) / (1.0 - clamped)) /
+                     (4.0 * 3.14159265358979323846)) *
+           map_world_span_px(zoom);
+}
+
+// Where the card is mounted on device. On the host the same layout lives in
+// the working tree, so the arithmetic can be exercised without a card.
+#if defined(ESP_PLATFORM)
+constexpr const char *kMapCardRoot = "/maps";
+#else
+constexpr const char *kMapCardRoot = "assets/maps/card";
+#endif
+
+double map_lon_at_world_px(double px, int zoom) noexcept
+{
+    return px / map_world_span_px(zoom) * 360.0 - 180.0;
+}
+
+double map_lat_at_world_px(double py, int zoom) noexcept
+{
+    const double n = 3.14159265358979323846 * (1.0 - 2.0 * py / map_world_span_px(zoom));
+    return std::atan(std::sinh(n)) * 57.29577951308232;
+}
+
+/// Which card tiles cover this view, and where the first one lands. Split out
+/// from the blit so the arithmetic is testable with no card present -- getting
+/// an offset sign wrong here is exactly what put the imagery off screen before.
+struct MapCardPlacement {
+    long first_x = 0;
+    long last_x = 0;
+    long first_y = 0;
+    long last_y = 0;
+    int offset_x = 0;
+    int offset_y = 0;
+};
+
+MapCardPlacement map_card_placement(double latitude_degrees, double longitude_degrees,
+                                    int zoom) noexcept
+{
+    const double left_px = map_world_px_x(longitude_degrees, zoom) -
+                           static_cast<double>(kSatelliteWidth) / 2.0;
+    const double top_px = map_world_px_y(latitude_degrees, zoom) -
+                          static_cast<double>(kSatelliteHeight) / 2.0;
+    MapCardPlacement placement{};
+    placement.first_x = static_cast<long>(std::floor(left_px / kSatelliteWidth));
+    placement.last_x = static_cast<long>(
+        std::floor((left_px + kSatelliteWidth - 1.0) / kSatelliteWidth));
+    placement.first_y = static_cast<long>(std::floor(top_px / kSatelliteHeight));
+    placement.last_y = static_cast<long>(
+        std::floor((top_px + kSatelliteHeight - 1.0) / kSatelliteHeight));
+    placement.offset_x = static_cast<int>(
+        std::lround(static_cast<double>(placement.first_x) * kSatelliteWidth - left_px));
+    placement.offset_y = static_cast<int>(
+        std::lround(static_cast<double>(placement.first_y) * kSatelliteHeight - top_px));
+    return placement;
+}
+
+bool load_map_grid_tile(int zoom, long tile_x, long tile_y, std::uint16_t *dest) noexcept
+{
+    const char *kind = map_satellite ? "sat" : "dark";
+    char path[128]{};
+    std::snprintf(path, sizeof(path), "%s/%s/z%d/%ld_%ld.rgb565", kMapCardRoot, kind,
+                  zoom, tile_x, tile_y);
+    return load_map_pixels_from_file(path, dest);
+}
+
+/// Paint whatever the card holds for this view. True if any tile landed;
+/// missing neighbours leave the chart underneath showing, which is what you
+/// want at the edge of the area you prepared rather than a black band.
+bool blit_map_card(std::uint16_t *pixels, std::uint16_t *scratch,
+                   double latitude_degrees, double longitude_degrees, int zoom,
+                   bool *fully_covered = nullptr) noexcept
+{
+    if (fully_covered != nullptr) *fully_covered = false;
+    if (pixels == nullptr || scratch == nullptr) return false;
+    const MapCardPlacement placement =
+        map_card_placement(latitude_degrees, longitude_degrees, zoom);
+    long wanted = 0;
+    long loaded = 0;
+    for (long tile_y = placement.first_y; tile_y <= placement.last_y; ++tile_y) {
+        for (long tile_x = placement.first_x; tile_x <= placement.last_x; ++tile_x) {
+            ++wanted;
+            if (!load_map_grid_tile(zoom, tile_x, tile_y, scratch)) continue;
+            ++loaded;
+            const int offset_x =
+                placement.offset_x +
+                static_cast<int>(tile_x - placement.first_x) * kSatelliteWidth;
+            const int offset_y =
+                placement.offset_y +
+                static_cast<int>(tile_y - placement.first_y) * kSatelliteHeight;
+            blit_map_tile(scratch, pixels, offset_x, offset_y);
+        }
+    }
+    if (fully_covered != nullptr) *fully_covered = loaded == wanted && wanted > 0;
+    return loaded > 0;
+}
+
 bool try_load_map_cell(double cell_lat, double cell_lon, std::uint16_t *dest) noexcept
 {
     if (dest == nullptr) return false;
@@ -2186,7 +2363,7 @@ bool fetch_map_cell(double cell_lat, double cell_lon, std::uint16_t *dest) noexc
 /// tile wide enough to contain the view, then magnifies it into place. Coarser
 /// means blurrier, never blank.
 bool blit_baked_coverage(std::uint16_t *pixels, double view_lat, double view_lon,
-                         double mpp) noexcept
+                         double mpp, int *used_zoom = nullptr) noexcept
 {
     if (pixels == nullptr || !::lilyshark::hasBakedMapTiles()) return false;
     const char *kind = map_chart ? "cht" : (map_satellite ? "sat" : "dark");
@@ -2214,25 +2391,33 @@ bool blit_baked_coverage(std::uint16_t *pixels, double view_lat, double view_lon
         if (std::fabs(de) + view_half_w > tile_half_w) continue;
         if (std::fabs(dn) + view_half_h > tile_half_h) continue;
 
+        // The source column for a screen column does not depend on the row.
+        // Computed per pixel this was 65 280 double divisions and lrounds a
+        // frame, on a chip with no hardware double; per axis it is 524.
+        std::array<int, static_cast<std::size_t>(kSatelliteWidth)> source_x{};
+        for (lv_coord_t x = 0; x < kSatelliteWidth; ++x) {
+            const double east_m =
+                (static_cast<double>(x) - static_cast<double>(kSatelliteWidth) * 0.5) * mpp;
+            source_x[static_cast<std::size_t>(x)] = static_cast<int>(std::lround(
+                static_cast<double>(kSatelliteWidth) * 0.5 + (east_m - de) / tile_mpp));
+        }
         for (lv_coord_t y = 0; y < kSatelliteHeight; ++y) {
-            // Ground metres north of the view centre for this screen row.
             const double north_m = (static_cast<double>(kSatelliteHeight) * 0.5 -
                                     static_cast<double>(y)) * mpp;
             const int sy = static_cast<int>(std::lround(
                 static_cast<double>(kSatelliteHeight) * 0.5 - (north_m - dn) / tile_mpp));
             if (sy < 0 || sy >= kSatelliteHeight) continue;
+            const std::uint16_t *source_row =
+                tile + static_cast<std::size_t>(sy) * kSatelliteWidth;
+            std::uint16_t *dest_row = pixels + static_cast<std::size_t>(y) * kSatelliteWidth;
             for (lv_coord_t x = 0; x < kSatelliteWidth; ++x) {
-                const double east_m = (static_cast<double>(x) -
-                                       static_cast<double>(kSatelliteWidth) * 0.5) * mpp;
-                const int sx = static_cast<int>(std::lround(
-                    static_cast<double>(kSatelliteWidth) * 0.5 + (east_m - de) / tile_mpp));
+                const int sx = source_x[static_cast<std::size_t>(x)];
                 if (sx < 0 || sx >= kSatelliteWidth) continue;
-                pixels[static_cast<std::size_t>(y) * kSatelliteWidth +
-                       static_cast<std::size_t>(x)] =
-                    tile[static_cast<std::size_t>(sy) * kSatelliteWidth +
-                         static_cast<std::size_t>(sx)];
+                dest_row[static_cast<std::size_t>(x)] =
+                    source_row[static_cast<std::size_t>(sx)];
             }
         }
+        if (used_zoom != nullptr) *used_zoom = zoom;
         return true;
     }
     return false;
@@ -2255,10 +2440,10 @@ bool ensure_field_map(double latitude_degrees, double longitude_degrees) noexcep
         return map_using_imagery;
     }
 
-    paint_field_pixels(pixels, latitude_degrees, longitude_degrees, mpp);
     map_using_imagery = false;
     map_imagery_edge = false;
     if (map_chart) {
+        paint_field_pixels(pixels, latitude_degrees, longitude_degrees, mpp);
         std::snprintf(satellite_cache_key, sizeof(satellite_cache_key), "%s", key);
         satellite_ready = true;
         return false;
@@ -2268,6 +2453,7 @@ bool ensure_field_map(double latitude_degrees, double longitude_degrees) noexcep
     const double cell_lon = map_cell_coord(longitude_degrees);
     std::uint16_t *scratch = satellite_scratch_ptr();
     if (scratch == nullptr) {
+        paint_field_pixels(pixels, latitude_degrees, longitude_degrees, mpp);
         if (try_load_map_cell(cell_lat, cell_lon, pixels) ||
             fetch_map_cell(cell_lat, cell_lon, pixels)) {
             map_using_imagery = true;
@@ -2277,16 +2463,66 @@ bool ensure_field_map(double latitude_degrees, double longitude_degrees) noexcep
         return map_using_imagery;
     }
 
+    // Imagery that covers the whole frame is tried before anything is drawn.
+    // The field chart underneath is a 320x204 pass of layered value noise in
+    // double precision, and the ESP32-S3 has no hardware for doubles -- around
+    // a quarter of a million emulated float operations. Painting it beneath
+    // imagery that hides every pixel of it was the most expensive thing a
+    // redraw did, and a redraw happens on every tap, zoom step and pan. That
+    // is the whole of the "the map is laggy when I press the buttons".
+    //
+    // The card outranks flash: it is the only imagery that follows you off the
+    // baked spot.
+    bool card_covered_everything = false;
+    if (blit_map_card(pixels, scratch, latitude_degrees, longitude_degrees, map_zoom,
+                      &card_covered_everything) &&
+        card_covered_everything) {
+        map_using_imagery = true;
+        std::snprintf(satellite_cache_key, sizeof(satellite_cache_key), "%s", key);
+        satellite_ready = true;
+        return true;
+    }
+#if defined(LILYSHARK_DEVICE)
+    {
+        int covered_zoom = 0;
+        if (blit_baked_coverage(pixels, latitude_degrees, longitude_degrees, mpp,
+                                &covered_zoom)) {
+            map_using_imagery = true;
+            // Only an edge if it had to reach for a coarser tile to fill the view.
+            map_imagery_edge = covered_zoom != map_zoom;
+            std::snprintf(satellite_cache_key, sizeof(satellite_cache_key), "%s", key);
+            satellite_ready = true;
+            return true;
+        }
+    }
+#endif
+
+    // Nothing covers the whole frame, so the chart earns its cost here.
+    paint_field_pixels(pixels, latitude_degrees, longitude_degrees, mpp);
+    if (blit_map_card(pixels, scratch, latitude_degrees, longitude_degrees, map_zoom,
+                      nullptr)) {
+        map_using_imagery = true;
+        map_imagery_edge = true;
+    }
+
     if (!try_load_map_cell(cell_lat, cell_lon, scratch)) {
         (void)fetch_map_cell(cell_lat, cell_lon, scratch);
     }
 
     const auto blit_cell = [&](double tlat, double tlon) noexcept {
-        if (!try_load_map_cell(tlat, tlon, scratch)) return;
+        // Where it lands first, and only then whether to pay for it. Loading a
+        // cell can magnify a whole 320x204 tile, and at deep zoom every one of
+        // the eight neighbours is off screen -- cells sit 55 m to 87 m apart
+        // while the screen spans 37 m. Deciding after the fact meant eight
+        // full-frame magnifies and eight full-frame blits per redraw, all of
+        // it painting nothing, on every single tap.
         const int offset_x = static_cast<int>(std::lround(
             ((tlon - longitude_degrees) * m_per_lon) / mpp));
         const int offset_y = static_cast<int>(std::lround(
             ((latitude_degrees - tlat) * 110540.0) / mpp));
+        if (offset_x <= -kSatelliteWidth || offset_x >= kSatelliteWidth) return;
+        if (offset_y <= -kSatelliteHeight || offset_y >= kSatelliteHeight) return;
+        if (!try_load_map_cell(tlat, tlon, scratch)) return;
         blit_map_tile(scratch, pixels, offset_x, offset_y);
         map_using_imagery = true;
         if (offset_x != 0 || offset_y != 0) map_imagery_edge = true;
@@ -2306,14 +2542,6 @@ bool ensure_field_map(double latitude_degrees, double longitude_degrees) noexcep
     blit_cell(::lilyshark::bakedMapTileLat(), ::lilyshark::bakedMapTileLon());
 #endif
     blit_cell(cell_lat, cell_lon);
-
-#if defined(LILYSHARK_DEVICE)
-    if (!map_using_imagery &&
-        blit_baked_coverage(pixels, latitude_degrees, longitude_degrees, mpp)) {
-        map_using_imagery = true;
-        map_imagery_edge = true;
-    }
-#endif
 
     std::snprintf(satellite_cache_key, sizeof(satellite_cache_key), "%s", key);
     satellite_ready = true;
@@ -2725,6 +2953,16 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
     }
 }
 
+/// How long since a node was heard, as a colour. Whether a neighbour is still
+/// in range is the question the nodes list exists to answer, and an age in
+/// muted grey only answers it if you stop and read the number.
+lv_color_t node_age_color_seconds(std::uint64_t age_seconds) noexcept
+{
+    if (age_seconds < 300ULL) return theme::lime();
+    if (age_seconds < 1800ULL) return theme::amber();
+    return theme::fault();
+}
+
 #if defined(LILYSHARK_DEVICE)
 void format_node(char *output, std::size_t capacity, const DecodedPacket &packet,
                  DecodedField field) noexcept
@@ -3000,6 +3238,13 @@ bool select_current_node_for_detail() noexcept
     node_detail_id = node.id;
     node_detail_selection_valid = true;
     return true;
+}
+
+lv_color_t node_age_color(std::uint64_t timestamp_us) noexcept
+{
+    const std::uint64_t now_us = static_cast<std::uint64_t>(esp_timer_get_time());
+    return node_age_color_seconds(
+        now_us > timestamp_us ? (now_us - timestamp_us) / 1000000ULL : 0);
 }
 
 void format_age(char *output, std::size_t capacity, std::uint64_t timestamp_us) noexcept
@@ -3711,7 +3956,7 @@ void build_nodes(lv_obj_t * parent)
         put_label(parent, home_protocol_tag(live_nodes[node_index].protocol), 88, y,
                   selected ? theme::pink() : theme::cyan(), &font_mono_10);
         put_label(parent, age, 146, y,
-                  selected ? theme::text() : theme::text_muted(), &font_mono_10);
+                  node_age_color(live_nodes[node_index].last_seen_us), &font_mono_10);
         put_label(parent, snr, 190, y,
                   selected ? theme::pink() : theme::lime(), &font_mono_10);
         if (live_nodes[node_index].has_position) {
@@ -3766,8 +4011,8 @@ void build_nodes(lv_obj_t * parent)
                           value_color, &font_mono_10);
         put_label(parent, simulator_protocol_label(node.protocol), 88, y,
                   selected ? theme::pink() : theme::cyan(), &font_mono_10);
-        put_label(parent, age, 146, y,
-                  selected ? theme::text() : theme::text_muted(), &font_mono_10);
+        put_label(parent, age, 146, y, node_age_color_seconds(node.last_seen_seconds),
+                  &font_mono_10);
         put_label(parent, snr, 190, y,
                   selected ? theme::pink() : theme::lime(), &font_mono_10);
         double pin_lat = 0.0;
@@ -7612,6 +7857,7 @@ bool announce_new_node(std::uint32_t id, const char *name) noexcept
     }
     chat_notice_until_ms = millis() + 12000U;
     live_data_dirty = true;
+    ::lilyshark::playNodeChime();
     record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
                          "New node heard");
     return true;
@@ -7677,6 +7923,9 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                         std::snprintf(shell_notice, sizeof(shell_notice),
                                       "NEW MESSAGE FROM %s", from);
                         chat_notice_until_ms = millis() + 12000U;
+                        // A banner only works if someone is looking. In the
+                        // field the deck is usually in a pocket.
+                        ::lilyshark::playMessageChime();
                         // Redraw regardless of which screen is up. Settings,
                         // Help and About are neither time-driven nor covered
                         // by the live-data refresh, so without this the alert
@@ -7894,6 +8143,35 @@ bool load_app_settings() noexcept
         return false;
     }
     app_settings = candidate;
+    return true;
+}
+
+bool write_chat_log() noexcept
+{
+    if(!ensure_preferences_ready()) return false;
+    // Static rather than automatic: two and a half kilobytes is more stack
+    // than the loop task has to spare.
+    static std::uint8_t bytes[kChatArchiveSize]{};
+    if(encode_chat_archive(bytes, sizeof(bytes)) != sizeof(bytes)) return false;
+    return profile_preferences.putBytes("chat", bytes, sizeof(bytes)) == sizeof(bytes);
+}
+
+bool load_chat_log() noexcept
+{
+    if(!ensure_preferences_ready()) return false;
+    if(profile_preferences.getBytesLength("chat") != kChatArchiveSize) return false;
+    static std::uint8_t bytes[kChatArchiveSize]{};
+    if(profile_preferences.getBytes("chat", bytes, sizeof(bytes)) != sizeof(bytes)) return false;
+    if(!decode_chat_archive(bytes, sizeof(bytes))) return false;
+    // The thread list is rebuilt from the lines rather than stored twice, so
+    // there is no second copy to fall out of step with them.
+    for(std::size_t index = 0; index < chat_log_count; ++index) {
+        const ChatLine &line = chat_log[(chat_log_start + index) % kChatLogCapacity];
+        if(!line.mine && line.peer != 0U && line.peer != 0xffffffffU) {
+            chat_remember_peer(line.peer, line.from);
+        }
+    }
+    chat_log_dirty = false;
     return true;
 }
 
@@ -9355,7 +9633,10 @@ void handle_navigation_key(uint32_t key)
     if (current_screen == Screen::map && app_shell.route() == ShellRoute::Analyzer &&
         (key == '+' || key == '=' || key == '-' ||
          key == 'i' || key == 'I' || key == 'd' || key == 'D' ||
-         key == 'g' || key == 'G')) {
+         key == 'g' || key == 'G' ||
+         key == LV_KEY_UP || key == LV_KEY_DOWN ||
+         key == LV_KEY_LEFT || key == LV_KEY_RIGHT ||
+         (key == LV_KEY_ENTER && map_panned && !map_popup.open))) {
         bool changed = false;
         if ((key == '+' || key == '=') && map_zoom < kMapZoomMax) {
             ++map_zoom;
@@ -9369,6 +9650,38 @@ void handle_navigation_key(uint32_t key)
             changed = apply_map_layer(false, false);
         } else if (key == 'g' || key == 'G') {
             changed = apply_map_layer(false, true);
+        } else if (key == LV_KEY_UP || key == LV_KEY_DOWN || key == LV_KEY_LEFT ||
+                   key == LV_KEY_RIGHT) {
+            // The trackball is the precise pointer on this device. A fingertip
+            // covers about 40 px of a 320 px panel, which at deep zoom is most
+            // of the gap between two operators standing together, so rolling
+            // beats dragging for looking around without losing the dot you
+            // were aiming at.
+            constexpr int kMapKeyPanPx = 32;
+            // Scale the step by the latitude the map was last drawn at, so a
+            // detent moves the same number of pixels wherever you are.
+            const double mpp = map_meters_per_pixel(
+                map_last_origin_valid ? map_last_origin_lat : 37.775);
+            const double step = static_cast<double>(kMapKeyPanPx) * mpp;
+            if (key == LV_KEY_LEFT) {
+                map_pan_east_m -= step;
+            } else if (key == LV_KEY_RIGHT) {
+                map_pan_east_m += step;
+            } else if (key == LV_KEY_UP) {
+                map_pan_north_m += step;
+            } else {
+                map_pan_north_m -= step;
+            }
+            map_panned = true;
+            map_popup.open = false;
+            changed = true;
+        } else if (key == LV_KEY_ENTER) {
+            // Clicking the trackball is the way back: one press returns the
+            // view to where you are standing.
+            map_pan_east_m = 0.0;
+            map_pan_north_m = 0.0;
+            map_panned = false;
+            changed = true;
         }
         if (changed) build_current_screen();
         return;
@@ -10388,6 +10701,190 @@ bool run_simulator_interaction_test() noexcept
     handle_navigation_key('I');
     if(!expect_simulator_state(map_satellite && !map_chart,
                                "Map I must select SAT imagery")) return false;
+
+    // Card tiles are the only imagery that follows the operator off the baked
+    // spot, so assert the grid arithmetic rather than eyeball it. An offset
+    // sign error here is exactly what put the imagery 391 px off screen.
+    {
+        constexpr int card_zoom = 20;
+        const MapCardPlacement here = map_card_placement(38.399649, -122.579476, card_zoom);
+        const double centre_x = (static_cast<double>(here.first_x) + 0.5) *
+                                static_cast<double>(kSatelliteWidth);
+        const double centre_y = (static_cast<double>(here.first_y) + 0.5) *
+                                static_cast<double>(kSatelliteHeight);
+        const double centre_lon = map_lon_at_world_px(centre_x, card_zoom);
+        const double centre_lat = map_lat_at_world_px(centre_y, card_zoom);
+        const MapCardPlacement centred =
+            map_card_placement(centre_lat, centre_lon, card_zoom);
+        if(!expect_simulator_state(centred.first_x == here.first_x &&
+                                       centred.last_x == here.first_x &&
+                                       centred.first_y == here.first_y &&
+                                       centred.last_y == here.first_y,
+                                   "a view on a card tile centre must need only that tile")) return false;
+        if(!expect_simulator_state(centred.offset_x == 0 && centred.offset_y == 0,
+                                   "a card tile centred under the view must land at zero offset")) return false;
+        const double shifted_lon = map_lon_at_world_px(
+            centre_x + static_cast<double>(kSatelliteWidth) / 2.0, card_zoom);
+        const MapCardPlacement shifted =
+            map_card_placement(centre_lat, shifted_lon, card_zoom);
+        if(!expect_simulator_state(shifted.last_x == shifted.first_x + 1,
+                                   "a half-tile pan must draw two card columns")) return false;
+        if(!expect_simulator_state(shifted.offset_x < 0,
+                                   "the trailing card column must hang off the left edge")) return false;
+    }
+
+#if !defined(ESP_PLATFORM)
+    // End to end over the real file path. The placement maths above can be
+    // right while the naming or the load is wrong, and that combination is
+    // what an operator experiences as "the map is still blank".
+    {
+        const bool saved_satellite = map_satellite;
+        const bool saved_chart = map_chart;
+        const int saved_zoom = map_zoom;
+        const bool saved_bundled_only = map_bundled_tiles_only;
+        map_satellite = true;
+        map_chart = false;
+        map_zoom = 20;
+        map_bundled_tiles_only = true;
+        const MapCardPlacement spot = map_card_placement(38.399649, -122.579467, map_zoom);
+        const double tile_cx = (static_cast<double>(spot.first_x) + 0.5) *
+                               static_cast<double>(kSatelliteWidth);
+        const double tile_cy = (static_cast<double>(spot.first_y) + 0.5) *
+                               static_cast<double>(kSatelliteHeight);
+        const double fixture_lon = map_lon_at_world_px(tile_cx, map_zoom);
+        const double fixture_lat = map_lat_at_world_px(tile_cy, map_zoom);
+        char kind_dir[192]{};
+        std::snprintf(kind_dir, sizeof(kind_dir), "%s/sat", kMapCardRoot);
+        char zoom_dir[208]{};
+        std::snprintf(zoom_dir, sizeof(zoom_dir), "%s/z%d", kind_dir, map_zoom);
+        char path[256]{};
+        std::snprintf(path, sizeof(path), "%s/%ld_%ld.rgb565", zoom_dir, spot.first_x,
+                      spot.first_y);
+        (void)::mkdir(kMapCardRoot, 0755);
+        (void)::mkdir(kind_dir, 0755);
+        (void)::mkdir(zoom_dir, 0755);
+        constexpr std::uint16_t fixture_colour = 0xF81FU;  // magenta appears nowhere else
+        bool wrote_fixture = false;
+        {
+            // Written a row at a time: a whole tile is 128 kB and this runs on
+            // the stack in a test, not in the render path.
+            std::array<std::uint16_t, kSatelliteWidth> row{};
+            row.fill(fixture_colour);
+            FILE *handle = std::fopen(path, "wb");
+            if (handle != nullptr) {
+                wrote_fixture = true;
+                for (lv_coord_t line = 0; line < kSatelliteHeight; ++line) {
+                    if (std::fwrite(row.data(), sizeof(std::uint16_t), row.size(), handle) !=
+                        row.size()) {
+                        wrote_fixture = false;
+                        break;
+                    }
+                }
+                std::fclose(handle);
+            }
+        }
+        bool card_reached_screen = false;
+        if (wrote_fixture) {
+            satellite_ready = false;
+            satellite_cache_key[0] = '\0';
+            const bool imagery = ensure_field_map(fixture_lat, fixture_lon);
+            const std::uint16_t *painted = satellite_pixel_ptr();
+            card_reached_screen =
+                imagery && painted != nullptr &&
+                painted[static_cast<std::size_t>(kSatelliteHeight / 2) * kSatelliteWidth +
+                        static_cast<std::size_t>(kSatelliteWidth / 2)] == fixture_colour;
+            (void)std::remove(path);
+        }
+        (void)::rmdir(zoom_dir);
+        (void)::rmdir(kind_dir);
+        (void)::rmdir(kMapCardRoot);
+        map_satellite = saved_satellite;
+        map_chart = saved_chart;
+        map_zoom = saved_zoom;
+        map_bundled_tiles_only = saved_bundled_only;
+        satellite_ready = false;
+        satellite_cache_key[0] = '\0';
+        if(!expect_simulator_state(wrote_fixture,
+                                   "the card fixture tile must be writable")) return false;
+        if(!expect_simulator_state(card_reached_screen,
+                                   "a card tile on disk must paint the map")) return false;
+    }
+#endif
+
+    // The trackball moves the map. Dragging with a fingertip is imprecise at
+    // deep zoom and hides the screen behind a hand; rolling does neither.
+    {
+        map_pan_east_m = 0.0;
+        map_pan_north_m = 0.0;
+        map_panned = false;
+        map_popup.open = false;
+        handle_navigation_key(LV_KEY_RIGHT);
+        if(!expect_simulator_state(map_panned && map_pan_east_m > 0.0,
+                                   "trackball right must pan the map east")) return false;
+        const double east_after_right = map_pan_east_m;
+        handle_navigation_key(LV_KEY_LEFT);
+        if(!expect_simulator_state(map_pan_east_m < east_after_right,
+                                   "trackball left must pan back the other way")) return false;
+        handle_navigation_key(LV_KEY_UP);
+        if(!expect_simulator_state(map_pan_north_m > 0.0,
+                                   "trackball up must pan the map north")) return false;
+        if(!expect_simulator_state(current_screen == Screen::map,
+                                   "panning must not leave the map")) return false;
+        handle_navigation_key(LV_KEY_ENTER);
+        if(!expect_simulator_state(!map_panned && map_pan_east_m == 0.0 &&
+                                       map_pan_north_m == 0.0,
+                                   "clicking the trackball must return the view to here")) return false;
+    }
+
+    // A conversation has to survive a power cycle. The bytes that go into NVS
+    // are checked here rather than on the device, where a failed round trip
+    // shows up only as an empty chat screen after a reboot with no way to tell
+    // whether it saved wrong or loaded wrong.
+    {
+        const std::size_t saved_count = chat_log_count;
+        const std::size_t saved_start = chat_log_start;
+        static ChatLine saved_lines[kChatLogCapacity]{};
+        std::memcpy(saved_lines, chat_log, sizeof(chat_log));
+
+        chat_log_count = 0;
+        chat_log_start = 0;
+        chat_push("RANGER", "AT THE GATE", false, 0x1234abcdU, "09:14");
+        chat_push("ME", "COPY, TEN MINUTES", true, 0x1234abcdU, "09:15");
+        const std::size_t pushed = chat_log_count;
+
+        static std::uint8_t archive[kChatArchiveSize]{};
+        const std::size_t encoded = encode_chat_archive(archive, sizeof(archive));
+
+        chat_log_count = 0;
+        chat_log_start = 0;
+        std::memset(chat_log, 0, sizeof(chat_log));
+        const bool decoded = decode_chat_archive(archive, sizeof(archive));
+
+        const bool restored =
+            decoded && chat_log_count == pushed &&
+            std::strcmp(chat_log[0].from, "RANGER") == 0 &&
+            std::strcmp(chat_log[0].text, "AT THE GATE") == 0 &&
+            chat_log[0].peer == 0x1234abcdU && !chat_log[0].mine &&
+            std::strcmp(chat_log[1].text, "COPY, TEN MINUTES") == 0 && chat_log[1].mine;
+
+        // A truncated or foreign blob must be refused, not half-applied.
+        const bool rejects_short = !decode_chat_archive(archive, sizeof(archive) - 1U);
+        archive[0] ^= 0xFFU;
+        const bool rejects_foreign = !decode_chat_archive(archive, sizeof(archive));
+
+        chat_log_count = saved_count;
+        chat_log_start = saved_start;
+        std::memcpy(chat_log, saved_lines, sizeof(chat_log));
+
+        if(!expect_simulator_state(encoded == kChatArchiveSize,
+                                   "the chat archive must encode to its full size")) return false;
+        if(!expect_simulator_state(restored,
+                                   "a saved chat log must come back line for line")) return false;
+        if(!expect_simulator_state(rejects_short,
+                                   "a truncated chat archive must be refused")) return false;
+        if(!expect_simulator_state(rejects_foreign,
+                                   "a chat archive with a foreign magic must be refused")) return false;
+    }
     // Peers sit hundreds of metres out, so at close zoom they are legitimately
     // off screen. Zoom out until at least one is plotted before testing taps.
     int map_node_hit = -1;
@@ -10714,7 +11211,7 @@ bool run_simulator_render_test() noexcept
     map_bundled_tiles_only = true;
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0x828b667afee2650bULL, 0x10b28279c7d286e0ULL, 0x1ee0a49f124aae4cULL,
-        0x1d5dbffece45216fULL, 0x347df7d2e0f891ebULL, 0xf21948c5cd52ba19ULL,
+        0x1d5dbffece45216fULL, 0x347df7d2e0f891ebULL, 0xf491645734525017ULL,
         0x21555e1c8309998cULL, 0xff854a52e9cc13ccULL, 0x79cb57dec8a26e00ULL,
         0xa3e5a0a80a54d6e8ULL, 0x952266efe4ead3dfULL, 0x0c9946d284d94185ULL,
         0x61427c1db2261862ULL,
@@ -12214,6 +12711,9 @@ void setup()
     device_display.fillScreen(TFT_BLACK);
 
     const bool app_settings_loaded = load_app_settings();
+    // Conversations survive a power cycle; losing them on every reboot made the
+    // chat feel like a toy rather than a log of what was said in the field.
+    (void)load_chat_log();
     onboarding_complete = app_settings_loaded && app_settings.onboarding_complete;
 
     lv_init();
@@ -12557,6 +13057,11 @@ void loop()
         } else {
             analyzer_link_line_length = 0;
         }
+    }
+
+    if(chat_log_dirty && static_cast<std::int32_t>(millis() - chat_log_save_due_ms) >= 0) {
+        (void)write_chat_log();
+        chat_log_dirty = false;
     }
 
     const uint32_t now = millis();

@@ -38,6 +38,11 @@ inline constexpr uint8_t trackball_left_pin = 1;
 inline constexpr uint8_t trackball_right_pin = 2;
 inline constexpr uint8_t trackball_press_pin = 0;
 
+// The MAX98357A class-D amplifier driving the speaker.
+inline constexpr uint8_t i2s_ws_pin = 5;
+inline constexpr uint8_t i2s_dout_pin = 6;
+inline constexpr uint8_t i2s_bck_pin = 7;
+
 inline constexpr uint8_t battery_adc_pin = 4;
 // The official T-Deck schematic and factory test use an equal divider.
 inline constexpr float battery_divider_multiplier = 2.0F;
