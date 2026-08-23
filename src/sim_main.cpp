@@ -115,6 +115,7 @@ enum class Screen : uint8_t {
     utilization,
     timeline,
     events,
+    messages,
     count,
 };
 
@@ -146,7 +147,7 @@ struct Point {
 
 constexpr std::array<const char *, static_cast<size_t>(Screen::count)> screen_names = {
     "TRAFFIC", "TRAFFIC FILTER", "PROTOCOLS", "PROTOCOL DETAIL", "SPECTRUM", "NODES", "NODE DETAIL", "PACKET DETAIL",
-    "MAP", "SURVEY", "UTILIZATION", "TIMELINE", "EVENTS",
+    "MAP", "SURVEY", "UTILIZATION", "TIMELINE", "EVENTS", "MESSAGES",
 };
 
 constexpr std::array<PacketRow, 15> packets = {{
@@ -590,6 +591,19 @@ constexpr lv_coord_t kEventBackX = 8;
 constexpr lv_coord_t kEventBackY = 204;
 constexpr lv_coord_t kEventBackW = 56;
 constexpr lv_coord_t kEventBackH = 18;
+// The message log: a summary panel, then one card per message heard.
+constexpr lv_coord_t kMsgSummaryY = 26;
+constexpr lv_coord_t kMsgFirstY = 66;
+constexpr lv_coord_t kMsgRowH = 34;
+constexpr std::size_t kMsgVisible = 4;
+
+// Where a finished capture sends you. Without these the survey ended on the
+// word COMPLETE and a START button, and everything it had just collected was
+// reachable only by knowing which other screen to go to.
+constexpr lv_coord_t kSurveyActY = 176;
+constexpr lv_coord_t kSurveyActH = 22;
+constexpr lv_coord_t kSurveyActW = 98;
+
 constexpr lv_coord_t kToolStripY = 204;
 constexpr lv_coord_t kToolChipX = 248;
 constexpr lv_coord_t kToolChipW = 64;
@@ -1320,6 +1334,33 @@ void draw_spectrum_mode_chips(lv_obj_t *parent, bool enabled) noexcept
                    fast, enabled);
     draw_mode_chip(parent, kSpecDeepX, kToolStripY, kSpecModeW, kToolChipH, "DEEP",
                    !fast, enabled);
+}
+
+/// Which destination a tap on the finished-capture row means. Kept pure and
+/// beside the drawing constants so the boxes and the hit targets cannot drift
+/// apart the way the chat scroll buttons once did.
+Screen survey_action_screen(std::uint16_t x) noexcept
+{
+    if (x < static_cast<std::uint16_t>(8 + kSurveyActW)) return Screen::messages;
+    if (x < static_cast<std::uint16_t>(8 + 2 * (kSurveyActW + 3))) return Screen::traffic;
+    return Screen::nodes;
+}
+
+/// The three places a finished capture leads. Drawn only once there is
+/// something to look at.
+void draw_survey_result_actions(lv_obj_t *parent, bool ready) noexcept
+{
+    const lv_color_t ink = ready ? theme::pink() : theme::text_muted();
+    // Not "FRAMES": that word is already a statistic three rows above, and a
+    // button wearing the same label as a number reads like it shows that number.
+    const std::array<const char *, 3> labels = {{"MESSAGES", "PACKETS", "NODES"}};
+    for (std::size_t index = 0; index < labels.size(); ++index) {
+        const lv_coord_t x = 8 + static_cast<lv_coord_t>(index) * (kSurveyActW + 3);
+        draw_outline_rect(parent, x, kSurveyActY, kSurveyActW, kSurveyActH, ink);
+        const lv_coord_t text_w = static_cast<lv_coord_t>(std::strlen(labels[index]) * 6);
+        put_label(parent, labels[index], x + (kSurveyActW - text_w) / 2, kSurveyActY + 7,
+                  ink, &font_pixel_6x8);
+    }
 }
 
 void draw_start_stop_strip(lv_obj_t *parent, const char *status, lv_color_t status_color,
@@ -5310,6 +5351,7 @@ void build_survey(lv_obj_t * parent)
     put_label(parent, line, 46, 164,
               survey.crc_invalid_frames == 0 ? theme::cyan() : theme::fault(),
               &font_pixel_6x8);
+    draw_survey_result_actions(parent, survey_has_result && !survey_running);
     const bool spectrum_active = radio_service.spectrumStatus().active();
     const bool receive_paused = survey_running && !radio_service.status().receiving;
     const char *footer = spectrum_active ? "SPECTRUM SCANNING" :
@@ -5358,6 +5400,7 @@ void build_survey(lv_obj_t * parent)
     put_label(parent, value, 46, 164,
               survey.crc_invalid_frames == 0U ? theme::cyan() : theme::fault(),
               &font_pixel_6x8);
+    draw_survey_result_actions(parent, survey.complete && !survey.running);
     const char *footer = simulator_spectrum_scanning ? "SPECTRUM SCANNING" :
         (survey.running ? "CAPTURING" :
          (survey.complete ? "COMPLETE" : "READY"));
@@ -5568,6 +5611,175 @@ void draw_events_range_footer(lv_obj_t *parent, std::size_t first, std::size_t v
     theme::rect(parent, 0, kEventsFooterY, 320, 20, lv_color_hex(0x050808));
     put_label(parent, line, 8, kEventsFooterY + 6, theme::pink(), &font_pixel_6x8);
     draw_up_down_chips(parent, kEventsFooterY + 4, first > 0U, first + visible < count);
+}
+
+/// One line of the message log, filled from the capture store on hardware and
+/// from the chat log in the simulator so both render the same way.
+struct MessageRow {
+    char who[16]{};
+    char when[10]{};
+    char route[8]{};
+    char snr[10]{};
+    const char *text = nullptr;
+    bool mine = false;
+};
+
+void draw_messages_empty(lv_obj_t *parent) noexcept
+{
+    draw_outline_rect(parent, 16, 84, 288, 92, theme::pink());
+    put_label(parent, "NO MESSAGES HEARD YET", 28, 96, theme::pink(), &font_mono_semibold_12);
+    put_label(parent, "EVERY TEXT MESSAGE THIS RADIO DECODES", 28, 120,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "LANDS HERE -- YOURS AND EVERYONE ELSE'S,", 28, 132,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "WITH WHO SENT IT AND HOW WELL IT ARRIVED.", 28, 144,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "START A CAPTURE ON SURVEY, OR JUST WAIT.", 28, 160,
+              theme::text_muted(), &font_pixel_6x8);
+}
+
+void draw_message_rows(lv_obj_t *parent, const MessageRow *rows, std::size_t count,
+                       std::size_t senders) noexcept
+{
+    // Summary panel, in the Home style: a labelled box with the numbers that
+    // say whether the log is worth reading.
+    draw_outline_rect(parent, 6, kMsgSummaryY, 308, 34, theme::pink());
+    char value[24]{};
+    put_label(parent, "MESSAGES", 12, kMsgSummaryY + 4, theme::pink(), &font_pixel_6x8);
+    std::snprintf(value, sizeof(value), "%u", static_cast<unsigned>(count));
+    put_label(parent, value, 12, kMsgSummaryY + 15, theme::text(), &font_mono_semibold_12);
+    put_label(parent, "SENDERS", 116, kMsgSummaryY + 4, theme::pink(), &font_pixel_6x8);
+    std::snprintf(value, sizeof(value), "%u", static_cast<unsigned>(senders));
+    put_label(parent, value, 116, kMsgSummaryY + 15, theme::cyan(), &font_mono_semibold_12);
+    put_label(parent, "NEWEST", 220, kMsgSummaryY + 4, theme::pink(), &font_pixel_6x8);
+    put_clipped_label(parent, count > 0 ? rows[0].when : "--", 220, kMsgSummaryY + 15, 88,
+                      theme::text(), &font_mono_semibold_12);
+
+    if (count == 0U) {
+        draw_messages_empty(parent);
+        return;
+    }
+    const std::size_t visible = count < kMsgVisible ? count : kMsgVisible;
+    for (std::size_t index = 0; index < visible; ++index) {
+        const MessageRow &row = rows[index];
+        const lv_coord_t y = kMsgFirstY + static_cast<lv_coord_t>(index) * kMsgRowH;
+        // The same left/right edge language the chat log uses, so a message
+        // you sent looks the same wherever you meet it.
+        theme::rect(parent, row.mine ? 310 : 4, y, 6, 28,
+                    row.mine ? theme::pink() : theme::cyan());
+        const lv_coord_t text_x = row.mine ? 58 : 14;
+        char header[40]{};
+        std::snprintf(header, sizeof(header), "%s  %s  %s", row.when, row.who, row.route);
+        put_clipped_label(parent, header, text_x, y, 190,
+                          row.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
+        if (row.snr[0] != '\0') {
+            put_label(parent, row.snr, 254, y, theme::lime(), &font_pixel_6x8);
+        }
+        put_clipped_label(parent, row.text != nullptr ? row.text : "", text_x, y + 11,
+                          row.mine ? 248 : 292, theme::text(), &font_mono_semibold_12);
+        theme::rule_line(parent, 6, y + 30, 308, 1, theme::grid());
+    }
+    if (count > visible) {
+        char more[28]{};
+        std::snprintf(more, sizeof(more), "%u OLDER NOT SHOWN",
+                      static_cast<unsigned>(count - visible));
+        put_label(parent, more, 12, kToolStripY - 12, theme::text_muted(), &font_pixel_6x8);
+    }
+}
+
+void build_messages(lv_obj_t * parent)
+{
+#if defined(LILYSHARK_DEVICE)
+    add_status_bar(parent, "MESSAGES");
+    std::array<LiveNodeSummary, 8> nodes{};
+    const std::size_t node_count = collect_live_nodes(nodes);
+    std::array<MessageRow, 16> rows{};
+    std::array<char[kChatTextCapacity], 16> texts{};
+    std::array<std::uint32_t, 16> senders{};
+    std::size_t sender_count = 0;
+    std::size_t count = 0;
+    const auto &store = capture_runtime.frames();
+    for (std::size_t age = 0; age < store.size() && count < rows.size(); ++age) {
+        const FrameRecord *record = store.newest(age);
+        if (record == nullptr) continue;
+        if (record->decoded.protocol != ProtocolId::Meshtastic) continue;
+        if (!record->decoded.hasAttribute(AttributeDefaultKeyReadable)) continue;
+        if (record->decoded.payload_length == 0U) continue;
+        if (record->raw.captured_length <
+            static_cast<std::uint16_t>(record->decoded.payload_offset +
+                                       record->decoded.payload_length)) {
+            continue;
+        }
+        MeshtasticPayload payload{};
+        if (!readMeshtasticPayload(record->raw.bytes + record->decoded.payload_offset,
+                                   record->decoded.payload_length,
+                                   record->decoded.source, record->decoded.packet_id,
+                                   payload)) {
+            continue;
+        }
+        if (!payload.has_text) continue;
+        MessageRow &row = rows[count];
+        row.mine = record->decoded.source == localMeshtasticNodeNum();
+        if (row.mine) {
+            std::snprintf(row.who, sizeof(row.who), "YOU");
+        } else {
+            const char *label = nullptr;
+            for (std::size_t index = 0; index < node_count; ++index) {
+                if (nodes[index].id == record->decoded.source && nodes[index].label[0] != '\0') {
+                    label = nodes[index].label;
+                    break;
+                }
+            }
+            if (label != nullptr) {
+                std::snprintf(row.who, sizeof(row.who), "%s", label);
+            } else {
+                std::snprintf(row.who, sizeof(row.who), "!%04lx",
+                              static_cast<unsigned long>(record->decoded.source & 0xffffU));
+            }
+        }
+        format_age(row.when, sizeof(row.when), record->raw.rf.timestamp_us);
+        std::snprintf(row.route, sizeof(row.route), "%s",
+                      record->decoded.destination == 0xffffffffU ? "ALL" : "DM");
+        std::snprintf(row.snr, sizeof(row.snr), "%+.1f",
+                      static_cast<double>(record->raw.rf.snr_db_x10) / 10.0);
+        std::snprintf(texts[count], kChatTextCapacity, "%s", payload.text);
+        row.text = texts[count];
+        bool seen = false;
+        for (std::size_t index = 0; index < sender_count; ++index) {
+            if (senders[index] == record->decoded.source) { seen = true; break; }
+        }
+        if (!seen && sender_count < senders.size()) senders[sender_count++] = record->decoded.source;
+        ++count;
+    }
+    draw_message_rows(parent, rows.data(), count, sender_count);
+#else
+    add_simulator_live_status_bar(parent, "MESSAGES");
+    std::array<MessageRow, 16> rows{};
+    std::array<std::uint32_t, 16> senders{};
+    std::size_t sender_count = 0;
+    std::size_t count = 0;
+    for (std::size_t offset = 0; offset < chat_log_count && count < rows.size(); ++offset) {
+        const std::size_t slot =
+            (chat_log_start + chat_log_count - 1U - offset) % kChatLogCapacity;
+        const ChatLine &line = chat_log[slot];
+        if (line.text[0] == '\0') continue;
+        MessageRow &row = rows[count];
+        row.mine = line.mine;
+        std::snprintf(row.who, sizeof(row.who), "%s", line.mine ? "YOU" : line.from);
+        std::snprintf(row.when, sizeof(row.when), "%s",
+                      line.when[0] != '\0' ? line.when : "--");
+        std::snprintf(row.route, sizeof(row.route), "%s",
+                      line.peer == 0xffffffffU ? "ALL" : "DM");
+        row.text = line.text;
+        bool seen = false;
+        for (std::size_t index = 0; index < sender_count; ++index) {
+            if (senders[index] == line.peer) { seen = true; break; }
+        }
+        if (!seen && sender_count < senders.size()) senders[sender_count++] = line.peer;
+        ++count;
+    }
+    draw_message_rows(parent, rows.data(), count, sender_count);
+#endif
 }
 
 void build_events(lv_obj_t * parent)
@@ -7574,8 +7786,42 @@ void build_chat(lv_obj_t * parent)
                       static_cast<unsigned>(chat_peer_count - shown));
         put_label(parent, extra, 148, kChatOlderY + 4, theme::pink(), &font_pixel_6x8);
     }
-    put_label(parent, broadcast ? "TO ALL" : "PRIVATE", 258, kChatOlderY + 4,
-              theme::pink(), &font_pixel_6x8);
+    // "TO ALL" said what the selected tab already says -- EVERYONE means
+    // broadcast, a node name means direct. This row now carries the one thing
+    // the chat screen could not tell you: how well the last thing from this
+    // peer actually arrived. Home earns its density the same way.
+    char link[16]{};
+#if defined(LILYSHARK_DEVICE)
+    {
+        std::array<LiveNodeSummary, 8> peers{};
+        const std::size_t peer_count = collect_live_nodes(peers);
+        const LiveNodeSummary *peer = nullptr;
+        for (std::size_t index = 0; index < peer_count; ++index) {
+            if (broadcast) {
+                if (peer == nullptr || peers[index].last_seen_us > peer->last_seen_us) {
+                    peer = &peers[index];
+                }
+            } else if (peers[index].id == dest) {
+                peer = &peers[index];
+                break;
+            }
+        }
+        if (peer != nullptr) {
+            std::snprintf(link, sizeof(link), "SNR %+.1f",
+                          static_cast<double>(peer->latest_snr_x10) / 10.0);
+        } else {
+            std::snprintf(link, sizeof(link), "NO SIGNAL");
+        }
+    }
+#else
+    std::snprintf(link, sizeof(link), "SNR %s", broadcast ? "-8.6" : "-12.7");
+#endif
+    {
+        const lv_coord_t link_w = static_cast<lv_coord_t>(std::strlen(link) * 6);
+        put_label(parent, link, 314 - link_w, kChatOlderY + 4,
+                  std::strcmp(link, "NO SIGNAL") == 0 ? theme::text_muted() : theme::lime(),
+                  &font_pixel_6x8);
+    }
     theme::rule_line(parent, 0, kChatOlderY + kChatOlderH, 320, 1, theme::pink());
 
     if (visible == 0U) {
@@ -7741,6 +7987,7 @@ void build_current_screen()
             case Screen::utilization: build_utilization(root); break;
             case Screen::timeline: build_timeline(root); break;
             case Screen::events: build_events(root); break;
+            case Screen::messages: build_messages(root); break;
             case Screen::count: break;
         }
     }
@@ -9643,6 +9890,24 @@ void handle_touch_tap(std::uint16_t x, std::uint16_t y)
         }
         return;
     }
+    if(current_screen == Screen::survey &&
+       y >= static_cast<std::uint16_t>(kSurveyActY) &&
+       y < static_cast<std::uint16_t>(kSurveyActY + kSurveyActH)) {
+        // Where the capture leads. Guarded on there being a result, so the
+        // buttons drawn muted before a run do nothing when pressed.
+#if defined(LILYSHARK_DEVICE)
+        const bool ready = survey_has_result && !survey_running;
+#else
+        const bool ready = simulator_live_telemetry.survey().complete &&
+                           !simulator_live_telemetry.survey().running;
+#endif
+        if (ready) {
+            current_screen = survey_action_screen(x);
+            app_shell.closeToAnalyzer();
+            build_current_screen();
+        }
+        return;
+    }
     if((current_screen == Screen::spectrum || current_screen == Screen::survey) &&
        y >= static_cast<std::uint16_t>(kToolStripY) &&
        y < static_cast<std::uint16_t>(theme::nav_top)) {
@@ -10970,6 +11235,45 @@ bool run_simulator_interaction_test() noexcept
         if(!expect_simulator_state(rejects_foreign,
                                    "a chat archive with a foreign magic must be refused")) return false;
     }
+
+    // A finished capture has to lead somewhere. It used to end on the word
+    // COMPLETE and a START button, with everything it had just collected
+    // reachable only by knowing which other screen to open.
+    {
+        handle_navigation_key('5');
+        if(!expect_simulator_state(current_screen == Screen::survey,
+                                   "direct key 5 must open Survey")) return false;
+        build_current_screen();
+        // The boundaries, against the boxes actually drawn.
+        if(!expect_simulator_state(survey_action_screen(8) == Screen::messages &&
+                                       survey_action_screen(8 + kSurveyActW - 1) ==
+                                           Screen::messages,
+                                   "the first capture action must open the message log")) return false;
+        if(!expect_simulator_state(survey_action_screen(8 + kSurveyActW + 3) == Screen::traffic,
+                                   "the second capture action must open the packet list")) return false;
+        if(!expect_simulator_state(survey_action_screen(8 + 2 * (kSurveyActW + 3)) ==
+                                       Screen::nodes,
+                                   "the third capture action must open the node list")) return false;
+        // With no result the row is drawn muted, and must not navigate.
+        const bool ready = simulator_live_telemetry.survey().complete &&
+                           !simulator_live_telemetry.survey().running;
+        handle_touch_tap(50, static_cast<std::uint16_t>(kSurveyActY + 4));
+        if(!ready &&
+           !expect_simulator_state(current_screen == Screen::survey,
+                                   "a survey with no result must not navigate")) return false;
+        // And the log itself must build and draw rather than merely compile.
+        current_screen = Screen::messages;
+        build_current_screen();
+        if(!expect_simulator_state(current_screen == Screen::messages,
+                                   "the message log must open")) return false;
+        // Put back exactly what this block found. The map assertions further
+        // down zoom out in a loop until a node is visible, and that loop never
+        // terminates if it is left on a screen where "-" is not a zoom key.
+        current_screen = Screen::map;
+        field_tab = FieldTab::Map;
+        app_shell.closeToAnalyzer();
+        build_current_screen();
+    }
     // Peers sit hundreds of metres out, so at close zoom they are legitimately
     // off screen. Zoom out until at least one is plotted before testing taps.
     int map_node_hit = -1;
@@ -11294,12 +11598,17 @@ bool run_simulator_render_test() noexcept
     // /tmp cache left by an earlier run, or a live tile fetch, would otherwise
     // make a "deterministic pixel" test depend on the machine it runs on.
     map_bundled_tiles_only = true;
+    // Seeded before the sweep so MESSAGES and CHAT are both hashed with real
+    // content. An empty screen hashes just as stably and catches nothing.
+    chat_push("RANGER", "AT THE GATE, HEADING UP", false, 0xffffffffU, "09:14");
+    chat_push("LILY", "COPY. TEN MINUTES OUT.", true, 0xffffffffU, "09:15");
+    chat_push("RANGER", "TRACK IS WASHED OUT PAST THE CREEK", false, 0xffffffffU, "09:18");
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
-        0x94e0d8ed548ceccfULL, 0xecbc56006f845c28ULL, 0xccd8b894535dae6cULL,
-        0xfb2f9dd0ce3781c7ULL, 0x0fe2c7ca3c3c9acfULL, 0xf2450661f86715f8ULL,
-        0x8a362b0a336d1188ULL, 0xbe6c5ef8280e2540ULL, 0xe5ee58c10f6e6f51ULL,
-        0x8c60b2f528f43eb8ULL, 0x62aacb8756fb5fefULL, 0x9ea5c2f1c78e6f21ULL,
-        0x4f3923ba585eca9eULL,
+        0x0cd08b0c71623817ULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
+        0x932ca408b25d655fULL, 0x58528a9a39aa7867ULL, 0xfa348ff23e543170ULL,
+        0x86f8c337e12d7380ULL, 0x942c5b2b206072e8ULL, 0x2d79e348284dfd29ULL,
+        0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xaa3ec62aa1276c19ULL,
+        0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
     }};
     constexpr std::array<ShellRoute, 17> shell_routes = {{
         ShellRoute::Splash,
@@ -11329,9 +11638,9 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xcad6c4dbec790876ULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
-        0x0e8d5caa0f3b18beULL, 0x84216ca975971329ULL, 0x4e401f5cbfc7bc7eULL,
-        0x216fdba2274b7f08ULL, 0x749b62a25c09011bULL, 0xb7c8c756f163e40aULL,
-        0xcaec929ddcd51cf2ULL, 0x646c5eb9e382d2c3ULL, 0xff17183a941ae14bULL,
+        0x0e8d5caa0f3b18beULL, 0x0c0a191f76a06f71ULL, 0x22ed3faf3d1304e6ULL,
+        0x7e1363de7108f530ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
+        0xde0a7b1d16ecf53aULL, 0x5e5e617ebee82f9bULL, 0x481e07ea9446ca03ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
     }};
 
@@ -11454,9 +11763,9 @@ bool run_simulator_render_test() noexcept
         "PACKET RAW", "PACKET HEX PAGE 2", "PACKET HEX PAGE 3", "EVENT DETAIL",
     }};
     constexpr std::array<std::uint64_t, interaction_names.size()> interaction_expected_hashes = {{
-        0xbe6c5ef8280e2540ULL, 0xec827b67acbe1216ULL, 0x737e78fa615cc8a2ULL,
-        0x84b417853ecec707ULL, 0xa3430b469fdbcd86ULL, 0x19f1470c24acd650ULL,
-        0xaf0e843e9adb1004ULL, 0x3baf5954707c0890ULL,
+        0x942c5b2b206072e8ULL, 0x9fbcc41ba7dc745eULL, 0x875baf65a7508f3aULL,
+        0x58a20e6754b3cf2fULL, 0xa61d3171e264c9ceULL, 0xe5269e10e20f51f8ULL,
+        0x27c2b90457f9839cULL, 0xaa632a3721716d88ULL,
     }};
     traffic_filter = TrafficFilter{};
     focus_simulator_inspector_packet();
@@ -11532,7 +11841,7 @@ bool run_simulator_render_test() noexcept
         // Hashed as well as written: the marks used to draw over the card,
         // and no behavioural test noticed because every assertion about it
         // passed while it was being painted through.
-        constexpr std::uint64_t kMapNodeCardHash = 0xd7b433868423c58eULL;
+        constexpr std::uint64_t kMapNodeCardHash = 0x76448995245a4bf6ULL;
         const std::uint64_t card_hash = hash_simulator_frame();
         std::fprintf(stderr, "Lilyshark render MAP NODE CARD: fnv1a=%016llx\n",
                      static_cast<unsigned long long>(card_hash));
@@ -11550,16 +11859,13 @@ bool run_simulator_render_test() noexcept
     // screens the device exists to drive. A conversation with lines in it,
     // hashed like everything else.
     {
-        chat_push("RANGER", "AT THE GATE, HEADING UP", false, 0xffffffffU, "09:14");
-        chat_push("LILY", "COPY. TEN MINUTES OUT.", true, 0xffffffffU, "09:15");
-        chat_push("RANGER", "TRACK IS WASHED OUT PAST THE CREEK", false, 0xffffffffU, "09:18");
         open_field_tab(FieldTab::Chat);
         build_current_screen();
         lv_refr_now(display);
         if (render_directory != nullptr) {
             (void)write_simulator_frame(render_directory, "chat", 0);
         }
-        constexpr std::uint64_t kChatHash = 0xc65de4cb190c83e0ULL;
+        constexpr std::uint64_t kChatHash = 0x7f4c3203cdc46d58ULL;
         const std::uint64_t chat_hash = hash_simulator_frame();
         std::size_t chat_ink = 0U;
         for(const std::uint16_t pixel : simulator_frame_buffer) {
@@ -11988,6 +12294,8 @@ bool simulator_screen_changed(simulator::TelemetryChange changes, Screen screen)
             return simulator::changed(changes, TelemetryChange::Timeline);
         case Screen::events:
             return simulator::changed(changes, TelemetryChange::Events);
+        case Screen::messages:
+            return simulator::changed(changes, TelemetryChange::Traffic);
         case Screen::count:
         default:
             return false;
