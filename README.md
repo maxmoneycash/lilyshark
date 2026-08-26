@@ -427,7 +427,8 @@ The simulator drives these views with deterministic synthetic RF telemetry. A fi
 | `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
 | `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
 | `F` | Cycle spreading factors 7 through 12 |
-| `C` | Cycle coding rates 4/5 through 4/8 |
+| `R` | Cycle coding rates 4/5 through 4/8 |
+| `C` | Open Chat; from a node's detail screen, open Chat addressed to that node |
 | `S` | Save a BMP screenshot to microSD |
 | `?` | Open Help without bypassing unfinished onboarding or destructive confirmations |
 | Touch tap | Select the tapped menu/table row or invoke the exact left/right action shown in the footer |

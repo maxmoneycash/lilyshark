@@ -10426,7 +10426,11 @@ void handle_navigation_key(uint32_t key)
                             "spreading factor");
         return;
     }
-    if(key == 'c' || key == 'C') {
+    // R, not C. Chat claimed C in an earlier change and returns before this
+    // ever runs, so coding rate had quietly become unreachable from the
+    // keyboard while the README still documented it. R sits beside B for
+    // bandwidth and F for spreading factor, and nothing else answers to it.
+    if(key == 'r' || key == 'R') {
         apply_tuned_profile(cycleProfileCodingRate(radio_service.activeProfile()), "coding rate");
         return;
     }
