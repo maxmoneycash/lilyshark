@@ -69,6 +69,7 @@
 #include "lilyshark/protocols/meshtastic_decoder.h"
 #include "lilyshark/protocols/meshtastic_encode.h"
 #include "lilyshark/protocols/meshtastic_payload.h"
+#include "lilyshark/protocols/lxmf_decoder.h"
 #include "lilyshark/protocols/reticulum_decoder.h"
 #include "lilyshark/shelby/shelby_pointer_decoder.h"
 #include "lilyshark/tdeck.h"
@@ -5037,6 +5038,39 @@ void build_packet_detail(lv_obj_t * parent)
                 std::snprintf(line, sizeof(line), "%u B APP PAYLOAD",
                               static_cast<unsigned>(readable.payload_length));
                 put_label(parent, line, 49, 182, theme::text(), &font_pixel_6x8);
+            }
+        }
+        // A Reticulum payload is very often an LXMF message. Without this the
+        // tab could say a data packet arrived and nothing about what it said.
+        if(!has_readable && record->decoded.protocol == ProtocolId::Reticulum &&
+           record->decoded.payload_length > 0U &&
+           record->raw.captured_length >=
+               static_cast<std::uint16_t>(record->decoded.payload_offset +
+                                          record->decoded.payload_length)) {
+            LxmfMessage lxmf{};
+            if(readLxmfMessage(&record->raw.bytes[record->decoded.payload_offset],
+                               record->decoded.payload_length, lxmf)) {
+                put_label(parent, "LXMF", 49, 168, theme::pink(), &font_pixel_6x8);
+                if(lxmf.has_title) {
+                    put_clipped_label(parent, lxmf.title, 85, 168, 220, theme::lime(),
+                                      &font_pixel_6x8);
+                } else if(lxmf.field_count > 0U) {
+                    std::snprintf(line, sizeof(line), "%u FIELDS",
+                                  static_cast<unsigned>(lxmf.field_count));
+                    put_label(parent, line, 85, 168, theme::lime(), &font_pixel_6x8);
+                } else {
+                    put_label(parent, "MESSAGE", 85, 168, theme::lime(), &font_pixel_6x8);
+                }
+                if(lxmf.has_content) {
+                    put_label(parent, "MSG", 49, 182, theme::pink(), &font_pixel_6x8);
+                    lv_obj_t *body = put_label(parent, lxmf.content, 85, 182, theme::cyan(),
+                                               &font_mono_10);
+                    lv_obj_set_width(body, theme::screen_width - 94);
+                    lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
+                } else {
+                    put_label(parent, "NO MESSAGE BODY", 49, 182, theme::text_muted(),
+                              &font_pixel_6x8);
+                }
             }
         }
         // A pointer frame gives its diagnostics rows to the pointer itself:
