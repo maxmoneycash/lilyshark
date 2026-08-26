@@ -62,7 +62,7 @@ render_png "${static_dir}/analyzer-12.ppm" "${preview_dir}/timeline-simulator.pn
 # --render-test. These names are referenced individually throughout README.md.
 analyzer_preview_names=(
   traffic traffic-filter protocols protocol-detail spectrum nodes node-detail
-  packet-detail map survey utilization timeline events
+  packet-detail map survey utilization timeline events messages
 )
 for index in "${!analyzer_preview_names[@]}"; do
   printf -v frame_name 'analyzer-%02d.ppm' "$((index + 1))"
@@ -92,8 +92,8 @@ for index in "${!interaction_preview_names[@]}"; do
 done
 
 firmware_preview_count="$(find "${firmware_preview_dir}" -maxdepth 1 -type f -name '*.png' | wc -l | tr -d ' ')"
-if [[ "${firmware_preview_count}" -ne 38 ]]; then
-  echo "Expected 38 firmware gallery frames, found ${firmware_preview_count}" >&2
+if [[ "${firmware_preview_count}" -ne 39 ]]; then
+  echo "Expected 39 firmware gallery frames, found ${firmware_preview_count}" >&2
   exit 1
 fi
 for firmware_preview in "${firmware_preview_dir}"/*.png; do
@@ -119,4 +119,4 @@ if [[ "${gif_geometry}" != "320x240" ]]; then
   exit 1
 fi
 
-echo "README screenshots, 38-frame firmware gallery, and live-diagnostics.gif regenerated"
+echo "README screenshots, 39-frame firmware gallery, and live-diagnostics.gif regenerated"

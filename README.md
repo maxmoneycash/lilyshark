@@ -193,9 +193,11 @@ one of them on the device.
   </tr>
   <tr>
     <td width="25%"><img src="design/previews/firmware/events.png" alt="Events — device history"></td>
+    <td width="25%"><img src="design/previews/firmware/messages.png" alt="Messages — every decoded text message, newest first"></td>
   </tr>
   <tr>
     <td align="center"><sub>Events — device history</sub></td>
+    <td align="center"><sub>Messages — every text message heard</sub></td>
   </tr>
 </table>
 
