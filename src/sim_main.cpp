@@ -1825,19 +1825,49 @@ void draw_linear_gauge(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t 
     }
 }
 
+// The unit circle a ring is drawn from, as exact float literals.
+//
+// These points become an anti-aliased LVGL line, so a last-ulp difference in
+// std::cos does not merely move a point -- it changes the coverage the
+// rasteriser computes, and therefore the intensity of neighbouring pixels. On
+// a test that hashes exact pixels that is the difference between passing on
+// macOS and failing on Linux, which is precisely what Home's compass was
+// doing. Literals parse identically everywhere; libm does not.
+constexpr std::size_t kRingSegments = 36;
+constexpr float kRingCos[kRingSegments + 1] = {
+    1.0f, 0.9848077297210693f, 0.9396926164627075f, 0.8660253882408142f,
+    0.7660444378852844f, 0.6427876353263855f, 0.5f, 0.3420201539993286f,
+    0.1736481785774231f, 6.123234262925839e-17f, -0.1736481785774231f,
+    -0.3420201539993286f, -0.5f, -0.6427876353263855f, -0.7660444378852844f,
+    -0.8660253882408142f, -0.9396926164627075f, -0.9848077297210693f, -1.0f,
+    -0.9848077297210693f, -0.9396926164627075f, -0.8660253882408142f, -0.7660444378852844f,
+    -0.6427876353263855f, -0.5f, -0.3420201539993286f, -0.1736481785774231f,
+    -1.8369701465288538e-16f, 0.1736481785774231f, 0.3420201539993286f, 0.5f,
+    0.6427876353263855f, 0.7660444378852844f, 0.8660253882408142f, 0.9396926164627075f,
+    0.9848077297210693f, 1.0f
+};
+constexpr float kRingSin[kRingSegments + 1] = {
+    0.0f, 0.1736481785774231f, 0.3420201539993286f, 0.5f, 0.6427876353263855f,
+    0.7660444378852844f, 0.8660253882408142f, 0.9396926164627075f, 0.9848077297210693f,
+    1.0f, 0.9848077297210693f, 0.9396926164627075f, 0.8660253882408142f,
+    0.7660444378852844f, 0.6427876353263855f, 0.5f, 0.3420201539993286f,
+    0.1736481785774231f, 1.2246468525851679e-16f, -0.1736481785774231f,
+    -0.3420201539993286f, -0.5f, -0.6427876353263855f, -0.7660444378852844f,
+    -0.8660253882408142f, -0.9396926164627075f, -0.9848077297210693f, -1.0f,
+    -0.9848077297210693f, -0.9396926164627075f, -0.8660253882408142f, -0.7660444378852844f,
+    -0.6427876353263855f, -0.5f, -0.3420201539993286f, -0.1736481785774231f,
+    -2.4492937051703357e-16f
+};
+
 void draw_map_ring(lv_obj_t *parent, lv_coord_t cx, lv_coord_t cy, lv_coord_t radius,
                    lv_color_t color, lv_coord_t width = 1) noexcept
 {
     if (radius < 3 || trace_buffer_index >= trace_buffers.size()) return;
     auto &points = trace_buffers[trace_buffer_index++];
-    constexpr std::size_t kSeg = 36;
+    constexpr std::size_t kSeg = kRingSegments;
     for (std::size_t index = 0; index <= kSeg; ++index) {
-        const double angle = (6.283185307179586 * static_cast<double>(index)) /
-                             static_cast<double>(kSeg);
-        points[index].x = static_cast<float>(cx) +
-            static_cast<float>(radius) * static_cast<float>(std::cos(angle));
-        points[index].y = static_cast<float>(cy) +
-            static_cast<float>(radius) * static_cast<float>(std::sin(angle));
+        points[index].x = static_cast<float>(cx) + static_cast<float>(radius) * kRingCos[index];
+        points[index].y = static_cast<float>(cy) + static_cast<float>(radius) * kRingSin[index];
     }
     lv_obj_t *line = lv_line_create(parent);
     theme::reset(line);
@@ -12109,23 +12139,6 @@ bool run_simulator_render_test() noexcept
             std::fprintf(stderr, "Simulator render failed: %s is nearly blank\n",
                          shell_names[index]);
             passed = false;
-        }
-        // TEMPORARY: dump Home's labels with their positions so the macOS and
-        // Linux renders can be compared line by line.
-        if(std::strcmp(shell_names[index], "HOME") == 0) {
-            std::function<void(lv_obj_t *)> walk = [&](lv_obj_t *node) {
-                if(node == nullptr) return;
-                if(lv_obj_check_type(node, &lv_label_class)) {
-                    std::fprintf(stderr, "HOMELABEL y=%4d x=%4d [%s]\n",
-                                 static_cast<int>(lv_obj_get_y(node)),
-                                 static_cast<int>(lv_obj_get_x(node)),
-                                 lv_label_get_text(node));
-                }
-                for(std::uint32_t child = 0; child < lv_obj_get_child_count(node); ++child) {
-                    walk(lv_obj_get_child(node, static_cast<std::int32_t>(child)));
-                }
-            };
-            walk(lv_screen_active());
         }
         if(hash != shell_expected_hashes[index]) {
             std::fprintf(stderr,
