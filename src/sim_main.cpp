@@ -12140,6 +12140,26 @@ bool run_simulator_render_test() noexcept
                          shell_names[index]);
             passed = false;
         }
+        // TEMPORARY: a row-by-column grid over the region that differs.
+        if(std::strcmp(shell_names[index], "HOME") == 0) {
+            for(std::size_t row = 168; row < 196; ++row) {
+                char line[160]{};
+                std::size_t at = 0;
+                at += static_cast<std::size_t>(
+                    std::snprintf(line + at, sizeof(line) - at, "HOMEGRID r%03zu", row));
+                for(std::size_t block = 0; block < 10U; ++block) {
+                    std::uint32_t h = 2166136261U;
+                    for(std::size_t col = block * 32U; col < (block + 1U) * 32U; ++col) {
+                        const std::uint16_t px = simulator_frame_buffer[row * 320U + col];
+                        h ^= static_cast<std::uint32_t>(px & 0xffU); h *= 16777619U;
+                        h ^= static_cast<std::uint32_t>(px >> 8U);   h *= 16777619U;
+                    }
+                    at += static_cast<std::size_t>(
+                        std::snprintf(line + at, sizeof(line) - at, " %08x", h));
+                }
+                std::fprintf(stderr, "%s\n", line);
+            }
+        }
         if(hash != shell_expected_hashes[index]) {
             std::fprintf(stderr,
                          "Simulator render failed: %s expected %016llx\n",
