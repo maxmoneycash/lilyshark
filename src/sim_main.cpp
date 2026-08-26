@@ -7228,7 +7228,16 @@ void draw_home_compass(lv_obj_t *parent, lv_coord_t cx, lv_coord_t cy,
     const lv_coord_t tail_x = cx - static_cast<lv_coord_t>(std::lround(east * 6.0));
     const lv_coord_t tail_y = cy + static_cast<lv_coord_t>(std::lround(north * 6.0));
     draw_map_segment(parent, tail_x, tail_y, tip_x, tip_y, theme::pink());
-    draw_map_chevron(parent, tip_x, tip_y, east, north);
+    // Scaled to the needle's own length before the chevron sees it. The
+    // chevron refuses vectors shorter than one unit -- a sensible guard on the
+    // map, where the units are metres and two nodes a metre apart have no
+    // meaningful direction -- but the compass was handing it a unit vector,
+    // whose length is mathematically exactly 1.0 and therefore lands on the
+    // comparison itself. hypot(sin, cos) returns 1.0 under glibc and a hair
+    // under it on Apple's libm, so the arrowhead drew on Linux and silently
+    // did not on macOS. The chevron normalises what it is given, so scaling
+    // changes nothing it draws -- only which side of the guard it starts on.
+    draw_map_chevron(parent, tip_x, tip_y, east * 12.0, north * 12.0);
     char brg[6]{};
     std::snprintf(brg, sizeof(brg), "%03.0f", bearing_deg);
     put_label(parent, brg, cx - 9, cy + radius + 2, theme::pink(), &font_pixel_6x8);
@@ -12038,7 +12047,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xcad6c4dbec790876ULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
-        0x0e8d5caa0f3b18beULL, 0x0c0a191f76a06f71ULL, 0x22ed3faf3d1304e6ULL,
+        0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0x22ed3faf3d1304e6ULL,
         0x7e1363de7108f530ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
         0xde0a7b1d16ecf53aULL, 0xd62b50d326551431ULL, 0xd11ac720a339c77aULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
@@ -12139,21 +12148,6 @@ bool run_simulator_render_test() noexcept
             std::fprintf(stderr, "Simulator render failed: %s is nearly blank\n",
                          shell_names[index]);
             passed = false;
-        }
-        // TEMPORARY: raw pixels for the region that differs.
-        if(std::strcmp(shell_names[index], "HOME") == 0) {
-            for(std::size_t row = 178; row <= 186; ++row) {
-                char line[260]{};
-                std::size_t at = 0;
-                at += static_cast<std::size_t>(
-                    std::snprintf(line + at, sizeof(line) - at, "HOMEPIX r%03zu", row));
-                for(std::size_t col = 288; col < 320U; ++col) {
-                    at += static_cast<std::size_t>(
-                        std::snprintf(line + at, sizeof(line) - at, " %04x",
-                                      simulator_frame_buffer[row * 320U + col]));
-                }
-                std::fprintf(stderr, "%s\n", line);
-            }
         }
         if(hash != shell_expected_hashes[index]) {
             std::fprintf(stderr,
