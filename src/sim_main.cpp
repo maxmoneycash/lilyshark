@@ -8037,22 +8037,26 @@ void build_chat(lv_obj_t * parent)
     char link[16]{};
 #if defined(LILYSHARK_DEVICE)
     {
-        std::array<LiveNodeSummary, 8> peers{};
-        const std::size_t peer_count = collect_live_nodes(peers);
-        const LiveNodeSummary *peer = nullptr;
-        for (std::size_t index = 0; index < peer_count; ++index) {
-            if (broadcast) {
-                if (peer == nullptr || peers[index].last_seen_us > peer->last_seen_us) {
-                    peer = &peers[index];
-                }
-            } else if (peers[index].id == dest) {
-                peer = &peers[index];
-                break;
-            }
+        // Walked directly rather than through collect_live_nodes, which visits
+        // all 64 stored frames and AES-decrypts every default-key Meshtastic
+        // payload among them. This screen redraws on every keystroke while a
+        // message is being typed, and SNR lives in the RF metadata beside the
+        // frame -- no payload needs opening to read it.
+        const auto &store = capture_runtime.frames();
+        const FrameRecord *heard = nullptr;
+        for (std::size_t offset = 0; offset < store.size(); ++offset) {
+            const FrameRecord *record = store.newest(offset);
+            if (record == nullptr) continue;
+            if (!frameIsFromAnotherNode(*record)) continue;
+            if (!record->decoded.hasField(FieldSource)) continue;
+            if (!broadcast && record->decoded.source != dest) continue;
+            // newest() walks newest first, so the first match is the newest.
+            heard = record;
+            break;
         }
-        if (peer != nullptr) {
+        if (heard != nullptr) {
             std::snprintf(link, sizeof(link), "SNR %+.1f",
-                          static_cast<double>(peer->latest_snr_x10) / 10.0);
+                          static_cast<double>(heard->raw.rf.snr_db_x10) / 10.0);
         } else {
             std::snprintf(link, sizeof(link), "NO SIGNAL");
         }
