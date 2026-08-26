@@ -91,6 +91,8 @@ build_and_run decoder_stress \
   src/core/reticulum_decoder.cpp \
   test/decoder_stress/test_decoder_stress.cpp
 
+python3 scripts/check_baked_tile_fallbacks.py
+
 build_and_run lxmf \
   src/core/lxmf_decoder.cpp \
   test/lxmf/test_lxmf.cpp

@@ -24,6 +24,17 @@ __attribute__((weak)) const std::uint16_t *bakedMapTile(const char *, double, do
     return nullptr;
 }
 
+/// Deepest baked zoom at or below the one asked for, or 0 when nothing is
+/// baked. Added to the generator after the first version of this file, which
+/// is why the device build linked here and failed on a clean checkout: the
+/// generated source is gitignored, so only a tree that had already run
+/// embed_map_tiles.py could resolve it.
+__attribute__((weak)) int bakedMapTileZoomAtOrBelow(const char *, double, double,
+                                                    int) noexcept
+{
+    return 0;
+}
+
 __attribute__((weak)) double bakedMapTileLat() noexcept { return 0.0; }
 __attribute__((weak)) double bakedMapTileLon() noexcept { return 0.0; }
 __attribute__((weak)) bool hasBakedMapTiles() noexcept { return false; }
