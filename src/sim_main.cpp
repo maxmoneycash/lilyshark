@@ -3482,6 +3482,133 @@ void draw_node_detail_axis_chips(lv_obj_t *parent) noexcept
     draw_axis_chip(parent, 282, 189, "-125", theme::text_muted());
 }
 
+/// Traces over the density heatmap: the strongest return at each frequency,
+/// and the noise floor under it.
+///
+/// The sweep already carries a full 33-bin power histogram per frequency, and
+/// the heatmap renders all of it -- but density alone does not answer the two
+/// questions an operator actually has, which are "how strong is the strongest
+/// thing here" and "how far above the floor is it". summarizeSpectrumBins
+/// computes both per point and the display was throwing them away.
+struct SpectrumTraceStats {
+    bool valid = false;
+    std::int16_t peak_dbm_x10 = 0;
+    std::uint32_t peak_hz = 0;
+    std::int16_t floor_dbm_x10 = 0;
+    std::uint32_t occupied_permille = 0;
+};
+
+SpectrumTraceStats draw_spectrum_traces(lv_obj_t *canvas, const SpectrumSweepResult &result,
+                                        std::uint16_t planned_point_count, lv_coord_t width,
+                                        lv_coord_t height) noexcept
+{
+    SpectrumTraceStats stats{};
+    if (canvas == nullptr || result.point_count == 0U || planned_point_count == 0U) return stats;
+
+    std::int32_t floor_sum_x10 = 0;
+    std::uint32_t floor_terms = 0;
+    std::uint64_t above_floor = 0;
+    std::uint64_t total = 0;
+    std::int16_t best_dbm_x10 = -30000;
+
+    lv_coord_t previous_peak_y = -1;
+    lv_coord_t previous_floor_y = -1;
+    for (lv_coord_t px = 0; px < width; ++px) {
+        const std::size_t point = static_cast<std::size_t>(px) * planned_point_count /
+                                  static_cast<std::size_t>(width);
+        if (point >= result.point_count) continue;
+        const SpectrumBinSummary summary = summarizeSpectrumBins(result.points[point].counts);
+        if (!summary.has_samples) continue;
+
+        total += summary.total_samples;
+        // Stronger than the measured floor, not merely out of the catch-all
+        // bin. Bin 0 is -11 dBm and bin 32 is the -139 floor, so a stronger
+        // signal is a *lower* index than the modal one. Counting anything
+        // outside bin 32 called a band with any noise floor at all 100% busy.
+        for (std::size_t bin = 0; bin < summary.modal_bin; ++bin) {
+            above_floor += result.points[point].counts[bin];
+        }
+        floor_sum_x10 += spectrumBinDbmX10(summary.modal_bin);
+        ++floor_terms;
+
+        // A bin index maps to a row the same way the heatmap maps it, so the
+        // trace lands on the band it describes rather than beside it.
+        const auto row_for_bin = [height](std::size_t bin) noexcept {
+            lv_coord_t row = static_cast<lv_coord_t>(bin * static_cast<std::size_t>(height) /
+                                                     kSpectrumPowerBinCount);
+            if (row < 0) row = 0;
+            if (row >= height) row = static_cast<lv_coord_t>(height - 1);
+            return row;
+        };
+        const lv_coord_t peak_y = row_for_bin(summary.strongest_nonzero_bin);
+        const lv_coord_t floor_y = row_for_bin(summary.modal_bin);
+
+        // Joined to the previous column, so a trace crossing several rows in
+        // one step reads as a line rather than a dotted stack.
+        const auto vertical = [canvas, height](lv_coord_t column, lv_coord_t from,
+                                               lv_coord_t to, lv_color_t ink) noexcept {
+            lv_coord_t lo = from < to ? from : to;
+            lv_coord_t hi = from < to ? to : from;
+            if (lo < 0) lo = 0;
+            if (hi >= height) hi = static_cast<lv_coord_t>(height - 1);
+            for (lv_coord_t row = lo; row <= hi; ++row) {
+                lv_canvas_set_px(canvas, column, row, ink, LV_OPA_COVER);
+            }
+        };
+        if (summary.has_above_floor_samples) {
+            vertical(px, previous_peak_y < 0 ? peak_y : previous_peak_y, peak_y, theme::text());
+            previous_peak_y = peak_y;
+        } else {
+            previous_peak_y = -1;
+        }
+        vertical(px, previous_floor_y < 0 ? floor_y : previous_floor_y, floor_y, theme::cyan());
+        previous_floor_y = floor_y;
+
+        if (summary.has_above_floor_samples && summary.strongest_nonzero_bin < summary.modal_bin) {
+            const std::int16_t dbm_x10 = spectrumBinDbmX10(summary.strongest_nonzero_bin);
+            if (dbm_x10 > best_dbm_x10) {
+                best_dbm_x10 = dbm_x10;
+                stats.peak_hz = result.points[point].frequency_hz;
+            }
+        }
+    }
+
+    if (floor_terms == 0U) return stats;
+    stats.valid = true;
+    stats.floor_dbm_x10 = static_cast<std::int16_t>(floor_sum_x10 /
+                                                    static_cast<std::int32_t>(floor_terms));
+    stats.peak_dbm_x10 = best_dbm_x10 == -30000 ? stats.floor_dbm_x10 : best_dbm_x10;
+    stats.occupied_permille = total == 0U ? 0U :
+        static_cast<std::uint32_t>((above_floor * 1000ULL) / total);
+    return stats;
+}
+
+/// Where the radio is actually configured to talk, marked on the sweep. The
+/// question a spectral scan is run to answer is almost always "is my channel
+/// clear", and that needs the channel drawn on the same axis as the noise.
+void draw_spectrum_channel_marker(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
+                                  lv_coord_t width, lv_coord_t height,
+                                  std::uint32_t start_hz, std::uint32_t end_hz,
+                                  std::uint32_t center_hz, std::uint32_t bandwidth_hz) noexcept
+{
+    if (end_hz <= start_hz || center_hz < start_hz || center_hz > end_hz) return;
+    const std::uint32_t span_hz = end_hz - start_hz;
+    const auto column = [&](std::uint32_t hz) noexcept {
+        if (hz <= start_hz) return x;
+        if (hz >= end_hz) return static_cast<lv_coord_t>(x + width - 1);
+        return static_cast<lv_coord_t>(
+            x + static_cast<lv_coord_t>((static_cast<std::uint64_t>(hz - start_hz) *
+                                         static_cast<std::uint64_t>(width)) / span_hz));
+    };
+    const std::uint32_t half = bandwidth_hz / 2U;
+    const lv_coord_t left = column(center_hz > half ? center_hz - half : start_hz);
+    const lv_coord_t right = column(center_hz + half);
+    theme::rect(parent, left, y, 1, height, theme::pink());
+    theme::rect(parent, right, y, 1, height, theme::pink());
+    const lv_coord_t label_x = left + 2 > x + width - 24 ? x + width - 24 : left + 2;
+    draw_axis_chip(parent, label_x, y + 1, "YOU", theme::pink());
+}
+
 void draw_spectrum_axes(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t width,
                         lv_coord_t height, std::uint32_t start_hz,
                         std::uint32_t end_hz) noexcept
@@ -4246,12 +4373,21 @@ void build_spectrum(lv_obj_t * parent)
             }
         }
     }
+    const SpectrumTraceStats traces =
+        draw_spectrum_traces(canvas, result, planned_point_count, width, height);
     lv_obj_invalidate(canvas);
     add_grid(parent, x, y, width, height, 47, 29);
     theme::rule_line(parent, x, y, width);
     theme::rule_line(parent, x, y + height, width);
     draw_spectrum_axes(parent, x, y, width, height, planned_request.start_frequency_hz,
                        planned_request.end_frequency_hz);
+    {
+        const RadioProfile &tuned = radio_service.activeProfile();
+        draw_spectrum_channel_marker(parent, x, y, width, height,
+                                     planned_request.start_frequency_hz,
+                                     planned_request.end_frequency_hz,
+                                     tuned.center_frequency_hz, tuned.bandwidth_hz);
+    }
 
     char line[72]{};
     if(status.active()) {
@@ -4285,32 +4421,45 @@ void build_spectrum(lv_obj_t * parent)
                                    survey_running ? theme::amber() : theme::text_muted(),
                                    "START", !survey_running, false, !survey_running);
     } else {
-        std::uint32_t busiest_score = 0;
-        std::uint32_t quietest_score = UINT32_MAX;
-        std::uint32_t busiest_hz = 0;
-        std::uint32_t quietest_hz = 0;
-        for(std::size_t point = 0; point < result.point_count; ++point) {
-            const SpectrumBinSummary summary = summarizeSpectrumBins(result.points[point].counts);
-            if(summary.above_floor_samples >= busiest_score) {
-                busiest_score = summary.above_floor_samples;
-                busiest_hz = result.points[point].frequency_hz;
-            }
-            if(summary.above_floor_samples < quietest_score) {
-                quietest_score = summary.above_floor_samples;
-                quietest_hz = result.points[point].frequency_hz;
-            }
+        // What the sweep measured, in the units the numbers are in. The old
+        // footer named the busiest and quietest frequency and counted the
+        // bins, which says where to look but never how strong, how quiet, or
+        // how much of the band was in use.
+        put_label(parent, "PEAK", 16, 178, theme::pink(), &font_pixel_6x8);
+        if(traces.valid) {
+            std::snprintf(line, sizeof(line), "%.0f DBM", 
+                          static_cast<double>(traces.peak_dbm_x10) / 10.0);
+        } else {
+            std::snprintf(line, sizeof(line), "--");
         }
-        put_label(parent, "BUSY", 16, 178, theme::pink(), &font_pixel_6x8);
-        std::snprintf(line, sizeof(line), "%.3f",
-                      static_cast<double>(busiest_hz) / 1000000.0);
-        put_label(parent, line, 16, 190, theme::amber(), &font_pixel_6x8);
-        put_label(parent, "QUIET", 132, 178, theme::pink(), &font_pixel_6x8);
-        std::snprintf(line, sizeof(line), "%.3f",
-                      static_cast<double>(quietest_hz) / 1000000.0);
-        put_label(parent, line, 132, 190, theme::cyan(), &font_pixel_6x8);
-        put_label(parent, "BINS", 242, 178, theme::pink(), &font_pixel_6x8);
-        std::snprintf(line, sizeof(line), "%u", result.point_count);
-        put_label(parent, line, 242, 190, theme::text(), &font_pixel_6x8);
+        put_label(parent, line, 16, 190, theme::text(), &font_pixel_6x8);
+        put_label(parent, "AT", 76, 178, theme::pink(), &font_pixel_6x8);
+        if(traces.valid && traces.peak_hz != 0U) {
+            std::snprintf(line, sizeof(line), "%.3f",
+                          static_cast<double>(traces.peak_hz) / 1000000.0);
+        } else {
+            std::snprintf(line, sizeof(line), "--");
+        }
+        put_label(parent, line, 76, 190, theme::amber(), &font_pixel_6x8);
+        put_label(parent, "FLOOR", 158, 178, theme::pink(), &font_pixel_6x8);
+        if(traces.valid) {
+            std::snprintf(line, sizeof(line), "%.0f DBM",
+                          static_cast<double>(traces.floor_dbm_x10) / 10.0);
+        } else {
+            std::snprintf(line, sizeof(line), "--");
+        }
+        put_label(parent, line, 158, 190, theme::cyan(), &font_pixel_6x8);
+        put_label(parent, "IN USE", 240, 178, theme::pink(), &font_pixel_6x8);
+        if(traces.valid) {
+            std::snprintf(line, sizeof(line), "%lu.%lu%%",
+                          static_cast<unsigned long>(traces.occupied_permille / 10U),
+                          static_cast<unsigned long>(traces.occupied_permille % 10U));
+        } else {
+            std::snprintf(line, sizeof(line), "--");
+        }
+        put_label(parent, line, 240, 190,
+                  traces.occupied_permille > 200U ? theme::amber() : theme::lime(),
+                  &font_pixel_6x8);
         draw_spectrum_action_strip(parent, survey_running ? "SURVEY ACTIVE" : "COMPLETE",
                                    survey_running ? theme::amber() : theme::pink(),
                                    "START", !survey_running, false, !survey_running);
@@ -4387,6 +4536,33 @@ void build_spectrum(lv_obj_t * parent)
             lv_canvas_set_px(canvas, px, py, color, LV_OPA_COVER);
         }
     }
+    // The same traces the device draws, from the same histogram shape, so the
+    // preview shows what the hardware shows rather than an approximation of it.
+    static SpectrumSweepResult preview{};
+    preview.point_count = 0U;
+    const std::uint16_t revealed_columns = static_cast<std::uint16_t>(
+        total_points == 0U ? 0U :
+        (static_cast<std::uint32_t>(completed) * simulator::kSpectrumColumnCount) / total_points);
+    for(std::size_t column = 0U;
+        column < revealed_columns && column < simulator::kSpectrumColumnCount &&
+        column < kMaxSpectrumSweepPoints;
+        ++column) {
+        // Columns span the whole request, not one step each: multiplying a
+        // column index by step_hz walked the peak frequency clean off the
+        // axis the chart was drawing.
+        preview.points[column].frequency_hz = request.start_frequency_hz +
+            static_cast<std::uint32_t>(
+                (static_cast<std::uint64_t>(column) *
+                 (request.end_frequency_hz - request.start_frequency_hz)) /
+                (simulator::kSpectrumColumnCount > 1U
+                     ? simulator::kSpectrumColumnCount - 1U : 1U));
+        for(std::size_t bin = 0U; bin < kSpectrumPowerBinCount; ++bin) {
+            preview.points[column].counts[bin] = histogram[column][bin];
+        }
+        preview.point_count = static_cast<std::uint16_t>(column + 1U);
+    }
+    const SpectrumTraceStats traces = draw_spectrum_traces(
+        canvas, preview, revealed_columns, width, height);
     lv_obj_invalidate(canvas);
 
     add_grid(parent, x, y, width, height, 24, 16);
@@ -4394,6 +4570,16 @@ void build_spectrum(lv_obj_t * parent)
     theme::rule_line(parent, x, y + height, width);
     draw_spectrum_axes(parent, x, y, width, height, request.start_frequency_hz,
                        request.end_frequency_hz);
+    {
+        const std::size_t profiles = builtinProfileCount();
+        if(profiles != 0U) {
+            const RadioProfile &tuned =
+                builtinProfiles()[simulator_active_profile_index % profiles];
+            draw_spectrum_channel_marker(parent, x, y, width, height,
+                                         request.start_frequency_hz, request.end_frequency_hz,
+                                         tuned.center_frequency_hz, tuned.bandwidth_hz);
+        }
+    }
 
     if(simulator_spectrum_scanning) {
         const lv_coord_t cursor = x + static_cast<lv_coord_t>(
@@ -4452,24 +4638,43 @@ void build_spectrum(lv_obj_t * parent)
                                    !simulator_survey_running);
         return;
     }
+    // The same four measurements the device reports, from the same traces, so
+    // the preview and the hardware cannot drift into describing the band
+    // differently.
     char metric[20]{};
-    put_label(parent, "NOISE", 16, 178, theme::pink(), &font_pixel_6x8);
-    std::snprintf(metric, sizeof(metric), "%d DBM", spectrum.noise_floor_dbm);
+    put_label(parent, "PEAK", 16, 178, theme::pink(), &font_pixel_6x8);
+    if(traces.valid) {
+        std::snprintf(metric, sizeof(metric), "%.0f DBM",
+                      static_cast<double>(traces.peak_dbm_x10) / 10.0);
+    } else {
+        std::snprintf(metric, sizeof(metric), "%d DBM", spectrum.noise_floor_dbm);
+    }
     put_label(parent, metric, 16, 190, theme::text(), &font_pixel_6x8);
-    theme::rule_line(parent, 107, 178, 1, 24, theme::pink());
-    put_label(parent, "BUSY", 132, 178, theme::pink(), &font_pixel_6x8);
-    const std::uint32_t busiest_frequency_hz = simulator_spectrum_metric_frequency_hz(
-        request, spectrum.busiest_frequency_khz);
+    theme::rule_line(parent, 71, 178, 1, 24, theme::pink());
+    put_label(parent, "AT", 82, 178, theme::pink(), &font_pixel_6x8);
+    const std::uint32_t busiest_frequency_hz = traces.valid && traces.peak_hz != 0U
+        ? traces.peak_hz
+        : simulator_spectrum_metric_frequency_hz(request, spectrum.busiest_frequency_khz);
     std::snprintf(metric, sizeof(metric), "%.3f",
                   static_cast<double>(busiest_frequency_hz) / 1000000.0);
-    put_label(parent, metric, 132, 190, theme::amber(), &font_pixel_6x8);
-    theme::rule_line(parent, 211, 178, 1, 24, theme::pink());
-    put_label(parent, "QUIET", 242, 178, theme::pink(), &font_pixel_6x8);
-    const std::uint32_t quietest_frequency_hz = simulator_spectrum_metric_frequency_hz(
-        request, spectrum.quietest_frequency_khz);
-    std::snprintf(metric, sizeof(metric), "%.3f",
-                  static_cast<double>(quietest_frequency_hz) / 1000000.0);
-    put_label(parent, metric, 242, 190, theme::cyan(), &font_pixel_6x8);
+    put_label(parent, metric, 82, 190, theme::amber(), &font_pixel_6x8);
+    theme::rule_line(parent, 152, 178, 1, 24, theme::pink());
+    put_label(parent, "FLOOR", 164, 178, theme::pink(), &font_pixel_6x8);
+    if(traces.valid) {
+        std::snprintf(metric, sizeof(metric), "%.0f DBM",
+                      static_cast<double>(traces.floor_dbm_x10) / 10.0);
+    } else {
+        std::snprintf(metric, sizeof(metric), "%d DBM", spectrum.noise_floor_dbm);
+    }
+    put_label(parent, metric, 164, 190, theme::cyan(), &font_pixel_6x8);
+    theme::rule_line(parent, 232, 178, 1, 24, theme::pink());
+    put_label(parent, "IN USE", 244, 178, theme::pink(), &font_pixel_6x8);
+    std::snprintf(metric, sizeof(metric), "%lu.%lu%%",
+                  static_cast<unsigned long>(traces.occupied_permille / 10U),
+                  static_cast<unsigned long>(traces.occupied_permille % 10U));
+    put_label(parent, metric, 244, 190,
+              traces.occupied_permille > 200U ? theme::amber() : theme::lime(),
+              &font_pixel_6x8);
     draw_spectrum_action_strip(parent,
                                simulator_survey_running ? "SURVEY ACTIVE" : "COMPLETE",
                                simulator_survey_running ? theme::amber() : theme::pink(),
@@ -11607,7 +11812,7 @@ bool run_simulator_render_test() noexcept
     chat_push("RANGER", "TRACK IS WASHED OUT PAST THE CREEK", false, 0xffffffffU, "09:18");
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0x0cd08b0c71623817ULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
-        0x932ca408b25d655fULL, 0x58528a9a39aa7867ULL, 0xfa348ff23e543170ULL,
+        0x932ca408b25d655fULL, 0x3b6ca3507efcd29cULL, 0x3d61199a6d61d28cULL,
         0x86f8c337e12d7380ULL, 0x942c5b2b206072e8ULL, 0x2d79e348284dfd29ULL,
         0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xaa3ec62aa1276c19ULL,
         0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
@@ -11885,6 +12090,46 @@ bool run_simulator_render_test() noexcept
             passed = false;
         }
         open_field_tab(FieldTab::Map);
+        build_current_screen();
+    }
+
+    // A completed sweep, with the traces and the channel marker over it. The
+    // spectrum screen's golden frame is otherwise the empty state, which hashes
+    // just as stably while covering none of the drawing that matters.
+    {
+        current_screen = Screen::spectrum;
+        app_shell.closeToAnalyzer();
+        simulator_spectrum_scanning = false;
+        simulator_spectrum_cancelled = false;
+        simulator_spectrum_started_ms = 0U;
+        simulator_spectrum_partial_points = simulator_spectrum_total_points();
+        for(std::size_t step = 0U; step < 12U; ++step) advance_simulator_live_data(1000U);
+        build_current_screen();
+        lv_refr_now(display);
+        if (render_directory != nullptr) {
+            (void)write_simulator_frame(render_directory, "spectrum", 0);
+        }
+        constexpr std::uint64_t kSpectrumSweptHash = 0xdf1b4a497ead5f46ULL;
+        const std::uint64_t swept_hash = hash_simulator_frame();
+        std::size_t swept_ink = 0U;
+        for(const std::uint16_t pixel : simulator_frame_buffer) {
+            if(pixel != background) ++swept_ink;
+        }
+        std::fprintf(stderr, "Lilyshark render SPECTRUM SWEPT: fnv1a=%016llx foreground=%zu\n",
+                     static_cast<unsigned long long>(swept_hash), swept_ink);
+        if(swept_ink < 1000U) {
+            std::fprintf(stderr, "Simulator render failed: SPECTRUM SWEPT is nearly blank\n");
+            passed = false;
+        }
+        if(swept_hash != kSpectrumSweptHash) {
+            std::fprintf(stderr, "Simulator render failed: SPECTRUM SWEPT expected %016llx\n",
+                         static_cast<unsigned long long>(kSpectrumSweptHash));
+            passed = false;
+        }
+        simulator_spectrum_partial_points = 0U;
+        current_screen = Screen::map;
+        field_tab = FieldTab::Map;
+        app_shell.closeToAnalyzer();
         build_current_screen();
     }
 
