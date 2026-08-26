@@ -8,6 +8,7 @@
 #include <unistd.h>
 #endif
 #include <cstring>
+#include <functional>
 
 #if defined(LILYSHARK_DEVICE)
 #include <Arduino.h>
@@ -2034,11 +2035,16 @@ void simulator_you_latlon(double &lat, double &lon) noexcept
     const std::uint32_t phase =
         static_cast<std::uint32_t>(simulator_live_telemetry.tick() / 4U);
     const std::size_t step = static_cast<std::size_t>(phase) % kSimulatorWalkSteps;
-    const double lat_rad = origin_lat * 0.017453292519943295;
     const double you_east = 70.0 * kSimulatorWalkCos[step];
     const double you_north = 70.0 * kSimulatorWalkSin[step];
+    // Metres per degree of longitude at the demo origin, as a literal. This
+    // was 111320.0 * std::cos(origin_lat in radians), and that libm call is
+    // the last thing standing between this walk and the same longitude on
+    // every platform -- it divides you_east, and the printed digit sits on a
+    // rounding boundary.
+    constexpr double metres_per_degree_lon = 87989.93705403568;
     lat = origin_lat + you_north / 110540.0;
-    lon = origin_lon + you_east / (111320.0 * std::cos(lat_rad));
+    lon = origin_lon + you_east / metres_per_degree_lon;
 }
 
 bool simulator_node_fix(const simulator::NodeSnapshot &node, double &lat,
@@ -12103,6 +12109,23 @@ bool run_simulator_render_test() noexcept
             std::fprintf(stderr, "Simulator render failed: %s is nearly blank\n",
                          shell_names[index]);
             passed = false;
+        }
+        // TEMPORARY: dump Home's labels with their positions so the macOS and
+        // Linux renders can be compared line by line.
+        if(std::strcmp(shell_names[index], "HOME") == 0) {
+            std::function<void(lv_obj_t *)> walk = [&](lv_obj_t *node) {
+                if(node == nullptr) return;
+                if(lv_obj_check_type(node, &lv_label_class)) {
+                    std::fprintf(stderr, "HOMELABEL y=%4d x=%4d [%s]\n",
+                                 static_cast<int>(lv_obj_get_y(node)),
+                                 static_cast<int>(lv_obj_get_x(node)),
+                                 lv_label_get_text(node));
+                }
+                for(std::uint32_t child = 0; child < lv_obj_get_child_count(node); ++child) {
+                    walk(lv_obj_get_child(node, static_cast<std::int32_t>(child)));
+                }
+            };
+            walk(lv_screen_active());
         }
         if(hash != shell_expected_hashes[index]) {
             std::fprintf(stderr,
