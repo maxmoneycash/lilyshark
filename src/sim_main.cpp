@@ -7820,20 +7820,29 @@ void build_help(lv_obj_t * parent)
 #if defined(LILYSHARK_DEVICE)
     constexpr const char *screenshot_help = "SCREENSHOT";
 #else
-    constexpr const char *screenshot_help = "DEVICE SCREENSHOT";
+    constexpr const char *screenshot_help = "SCREENSHOT";
 #endif
     constexpr std::array<std::array<const char *, 2>, 3> nav = {{
         {{"BALL L / R", "CHANGE VIEW"}},
         {{"BALL U / D", "SELECT"}},
         {{"BALL PRESS", "OPEN"}},
     }};
-    constexpr std::array<std::array<const char *, 2>, 6> keys = {{
+    // Two columns, because one could not hold the keys that matter. C opens
+    // Chat -- one of the two things this device exists to do -- and was not
+    // listed at all; nor were Settings, the map controls, or the timeline
+    // filters. Buttons no longer carry their shortcut, so this is where a
+    // reader comes to find one, and a gap here is the whole cost of that.
+    constexpr std::array<std::array<const char *, 2>, 10> keys = {{
         {{"BACKSPACE", "BACK"}},
+        {{"C", "CHAT"}},
         {{"M OR 0", "HOME"}},
+        {{"8", "SETTINGS"}},
+        {{"1-7", "LIVE VIEWS"}},
+        {{"9 / T", "PROTO / TIME"}},
         {{"P", "PROFILES"}},
+        {{"+ -", "MAP ZOOM"}},
+        {{"I D G", "MAP LAYER"}},
         {{"S", screenshot_help}},
-        {{"?", "HELP"}},
-        {{"1-7 / 9 / T", "LIVE VIEW"}},
     }};
     put_label(parent, "NAV", 8, 26, theme::pink(), &font_pixel_6x8);
     for (std::size_t index = 0; index < nav.size(); ++index) {
@@ -7844,11 +7853,16 @@ void build_help(lv_obj_t * parent)
     }
     put_label(parent, "KEYS", 8, 96, theme::pink(), &font_pixel_6x8);
     for (std::size_t index = 0; index < keys.size(); ++index) {
-        const lv_coord_t y = 108 + static_cast<lv_coord_t>(index) * 16;
-        put_label(parent, keys[index][0], 8, y, theme::text(), &font_pixel_6x8);
-        lv_obj_t *value = theme::label(parent, keys[index][1], theme::cyan(), &font_mono_10);
-        lv_obj_align_to(value, parent, LV_ALIGN_TOP_RIGHT, -8, y);
+        const lv_coord_t column = static_cast<lv_coord_t>(index / 5U);
+        const lv_coord_t row = static_cast<lv_coord_t>(index % 5U);
+        const lv_coord_t x = 8 + column * 158;
+        const lv_coord_t y = 110 + row * 17;
+        put_label(parent, keys[index][0], x, y, theme::text(), &font_pixel_6x8);
+        put_clipped_label(parent, keys[index][1], x + 68, y, 84, theme::cyan(),
+                          &font_pixel_6x8);
     }
+    put_label(parent, "? OPENS THIS SCREEN FROM ANYWHERE.", 8, 190,
+              theme::text_muted(), &font_pixel_6x8);
     draw_back_strip(parent, "ABOUT");
 }
 
@@ -11891,7 +11905,7 @@ bool run_simulator_render_test() noexcept
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
         0x0e8d5caa0f3b18beULL, 0x0c0a191f76a06f71ULL, 0x22ed3faf3d1304e6ULL,
         0x7e1363de7108f530ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
-        0xde0a7b1d16ecf53aULL, 0x5e5e617ebee82f9bULL, 0xd11ac720a339c77aULL,
+        0xde0a7b1d16ecf53aULL, 0xd62b50d326551431ULL, 0xd11ac720a339c77aULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
     }};
 
