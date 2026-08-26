@@ -493,10 +493,10 @@ export default function Config() {
 									type="number"
 									min={0}
 									disabled={!alerts.on}
-									value={alerts.autonomiaH}
+									value={alerts.runtimeH}
 									style={{ width: 80 }}
 									onChange={(e) =>
-										saveAlerts({ autonomiaH: Number(e.target.value) })
+										saveAlerts({ runtimeH: Number(e.target.value) })
 									}
 								/>
 								<span className="dim">{t("h")}</span>

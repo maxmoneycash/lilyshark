@@ -411,7 +411,7 @@ const CHATTER: [number, string, number][] = [
   [18, "anyone have a spare 915 antenna? Menlo", 22],
   [26, "creek gauge 01 reading 0.42 m, steady", 17],
   [2, "Arastradero on solar only, 61% and holding", 13],
-  [12, "capture uploaded, pointer going out on Primary now", 8],
+  [12, "capture uploaded, pointer going out on LongFast now", 8],
   [9, "got the pointer at Caltrain, resolving it now", 6],
   [5, "resolved — 19,200 B, commitment checks out", 4],
   [31, "reminder: weekly net Thursday 19:30 on this channel", 2],
@@ -457,7 +457,7 @@ const LIVE_POOL: [number, string][] = [
   [12, "levee checkpoint — path via HVR holding at 2 hops"],
   [5, "reading the last pointer now, commitment matches"],
   [9, "Caltrain platform, RSSI to HVR up 4 dB since morning"],
-  [3, "Hoover relaying 18 pkt/min, all CRC clean"],
+  [3, "Hoover relaying 18 PKT/MIN, all CRC clean"],
   [0, "Skyline wx: fog rolling over the ridge, antennas dry"],
   [26, "creek gauge 02: 0.44 m, +2 cm on the hour"],
   [21, "Woodside store porch node back on solar"],
@@ -469,7 +469,7 @@ const LIVE_POOL: [number, string][] = [
   [12, "heading back, dropping a capture to Shelby at the car"],
   [1, "Windy Hill sees all three portola nodes direct tonight"],
   [28, "fire watch cam battery cycled fine overnight"],
-  [5, "new .lscap up — pointer on Primary in a minute"],
+  [5, "new .lscap up — pointer on LongFast in a minute"],
 ];
 
 /** The Baylands walker: a small loop along the levee, one step per tick. */
@@ -574,7 +574,7 @@ export function seedDemo(): void {
     s.messages = [...buildMessages(nodes, now), ...s.messages].sort((a, b) => a.ts - b.ts);
 
     if (!s.channels.has(0)) {
-      s.channels = new Map(s.channels).set(0, { index: 0, name: "Primary" });
+      s.channels = new Map(s.channels).set(0, { index: 0, name: "LongFast" });
       createdChannel0 = true;
     }
     s.posUpdates = new Map(nodes.map((n) => [n.num, now - Math.abs(jitter(n.num, 1)) * 900_000]));
@@ -606,7 +606,7 @@ export function clearDemo(): void {
     if (createdChannel0) {
       const ch = new Map(s.channels);
       // only if it is still the one we invented
-      if (ch.get(0)?.name === "Primary") ch.delete(0);
+      if (ch.get(0)?.name === "LongFast") ch.delete(0);
       s.channels = ch;
       createdChannel0 = false;
     }

@@ -597,12 +597,11 @@
 
 .meshterm .msg-mine {
 	background: color-mix(in srgb, var(--fg) 8%, transparent);
-	border-left: 2px solid var(--fg);
-	padding-left: 8px;
-	margin-left: -10px;
+	padding: 2px 10px 2px 8px;
+	margin: 0 -4px;
 }
 .meshterm .msg-mine.failed {
-	border-left-color: var(--err);
+	background: color-mix(in srgb, var(--err) 14%, transparent);
 }
 
 /* quote/forward button: dim, revealed on hovering the message */
@@ -707,6 +706,37 @@
 	border-top: 1px solid var(--border);
 }
 
+.meshterm .chat-empty {
+	border: 1px solid var(--border);
+	padding: 16px 14px;
+	margin: 8px 0 12px;
+	max-width: 36rem;
+}
+.meshterm .chat-empty-title {
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	margin-bottom: 6px;
+}
+.meshterm .chat-hint {
+	font-size: 11px;
+	color: var(--fg-dim);
+	margin-bottom: 10px;
+	max-width: 42rem;
+}
+.meshterm .chat-remain {
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	min-width: 2ch;
+	text-align: right;
+}
+.meshterm .chat-send {
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	padding: 4px 12px;
+}
+.meshterm .chat-send:disabled {
+	opacity: 0.45;
+}
 .meshterm .chat-input {
 	display: flex;
 	align-items: center;
@@ -910,6 +940,20 @@
 	pointer-events: none;
 	background: color-mix(in srgb, var(--bg) 80%, transparent);
 	padding: 1px 6px;
+}
+.meshterm .map-toolbar {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+}
+.meshterm .map-chip-row {
+	display: inline-flex;
+	gap: 4px;
+	align-items: center;
+}
+.meshterm .map-chip-row button {
+	font-size: 10px;
+	padding: 2px 7px;
 }
 
 /* ── pie ── */

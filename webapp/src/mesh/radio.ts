@@ -211,26 +211,26 @@ function upsertNode(num: number, patch: Partial<NodeEntry>): void {
       patch.hopsAway !== prev.hopsAway &&
       s.status === DeviceStatus.Configured
     ) {
-      avisarCambioRuta(merged, prev.hopsAway);
+      noteRouteChange(merged, prev.hopsAway);
     }
   });
 }
 
 // One warning per node every 6 h: the distance can oscillate between two
 // values for a while and we don't want a notification per bounce.
-const rutaAvisada = new Map<number, number>();
+const routeWarned = new Map<number, number>();
 
-function avisarCambioRuta(n: NodeEntry, antes: number): void {
-  const nowMs = n.hopsAway as number;
-  saveHopChange(n.num, nowMs, antes).catch(dbFail(t("route change")));
-  const quien = n.longName || n.shortName;
-  addLog("ROUTE: {0} goes from {1} to {2} hops", quien, antes, nowMs);
+function noteRouteChange(n: NodeEntry, previous: number): void {
+  const hops = n.hopsAway as number;
+  saveHopChange(n.num, hops, previous).catch(dbFail(t("route change")));
+  const who = n.longName || n.shortName;
+  addLog("ROUTE: {0} goes from {1} to {2} hops", who, previous, hops);
   if (!n.fav || !getAlertCfg().on) return;
-  if (Date.now() - (rutaAvisada.get(n.num) ?? -Infinity) < COOLDOWN_MS) return;
-  rutaAvisada.set(n.num, Date.now());
+  if (Date.now() - (routeWarned.get(n.num) ?? -Infinity) < COOLDOWN_MS) return;
+  routeWarned.set(n.num, Date.now());
   void notify(
-    t("{0} · route {1}", quien, nowMs > antes ? t("longer") : t("shorter")),
-    t("Now {0} hops away (was {1})", nowMs, antes),
+    t("{0} · route {1}", who, hops > previous ? t("longer") : t("shorter")),
+    t("Now {0} hops away (was {1})", hops, previous),
   );
 }
 
@@ -1366,7 +1366,11 @@ export async function sendText(
       s.messages = [...s.messages, msg];
     });
     try {
-      await sendDeviceLine(`LSK TX meshtastic text ${text}`);
+      await sendDeviceLine(
+        isDm
+          ? `LSK TX meshtastic dm ${(destination >>> 0).toString(16).padStart(8, "0")} ${text}`
+          : `LSK TX meshtastic text ${text}`,
+      );
       setMsgState(msg.id, msg.ts, "sent");
     } catch (e) {
       setMsgState(msg.id, msg.ts, "failed");

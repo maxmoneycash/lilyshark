@@ -327,26 +327,30 @@ export async function loadNeighbors(
 export async function saveHopChange(
   node: number,
   hops: number,
-  antes: number | undefined,
+  previous: number | undefined,
   ts = Date.now(),
 ): Promise<void> {
   const { os, tx } = await store("hops", "readwrite");
-  os.put({ node, ts, hops, antes: antes ?? null });
+  os.put({ node, ts, hops, previous: previous ?? null, antes: previous ?? null });
   await txDone(tx);
 }
 
 export async function loadHopChanges(
   node: number,
   limit = 10,
-): Promise<{ ts: number; hops: number; antes?: number }[]> {
+): Promise<{ ts: number; hops: number; previous?: number }[]> {
   const { os } = await store("hops");
-  const rows = await collect<{ ts: number; hops: number; antes: number | null }>(
-    os,
-    IDBKeyRange.bound([node, -Infinity], [node, Infinity]),
-    "prev",
-    limit,
-  );
-  return rows.map((r) => ({ ts: r.ts, hops: r.hops, antes: r.antes ?? undefined }));
+  const rows = await collect<{
+    ts: number;
+    hops: number;
+    previous?: number | null;
+    antes?: number | null;
+  }>(os, IDBKeyRange.bound([node, -Infinity], [node, Infinity]), "prev", limit);
+  return rows.map((r) => ({
+    ts: r.ts,
+    hops: r.hops,
+    previous: r.previous ?? r.antes ?? undefined,
+  }));
 }
 
 // ── sightings ───────────────────────────────────────────────────────────────
@@ -367,7 +371,7 @@ export async function markHeard(node: number, ts = Date.now()): Promise<void> {
 }
 
 /** Activity per node and hour since a given date. */
-export async function loadActividad(
+export async function loadActivity(
   sinceMs: number,
 ): Promise<{ node: number; hourBucket: number; n: number }[]> {
   const { os } = await store("sightings");

@@ -5,8 +5,9 @@ import {
 	ago,
 	asciiBattery,
 	distKm,
-	fechaHora,
+	dateTime,
 	fmtDist,
+	fmtHemisphere,
 	hwName,
 	snrClass,
 } from "../fmt";
@@ -62,28 +63,28 @@ function Copy({ text, children }: { text: string; children: React.ReactNode }) {
 }
 
 type SortKey =
-	| "visto"
-	| "nombre"
-	| "corto"
-	| "saltos"
+	| "seen"
+	| "name"
+	| "short"
+	| "hops"
 	| "snr"
-	| "bateria"
+	| "battery"
 	| "pos";
 
 // default direction the first time each column is clicked
 const DEFAULT_DIR: Record<SortKey, 1 | -1> = {
-	visto: -1,
-	nombre: 1,
-	corto: 1,
-	saltos: 1,
+	seen: -1,
+	name: 1,
+	short: 1,
+	hops: 1,
 	snr: -1,
-	bateria: -1,
+	battery: -1,
 	pos: 1,
 };
 
 // Distance from my node, ready to append after the coordinates. Empty when
 // there's no fix on either side or the node is mine.
-function distDesde(
+function distFrom(
 	n: NodeEntry,
 	me: NodeEntry | undefined,
 	isMe: boolean,
@@ -120,19 +121,19 @@ function sortNodesBy(
 ) {
 	const s = [...nodes];
 	switch (key) {
-		case "nombre":
+		case "name":
 			return s.sort(
 				(a, b) => (a.longName ?? "").localeCompare(b.longName ?? "") * dir,
 			);
-		case "corto":
+		case "short":
 			return s.sort(
 				(a, b) => (a.shortName ?? "").localeCompare(b.shortName ?? "") * dir,
 			);
-		case "saltos":
+		case "hops":
 			return s.sort((a, b) => cmpOpt(a.hopsAway, b.hopsAway, dir));
 		case "snr":
 			return s.sort((a, b) => cmpOpt(a.snr, b.snr, dir));
-		case "bateria":
+		case "battery":
 			return s.sort((a, b) => cmpOpt(a.batteryLevel, b.batteryLevel, dir));
 		case "pos": {
 			const d = (n: NodeEntry) =>
@@ -228,7 +229,7 @@ function Detail(props: {
 	const [showHistory, setShowHistory] = useState(false);
 	const [bat, setBat] = useState<Forecast>();
 	const [hops, setHops] = useState<
-		{ ts: number; hops: number; antes?: number }[]
+		{ ts: number; hops: number; previous?: number }[]
 	>([]);
 
 	useEffect(() => {
@@ -395,13 +396,13 @@ function Detail(props: {
 						className="dim"
 						style={{ fontSize: 10 }}
 						title={hops
-							.map((h) => `${fechaHora(h.ts)} · ${h.antes ?? "?"} → ${h.hops}`)
+							.map((h) => `${dateTime(h.ts)} · ${h.previous ?? "?"} → ${h.hops}`)
 							.join("\n")}
 					>
 						{" "}
 						{t("· changed {0} ago (was {1})",
 							ago(hops[0].ts / 1000),
-							hops[0].antes ?? "?",
+							hops[0].previous ?? "?",
 						)}
 					</span>
 				)}
@@ -425,9 +426,9 @@ function Detail(props: {
 			n.lat !== undefined && n.lon !== undefined ? (
 				<>
 					<Copy text={`${n.lat}, ${n.lon}`}>
-						{`${n.lat.toFixed(4)}N ${n.lon.toFixed(4)}E`}
+						{fmtHemisphere(n.lat, n.lon)}
 					</Copy>
-					{distDesde(n, props.me, props.isMe)}
+					{distFrom(n, props.me, props.isMe)}
 				</>
 			) : (
 				t("NO GPS FIX")
@@ -435,7 +436,7 @@ function Detail(props: {
 		],
 		[
 			t("LAST SEEN"),
-			<span title={fechaHora(n.lastHeard * 1000)}>{ago(n.lastHeard)}</span>,
+			<span title={dateTime(n.lastHeard * 1000)}>{ago(n.lastHeard)}</span>,
 		],
 	];
 	return (
@@ -471,7 +472,7 @@ function Detail(props: {
 			<div
 				className="dim"
 				style={{ padding: "2px 12px 12px", fontSize: 11 }}
-				title={fechaHora(n.lastHeard * 1000)}
+				title={dateTime(n.lastHeard * 1000)}
 			>
 				{t("LAST PACKET {0} AGO", ago(n.lastHeard))}
 			</div>
@@ -542,7 +543,7 @@ function Detail(props: {
 									{history.map((h) => (
 										<div key={h.ts} style={{ marginBottom: 6 }}>
 											<div className="dim" style={{ fontSize: 10 }}>
-												{fechaHora(h.ts)} ·{" "}
+												{dateTime(h.ts)} ·{" "}
 												{t("{0} hops", h.route.length + 1)}
 											</div>
 											<RouteLine
@@ -762,7 +763,7 @@ export default function Nodes({
 			?.scrollIntoView({ block: "nearest" });
 	}, [initialSelected]);
 	const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({
-		key: "visto",
+		key: "seen",
 		dir: -1,
 	});
 	const onSort = (key: SortKey) =>
@@ -816,25 +817,25 @@ export default function Nodes({
 					<table className="grid">
 						<thead>
 							<tr>
-								<Th label={t("NODE")} k="nombre" sort={sort} onSort={onSort} />
-								<Th label={t("SHORT")} k="corto" sort={sort} onSort={onSort} />
+								<Th label={t("NODE")} k="name" sort={sort} onSort={onSort} />
+								<Th label={t("SHORT")} k="short" sort={sort} onSort={onSort} />
 								<Th label="SNR" k="snr" sort={sort} onSort={onSort} />
 								<Th
 									label={t("BATTERY")}
-									k="bateria"
+									k="battery"
 									sort={sort}
 									onSort={onSort}
 								/>
 								<Th
 									label={t("HOPS")}
-									k="saltos"
+									k="hops"
 									sort={sort}
 									onSort={onSort}
 								/>
 								<Th label={t("POSITION")} k="pos" sort={sort} onSort={onSort} />
 								<Th
 									label={t("LAST SEEN")}
-									k="visto"
+									k="seen"
 									sort={sort}
 									onSort={onSort}
 								/>
@@ -887,16 +888,16 @@ export default function Nodes({
 									<td>
 										{n.lat !== undefined && n.lon !== undefined ? (
 											<>
-												{`${n.lat.toFixed(4)}N ${n.lon.toFixed(4)}E`}
+												{fmtHemisphere(n.lat, n.lon)}
 												<span className="dim">
-													{distDesde(n, me, n.num === s.myNodeNum)}
+													{distFrom(n, me, n.num === s.myNodeNum)}
 												</span>
 											</>
 										) : (
 											t("NO GPS FIX")
 										)}
 									</td>
-									<td title={fechaHora(n.lastHeard * 1000)}>
+									<td title={dateTime(n.lastHeard * 1000)}>
 										{ago(n.lastHeard)}
 									</td>
 								</tr>
@@ -904,13 +905,20 @@ export default function Nodes({
 						</tbody>
 					</table>
 					{nodes.length === 0 && (
-						<p className="dim" style={{ padding: 12 }}>
-							{q
-								? t("NO MATCHES FOR \"{0}\"_", filter)
-								: link.status === "linked"
-									? "T-Deck is listening on this radio profile. Other nodes appear here when they transmit. Nothing has been heard yet."
-									: "NO NODES DETECTED — AWAITING SIGNAL_"}
-						</p>
+						<div className="chat-empty" style={{ margin: 12 }}>
+							<div className="chat-empty-title">
+								{q
+									? t("NO MATCHES FOR \"{0}\"", filter)
+									: t("NO NODES HEARD")}
+							</div>
+							<div className="dim">
+								{q
+									? t("Clear the filter or try another name.")
+									: link.status === "linked"
+										? t("This T-Deck is listening. Names appear after a nearby radio transmits.")
+										: t("Connect the T-Deck or wait for a frame with a stable source.")}
+							</div>
+						</div>
 					)}
 				</div>
 				<div className="panel-foot">

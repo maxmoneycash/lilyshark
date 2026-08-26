@@ -11,7 +11,7 @@ export interface Forecast {
   /** how much to trust it: 0..1 from the spread of the points around the line */
   fit: number;
   samples: number;
-  ultimo: number; // last known %
+  last: number; // last known %
 }
 
 /** Least squares linear regression over the last `hours` hours of battery.
@@ -61,12 +61,12 @@ export function forecastBattery(
   // flat battery (ssTot 0): the line is exact, R²=1 by convention
   const fit = ssTot === 0 ? 1 : Math.max(0, 1 - ssRes / ssTot);
 
-  const ultimo = ys[n - 1];
-  const r: Forecast = { slope, fit, samples: n, ultimo };
+  const last = ys[n - 1];
+  const r: Forecast = { slope, fit, samples: n, last };
   // predicting a runout only makes sense when it really drops; a threshold
   // slightly below 0 keeps the noise of a flat battery from becoming a warning
   if (slope < -0.05) {
-    r.hoursRemaining = ultimo / -slope;
+    r.hoursRemaining = last / -slope;
   }
   return r;
 }

@@ -12,19 +12,19 @@ Object.defineProperty(globalThis, "localStorage", {
 	configurable: true,
 });
 
-const { asciiBattery, distKm, fechaHora, fmtDist, getHourPref, hhmm, is12h } =
+const { asciiBattery, distKm, dateTime, fmtDist, fmtHemisphere, getHourPref, hhmm, is12h } =
 	await import("./fmt.ts");
 
 const T = new Date("2026-07-20T15:04:05").getTime();
-const MEDIANOCHE = new Date("2026-07-20T00:30:00").getTime();
+const MIDNIGHT = new Date("2026-07-20T00:30:00").getTime();
 
 // ── clock format ─────────────────────────────────────────────────────────
 assert.equal(getHourPref(), "auto", "nothing stored yields the default");
 
 stored.set("hourFormat", "24");
 assert.equal(is12h(), false);
-assert.match(hhmm(T), /^15[:.]04[:.]05$/, `24 h da ${hhmm(T)}`);
-assert.ok(!/\d\d:\d\d:\d\d.+[ap]/i.test(hhmm(T)), "24 h no lleva AM/PM");
+assert.match(hhmm(T), /^15[:.]04[:.]05$/, `24 h gave ${hhmm(T)}`);
+assert.ok(!/\d\d:\d\d:\d\d.+[ap]/i.test(hhmm(T)), "24 h must not carry AM/PM");
 
 stored.set("hourFormat", "12");
 assert.equal(is12h(), true);
@@ -34,12 +34,12 @@ assert.match(
 	/\b03[:.]04/,
 	`12 h should show 3 o'clock, got ${hhmm(T)}`,
 );
-assert.match(hhmm(T), /[ap]\.?\s?m|[AP]M/i, `12 h sin AM/PM: ${hhmm(T)}`);
+assert.match(hhmm(T), /[ap]\.?\s?m|[AP]M/i, `12 h missing AM/PM: ${hhmm(T)}`);
 // midnight in 12 h is 12, never 0: the classic off-by-one of hand-rolled formatters
 assert.match(
-	hhmm(MEDIANOCHE),
+	hhmm(MIDNIGHT),
 	/\b12[:.]30/,
-	`medianoche da ${hhmm(MEDIANOCHE)}`,
+	`midnight gave ${hhmm(MIDNIGHT)}`,
 );
 
 // seconds are optional, but the hour must not change with them
@@ -50,29 +50,29 @@ assert.ok(
 assert.ok(hhmm(T).startsWith(hhmm(T, false).slice(0, 2)));
 
 // a corrupt value falls back to automatic instead of breaking the clock
-stored.set("hourFormat", "basura");
+stored.set("hourFormat", "garbage");
 assert.equal(getHourPref(), "auto");
 assert.ok(hhmm(T).length > 0);
 
 // ── date + time ──────────────────────────────────────────────────────────
 // toLocaleString with only hour12 and no component would return the date
-// alone: fechaHora has to keep carrying the time
+// alone: dateTime has to keep carrying the time
 stored.set("hourFormat", "24");
 assert.match(
-	fechaHora(T),
+	dateTime(T),
 	/15[:.]04/,
-	`fechaHora pierde la hhmm: ${fechaHora(T)}`,
+	`dateTime dropped the time: ${dateTime(T)}`,
 );
 assert.match(
-	fechaHora(T),
+	dateTime(T),
 	/\d{1,4}[/.-]\d{1,2}/,
-	`fechaHora pierde la fecha: ${fechaHora(T)}`,
+	`dateTime dropped the date: ${dateTime(T)}`,
 );
 
 // ── battery bar ──────────────────────────────────────────────────────────
 // the width is fixed: it lines up in a column of a monospace table
-const anchos = new Set([0, 5, 50, 99, 100].map((n) => asciiBattery(n).length));
-assert.equal(anchos.size, 1, `la barra cambia de ancho: ${[...anchos]}`);
+const widths = new Set([0, 5, 50, 99, 100].map((n) => asciiBattery(n).length));
+assert.equal(widths.size, 1, `battery bar width shifted: ${[...widths]}`);
 assert.ok(asciiBattery(101).includes("PWR"), ">100 % means external power");
 assert.equal(asciiBattery(undefined), "—");
 
@@ -90,11 +90,18 @@ assert.ok(
 );
 // known short leg (Palma → Inca, ~28 km) within a few percent of haversine
 const d = distKm(39.5696, 2.6502, 39.7217, 2.9106);
-assert.ok(d > 26 && d < 30, `Palma-Inca fuera de rango: ${d}`);
+assert.ok(d > 26 && d < 30, `Palma-Inca out of range: ${d}`);
 
-assert.equal(fmtDist(0.84), "840 m");
-assert.equal(fmtDist(0.999), "999 m");
-assert.equal(fmtDist(1), "1.0 km");
-assert.equal(fmtDist(12.37), "12.4 km");
+assert.equal(fmtDist(0.84), "840M");
+assert.equal(fmtDist(0.999), "999M");
+assert.equal(fmtDist(1), "1.0KM");
+assert.equal(fmtDist(12.37), "12.4KM");
+
+assert.equal(fmtHemisphere(37.7749, -122.4194), "37.7749 N  122.419 W");
+assert.equal(fmtHemisphere(-33.8688, 151.2093), "33.8688 S  151.209 E");
+assert.equal(
+	fmtHemisphere(37.4419, -122.143, 5, 5),
+	"37.44190 N  122.14300 W",
+);
 
 console.log("fmt.test.ts OK");

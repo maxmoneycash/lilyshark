@@ -2,13 +2,19 @@ import L from "leaflet";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import "leaflet/dist/leaflet.css";
 import { DEMO_CENTER, isDemo } from "../demo";
-import { ago, asciiBattery, fechaHora, useHourTick } from "../fmt";
+import {
+	contourIntervalForZoom,
+	paintDarkContourTile,
+	paintFieldChartTile,
+	paintTerrariumContourPixels,
+} from "../fieldChart";
+import { ago, asciiBattery, dateTime, fmtHemisphere, useHourTick } from "../fmt";
 import { t, useLangTick } from "../i18n";
 import { useDeviceLink } from "../../lib/deviceLink";
 import { deleteWaypoint, sendWaypoint } from "../radio";
 import { getSnapshot, subscribe } from "../store";
 import { SimulateBadge } from "../ThisDevice";
-import { accent, fg, isLight, useThemeTick } from "../theme";
+import { accent, fg, useThemeTick } from "../theme";
 
 interface Draft {
 	id?: number; // defined = editing
@@ -49,6 +55,8 @@ export default function MapView({
 	const [draft, setDraft] = useState<Draft>();
 	const [wpMsg, setWpMsg] = useState("");
 	const [filter, setFilter] = useState<"all" | "fav" | "active">("all");
+	const [basemap, setBasemap] = useState<"sat" | "map" | "chart">("sat");
+	const tileRef = useRef<L.Layer | null>(null);
 	// The parent passes a fresh arrow on every render; going through a ref keeps
 	// it out of the marker effect's deps without ever calling a stale one.
 	const openNodeRef = useRef(onOpenNode);
@@ -63,9 +71,11 @@ export default function MapView({
 			[DEMO_CENTER.lat, DEMO_CENTER.lon],
 			12,
 		);
-		L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-			attribution: "© OpenStreetMap",
-		}).addTo(map);
+		const tiles = L.tileLayer(
+			"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+			{ attribution: "Esri" },
+		).addTo(map);
+		tileRef.current = tiles;
 		layerRef.current = L.layerGroup().addTo(map);
 		map.on("contextmenu", (e: L.LeafletMouseEvent) => {
 			setWpMsg("");
@@ -89,12 +99,102 @@ export default function MapView({
 			ro.disconnect();
 			map.remove();
 			mapRef.current = null;
+			tileRef.current = null;
 			fittedRef.current = false;
 			// the new map starts blank: whatever was centered/fitted has to happen
 			// again (StrictMode remounts twice in dev, and this ref outlives the map)
 			focusedRef.current = undefined;
 		};
 	}, []);
+
+	useEffect(() => {
+		const map = mapRef.current;
+		if (!map) return;
+		if (tileRef.current) map.removeLayer(tileRef.current);
+		if (basemap === "chart") {
+			const Chart = L.GridLayer.extend({
+				createTile(coords: L.Coords) {
+					const tile = document.createElement("canvas");
+					tile.width = tile.height = 256;
+					const ctx = tile.getContext("2d");
+					if (ctx) paintFieldChartTile(ctx, coords.x, coords.y, coords.z, 256);
+					return tile;
+				},
+			});
+			tileRef.current = new Chart({ attribution: "FIELD CHART" });
+		} else if (basemap === "sat") {
+			tileRef.current = L.tileLayer(
+				"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+				{ attribution: "Esri" },
+			);
+		} else {
+			const group = L.layerGroup();
+			L.tileLayer(
+				"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+				{ attribution: "FIELD DARK" },
+			).addTo(group);
+			const Contours = L.GridLayer.extend({
+				createTile(coords: L.Coords, done: (err: Error | null, tile: HTMLElement) => void) {
+					const tile = document.createElement("canvas");
+					tile.width = tile.height = 256;
+					const ctx = tile.getContext("2d");
+					const srcZ = Math.min(coords.z, 15);
+					const shift = coords.z - srcZ;
+					const srcX = coords.x >> shift;
+					const srcY = coords.y >> shift;
+					const url =
+						`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${srcZ}/${srcX}/${srcY}.png`;
+					fetch(url)
+						.then((res) => {
+							if (!res.ok) throw new Error("terrarium");
+							return res.blob();
+						})
+						.then((blob) => createImageBitmap(blob))
+						.then((bmp) => {
+							if (!ctx) {
+								done(null, tile);
+								return;
+							}
+							const scratch = document.createElement("canvas");
+							scratch.width = scratch.height = 256;
+							const sctx = scratch.getContext("2d");
+							if (!sctx) {
+								done(null, tile);
+								return;
+							}
+							if (shift === 0) {
+								sctx.drawImage(bmp, 0, 0, 256, 256);
+							} else {
+								const q = 256 >> shift;
+								const sx = (coords.x - (srcX << shift)) * q;
+								const sy = (coords.y - (srcY << shift)) * q;
+								sctx.drawImage(bmp, sx, sy, q, q, 0, 0, 256, 256);
+							}
+							const src = sctx.getImageData(0, 0, 256, 256);
+							const out = ctx.createImageData(256, 256);
+							paintTerrariumContourPixels(
+								out.data,
+								src.data,
+								256,
+								contourIntervalForZoom(coords.z),
+							);
+							ctx.putImageData(out, 0, 0);
+							done(null, tile);
+						})
+						.catch(() => {
+							if (ctx) {
+								paintDarkContourTile(ctx, coords.x, coords.y, coords.z, 256);
+							}
+							done(null, tile);
+						});
+					return tile;
+				},
+			});
+			new Contours({ opacity: 0.9 }).addTo(group);
+			tileRef.current = group;
+		}
+		tileRef.current.addTo(map);
+	}, [basemap]);
 
 	useEffect(() => {
 		const layer = layerRef.current;
@@ -134,7 +234,7 @@ export default function MapView({
 			`<span style="opacity:.85;">ID</span><span>!${n.num.toString(16)}</span>` +
 			`<span style="opacity:.85;">SNR</span><span>${n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : "—"}</span>` +
 			`<span style="opacity:.85;">BAT</span><span>${asciiBattery(n.batteryLevel)}</span>` +
-			`<span style="opacity:.85;">${t("SEEN")}</span><span title="${fechaHora(n.lastHeard * 1000)}">${t("{0} ago", ago(n.lastHeard))}</span>` +
+			`<span style="opacity:.85;">${t("SEEN")}</span><span title="${dateTime(n.lastHeard * 1000)}">${t("{0} ago", ago(n.lastHeard))}</span>` +
 			`</div>`;
 
 		for (const group of byCoord.values()) {
@@ -149,7 +249,7 @@ export default function MapView({
 			// Popup built in the DOM (not a string) so the [+INFO] onclick can be attached
 			const box = document.createElement("div");
 			box.innerHTML =
-				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">POS ${lat.toFixed(4)}N ${lon.toFixed(4)}E · ${group.length} ${t("NODE")}${group.length > 1 ? "S" : ""}</div>` +
+				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">POS ${fmtHemisphere(lat, lon)} · ${group.length} ${t("NODE")}${group.length > 1 ? "S" : ""}</div>` +
 				group.map(nodeRows).join("");
 			for (const btn of box.querySelectorAll<HTMLButtonElement>(
 				"button[data-num]",
@@ -193,14 +293,14 @@ export default function MapView({
 			const emoji = w.icon ? String.fromCodePoint(w.icon) : "📍";
 			const box = document.createElement("div");
 			box.innerHTML =
-				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">WAYPOINT · ${w.lat.toFixed(4)}N ${w.lon.toFixed(4)}E</div>` +
+				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">WAYPOINT · ${fmtHemisphere(w.lat, w.lon)}</div>` +
 				`<div style="font-weight:700;margin:4px 0;">${emoji} ${w.name || t("(unnamed)")}</div>` +
 				(w.description
 					? `<div style="margin-bottom:4px;">${w.description}</div>`
 					: "") +
 				`<div style="opacity:.85;font-size:11px;">${t("from {0}", getSnapshot().nodes.get(w.from)?.shortName ?? w.from.toString(16))}` +
 				(w.expire
-					? ` · ${t("expires {0}", fechaHora(w.expire * 1000))}`
+					? ` · ${t("expires {0}", dateTime(w.expire * 1000))}`
 					: ` · ${t("no expiry")}`) +
 				`</div>`;
 			const row = document.createElement("div");
@@ -248,7 +348,7 @@ export default function MapView({
 			box.innerHTML =
 				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">THIS DEVICE</div>` +
 				`<div style="font-weight:700;margin:4px 0;">LILYSHARK USB</div>` +
-				`<div>${deviceFix.lat.toFixed(5)}N ${deviceFix.lon.toFixed(5)}E</div>` +
+				`<div>${fmtHemisphere(deviceFix.lat, deviceFix.lon, 5, 5)}</div>` +
 				`<div style="opacity:.85;margin-top:4px;">${deviceLink.telemetry?.gps ?? ""} · ${deviceLink.telemetry?.bat ?? ""}</div>` +
 				(deviceLink.telemetry?.sim
 					? `<div style="margin-top:4px;letter-spacing:1px;">SIMULATE MODE · SYNTHETIC</div>`
@@ -331,7 +431,7 @@ export default function MapView({
 				(filter === "fav" && n.fav) ||
 				(filter === "active" && nowS - n.lastHeard < 3600)),
 	);
-	const puntos = new Set(drawn.map((n) => `${n.lat},${n.lon}`)).size;
+	const points = new Set(drawn.map((n) => `${n.lat},${n.lon}`)).size;
 
 	// map-main: on phones this screen becomes a full app-window (the page does
 	// not scroll), so the map takes everything between header and footer and a
@@ -346,27 +446,40 @@ export default function MapView({
 						{junk > 0 && ` · ${t("{0} DISCARDED (0,0)", junk)}`}
 						{s.waypoints.size > 0 && ` · ${s.waypoints.size} WAYPOINTS`}
 					</span>
-					<span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-						{(
-							[
-								["all", t("ALL")],
-								["fav", t("★ FAV")],
-								["active", t("ACTIVE 1H")],
-							] as const
-						).map(([key, label]) => (
-							<button
-								key={key}
-								className={filter === key ? "primary" : ""}
-								style={{ fontSize: 10, padding: "0 6px" }}
-								onClick={() => setFilter(key)}
-							>
-								{label}
-							</button>
-						))}
-						{/* The tiles are recolored to whatever the theme is; the label was
-						    hardcoded to the dark terminal's and lied on the light one. */}
-						<span style={{ marginLeft: 4 }}>
-							{isLight() ? t("LAYER: LIGHT") : t("LAYER: DARK")}
+					<span className="map-toolbar">
+						<span className="map-chip-row">
+							{(
+								[
+									["all", t("ALL")],
+									["fav", t("★ FAV")],
+									["active", t("ACTIVE 1H")],
+								] as const
+							).map(([key, label]) => (
+								<button
+									key={key}
+									className={filter === key ? "primary" : ""}
+									onClick={() => setFilter(key)}
+								>
+									{label}
+								</button>
+							))}
+						</span>
+						<span className="map-chip-row">
+							{(
+								[
+									["sat", t("SAT I")],
+									["map", t("MAP D")],
+									["chart", t("CHT G")],
+								] as const
+							).map(([key, label]) => (
+								<button
+									key={key}
+									className={basemap === key ? "primary" : ""}
+									onClick={() => setBasemap(key)}
+								>
+									{label}
+								</button>
+							))}
 						</span>
 					</span>
 				</div>
@@ -415,7 +528,12 @@ export default function MapView({
 						</div>
 					)}
 					<div className="map-hud" style={{ right: 10, top: 8 }}>
-						{t("{0} NODES · {1} POINTS", drawn.length, puntos)} · TILES © OSM
+						{t("{0} NODES · {1} POINTS", drawn.length, points)} ·{" "}
+						{basemap === "sat"
+							? "ESRI SAT"
+							: basemap === "map"
+								? "FIELD DARK"
+								: "FIELD CHART"}
 						{deviceLink.status === "linked" && !deviceFix && (
 							<>
 								{" · "}
@@ -463,7 +581,7 @@ export default function MapView({
 								}}
 							>
 								<span className="dim">
-									{draft.lat.toFixed(5)}N {draft.lon.toFixed(5)}E
+									{fmtHemisphere(draft.lat, draft.lon, 5, 5)}
 								</span>
 								<input
 									placeholder={t("name")}

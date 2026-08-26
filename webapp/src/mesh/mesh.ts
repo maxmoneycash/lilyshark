@@ -6,43 +6,43 @@ const TYPE_REPEATER = 2;
 
 export interface MeshSummary {
   total: number;
-  activos1h: number;
+  active1h: number;
   active24h: number;
-  nuncaOidos: number; // lastHeard 0: they come from the contact list, we never heard them
+  neverHeard: number; // lastHeard 0: they come from the contact list, we never heard them
   withPosition: number;
-  repetidores: number;
-  conPki: number;
-  bateriaBaja: number; // <= 20 % (>100 is external power, doesn't count)
-  saltos: Map<number | "?", number>; // hopsAway → number of nodes
-  mudos: NodeEntry[]; // silent favorites, the quietest first
+  repeaters: number;
+  withPki: number;
+  lowBattery: number; // <= 20 % (>100 is external power, doesn't count)
+  hops: Map<number | "?", number>; // hopsAway → number of nodes
+  silent: NodeEntry[]; // silent favorites, the quietest first
 }
 
 /** Snapshot of the mesh from the node list. Pure: the screen only paints. */
 export function summarize(
   nodes: Iterable<NodeEntry>,
   now = Date.now(),
-  mudoDesdeH = 24,
+  silentAfterH = 24,
 ): MeshSummary {
   const r: MeshSummary = {
     total: 0,
-    activos1h: 0,
+    active1h: 0,
     active24h: 0,
-    nuncaOidos: 0,
+    neverHeard: 0,
     withPosition: 0,
-    repetidores: 0,
-    conPki: 0,
-    bateriaBaja: 0,
-    saltos: new Map(),
-    mudos: [],
+    repeaters: 0,
+    withPki: 0,
+    lowBattery: 0,
+    hops: new Map(),
+    silent: [],
   };
   for (const n of nodes) {
     r.total++;
-    if (!n.lastHeard) r.nuncaOidos++;
+    if (!n.lastHeard) r.neverHeard++;
     else {
       const h = (now - n.lastHeard * 1000) / 3_600_000;
-      if (h < 1) r.activos1h++;
+      if (h < 1) r.active1h++;
       if (h < 24) r.active24h++;
-      if (n.fav && h >= mudoDesdeH) r.mudos.push(n);
+      if (n.fav && h >= silentAfterH) r.silent.push(n);
     }
     // (0,0) is junk GPS, the same criterion the map uses
     if (
@@ -52,13 +52,13 @@ export function summarize(
     ) {
       r.withPosition++;
     }
-    if (n.type === TYPE_REPEATER) r.repetidores++;
-    if (n.publicKey) r.conPki++;
-    if (n.batteryLevel !== undefined && n.batteryLevel <= 20) r.bateriaBaja++;
+    if (n.type === TYPE_REPEATER) r.repeaters++;
+    if (n.publicKey) r.withPki++;
+    if (n.batteryLevel !== undefined && n.batteryLevel <= 20) r.lowBattery++;
     const k = n.hopsAway ?? "?";
-    r.saltos.set(k, (r.saltos.get(k) ?? 0) + 1);
+    r.hops.set(k, (r.hops.get(k) ?? 0) + 1);
   }
-  r.mudos.sort((a, b) => a.lastHeard - b.lastHeard);
+  r.silent.sort((a, b) => a.lastHeard - b.lastHeard);
   return r;
 }
 
@@ -66,7 +66,7 @@ export interface Edge {
   a: number;
   b: number;
   snr?: number; // dB
-  src: "vecinos" | "traceroute";
+  src: "neighbors" | "traceroute";
 }
 
 export const edgeKey = (a: number, b: number) =>
@@ -104,7 +104,7 @@ export function buildEdges(
       a: n.node,
       b: n.neighbor,
       snr: n.snr,
-      src: "vecinos",
+      src: "neighbors",
     });
   }
   return [...out.values()];
