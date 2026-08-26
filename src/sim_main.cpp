@@ -2003,7 +2003,8 @@ void draw_node_fix_strip(lv_obj_t *parent, double lat, double lon, bool have_you
     field_local_meters(you_lat, you_lon, lat, lon, east_m, north_m);
     char range[12]{};
     format_map_range(range, sizeof(range), std::hypot(east_m, north_m));
-    std::snprintf(line, sizeof(line), "%s  %03.0f", range, map_bearing_deg(east_m, north_m));
+    std::snprintf(line, sizeof(line), "%s  BEARING %03.0f", range,
+                  map_bearing_deg(east_m, north_m));
     put_label(parent, line, 136, 74, theme::pink(), &font_pixel_6x8);
 }
 
@@ -4726,7 +4727,7 @@ void build_node_detail(lv_obj_t * parent)
     format_age(age, sizeof(age), node.last_seen_us);
     put_label(parent, node.label[0] != '\0' ? node.label : "NODE", 8, 24,
               theme::text(), &font_pixel_18x24);
-    std::snprintf(line, sizeof(line), "%08lX  %s  LAST %s  %u FR",
+    std::snprintf(line, sizeof(line), "%08lX  %s  HEARD %s AGO  %u PACKETS",
                   static_cast<unsigned long>(node.id), home_protocol_tag(node.protocol), age,
                   static_cast<unsigned>(node.frames));
     put_label(parent, line, 9, 50, theme::text_muted(), &font_pixel_6x8);
@@ -4785,7 +4786,7 @@ void build_node_detail(lv_obj_t * parent)
         break;
     }
     put_label(parent, callsign, 8, 24, theme::text(), &font_pixel_18x24);
-    std::snprintf(node_line, sizeof(node_line), "%08lX  %s  LAST %s  %u FR",
+    std::snprintf(node_line, sizeof(node_line), "%08lX  %s  HEARD %s AGO  %u PACKETS",
                   static_cast<unsigned long>(live_node.id),
                   simulator_protocol_label(live_node.protocol), age,
                   static_cast<unsigned>(live_node.frame_count));
@@ -11854,7 +11855,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0x0cd08b0c71623817ULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
         0x932ca408b25d655fULL, 0x3b6ca3507efcd29cULL, 0x3d61199a6d61d28cULL,
-        0x86f8c337e12d7380ULL, 0x942c5b2b206072e8ULL, 0x2d79e348284dfd29ULL,
+        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x2d79e348284dfd29ULL,
         0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xaa3ec62aa1276c19ULL,
         0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
     }};
