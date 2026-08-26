@@ -1975,16 +1975,68 @@ bool field_peer_fix(std::size_t raw_index, double &lat, double &lon) noexcept
 }
 
 #if !defined(LILYSHARK_DEVICE)
+// A deterministic circle for the synthetic demo walk.
+//
+// This fed std::sin and std::cos into coordinates printed with %.4f and %.3f,
+// and the walk's own radius puts those digits astride a rounding boundary:
+// the longitude swings +/-0.0008 degrees around -122.4194, so 122.4195 sits
+// inside its range. A last-ulp disagreement between Apple's libm and glibc
+// therefore flipped a printed digit, and the pixel-exact render test failed on
+// Linux while passing on macOS -- invisibly, because the render stage only
+// starts running in CI once the device-shell suite ahead of it passes.
+//
+// The motion here is invented, so it owes nothing to real trigonometry; it
+// owes the test bit-identical results on every platform. Sixty-four points
+// around a circle as exact decimal literals give that, since IEEE-754 parsing
+// of a decimal literal is specified and does not vary by library.
+constexpr std::size_t kSimulatorWalkSteps = 64;
+constexpr double kSimulatorWalkSin[kSimulatorWalkSteps] = {
+    0.0, 0.0980171403295606, 0.19509032201612825, 0.29028467725446233, 0.3826834323650898,
+    0.47139673682599764, 0.5555702330196022, 0.6343932841636455, 0.7071067811865475,
+    0.773010453362737, 0.8314696123025452, 0.8819212643483549, 0.9238795325112867,
+    0.9569403357322088, 0.9807852804032304, 0.9951847266721968, 1.0, 0.9951847266721969,
+    0.9807852804032304, 0.9569403357322089, 0.9238795325112867, 0.881921264348355,
+    0.8314696123025453, 0.7730104533627371, 0.7071067811865476, 0.6343932841636455,
+    0.5555702330196022, 0.47139673682599786, 0.3826834323650899, 0.2902846772544624,
+    0.1950903220161286, 0.09801714032956083, 1.2246467991473532e-16, -0.09801714032956059,
+    -0.19509032201612836, -0.2902846772544621, -0.38268343236508967, -0.47139673682599764,
+    -0.555570233019602, -0.6343932841636453, -0.7071067811865475, -0.7730104533627367,
+    -0.8314696123025452, -0.8819212643483549, -0.9238795325112865, -0.9569403357322088,
+    -0.9807852804032303, -0.9951847266721969, -1.0, -0.9951847266721969,
+    -0.9807852804032304, -0.9569403357322089, -0.9238795325112866, -0.881921264348355,
+    -0.8314696123025455, -0.7730104533627369, -0.7071067811865477, -0.6343932841636459,
+    -0.5555702330196022, -0.471396736825998, -0.3826834323650904, -0.2902846772544625,
+    -0.19509032201612872, -0.0980171403295605
+};
+constexpr double kSimulatorWalkCos[kSimulatorWalkSteps] = {
+    1.0, 0.9951847266721969, 0.9807852804032304, 0.9569403357322088, 0.9238795325112867,
+    0.881921264348355, 0.8314696123025452, 0.773010453362737, 0.7071067811865476,
+    0.6343932841636455, 0.5555702330196023, 0.4713967368259978, 0.38268343236508984,
+    0.29028467725446233, 0.19509032201612833, 0.09801714032956077, 6.123233995736766e-17,
+    -0.09801714032956065, -0.1950903220161282, -0.29028467725446216, -0.3826834323650897,
+    -0.4713967368259977, -0.555570233019602, -0.6343932841636454, -0.7071067811865475,
+    -0.773010453362737, -0.8314696123025453, -0.8819212643483549, -0.9238795325112867,
+    -0.9569403357322088, -0.9807852804032304, -0.9951847266721968, -1.0,
+    -0.9951847266721969, -0.9807852804032304, -0.9569403357322089, -0.9238795325112868,
+    -0.881921264348355, -0.8314696123025455, -0.7730104533627371, -0.7071067811865477,
+    -0.6343932841636458, -0.5555702330196022, -0.4713967368259979, -0.38268343236509034,
+    -0.29028467725446244, -0.19509032201612866, -0.09801714032956045,
+    -1.8369701987210297e-16, 0.09801714032956009, 0.1950903220161283, 0.29028467725446205,
+    0.38268343236509, 0.4713967368259976, 0.5555702330196018, 0.6343932841636456,
+    0.7071067811865474, 0.7730104533627367, 0.8314696123025452, 0.8819212643483548,
+    0.9238795325112865, 0.9569403357322088, 0.9807852804032303, 0.9951847266721969
+};
+
 void simulator_you_latlon(double &lat, double &lon) noexcept
 {
     constexpr double origin_lat = 37.77490;
     constexpr double origin_lon = -122.41940;
     const std::uint32_t phase =
         static_cast<std::uint32_t>(simulator_live_telemetry.tick() / 4U);
-    const double walk = static_cast<double>(phase) * 0.18;
+    const std::size_t step = static_cast<std::size_t>(phase) % kSimulatorWalkSteps;
     const double lat_rad = origin_lat * 0.017453292519943295;
-    const double you_east = 70.0 * std::cos(walk);
-    const double you_north = 70.0 * std::sin(walk);
+    const double you_east = 70.0 * kSimulatorWalkCos[step];
+    const double you_north = 70.0 * kSimulatorWalkSin[step];
     lat = origin_lat + you_north / 110540.0;
     lon = origin_lon + you_east / (111320.0 * std::cos(lat_rad));
 }
@@ -12051,26 +12103,6 @@ bool run_simulator_render_test() noexcept
             std::fprintf(stderr, "Simulator render failed: %s is nearly blank\n",
                          shell_names[index]);
             passed = false;
-        }
-        // TEMPORARY: HOME renders differently on Linux than on macOS and the
-        // render test only started running in CI once the device-shell suite
-        // stopped failing ahead of it. A per-band hash says which rows differ.
-        if(std::strcmp(shell_names[index], "HOME") == 0) {
-            for(std::size_t band = 0; band < 30U; ++band) {
-                std::uint64_t band_hash = 1469598103934665603ULL;
-                for(std::size_t row = band * 8U; row < (band + 1U) * 8U; ++row) {
-                    for(std::size_t col = 0; col < 320U; ++col) {
-                        const std::uint16_t pixel = simulator_frame_buffer[row * 320U + col];
-                        band_hash ^= static_cast<std::uint64_t>(pixel & 0xffU);
-                        band_hash *= 1099511628211ULL;
-                        band_hash ^= static_cast<std::uint64_t>(pixel >> 8U);
-                        band_hash *= 1099511628211ULL;
-                    }
-                }
-                std::fprintf(stderr, "HOMEBAND %02zu rows %3zu-%3zu: %016llx\n", band,
-                             band * 8U, band * 8U + 7U,
-                             static_cast<unsigned long long>(band_hash));
-            }
         }
         if(hash != shell_expected_hashes[index]) {
             std::fprintf(stderr,
