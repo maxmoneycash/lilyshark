@@ -1509,7 +1509,7 @@ void add_status_bar(lv_obj_t * parent, const char * title, const char * left_val
                         theme::pink());
             put_clipped_label(bar, shell_notice, 6, 3, 236, theme::on_accent(),
                               &font_mono_semibold_12);
-            put_label(bar, "CHAT 6", 254, 4, theme::on_accent(), &font_mono_semibold_12);
+            put_label(bar, "CHAT", 266, 4, theme::on_accent(), &font_mono_semibold_12);
             return;
         }
     }
@@ -3837,10 +3837,10 @@ void draw_radio_tools(lv_obj_t *parent) noexcept
         draw_mode_chip(parent, x, kRadioToolY, kRadioToolW, kRadioToolH, label,
                        selected, true);
     };
-    chip(4, "SPEC 2");
-    chip(66, "SURV 5");
-    chip(128, "AIR 6");
-    chip(190, "EVNT 7");
+    chip(4, "SPECTRUM");
+    chip(66, "SURVEY");
+    chip(128, "AIRTIME");
+    chip(190, "EVENTS");
     chip(252, "FILTER", traffic_filter.active());
 }
 
@@ -6648,7 +6648,9 @@ void build_timeline(lv_obj_t *parent)
     add_simulator_live_status_bar(parent, "TIMELINE");
 #endif
     constexpr std::array<const char *, 5> filters = {{
-        "ALL A", "MESH H", "MCORE K", "RNS N", "RAW W",
+        // The filter is where a reader learns what the short tag in the traffic
+        // table means, so it spends its 58 px on the whole protocol name.
+        "ALL", "MESH", "MESHCORE", "RETICULUM", "RAW",
     }};
     for (std::size_t index = 0; index < filters.size(); ++index) {
         const lv_coord_t x = kTlChipX0 + static_cast<lv_coord_t>(index) * kTlChipGap;
@@ -11853,10 +11855,10 @@ bool run_simulator_render_test() noexcept
     chat_push("LILY", "COPY. TEN MINUTES OUT.", true, 0xffffffffU, "09:15");
     chat_push("RANGER", "TRACK IS WASHED OUT PAST THE CREEK", false, 0xffffffffU, "09:18");
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
-        0x0cd08b0c71623817ULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
+        0xa9a8caf8710d718cULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
         0x932ca408b25d655fULL, 0x3b6ca3507efcd29cULL, 0x3d61199a6d61d28cULL,
         0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x2d79e348284dfd29ULL,
-        0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xaa3ec62aa1276c19ULL,
+        0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xae5f04f11f7d4fb1ULL,
         0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
     }};
     constexpr std::array<ShellRoute, 17> shell_routes = {{
