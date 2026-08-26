@@ -3990,14 +3990,16 @@ void draw_this_device_row(lv_obj_t *parent) noexcept
     const bool fixed = app_settings.gps_enabled;
 #endif
     put_label(parent, fixed ? "HERE" : "--", 226, y, theme::cyan(), &font_mono_10);
+    // The identity moves right of the range column: "HERE" is four mono-10
+    // characters and ran straight through an id line that started at 240.
     char id_line[20]{};
 #if defined(LILYSHARK_DEVICE)
     std::snprintf(id_line, sizeof(id_line), "!%08lx",
                   static_cast<unsigned long>(localMeshtasticNodeNum()));
 #else
-    std::snprintf(id_line, sizeof(id_line), "THIS DEVICE");
+    std::snprintf(id_line, sizeof(id_line), "!4b01a2e0");
 #endif
-    put_clipped_label(parent, id_line, 240, y, 74, theme::text_muted(), &font_pixel_6x8);
+    put_clipped_label(parent, id_line, 258, y, 56, theme::text_muted(), &font_pixel_6x8);
     theme::rule_line(parent, 6, y + 18, 308, 1, theme::cyan());
 }
 
