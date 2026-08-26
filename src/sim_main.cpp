@@ -7852,15 +7852,18 @@ void build_help(lv_obj_t * parent)
 void build_about(lv_obj_t * parent)
 {
     add_gear_status(parent, "ABOUT");
-    add_scaled_wordmark(parent, 82, 31, 156);
-    put_centered_label(parent, "LORA FIELD DIAGNOSTICS", 100, theme::pink(),
+    // 156 wide keeps the wordmark's 264x128 aspect, so it occupies 75 rows
+    // from 28 and its descender reaches about row 100. The tagline used to sit
+    // at exactly 100 and the shark's fin ran straight through DIAGNOSTICS.
+    add_scaled_wordmark(parent, 82, 28, 156);
+    put_centered_label(parent, "LORA FIELD DIAGNOSTICS", 106, theme::pink(),
                        &font_pixel_6x8);
-    put_centered_label(parent, "FOR THE T-DECK", 112, theme::text_muted(),
+    put_centered_label(parent, "FOR THE T-DECK", 118, theme::text_muted(),
                        &font_pixel_6x8);
-    put_label(parent, "FIRMWARE", 34, 132, theme::pink(), &font_pixel_6x8);
-    put_label(parent, firmware_version, 112, 132, theme::text(), &font_mono_10);
-    put_label(parent, "PROTOCOLS", 34, 150, theme::pink(), &font_pixel_6x8);
-    put_label(parent, "MESH / MCORE / RNS", 112, 150,
+    put_label(parent, "FIRMWARE", 34, 136, theme::pink(), &font_pixel_6x8);
+    put_label(parent, firmware_version, 112, 136, theme::text(), &font_mono_10);
+    put_label(parent, "PROTOCOLS", 34, 152, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "MESH / MCORE / RNS / LXMF", 112, 152,
               theme::cyan(), &font_mono_10);
     put_label(parent, "LICENSE", 34, 168, theme::pink(), &font_pixel_6x8);
     put_label(parent, "GPL-3.0", 112, 168, theme::text(), &font_mono_10);
@@ -11881,7 +11884,7 @@ bool run_simulator_render_test() noexcept
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
         0x0e8d5caa0f3b18beULL, 0x0c0a191f76a06f71ULL, 0x22ed3faf3d1304e6ULL,
         0x7e1363de7108f530ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
-        0xde0a7b1d16ecf53aULL, 0x5e5e617ebee82f9bULL, 0x481e07ea9446ca03ULL,
+        0xde0a7b1d16ecf53aULL, 0x5e5e617ebee82f9bULL, 0xd11ac720a339c77aULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
     }};
 
