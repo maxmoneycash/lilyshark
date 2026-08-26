@@ -91,6 +91,10 @@ build_and_run decoder_stress \
   src/core/reticulum_decoder.cpp \
   test/decoder_stress/test_decoder_stress.cpp
 
+build_and_run lxmf \
+  src/core/lxmf_decoder.cpp \
+  test/lxmf/test_lxmf.cpp
+
 build_and_run profile_tuning \
   src/core/builtin_profiles.cpp \
   src/core/profile_tuning.cpp \
