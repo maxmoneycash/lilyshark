@@ -39,6 +39,8 @@ A single T-Deck is enough for field surveys, packet inspection, radio-profile ch
 
 The firmware is also a complete device shell, not a loose collection of graphs. It boots into the Lily Pink (`#FF4F9D`) wordmark, explains its packet/RF/network/capture tools, guides a first-time user through network and radio-profile selection, teaches the controls, checks the available hardware, then opens a Home screen with clear routes to diagnostics and settings. Capture, storage, radio, display, keyboard, optional GPS, Help, About, and setup reset are all controllable on the T-Deck.
 
+A banner only works if somebody is looking at the screen, and in the field the deck is usually in a pocket. A message arriving raises a status-bar banner for twelve seconds and plays a rising two-tone through the speaker; a node heard for the first time announces itself and plays two quieter blips. The nodes list colours how long ago each neighbour was heard -- green inside five minutes, amber to thirty, red beyond -- and reports how far away it is, which is the question the screen exists to answer. Conversations are saved to NVS and survive a power cycle.
+
 The diagnostic views change as the radio environment changes. Frames enter the Traffic feed, protocol totals roll forward, the spectrum history advances, node signals develop over time, surveys accumulate observations, and the synchronized Timeline shows packet rate, SNR, CRC failures, and events on one clock.
 
 > [!NOTE]
@@ -419,6 +421,9 @@ The simulator drives these views with deterministic synthetic RF telemetry. A fi
 | `T` | Open Timeline |
 | `X` from Traffic | Open Traffic Filter; use Up/Down to choose a predicate, Left/Right to change it, `R` to reset, and Enter to apply |
 | `P` | Open the five-preset radio-profile picker with the active preset focused |
+| Trackball on Map | Roll to pan; press to return the view to where you are standing. A fingertip covers about 40 px of a 320 px panel, which at deep zoom is most of the gap between two operators standing together |
+| `+` / `-` on Map | Zoom, from z12 out to z23 |
+| `I` / `D` / `G` on Map | Satellite imagery, dark road map, or the drawn field chart. The on-screen chip names the layer you are on and moves to the next when tapped |
 | `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
 | `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
 | `F` | Cycle spreading factors 7 through 12 |
@@ -818,8 +823,10 @@ The standalone C++ tests compile with warnings as errors and run under AddressSa
 - [x] Add keyboard, trackball, GT911 touch, battery, and optional-GPS services.
 - [x] Add an interruptible SX1262 spectral-scan state machine with receive restoration.
 - [x] Add sanitizer-backed host tests and a two-target GitHub Actions build.
-- [ ] Boot the factory image on a physical T-Deck and verify every hardware service.
-- [ ] Capture known Meshtastic, MeshCore, and RNode fixtures over the air and compare bytes with desktop captures.
+- [x] Boot the factory image on a physical T-Deck and verify the display, input, GPS, battery, and radio services.
+- [x] Pass live traffic between two T-Decks and decode it, including direct messages.
+- [x] Read LXMF messages out of Reticulum payloads.
+- [ ] Capture known MeshCore and RNode fixtures over the air and compare bytes with desktop captures.
 - [ ] Calibrate touch orientation, battery voltage, and spectral power against known references.
 - [ ] Exercise scan cancellation, SD removal, CRC bursts, missing peripherals, and radio recovery.
 - [ ] Run an overnight capture and spectrum endurance test on hardware.
