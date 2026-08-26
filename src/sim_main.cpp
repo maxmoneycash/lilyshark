@@ -12052,6 +12052,26 @@ bool run_simulator_render_test() noexcept
                          shell_names[index]);
             passed = false;
         }
+        // TEMPORARY: HOME renders differently on Linux than on macOS and the
+        // render test only started running in CI once the device-shell suite
+        // stopped failing ahead of it. A per-band hash says which rows differ.
+        if(std::strcmp(shell_names[index], "HOME") == 0) {
+            for(std::size_t band = 0; band < 30U; ++band) {
+                std::uint64_t band_hash = 1469598103934665603ULL;
+                for(std::size_t row = band * 8U; row < (band + 1U) * 8U; ++row) {
+                    for(std::size_t col = 0; col < 320U; ++col) {
+                        const std::uint16_t pixel = simulator_frame_buffer[row * 320U + col];
+                        band_hash ^= static_cast<std::uint64_t>(pixel & 0xffU);
+                        band_hash *= 1099511628211ULL;
+                        band_hash ^= static_cast<std::uint64_t>(pixel >> 8U);
+                        band_hash *= 1099511628211ULL;
+                    }
+                }
+                std::fprintf(stderr, "HOMEBAND %02zu rows %3zu-%3zu: %016llx\n", band,
+                             band * 8U, band * 8U + 7U,
+                             static_cast<unsigned long long>(band_hash));
+            }
+        }
         if(hash != shell_expected_hashes[index]) {
             std::fprintf(stderr,
                          "Simulator render failed: %s expected %016llx\n",
