@@ -367,14 +367,19 @@ std::uint16_t *satellite_scratch_ptr() noexcept
 
 constexpr lv_coord_t kPlotMaxW = 312;
 constexpr lv_coord_t kPlotMaxH = 52;
-#if !defined(LILYSHARK_DEVICE)
-static std::array<std::uint16_t, kPlotMaxW * kPlotMaxH> plot_store_a{};
-static std::array<std::uint16_t, kPlotMaxW * kPlotMaxH> plot_store_b{};
-std::uint16_t *plot_pixels(int slot) noexcept
-{
-    return slot == 0 ? plot_store_a.data() : plot_store_b.data();
-}
-#elif defined(ESP_PLATFORM)
+// Split on ESP_PLATFORM, not on LILYSHARK_DEVICE. PSRAM exists only on the
+// real chip; every host build -- the simulator and the device-shell tests
+// alike -- gets static buffers.
+//
+// The device-shell test compiles LILYSHARK_DEVICE without ESP_PLATFORM, so it
+// used to fall through to the null case and take draw_plot_columns, which
+// draws one LVGL object per column. A 280-pixel sparkline became 244 objects
+// where the device makes about five, Home reached 346 children against a
+// 96 KB LVGL heap, and the realloc of the child array returned null while
+// LVGL wrote through it anyway. The test crashed on a path the firmware never
+// takes, which is worse than not testing it: the failure looked like a device
+// bug and was an artifact of the fixture.
+#if defined(ESP_PLATFORM)
 static std::uint16_t *plot_store_a = nullptr;
 static std::uint16_t *plot_store_b = nullptr;
 std::uint16_t *plot_pixels(int slot) noexcept
@@ -388,7 +393,12 @@ std::uint16_t *plot_pixels(int slot) noexcept
     return slot_ptr;
 }
 #else
-std::uint16_t *plot_pixels(int) noexcept { return nullptr; }
+static std::array<std::uint16_t, kPlotMaxW * kPlotMaxH> plot_store_a{};
+static std::array<std::uint16_t, kPlotMaxW * kPlotMaxH> plot_store_b{};
+std::uint16_t *plot_pixels(int slot) noexcept
+{
+    return slot == 0 ? plot_store_a.data() : plot_store_b.data();
+}
 #endif
 
 // The static preview path is compiled for both targets even though device views
@@ -10428,9 +10438,12 @@ void handle_navigation_key(uint32_t key)
     }
     // R, not C. Chat claimed C in an earlier change and returns before this
     // ever runs, so coding rate had quietly become unreachable from the
-    // keyboard while the README still documented it. R sits beside B for
-    // bandwidth and F for spreading factor, and nothing else answers to it.
-    if(key == 'r' || key == 'R') {
+    // keyboard while the README still documented it.
+    //
+    // Traffic Filter already answers to R to reset itself, and it is further
+    // down this same chain -- so this has to stand aside there, or moving the
+    // key would fix one shadow by creating another.
+    if((key == 'r' || key == 'R') && current_screen != Screen::traffic_filter) {
         apply_tuned_profile(cycleProfileCodingRate(radio_service.activeProfile()), "coding rate");
         return;
     }
@@ -11453,6 +11466,36 @@ bool run_simulator_interaction_test() noexcept
         if(!expect_simulator_state(!map_panned && map_pan_east_m == 0.0 &&
                                        map_pan_north_m == 0.0,
                                    "clicking the trackball must return the view to here")) return false;
+    }
+
+    // Keys that two handlers both answer to, where the first one returns.
+    // Chat took C and silently killed coding-rate tuning; moving coding rate
+    // to R then silently killed the Traffic Filter reset, which also answers
+    // to R further down the same chain. Neither showed up as a failure
+    // anywhere, so each key is exercised here for its documented effect.
+    {
+        handle_navigation_key('1');
+        if(!expect_simulator_state(current_screen == Screen::traffic,
+                                   "direct key 1 must open Traffic")) return false;
+        handle_navigation_key('X');
+        if(!expect_simulator_state(current_screen == Screen::traffic_filter,
+                                   "X from Traffic must open the filter")) return false;
+        traffic_filter.crc = TrafficCrcPredicate::Valid;
+        handle_navigation_key('R');
+        if(!expect_simulator_state(!traffic_filter.active(),
+                                   "R on Traffic Filter must reset it, not tune the radio")) return false;
+
+        handle_navigation_key('C');
+        if(!expect_simulator_state(chat_open,
+                                   "C must open Chat")) return false;
+        chat_open = false;
+
+        // Put the map back for the assertions that follow, which zoom out in a
+        // loop until a node is visible and never terminate anywhere else.
+        current_screen = Screen::map;
+        field_tab = FieldTab::Map;
+        app_shell.closeToAnalyzer();
+        build_current_screen();
     }
 
     // A conversation has to survive a power cycle. The bytes that go into NVS

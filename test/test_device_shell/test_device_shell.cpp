@@ -201,7 +201,11 @@ bool hasPcapHeader(const std::shared_ptr<device_shell_fake::FileData> &file)
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x0e, 0x01, 0x00, 0x00, 0x0e, 0x01, 0x00, 0x00,
     }};
-    return file != nullptr && file->bytes.size() == expected.size() &&
+    // Starts with, not equals. A capture that has since recorded frames is
+    // still a capture with a correct header, and the device beacons its own
+    // position at boot, so the file is rarely header-only by the time anything
+    // looks at it.
+    return file != nullptr && file->bytes.size() >= expected.size() &&
            std::memcmp(file->bytes.data(), expected.data(), expected.size()) == 0;
 }
 
@@ -212,7 +216,11 @@ bool hasLilysharkCaptureHeader(const std::shared_ptr<device_shell_fake::FileData
         0x18, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x40, 0x42, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00,
     }};
-    return file != nullptr && file->bytes.size() == expected.size() &&
+    // Starts with, not equals. A capture that has since recorded frames is
+    // still a capture with a correct header, and the device beacons its own
+    // position at boot, so the file is rarely header-only by the time anything
+    // looks at it.
+    return file != nullptr && file->bytes.size() >= expected.size() &&
            std::memcmp(file->bytes.data(), expected.data(), expected.size()) == 0;
 }
 
@@ -313,10 +321,10 @@ bool healthyScenario()
 
     auto pcap = fileWithSuffix(".pcap");
     auto native_capture = fileWithSuffix(".lscap");
-    if(!require(pcap != nullptr && pcap->bytes.size() == 24U,
-                "PCAP global header is missing")) return false;
-    if(!require(native_capture != nullptr && native_capture->bytes.size() == 24U,
-                "native capture header is missing")) return false;
+    if(!require(hasPcapHeader(pcap),
+                "PCAP global header is missing or malformed")) return false;
+    if(!require(hasLilysharkCaptureHeader(native_capture),
+                "native capture header is missing or malformed")) return false;
 
     lv_mem_monitor_t memory{};
     lv_mem_monitor(&memory);
@@ -386,11 +394,14 @@ bool healthyScenario()
                 "captured frame did not redraw the live Traffic screen")) return false;
 
     sendKeyboard('\r');
-    if(!require(hasLabel(lv_screen_active(), "PACKET DETAIL"),
+    if(!require(hasLabel(lv_screen_active(), "PACKET"),
                 "Enter did not open Packet Detail for the injected frame")) return false;
+    // The old "LEFT / RIGHT  SECTION" hint was removed when the back strips
+    // were pruned, so the tab strip itself stands for "opened on PKT".
     if(!require(labelWithPrefix(lv_screen_active(), "FRAME #") != nullptr &&
                     labelWithPrefix(lv_screen_active(), "PAYLOAD OFFSET ") != nullptr &&
-                    hasLabel(lv_screen_active(), "LEFT / RIGHT  SECTION"),
+                    hasLabel(lv_screen_active(), "PKT") &&
+                    hasLabel(lv_screen_active(), "RAW"),
                 "Packet Detail did not open on the PKT summary tab")) return false;
 
     sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
@@ -505,7 +516,7 @@ bool healthyScenario()
     loop();
     sendKeyboard('\r');
     const char *filtered_frame = labelWithPrefix(lv_screen_active(), "FRAME #");
-    if(!require(hasLabel(lv_screen_active(), "PACKET DETAIL") &&
+    if(!require(hasLabel(lv_screen_active(), "PACKET") &&
                     filtered_frame != nullptr &&
                     std::strstr(filtered_frame, "CAPTURED 95 / ORIGINAL 95") != nullptr,
                 "filtered Enter opened the newer nonmatching raw frame")) return false;
@@ -701,6 +712,31 @@ bool healthyScenario()
     sendKeyboard(0x08U);
     if(!require(labelWithPrefix(lv_screen_active(), "1-6/") != nullptr,
                 "Event Detail Back did not restore the newest Events window")) return false;
+
+    // Keys that more than one handler answers to, checked on the device build
+    // because both of the shadows found here lived behind LILYSHARK_DEVICE and
+    // the simulator therefore could not see either.
+    //
+    // Chat claimed C and returned before the coding-rate handler further down,
+    // so tuning stopped working the day chat shipped. Moving coding rate to R
+    // then put it in front of the Traffic Filter reset, which answers to R as
+    // well. Neither failed anywhere; both were silent.
+    sendKeyboard('1');
+    if(!require(hasLabel(lv_screen_active(), "RADIO"),
+                "1 did not open the live traffic view")) return false;
+    sendKeyboard('X');
+    if(!require(hasLabel(lv_screen_active(), "FILTER"),
+                "X did not open Traffic Filter")) return false;
+    sendKeyboard('R');
+    if(!require(hasLabel(lv_screen_active(), "FILTER"),
+                "R on Traffic Filter tuned the radio instead of resetting the filter")) return false;
+
+    sendKeyboard('C');
+    if(!require(hasLabel(lv_screen_active(), "CHAT"),
+                "C did not open Chat")) return false;
+    sendKeyboard('M');
+    if(!require(hasLabel(lv_screen_active(), "HOME"),
+                "M did not return the shell to Home after Chat")) return false;
 
     return true;
 }
@@ -1112,7 +1148,7 @@ bool persistedSimulateModeScenario()
 
     const std::size_t simulated_native_after_frame = simulated_native->bytes.size();
     sendKeyboard('\r');
-    if(!require(hasLabel(lv_screen_active(), "PACKET DETAIL"),
+    if(!require(hasLabel(lv_screen_active(), "PACKET"),
                 "synthetic Traffic row did not open Packet Detail")) return false;
     for(std::size_t index = 0U; index < 4U; ++index) {
         sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
