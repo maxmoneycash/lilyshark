@@ -39,7 +39,8 @@ import {
   disconnectDeviceLink,
   useDeviceLink,
 } from "../lib/deviceLink";
-import { bindAnalyzerMesh } from "./analyzerMesh";
+import { bindAnalyzerMesh, setNetPublisher } from "./analyzerMesh";
+import { netConnect, publishHeardFrame } from "./net";
 import "./meshterm.css";
 
 const VERSION = "0.1.0";
@@ -262,6 +263,10 @@ function App() {
   // it the instant real hardware appears so the two can never be confused.
   useEffect(() => {
     bindAnalyzerMesh();
+    // The internet leg: frames the deck hears go to the shared room, and
+    // frames other analyzers publish come back as NET nodes and messages.
+    setNetPublisher(publishHeardFrame);
+    netConnect();
     const onTab = (e: Event) => {
       const next = (e as CustomEvent<string>).detail;
       if ((TABS as readonly string[]).includes(next)) setTab(next as Tab);

@@ -10,6 +10,7 @@
 import type { DeviceTelemetry, HeardFrame } from "../lib/deviceLink";
 import { setAnalyzerMeshSink } from "../lib/deviceLink";
 import { clearDemo } from "./demo";
+import type { NetEnvelope } from "./netProtocol";
 import { addLog, mutate, type Message, type NodeEntry } from "./store";
 
 /** Stable local id for the T-Deck itself. Not a Meshtastic node number. */
@@ -48,6 +49,14 @@ function batteryFromTelemetry(sample: DeviceTelemetry): number | undefined {
 }
 
 let sessionOpen = false;
+
+/** The net bridge's publish hook, registered at app start. Kept as a setter
+ *  so this module and the bridge can import each other's types without an
+ *  import cycle at runtime. */
+let netPublisher: ((frame: HeardFrame) => void) | undefined;
+export function setNetPublisher(publish: ((frame: HeardFrame) => void) | undefined): void {
+  netPublisher = publish;
+}
 
 export function applyAnalyzerLink(): void {
   if (!sessionOpen) {
@@ -98,6 +107,7 @@ export function applyAnalyzerTelemetry(sample: DeviceTelemetry): void {
 export function applyHeardFrame(frame: HeardFrame): void {
   if (!frame.src) return;
   applyAnalyzerLink();
+  netPublisher?.(frame);
   upsertLive(frame.src, {
     longName: frame.name ?? `!${hexId(frame.src)}`,
     shortName: frame.short ?? hexId(frame.src).slice(-4).toUpperCase(),
@@ -126,6 +136,48 @@ export function applyHeardFrame(frame: HeardFrame): void {
     hops: frame.hops,
     snr: frame.snrX10 / 10,
     rssi: frame.rssiX10 / 10,
+  };
+  mutate((s) => {
+    if (!s.channels.has(0)) {
+      s.channels = new Map(s.channels).set(0, { index: 0, name: "LongFast" });
+    }
+    if (s.messages.some((m) => m.id === msg.id && m.from === msg.from && m.ts === msg.ts)) {
+      return;
+    }
+    s.messages = [...s.messages, msg].slice(-400);
+  });
+}
+
+/** A frame relayed from another analyzer over the internet. Shown even with
+ *  no deck on the cable: the web map is a viewer in its own right. Never
+ *  re-published — frames enter the room only from a device link. */
+export function applyNetFrame(env: NetEnvelope): void {
+  const frame = env.frame;
+  upsertLive(frame.src, {
+    longName: frame.name ?? `!${hexId(frame.src)}`,
+    shortName: frame.short ?? hexId(frame.src).slice(-4).toUpperCase(),
+    lastHeard: env.at / 1000,
+    hopsAway: frame.hops,
+    lat: frame.lat,
+    lon: frame.lon,
+    viaNet: true,
+  });
+
+  if (!frame.text) return;
+  const BROADCAST = 0xffffffff;
+  const isBroadcast = frame.dst === BROADCAST || frame.dst === 0;
+  const convo = isBroadcast ? "ch:0" : `dm:${frame.src}`;
+  const msg: Message = {
+    id: env.at ^ frame.src,
+    convo,
+    from: frame.src,
+    to: isBroadcast ? BROADCAST : frame.dst,
+    channel: 0,
+    text: frame.text,
+    ts: env.at,
+    mine: false,
+    state: "delivered",
+    hops: frame.hops,
   };
   mutate((s) => {
     if (!s.channels.has(0)) {

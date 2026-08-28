@@ -26,6 +26,7 @@ import {
 	setFixedPosition,
 } from "../radio";
 import { getSnapshot, mutate, subscribe } from "../store";
+import { setNetEnabled, useNetState } from "../net";
 import {
 	getHiContrast,
 	getTheme,
@@ -98,6 +99,7 @@ export default function Config() {
 	const s = useSyncExternalStore(subscribe, getSnapshot);
 	const self = s.selfInfo;
 
+	const net = useNetState();
 	const [advertName, setAdvertName] = useState("");
 	// radio params round-trip the exact units SelfInfo reports
 	const [freq, setFreq] = useState(0);
@@ -384,6 +386,34 @@ export default function Config() {
 		<main style={{ overflowY: "auto", alignItems: "start" }}>
 			<div className="cfg-grid">
 				<div className="cfg-col">
+					<Section title="CONFIG // NET RELAY">
+						<div className="form-grid">
+							<label>RELAY</label>
+							<select
+								value={net.enabled ? "on" : "off"}
+								style={{ width: 140 }}
+								onChange={(e) => setNetEnabled(e.target.value === "on")}
+							>
+								<option value="on">ON</option>
+								<option value="off">OFF</option>
+							</select>
+							<label>STATUS</label>
+							<span className={net.enabled && !net.connected ? "warn" : ""}>
+								{!net.enabled
+									? "OFF"
+									: net.connected
+										? `CONNECTED · ROOM ${net.room} · ${net.published} SENT / ${net.received} HEARD`
+										: "CONNECTING…"}
+							</span>
+						</div>
+						<div className="hint">
+							Frames your deck hears are shared with other Lilyshark analyzers
+							over the internet, and theirs appear here and on your deck marked
+							NET. The default room is public — the same standing as the
+							LongFast radio channel it mirrors. Turn it off and the mesh is
+							radio-only.
+						</div>
+					</Section>
 					<Section title={t("CONFIG // APPLICATION")}>
 						<div className="form-grid">
 							<label>{t("TIME")}</label>

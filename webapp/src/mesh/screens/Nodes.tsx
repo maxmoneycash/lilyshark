@@ -360,8 +360,8 @@ function Detail(props: {
 			: []),
 		[
 			"SNR",
-			<span className={snrClass(n.snr)}>
-				{n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : "—"}
+			<span className={n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}>
+				{n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : n.viaNet ? "VIA NET" : "—"}
 			</span>,
 		],
 		[
@@ -870,8 +870,8 @@ export default function Nodes({
 										{n.ignored && " 🚫"}
 									</td>
 									<td style={{ fontWeight: 700 }}>{n.shortName}</td>
-									<td className={snrClass(n.snr)}>
-										{n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : "—"}
+									<td className={n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}>
+										{n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : n.viaNet ? "NET" : "—"}
 									</td>
 									<td
 										className={

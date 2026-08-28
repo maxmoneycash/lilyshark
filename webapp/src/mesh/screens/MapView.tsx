@@ -227,7 +227,7 @@ export default function MapView({
 
 		const nodeRows = (n: (typeof positioned)[number]) =>
 			`<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 2px;">` +
-			`<span style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("NODE")} // ${n.shortName}</span>` +
+			`<span style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("NODE")} // ${n.shortName}${n.viaNet ? " · NET" : ""}</span>` +
 			`<button data-num="${n.num}" style="font-size:10px;padding:0 6px;">[ +INFO ]</button>` +
 			`</div>` +
 			`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;">` +

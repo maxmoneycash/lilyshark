@@ -41,6 +41,8 @@ export interface NodeEntry {
   hopsAway?: number; // out path length; undefined = flood / unknown
   outPath?: number[]; // 1-byte hashes of the repeaters towards the contact
   fav?: boolean; // local: first in the list
+  /** Heard through the internet bridge, not this deck's radio. */
+  viaNet?: boolean;
   ignored?: boolean; // local: its messages are discarded
 }
 

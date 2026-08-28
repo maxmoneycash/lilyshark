@@ -79,12 +79,17 @@ tiles for each zoom with `scripts/fetch_satellite_map.py`, run
   beyond the current view is pointed at from the screen edge with its name
   and range — you don't have to hunt for the dot.
 - **Across a region** (Kenwood ↔ Cupertino is ~100 km): two handheld T-Decks
-  will **not** reach each other directly; that is physics, not firmware.
-  Positions *can* still arrive if the public Meshtastic mesh relays them —
-  Lilyshark beacons with the standard hop limit of 3 on the default channel,
-  so community nodes will rebroadcast — but across that distance it depends
-  entirely on which high-site relays sit between you. Treat it as a bonus,
-  not a promise. When the decks are physically together, everything works.
+  will **not** reach each other directly — that is physics, not firmware. The
+  guaranteed path is the **net relay**: keep the deck USB-linked to the
+  analyzer at [lilyshark.com](https://lilyshark.com) on both ends. Every frame
+  a deck hears is shared with the other analyzers in the room, shown on their
+  web maps, and handed down the cable so it lands on the deck itself — node on
+  the map, message in chat, chime and all — marked **NET** wherever
+  provenance shows. It is on by default; the toggle lives in CONFIG. Direct
+  messages work across it exactly like over the air: open the node, MESSAGE,
+  send. Positions may *also* arrive over RF via the public Meshtastic mesh
+  (we beacon with the standard hop limit of 3), but treat that as a bonus.
+  When the decks are physically together, plain radio does everything.
 
 ## If it doesn't
 
