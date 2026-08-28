@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { loadActividad, loadAllTraceroutes, loadNeighbors } from "../db";
+import { loadActivity, loadAllTraceroutes, loadNeighbors } from "../db";
 import { demoNeighbors } from "../demo";
-import { ago, fechaHora } from "../fmt";
+import { ago, dateTime } from "../fmt";
 import { t } from "../i18n";
 import { buildEdges, type Edge, edgeKey as key, summarize } from "../mesh";
 import { getSnapshot, subscribe } from "../store";
@@ -39,7 +39,7 @@ function layout(
 		);
 	const arr = ids.map((id) => pos.get(id)!);
 	const n = arr.length;
-	const k = Math.sqrt((w * h) / Math.max(1, n)); // distancia ideal entre nodos
+	const k = Math.sqrt((w * h) / Math.max(1, n)); // ideal distance between nodes
 	const ITERS = 400;
 	let temp = w / 8; // max displacement per iteration, cools down to 0
 
@@ -58,7 +58,7 @@ function layout(
 					vy = ((i * 53 + j) % 13) - 6;
 					d = Math.hypot(vx, vy) || 1;
 				}
-				const rep = (k * k) / d; // magnitud
+				const rep = (k * k) / d; // magnitude
 				dx[i] += (vx / d) * rep;
 				dy[i] += (vy / d) * rep;
 				dx[j] -= (vx / d) * rep;
@@ -69,7 +69,7 @@ function layout(
 			const vx = arr[i].x - arr[j].x;
 			const vy = arr[i].y - arr[j].y;
 			const d = Math.hypot(vx, vy) || 0.01;
-			const att = (d * d) / k; // magnitud
+			const att = (d * d) / k; // magnitude
 			dx[i] -= (vx / d) * att;
 			dy[i] -= (vy / d) * att;
 			dx[j] += (vx / d) * att;
@@ -128,18 +128,18 @@ export default function Mesh() {
 	>([]);
 	const [sel, setSel] = useState<number | undefined>();
 	const [reload, setReload] = useState(0);
-	const [vista, setVista] = useState<"grafo" | "actividad">("grafo");
+	const [view, setView] = useState<"graph" | "activity">("graph");
 	const [act, setAct] = useState<{ node: number; hhmm: number; n: number }[]>(
 		[],
 	);
-	const [actHoras, setActHoras] = useState(48);
+	const [actHours, setActHours] = useState(48);
 
 	useEffect(() => {
-		if (vista !== "actividad") return;
-		loadActividad(Date.now() - actHoras * 3_600_000)
+		if (view !== "activity") return;
+		loadActivity(Date.now() - actHours * 3_600_000)
 			.then(setAct)
 			.catch(() => {});
-	}, [vista, actHoras, reload]);
+	}, [view, actHours, reload]);
 
 	useEffect(() => {
 		loadNeighbors()
@@ -186,35 +186,35 @@ export default function Mesh() {
 
 	const selEdges =
 		sel !== undefined ? edges.filter((e) => e.a === sel || e.b === sel) : [];
-	const vecinosSel = new Set(selEdges.map((e) => (e.a === sel ? e.b : e.a)));
+	const neighborSel = new Set(selEdges.map((e) => (e.a === sel ? e.b : e.a)));
 
 	// s.version changes with every packet: recomputing the snapshot is cheap
 	const sum = useMemo(() => summarize(s.nodes.values()), [s]);
 
 	// activity grid: rows = nodes, columns = hours
-	const rejilla = useMemo(() => {
+	const grid = useMemo(() => {
 		const nowMs = Math.floor(Date.now() / 3_600_000);
 		const hours = Array.from(
-			{ length: actHoras },
-			(_, i) => nowMs - actHoras + 1 + i,
+			{ length: actHours },
+			(_, i) => nowMs - actHours + 1 + i,
 		);
-		const porNodo = new Map<number, Map<number, number>>();
+		const byNode = new Map<number, Map<number, number>>();
 		let max = 1;
 		for (const r of act) {
-			const m = porNodo.get(r.node) ?? new Map<number, number>();
+			const m = byNode.get(r.node) ?? new Map<number, number>();
 			m.set(r.hhmm, (m.get(r.hhmm) ?? 0) + r.n);
-			porNodo.set(r.node, m);
+			byNode.set(r.node, m);
 			if (r.n > max) max = r.n;
 		}
-		const filas = [...porNodo.entries()]
+		const rows = [...byNode.entries()]
 			.map(([node, m]) => ({
 				node,
-				celdas: m,
+				cells: m,
 				total: [...m.values()].reduce((a, b) => a + b, 0),
 			}))
 			.sort((a, b) => b.total - a.total);
-		return { hours, filas, max };
-	}, [act, actHoras]);
+		return { hours, rows, max };
+	}, [act, actHours]);
 
 	const tile = (label: string, value: string | number, cls = "") => (
 		<div key={label} className="panel stat-tile" style={{ minWidth: 96 }}>
@@ -226,7 +226,7 @@ export default function Mesh() {
 	);
 
 	// hops sorted, with the unknown bucket last
-	const saltos = [...sum.saltos.entries()].sort((a, b) =>
+	const hops = [...sum.hops.entries()].sort((a, b) =>
 		a[0] === "?" ? 1 : b[0] === "?" ? -1 : Number(a[0]) - Number(b[0]),
 	);
 
@@ -244,17 +244,17 @@ export default function Mesh() {
 					}}
 				>
 					{tile(t("NODES"), sum.total)}
-					{tile(t("ACTIVE 1 H"), sum.activos1h)}
+					{tile(t("ACTIVE 1 H"), sum.active1h)}
 					{tile(t("ACTIVE 24 H"), sum.active24h)}
 					{tile(t("WITH POSITION"), sum.withPosition)}
-					{tile(t("REPEATERS"), sum.repetidores)}
-					{tile(t("WITH PKI"), sum.conPki)}
+					{tile(t("REPEATERS"), sum.repeaters)}
+					{tile(t("WITH PKI"), sum.withPki)}
 					{tile(
 						t("LOW BATTERY"),
-						sum.bateriaBaja,
-						sum.bateriaBaja > 0 ? "err" : "",
+						sum.lowBattery,
+						sum.lowBattery > 0 ? "err" : "",
 					)}
-					{tile(t("NEVER HEARD"), sum.nuncaOidos, "dim")}
+					{tile(t("NEVER HEARD"), sum.neverHeard, "dim")}
 
 					<div className="panel" style={{ padding: "8px 12px", minWidth: 190 }}>
 						<div
@@ -263,7 +263,7 @@ export default function Mesh() {
 						>
 							{t("HOPS")}
 						</div>
-						{saltos.map(([k, n]) => (
+						{hops.map(([k, n]) => (
 							<div
 								key={String(k)}
 								style={{ display: "flex", gap: 8, fontSize: 12 }}
@@ -283,7 +283,7 @@ export default function Mesh() {
 						))}
 					</div>
 
-					{sum.mudos.length > 0 && (
+					{sum.silent.length > 0 && (
 						<div
 							className="panel"
 							style={{ padding: "8px 12px", minWidth: 200 }}
@@ -295,13 +295,13 @@ export default function Mesh() {
 								{t("★ SILENT FAVORITES")}
 							</div>
 							<div style={{ maxHeight: 92, overflowY: "auto" }}>
-								{sum.mudos.map((n) => (
+								{sum.silent.map((n) => (
 									<div
 										key={n.num}
 										style={{ display: "flex", gap: 10, fontSize: 12 }}
 									>
 										<span style={{ flex: 1 }}>{n.shortName}</span>
-										<span className="dim" title={fechaHora(n.lastHeard * 1000)}>
+										<span className="dim" title={dateTime(n.lastHeard * 1000)}>
 											{t("{0} ago", ago(n.lastHeard))}
 										</span>
 									</div>
@@ -316,31 +316,31 @@ export default function Mesh() {
 				<div className="panel-title">
 					<span style={{ display: "flex", gap: 10, alignItems: "center" }}>
 						<button
-							className={vista === "grafo" ? "tab active" : "tab"}
+							className={view === "graph" ? "tab active" : "tab"}
 							style={{ fontSize: 10 }}
-							onClick={() => setVista("grafo")}
+							onClick={() => setView("graph")}
 						>
 							{t("GRAPH")}
 						</button>
 						<button
-							className={vista === "actividad" ? "tab active" : "tab"}
+							className={view === "activity" ? "tab active" : "tab"}
 							style={{ fontSize: 10 }}
-							onClick={() => setVista("actividad")}
+							onClick={() => setView("activity")}
 						>
 							{t("ACTIVITY")}
 						</button>
-						{vista === "grafo"
+						{view === "graph"
 							? `${t("{0} NODES", ids.length)} · ${t("{0} LINKS", edges.length)}`
-							: t("{0} NODES HEARD", rejilla.filas.length)}
+							: t("{0} NODES HEARD", grid.rows.length)}
 					</span>
 					<span style={{ display: "flex", gap: 10, alignItems: "center" }}>
-						{vista === "actividad" &&
+						{view === "activity" &&
 							[24, 48, 168].map((h) => (
 								<button
 									key={h}
-									className={actHoras === h ? "tab active" : "tab"}
+									className={actHours === h ? "tab active" : "tab"}
 									style={{ fontSize: 10 }}
-									onClick={() => setActHoras(h)}
+									onClick={() => setActHours(h)}
 								>
 									{h === 168 ? t("7 D") : `${h} H`}
 								</button>
@@ -353,17 +353,17 @@ export default function Mesh() {
 							⟳ {t("RELOAD")}
 						</button>
 						<span className="dim" style={{ fontSize: 11 }}>
-							{vista === "actividad"
+							{view === "activity"
 								? t("ONE CELL = ONE HOUR")
 								: t("{0} FROM NEIGHBORS",
-										edges.filter((e) => e.src === "vecinos").length,
+										edges.filter((e) => e.src === "neighbors").length,
 									)}
 						</span>
 					</span>
 				</div>
 
-				{vista === "actividad" ? (
-					rejilla.filas.length === 0 ? (
+				{view === "activity" ? (
+					grid.rows.length === 0 ? (
 						<p className="dim" style={{ padding: 16, fontSize: 12 }}>
 							{t("NO SIGHTINGS RECORDED — the history starts filling up now, with the app connected_",
 							)}
@@ -372,7 +372,7 @@ export default function Mesh() {
 						<div style={{ flex: 1, overflow: "auto", padding: 12 }}>
 							<table style={{ borderCollapse: "collapse", fontSize: 11 }}>
 								<tbody>
-									{rejilla.filas.map((f) => (
+									{grid.rows.map((f) => (
 										<tr key={f.node}>
 											<td
 												style={{
@@ -386,16 +386,16 @@ export default function Mesh() {
 												{short(f.node)}
 												{f.node === s.myNodeNum && ` (${t("ME")})`}
 											</td>
-											{rejilla.hours.map((h) => {
-												const n = f.celdas.get(h) ?? 0;
+											{grid.hours.map((h) => {
+												const n = f.cells.get(h) ?? 0;
 												// intensity relative to the max, with a visible floor
 												const op =
-													n === 0 ? 0 : 0.25 + 0.75 * (n / rejilla.max);
+													n === 0 ? 0 : 0.25 + 0.75 * (n / grid.max);
 												const d = new Date(h * 3_600_000);
 												return (
 													<td
 														key={h}
-														title={`${short(f.node)} · ${fechaHora(d.getTime())} · ${t("{0} packets", n)}`}
+														title={`${short(f.node)} · ${dateTime(d.getTime())} · ${t("{0} packets", n)}`}
 														style={{
 															width: 9,
 															height: 14,
@@ -478,7 +478,7 @@ export default function Mesh() {
 										ids.length <= 45 ||
 										isMe ||
 										id === sel ||
-										vecinosSel.has(id);
+										neighborSel.has(id);
 									return (
 										<g
 											key={id}

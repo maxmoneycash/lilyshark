@@ -45,17 +45,17 @@ export function useHourTick(): number {
 }
 
 /** hh:mm:ss. 2-digit even in 12 h: the width has to stay fixed in a monospace UI. */
-export function hhmm(ms: number, segundos = true): string {
+export function hhmm(ms: number, seconds = true): string {
   return new Date(ms).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
-    ...(segundos ? { second: "2-digit" as const } : {}),
+    ...(seconds ? { second: "2-digit" as const } : {}),
     hour12: hour12(),
   });
 }
 
 /** Date + time, for anything not from today. */
-export function fechaHora(ms: number): string {
+export function dateTime(ms: number): string {
   return new Date(ms).toLocaleString(undefined, {
     dateStyle: "short",
     timeStyle: "medium",
@@ -81,9 +81,19 @@ export function distKm(aLat: number, aLon: number, bLat: number, bLon: number): 
   return Math.sqrt(x * x + y * y) * 6371;
 }
 
-/** "840 m" under a km, "12.4 km" above. */
+/** "840M" under a km, "12.4KM" above. Matches field range chrome. */
 export function fmtDist(km: number): string {
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+  return km < 1 ? `${Math.round(km * 1000)}M` : `${km.toFixed(1)}KM`;
+}
+
+/** Field-style hemisphere coords. West is W, south is S. */
+export function fmtHemisphere(
+  lat: number,
+  lon: number,
+  latDigits = 4,
+  lonDigits = 3,
+): string {
+  return `${Math.abs(lat).toFixed(latDigits)} ${lat >= 0 ? "N" : "S"}  ${Math.abs(lon).toFixed(lonDigits)} ${lon >= 0 ? "E" : "W"}`;
 }
 
 /** [███████░░░]  72% — or PWR when plugged in.

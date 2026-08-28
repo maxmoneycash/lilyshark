@@ -4,23 +4,22 @@ import { clearConvo, retryMessage, sendText } from "../radio";
 import { saveText, stamp } from "../export";
 import { getDeviceLinkState } from "../../lib/deviceLink";
 import { t } from "../i18n";
-import { fechaHora, hhmm } from "../fmt";
+import { dateTime, hhmm } from "../fmt";
 
 // in search results the time alone isn't enough: they may be from another day
-const fecha = (ms: number) =>
+const dateLabel = (ms: number) =>
   new Date(ms).toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
 
 // midnight-to-midnight day key: two timestamps in the same local day match
-const diaKey = (ms: number) => new Date(ms).toDateString();
+const dayKey = (ms: number) => new Date(ms).toDateString();
 
-// Day separator between messages: HOY/AYER for the recent ones, the full date
-// (with weekday) for the rest, so a long backlog doesn't blur across days.
-const fechaSep = (ms: number): string => {
+// Day separator: TODAY/YESTERDAY for recent messages, full date otherwise.
+const dateSep = (ms: number): string => {
   const d = new Date(ms);
   d.setHours(0, 0, 0, 0);
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const days = Math.round((hoy.getTime() - d.getTime()) / 86_400_000);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((today.getTime() - d.getTime()) / 86_400_000);
   if (days === 0) return t("TODAY");
   if (days === 1) return t("YESTERDAY");
   return new Date(ms).toLocaleDateString(undefined, {
@@ -55,7 +54,7 @@ export default function Chat({
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  // the 3 s disarm of the LIMPIAR confirmation
+  // the 3 s disarm of the CLEAR confirmation
   const clearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [replyTo, setReplyTo] = useState<Message | undefined>();
 
@@ -98,7 +97,7 @@ export default function Chat({
     label: `#${c.name}`,
   }));
   if (channelConvos.length === 0) {
-    channelConvos.push({ key: "ch:0", label: t("#Primary") });
+    channelConvos.push({ key: "ch:0", label: t("LONGFAST") });
   }
   const dmKeys = new Set(
     s.messages.filter((m) => m.convo.startsWith("dm:")).map((m) => m.convo),
@@ -159,7 +158,7 @@ export default function Chat({
         <div style={{ padding: "8px 0" }}>
           {dmConvos.length === 0 && (
             <div className="convo-item dim" style={{ cursor: "default" }}>
-              <span>{t("— none —")}</span>
+              <span>{t("— NONE —")}</span>
             </div>
           )}
           {dmConvos.map((c) => (
@@ -183,11 +182,11 @@ export default function Chat({
             PANEL // CHAT · {convoLabel}
             {convo.startsWith("dm:") &&
               (s.nodes.get(Number(convo.slice(3)))?.publicKey ? (
-                <span title={t("end-to-end encrypted (PKI)")}> 🔒 PKI</span>
+                <span title={t("END-TO-END ENCRYPTED (PKI)")}> 🔒 PKI</span>
               ) : (
                 <span
                   className="warn"
-                  title={t("no public key: encrypted with the channel PSK only")}
+                  title={t("NO PUBLIC KEY: ENCRYPTED WITH THE CHANNEL PSK ONLY")}
                 >
                   {" "}
                   {t("⚠ NO PKI")}
@@ -205,13 +204,13 @@ export default function Chat({
                   e.currentTarget.blur();
                 }
               }}
-              placeholder={t("search the whole history_")}
-              title={t("Ctrl+F · ESC clears")}
+              placeholder={t("SEARCH THE WHOLE HISTORY_")}
+              title={t("CTRL+F · ESC CLEARS")}
               style={{ width: 190, fontSize: 11 }}
             />
             <button
               style={{ fontSize: 10, padding: "0 6px" }}
-              title={t("Export this conversation to a text file")}
+              title={t("EXPORT THIS CONVERSATION TO A TEXT FILE")}
               disabled={msgs.length === 0}
               onClick={async () => {
                 try {
@@ -235,7 +234,7 @@ export default function Chat({
             <button
               className="danger"
               style={{ fontSize: 10, padding: "0 6px" }}
-              title={t("Delete all messages in this conversation")}
+              title={t("DELETE ALL MESSAGES IN THIS CONVERSATION")}
               disabled={convoCount === 0}
               onClick={() => {
                 if (confirmClear) {
@@ -271,17 +270,22 @@ export default function Chat({
           }}
         >
           {msgs.length === 0 && (
-            <div className="dim" style={{ fontSize: 11 }}>
-              {q
-                ? t("NO RESULTS FOR \"{0}\"_", search)
-                : t("──── NO MESSAGES IN {0} — AWAITING SIGNAL_ ────", convoLabel)}
+            <div className="chat-empty">
+              <div className="chat-empty-title">
+                {q
+                  ? t("NO RESULTS FOR \"{0}\"", search)
+                  : t("NO MESSAGES IN {0}", convoLabel)}
+              </div>
+              <div className="dim">
+                {q
+                  ? t("TRY ANOTHER WORD OR CLEAR SEARCH WITH ESC.")
+                  : t("TYPE BELOW AND PRESS SEND E. ENTER ALSO TRANSMITS.")}
+              </div>
             </div>
           )}
           {!q && getDeviceLinkState().status === "linked" && (
-            <div className="dim" style={{ fontSize: 11, marginBottom: 8 }}>
-              This T-Deck has no chat screen. Messages you send leave over LoRa
-              (Meshtastic LongFast). They show here and in TRAFFIC. Other people
-              only appear if a nearby Meshtastic radio answers on the air.
+            <div className="chat-hint">
+              {t("SAME RADIO AS THE T-DECK. DEVICE: CHAT TAB, TYPE, ENTER. TAB CYCLES LONGFAST OR A HEARD NODE.")}
             </div>
           )}
           {q && msgs.length > 0 && (
@@ -293,10 +297,10 @@ export default function Chat({
             // a separator when the day changes from the previous message; not in
             // search, where results aren't a single day-ordered thread
             const sep =
-              !q && (i === 0 || diaKey(m.ts) !== diaKey(msgs[i - 1].ts));
+              !q && (i === 0 || dayKey(m.ts) !== dayKey(msgs[i - 1].ts));
             return (
             <Fragment key={`${m.id}-${m.ts}`}>
-            {sep && <div className="chat-daysep">{fechaSep(m.ts)}</div>}
+            {sep && <div className="chat-daysep">{dateSep(m.ts)}</div>}
             <div
               className={m.mine ? `msg-mine ${m.state === "failed" ? "failed" : ""}` : ""}
               style={q ? { cursor: "pointer" } : undefined}
@@ -311,7 +315,7 @@ export default function Chat({
             >
               {q && (
                 <>
-                  <span className="dim">{fecha(m.ts)}</span>{" "}
+                  <span className="dim">{dateLabel(m.ts)}</span>{" "}
                   <span className="warn">{labelOf(m.convo)}</span>{" "}
                 </>
               )}
@@ -323,15 +327,15 @@ export default function Chat({
                       ↩{" "}
                       {orig
                         ? `<${nodeShort(orig.from)}> ${orig.text}`
-                        : t("(original message)")}
+                        : t("(ORIGINAL MESSAGE)")}
                     </div>
                   );
                 })()}
-              <span className="dim" title={fechaHora(m.ts)}>[{hhmm(m.ts)}]</span>{" "}
+              <span className="dim" title={dateTime(m.ts)}>[{hhmm(m.ts)}]</span>{" "}
               <span
                 className={`nodelink ${m.mine ? "" : "warn"}`}
                 style={m.mine ? { fontWeight: 700 } : undefined}
-                title={t("Node actions")}
+                title={t("NODE ACTIONS")}
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenu({ num: m.from, x: e.clientX, y: e.clientY });
@@ -344,19 +348,19 @@ export default function Chat({
                 (() => {
                   const parts = [
                     m.hops === 0
-                      ? t("direct")
+                      ? t("DIRECT")
                       : m.hops === 1
-                        ? t("1 hop")
+                        ? t("1 HOP")
                         : m.hops !== undefined
-                          ? t("{0} hops", m.hops)
+                          ? t("{0} HOPS", m.hops)
                           : null,
-                    m.snr !== undefined ? `${m.snr.toFixed(1)} dB` : null,
+                    m.snr !== undefined ? `${m.snr.toFixed(1)} DB` : null,
                   ].filter(Boolean);
                   return (
                     <span
                       className="dim"
                       style={{ fontSize: 10 }}
-                      title={t("Hops to reach us (hopStart − hopLimit) · SNR of the last hop",
+                      title={t("HOPS TO REACH US (HOPSTART − HOPLIMIT) · SNR OF THE LAST HOP",
                       )}
                     >
                       [{parts.join(" · ")}]{" "}
@@ -365,20 +369,20 @@ export default function Chat({
                 })()}
               {m.text}{" "}
               {m.mine && m.state === "queued" && (
-                <span className="warn">{t("⧗ queued")}</span>
+                <span className="warn">{t("⧗ QUEUED")}</span>
               )}
               {m.mine && m.state === "sent" && (
-                <span className="dim">{t("➤ on air LongFast · no reply yet")}</span>
+                <span className="dim">{t("➤ ON AIR LONGFAST · NO REPLY YET")}</span>
               )}
               {m.mine && m.state === "delivered" && (
-                <span className="dim">{t("✓ delivered")}</span>
+                <span className="dim">{t("✓ DELIVERED")}</span>
               )}
               {m.mine && m.state === "failed" && (
                 <>
-                  <span className="err">{t("✗ failed")}</span>{" "}
+                  <span className="err">{t("✗ FAILED")}</span>{" "}
                   <button
                     style={{ fontSize: 10, padding: "0 6px" }}
-                    title={t("Retry send")}
+                    title={t("RETRY SEND")}
                     onClick={() => retryMessage(m).catch(() => {})}
                   >
                     {t("↻ RETRY")}
@@ -388,7 +392,7 @@ export default function Chat({
               {!q && (
                 <button
                   className="quote-btn"
-                  title={t("Reply")}
+                  title={t("REPLY")}
                   onClick={() => {
                     setReplyTo(m);
                     inputRef.current?.focus();
@@ -406,7 +410,7 @@ export default function Chat({
         {replyTo && (
           <div className="reply-bar">
             <span className="dim">
-              ↩ {t("replying to")} &lt;{nodeShort(replyTo.from)}&gt;:{" "}
+              ↩ {t("REPLYING TO")} &lt;{nodeShort(replyTo.from)}&gt;:{" "}
               {replyTo.text.slice(0, 60)}
             </span>
             <button
@@ -424,14 +428,25 @@ export default function Chat({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSend()}
-            placeholder={t("type a message_")}
+            placeholder={t("TYPE A MESSAGE")}
+            maxLength={200}
           />
-          <span className="cursor">█</span>
-          <span className="dim" style={{ fontSize: 11 }}>
-            {t("ENTER=TX · {0} B FREE",
-              Math.max(0, 200 - new TextEncoder().encode(draft).length),
-            )}
+          <span
+            className={
+              200 - new TextEncoder().encode(draft).length < 20
+                ? "chat-remain warn"
+                : "chat-remain dim"
+            }
+          >
+            {Math.max(0, 200 - new TextEncoder().encode(draft).length)}
           </span>
+          <button
+            className="primary chat-send"
+            disabled={!draft.trim()}
+            onClick={() => void onSend()}
+          >
+            {t("SEND E")}
+          </button>
         </div>
       </div>
       {menu &&
@@ -455,7 +470,7 @@ export default function Chat({
                       close();
                     }}
                   >
-                    {t("✉ Send DM")}
+                    {t("✉ SEND DM")}
                   </button>
                 )}
                 <button
@@ -464,7 +479,7 @@ export default function Chat({
                     close();
                   }}
                 >
-                  {t("☷ View in NODES")}
+                  {t("☷ VIEW IN NODES")}
                 </button>
                 {hasPos && (
                   <button
@@ -473,7 +488,7 @@ export default function Chat({
                       close();
                     }}
                   >
-                    {t("⚲ View on MAP")}
+                    {t("⚲ VIEW ON MAP")}
                   </button>
                 )}
               </div>

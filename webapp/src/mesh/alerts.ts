@@ -6,14 +6,14 @@ export interface AlertCfg {
   on: boolean;
   battery: number; // % · warn below this
   silentH: number; // hours without a signal
-  autonomiaH: number; // hours of runtime left · 0 = don't warn
+  runtimeH: number; // hours of runtime left · 0 = don't warn
 }
 
 const DEFAULT_ALERTS: AlertCfg = {
   on: false,
   battery: 20,
   silentH: 12,
-  autonomiaH: 12,
+  runtimeH: 12,
 };
 
 const KEY = "alerts";
@@ -21,9 +21,16 @@ const KEY = "alerts";
 export function getAlertCfg(): AlertCfg {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? { ...DEFAULT_ALERTS, ...JSON.parse(raw) } : DEFAULT_ALERTS;
+    if (!raw) return { ...DEFAULT_ALERTS };
+    const parsed = JSON.parse(raw) as Partial<AlertCfg> & { autonomiaH?: number };
+    return {
+      on: parsed.on ?? DEFAULT_ALERTS.on,
+      battery: parsed.battery ?? DEFAULT_ALERTS.battery,
+      silentH: parsed.silentH ?? DEFAULT_ALERTS.silentH,
+      runtimeH: parsed.runtimeH ?? parsed.autonomiaH ?? DEFAULT_ALERTS.runtimeH,
+    };
   } catch {
-    return DEFAULT_ALERTS;
+    return { ...DEFAULT_ALERTS };
   }
 }
 
@@ -35,7 +42,7 @@ export function setAlertCfg(cfg: AlertCfg): void {
  *  whoever notifies takes care of translating it. */
 export interface Alert {
   key: string; // node+type, so the warning isn't repeated
-  kind: "bateria" | "mudo" | "autonomia";
+  kind: "battery" | "silent" | "runtime";
   name: string; // readable node name
   value: number; // % battery · hours of silence
   threshold: number;
@@ -73,7 +80,7 @@ export function evalAlerts(
       if (due(key)) {
         out.push({
           key,
-          kind: "bateria",
+          kind: "battery",
           name: who,
           value: n.batteryLevel,
           threshold: cfg.battery,
@@ -85,11 +92,11 @@ export function evalAlerts(
     if (n.lastHeard > 0) {
       const hours = (now - n.lastHeard * 1000) / 3_600_000;
       if (hours >= cfg.silentH) {
-        const key = `mudo:${n.num}`;
+        const key = `silent:${n.num}`;
         if (due(key)) {
           out.push({
             key,
-            kind: "mudo",
+            kind: "silent",
             name: who,
             value: Math.floor(hours),
             threshold: cfg.silentH,
@@ -106,25 +113,25 @@ export function evalAlerts(
 /** Runtime warning: the battery isn't low yet, but at the current rate it
  *  will be soon. It stays quiet when the forecast is unreliable — warning
  *  about a runout derived from an irregular series is worse than not warning. */
-export function evalAutonomia(
-  node: { num: number; nombre: string; fav?: boolean },
+export function evalRuntime(
+  node: { num: number; name: string; fav?: boolean },
   forecast: Forecast | undefined,
   cfg: AlertCfg,
   lastFired: Map<string, number>,
   now = Date.now(),
 ): Alert | undefined {
-  if (!cfg.on || !cfg.autonomiaH || !node.fav) return undefined;
+  if (!cfg.on || !cfg.runtimeH || !node.fav) return undefined;
   const h = forecast?.hoursRemaining;
   if (h === undefined || forecast!.fit < 0.5) return undefined;
-  if (h > cfg.autonomiaH) return undefined;
+  if (h > cfg.runtimeH) return undefined;
   const key = `auto:${node.num}`;
   if (now - (lastFired.get(key) ?? -Infinity) < COOLDOWN_MS) return undefined;
   lastFired.set(key, now);
   return {
     key,
-    kind: "autonomia",
-    name: node.nombre,
+    kind: "runtime",
+    name: node.name,
     value: Math.round(h),
-    threshold: cfg.autonomiaH,
+    threshold: cfg.runtimeH,
   };
 }

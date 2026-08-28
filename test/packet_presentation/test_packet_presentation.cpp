@@ -183,8 +183,8 @@ void testMeshtasticOpaqueLabelDoesNotDependOnChannelHash()
     assert(full_hash.kind == PacketKind::OpaquePayload);
     assert(!zero_hash.hasAttribute(AttributeEncrypted));
     assert(!full_hash.hasAttribute(AttributeEncrypted));
-    expectLabel(zero_hash, "OPAQUE");
-    expectLabel(full_hash, "OPAQUE");
+    expectLabel(zero_hash, "ENC");
+    expectLabel(full_hash, "ENC");
 }
 
 void testNodeSummaryAdmissionPolicy()

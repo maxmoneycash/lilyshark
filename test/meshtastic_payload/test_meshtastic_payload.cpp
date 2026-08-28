@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "lilyshark/core/mesh_identity.h"
 #include "lilyshark/crypto/aes128.h"
 #include "lilyshark/protocols/meshtastic_encode.h"
 #include "lilyshark/protocols/meshtastic_payload.h"
@@ -176,6 +177,22 @@ void testEncodeTextRoundTripsThroughDefaultKeyReader()
     assert(std::strcmp(payload.text, "hello bay") == 0);
 }
 
+void testEncodeTextWritesDestination()
+{
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0x4c534b01U;
+    request.to_node = 0x11223344U;
+    request.packet_id = 1;
+    request.text = "dm";
+    std::uint8_t frame[128]{};
+    const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(n > 16);
+    assert(frame[0] == 0x44);
+    assert(frame[1] == 0x33);
+    assert(frame[2] == 0x22);
+    assert(frame[3] == 0x11);
+}
+
 void testEncodePositionRoundTrips()
 {
     MeshtasticEncodeRequest request{};
@@ -192,6 +209,25 @@ void testEncodePositionRoundTrips()
     assert(payload.has_position);
     assert(payload.latitude_degrees > 37.911 && payload.latitude_degrees < 37.912);
     assert(payload.longitude_degrees < -122.017 && payload.longitude_degrees > -122.018);
+}
+
+void testMacsBecomeDistinctNonBroadcastNodeNums()
+{
+    const std::uint32_t a = deriveMeshtasticNodeNum(0xAABBCCDDEE11ULL);
+    const std::uint32_t b = deriveMeshtasticNodeNum(0xAABBCCDDEE22ULL);
+    assert(a != 0U);
+    assert(a != 0xffffffffU);
+    assert(a != b);
+    setLocalMeshtasticNodeNum(a);
+    assert(localMeshtasticNodeNum() == a);
+    char short_name[8]{};
+    char long_name[24]{};
+    formatLocalMeshtasticShortName(short_name, sizeof(short_name));
+    formatLocalMeshtasticLongName(long_name, sizeof(long_name));
+    assert(std::strlen(short_name) == 4);
+    assert(std::strncmp(long_name, "Lilyshark-", 10) == 0);
+    setLocalMeshtasticNodeNum(0);
+    assert(localMeshtasticNodeNum() == a);
 }
 
 void testEmptyAndOversizedInputsAreRefused()
@@ -215,7 +251,9 @@ int main()
     testReadsPositionPayload();
     testLongFastHashMatchesKnownFrame();
     testEncodeTextRoundTripsThroughDefaultKeyReader();
+    testEncodeTextWritesDestination();
     testEncodePositionRoundTrips();
+    testMacsBecomeDistinctNonBroadcastNodeNums();
     testEmptyAndOversizedInputsAreRefused();
     std::printf("meshtastic payload tests passed\n");
     return 0;

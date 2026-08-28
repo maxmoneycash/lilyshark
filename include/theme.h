@@ -7,11 +7,12 @@ LV_FONT_DECLARE(font_condensed_bold_16);
 LV_FONT_DECLARE(font_condensed_bold_28);
 LV_FONT_DECLARE(font_mono_10);
 LV_FONT_DECLARE(font_mono_semibold_12);
+LV_FONT_DECLARE(font_pixel_6x8);
+LV_FONT_DECLARE(font_pixel_18x24);
 
 namespace lilyshark::theme {
 
-// Hallmark · macrostructure: Workbench · theme: studied-DNA (source: user-supplied T-Deck references) · tone: field instrument · anchor hue: phosphor green
-// Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 · slop: pass
+// Workbench: near-black green ground, phosphor data, pink only for the mark.
 
 inline lv_color_t background() { return lv_color_hex(0x07100F); }
 inline lv_color_t surface() { return lv_color_hex(0x0B1716); }
@@ -26,6 +27,7 @@ inline lv_color_t cyan() { return lv_color_hex(0x71D8DF); }
 inline lv_color_t amber() { return lv_color_hex(0xF2CE58); }
 inline lv_color_t fault() { return lv_color_hex(0xF06C65); }
 inline lv_color_t focus() { return lv_color_hex(0x1A5BC4); }
+inline lv_color_t on_accent() { return lv_color_hex(0x07100F); }
 inline lv_color_t heat_deep() { return lv_color_hex(0x061A38); }
 inline lv_color_t heat_cold() { return lv_color_hex(0x103A78); }
 inline lv_color_t heat_mid() { return lv_color_hex(0x1C74B8); }
@@ -36,6 +38,9 @@ inline lv_color_t heat_peak() { return lv_color_hex(0xFFE36B); }
 constexpr lv_coord_t screen_width = 320;
 constexpr lv_coord_t screen_height = 240;
 constexpr lv_coord_t status_height = 22;
+constexpr lv_coord_t nav_top = 226;
+constexpr lv_coord_t nav_height = 14;
+constexpr lv_coord_t tab_width = 64;
 constexpr lv_coord_t inset = 7;
 constexpr lv_coord_t space_xs = 4;
 constexpr lv_coord_t space_sm = 8;

@@ -4,6 +4,63 @@ All notable changes to Lilyshark are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project is
 pre-release, so versions are dates, not semver.
 
+## [2026-08-26]
+
+The field session release: two T-Decks exchanging decoded traffic and direct
+messages on real hardware, and everything that made that work.
+
+### Fixed
+- The radio went permanently deaf after its first transmit: `transmit()`
+  cleared the DIO1 interrupt handler and `resumeReceive()` never re-attached
+  it. Every device announces itself at boot, so every device went deaf before
+  hearing anything. Guarded by a radio integration test that fails on revert.
+- The map scale bar printed "200 M" over a bar measuring 8.4 m at z20; it now
+  derives a 1-2-5 step from the scale actually on screen.
+- Map redraws painted a 65,280-pixel double-precision field chart underneath
+  imagery that covered every pixel of it, and loaded eight neighbouring tiles
+  before computing that all of them were off screen — the whole of the "map is
+  laggy" report.
+- The compass arrowhead was silently absent on macOS and present on Linux:
+  the chevron guard rejects vectors under one unit, and the compass handed it
+  a unit vector whose libm-computed length landed on the comparison itself.
+- Chat ran up to 64 AES-128 decryptions per keystroke for one SNR figure that
+  lives in RF metadata beside the frame.
+- `C` was claimed by chat and silently killed coding-rate tuning; coding rate
+  moved to `R`, which then had to stand aside on Traffic Filter, whose reset
+  also answers to `R`. The new-message banner named a key (`6`) that opened
+  Airtime. Keys are now regression-tested for their documented effect.
+- The device-shell suite segfaulted on a fixture-only path (null plot buffer →
+  244 LVGL objects for one sparkline) and then failed on ~40 assertion strings
+  that had drifted from the reworked UI; the firmware did not link on a clean
+  checkout because a generator symbol had no weak fallback. CI is green again,
+  and the render stage it had been blocking runs once more.
+
+### Added
+- Satellite imagery on-device: hillshade, terrarium contours, and street
+  labels, baked for a location or read from a microSD tile pyramid laid on the
+  Web Mercator pixel grid (`scripts/build_map_card.py`). Trackball pans the
+  map; clicking recentres.
+- Chat between devices, with per-peer threads, unread badges, persistence to
+  NVS across power cycles, and audible chimes for messages and newly heard
+  nodes through the I2S speaker.
+- A MESSAGES screen: every decoded text message, newest first, with sender,
+  scope, age, and arrival SNR. A finished survey now offers MESSAGES /
+  PACKETS / NODES instead of ending on the word COMPLETE.
+- Spectrum analysis over the existing 33-bin sweep: peak and noise-floor
+  traces, the radio's own channel bracketed on the axis, and a footer with
+  peak dBm, its frequency, the floor, and band occupancy.
+- LXMF: messages that were never encrypted are read out of Reticulum payloads
+  (destination/source hashes, timestamp, title, body, field count), with an
+  independent-implementation test vector suite and a 31,855-case fuzz guard.
+  Encrypted destinations stay opaque.
+- The web analyzer gained browser capture with Shelby publish, and the same
+  three basemaps as the device, sharing the field-chart and contour maths.
+
+### Changed
+- Every "word + keystroke" button label spelled out; Help rebuilt around the
+  keys an operator actually reaches for; GPS states read ON / FINDING / OFF
+  everywhere; node lists show range and colour their last-heard age.
+
 ## [2026-08-15]
 
 ### Added — complete T-Deck product shell

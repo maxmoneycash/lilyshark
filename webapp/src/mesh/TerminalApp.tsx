@@ -10,7 +10,7 @@ import {
   reconnectLast,
   setConnectionLostHandler,
 } from "./radio";
-import { evalAlerts, evalAutonomia, getAlertCfg } from "./alerts";
+import { evalAlerts, evalRuntime, getAlertCfg } from "./alerts";
 import { clearDemo, seedDemo } from "./demo";
 import { forecastBattery } from "./battery";
 import { addLog, DeviceStatus, fmtLog, getSnapshot, subscribe } from "./store";
@@ -335,7 +335,7 @@ function App() {
         Date.now(),
         st.myNodeNum,
       )) {
-        if (a.kind === "bateria") {
+        if (a.kind === "battery") {
           void notify(
             t("{0} · battery {1}%", a.name, a.value),
             t("Below the threshold ({0}%)", a.threshold),
@@ -358,7 +358,7 @@ function App() {
     const fired = new Map<string, number>();
     const check = async () => {
       const cfg = getAlertCfg();
-      if (!cfg.on || !cfg.autonomiaH) return;
+      if (!cfg.on || !cfg.runtimeH) return;
       const st = getSnapshot();
       for (const n of st.nodes.values()) {
         if (!n.fav || n.num === st.myNodeNum) continue;
@@ -368,8 +368,8 @@ function App() {
             "batteryLevel",
             Date.now() - 6 * 3_600_000,
           );
-          const a = evalAutonomia(
-            { num: n.num, nombre: n.longName || n.shortName, fav: n.fav },
+          const a = evalRuntime(
+            { num: n.num, name: n.longName || n.shortName, fav: n.fav },
             forecastBattery(rows),
             cfg,
             fired,

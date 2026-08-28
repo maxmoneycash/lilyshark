@@ -283,6 +283,44 @@ void testRestoreFailureSchedulesFullConfigureRecovery()
     service.stop();
 }
 
+// A transmit must leave the receiver able to report the next packet. transmit()
+// clears the DIO1 action before keying up; if it is not re-attached the radio
+// keeps "receiving" in status while the interrupt that delivers packets is
+// gone. The device announces itself on the mesh at boot, so this went deaf
+// before it had ever heard anything, and two devices could never see one
+// another.
+void testTransmitLeavesReceiverAbleToDeliverPackets()
+{
+    auto &fake = radiolib_fake::state();
+    fake.reset();
+    fake.now_ms = 100;
+
+    CapturedFrame capture{};
+    TDeckRadioService service{};
+    assert(service.begin(testProfile(), captureFrame, &capture));
+    assert(fake.dio1_action != nullptr);
+
+    const std::uint8_t payload[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    assert(service.transmit(payload, sizeof(payload)));
+    assert(service.status().receiving);
+    assert(fake.dio1_action != nullptr &&
+           "the DIO1 handler must survive a transmit or no packet is ever reported");
+
+    // Prove it end to end: raise an interrupt the way the radio would and
+    // require the frame to reach the sink.
+    const unsigned before = capture.calls;
+    fake.packet = {0x01, 0x02, 0x03};
+    fake.packet_length = fake.packet.size();
+    fake.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+    fake.header_has_crc = true;
+    fake.read_data_result = RADIOLIB_ERR_NONE;
+    fake.dio1_action();
+    service.poll();
+    assert(capture.calls == before + 1U &&
+           "a packet received after a transmit must still reach the capture sink");
+    service.stop();
+}
+
 } // namespace
 
 int main()
@@ -291,6 +329,7 @@ int main()
     testReceiveArmRetryAndInvalidLengthRearm();
     testSpectrumSweepRestoresReceiver();
     testRestoreFailureSchedulesFullConfigureRecovery();
+    testTransmitLeavesReceiverAbleToDeliverPackets();
     std::puts("radio service state-transition tests passed");
     return 0;
 }

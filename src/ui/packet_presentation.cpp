@@ -75,6 +75,19 @@ const char *packetKindLabel(const DecodedPacket &packet) noexcept
         }
     }
 
+    if (packet.protocol == ProtocolId::Meshtastic && packet.application_port != 0) {
+        switch (packet.application_port) {
+        case 1: return "TEXT";
+        case 3: return "POS";
+        case 4: return "NODE";
+        case 5: return "ROUTE";
+        case 67: return "TELE";
+        case 70: return "TRACE";
+        case 71: return "NBR";
+        default: break;
+        }
+    }
+
     switch (packet.kind) {
     case PacketKind::EncryptedPayload:
         return "ENC";
@@ -85,7 +98,7 @@ const char *packetKindLabel(const DecodedPacket &packet) noexcept
     case PacketKind::Advertisement:
         return "ADV";
     case PacketKind::OpaquePayload:
-        return "OPAQUE";
+        return packet.protocol == ProtocolId::Meshtastic ? "ENC" : "OPAQUE";
     case PacketKind::Unknown:
     default:
         return "RAW";

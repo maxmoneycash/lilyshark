@@ -255,6 +255,12 @@ void TDeckRadioService::onDio1() noexcept
 
 void TDeckRadioService::resumeReceive() noexcept
 {
+    // The DIO1 handler must be live before receive starts. transmit() and the
+    // spectrum sweep both clear it, and it used to be re-attached only inside
+    // configure() — so the first transmit left the radio permanently unable to
+    // report a received packet. The device announces itself at boot, which
+    // meant it went deaf before it had ever heard anything.
+    radio_.setDio1Action(onDio1);
     const std::int16_t state = radio_.startReceive();
     status_.last_error = state;
     status_.receiving = state == RADIOLIB_ERR_NONE;

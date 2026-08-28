@@ -39,16 +39,23 @@ A single T-Deck is enough for field surveys, packet inspection, radio-profile ch
 
 The firmware is also a complete device shell, not a loose collection of graphs. It boots into the Lily Pink (`#FF4F9D`) wordmark, explains its packet/RF/network/capture tools, guides a first-time user through network and radio-profile selection, teaches the controls, checks the available hardware, then opens a Home screen with clear routes to diagnostics and settings. Capture, storage, radio, display, keyboard, optional GPS, Help, About, and setup reset are all controllable on the T-Deck.
 
+A banner only works if somebody is looking at the screen, and in the field the deck is usually in a pocket. A message arriving raises a status-bar banner for twelve seconds and plays a rising two-tone through the speaker; a node heard for the first time announces itself and plays two quieter blips. The nodes list colours how long ago each neighbour was heard -- green inside five minutes, amber to thirty, red beyond -- and reports how far away it is, which is the question the screen exists to answer. Conversations are saved to NVS and survive a power cycle.
+
 The diagnostic views change as the radio environment changes. Frames enter the Traffic feed, protocol totals roll forward, the spectrum history advances, node signals develop over time, surveys accumulate observations, and the synchronized Timeline shows packet rate, SNR, CRC failures, and events on one clock.
 
 > [!NOTE]
-> The current firmware is a developer alpha, and it runs on real hardware: on a
-> T-Deck Plus the display, keyboard, trackball, SX1262 (listening, error 0),
-> GPS (fix, 12 satellites via baud autodetect), battery readout, USB analyzer
-> link, and the full screen set have all been exercised in a field session.
-> Still untested on hardware: microSD capture writes, touch calibration, and
-> spectrum-scan recovery. Treat those paths as unverified until they get the
-> same treatment.
+> The current firmware is a developer alpha, and it runs on real hardware. Two
+> T-Deck Plus units have been exercised together in the field: display,
+> keyboard, trackball, GT911 touch, GPS (fix, up to 12 satellites via baud
+> autodetect), battery readout, USB analyzer link, and the full screen set.
+> The SX1262 receives and decodes live over-air Meshtastic traffic between the
+> two units -- position and NodeInfo beacons at -65 dBm with zero CRC errors --
+> and direct messages pass between them in both directions.
+>
+> Still untested on hardware: microSD capture writes, touch calibration
+> against a known reference, spectrum-scan recovery, and any live MeshCore or
+> Reticulum/RNode traffic, for which no second implementation has been on the
+> air here. Treat those paths as unverified until they get the same treatment.
 
 ## Contents
 
@@ -186,9 +193,11 @@ one of them on the device.
   </tr>
   <tr>
     <td width="25%"><img src="design/previews/firmware/events.png" alt="Events — device history"></td>
+    <td width="25%"><img src="design/previews/firmware/messages.png" alt="Messages — every decoded text message, newest first"></td>
   </tr>
   <tr>
     <td align="center"><sub>Events — device history</sub></td>
+    <td align="center"><sub>Messages — every text message heard</sub></td>
   </tr>
 </table>
 
@@ -414,10 +423,14 @@ The simulator drives these views with deterministic synthetic RF telemetry. A fi
 | `T` | Open Timeline |
 | `X` from Traffic | Open Traffic Filter; use Up/Down to choose a predicate, Left/Right to change it, `R` to reset, and Enter to apply |
 | `P` | Open the five-preset radio-profile picker with the active preset focused |
+| Trackball on Map | Roll to pan; press to return the view to where you are standing. A fingertip covers about 40 px of a 320 px panel, which at deep zoom is most of the gap between two operators standing together |
+| `+` / `-` on Map | Zoom, from z12 out to z23 |
+| `I` / `D` / `G` on Map | Satellite imagery, dark road map, or the drawn field chart. The on-screen chip names the layer you are on and moves to the next when tapped |
 | `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
 | `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
 | `F` | Cycle spreading factors 7 through 12 |
-| `C` | Cycle coding rates 4/5 through 4/8 |
+| `R` | Cycle coding rates 4/5 through 4/8 |
+| `C` | Open Chat; from a node's detail screen, open Chat addressed to that node |
 | `S` | Save a BMP screenshot to microSD |
 | `?` | Open Help without bypassing unfinished onboarding or destructive confirmations |
 | Touch tap | Select the tapped menu/table row or invoke the exact left/right action shown in the footer |
@@ -432,10 +445,12 @@ Decoding is profile-gated because these LoRa protocols do not all carry an unamb
 | --- | --- | --- | --- |
 | **Meshtastic** | US LongFast, 906.875 MHz, 250 kHz, SF11, CR 4/5 | Outer header, source, destination, packet ID, channel hash/hint, hop limit/start, next hop, relay byte, broadcast/ACK/MQTT flags | Protobuf payload stays opaque. The outer header alone does not prove whether it is clear or encrypted; channel keys and payload decryption are not implemented. |
 | **MeshCore** | Current US recommendation at 910.525 MHz/62.5 kHz/SF7; legacy 915 MHz/250 kHz/SF10 | Version 1 route type, payload type, encoded path shape, transport codes, group channel, ACK checksum, structural length validation | Protected direct, group, and anonymous payloads stay opaque. Advertisement bodies are not expanded into contacts. |
-| **Reticulum / RNode** | Documented EU example at 867.2 MHz plus a tunable 915 MHz US starting point, both 125 kHz/SF8 | RNode shim, split marker, Reticulum header type, packet and destination type, context, hops, hash prefixes, outer-header protection marker | RNode PHY settings are deployment-defined. IFAC-marked content stays opaque and unverified without an interface key. The included profiles are starting points, not universal Reticulum channels. |
+| **Reticulum / RNode** | Documented EU example at 867.2 MHz plus a tunable 915 MHz US starting point, both 125 kHz/SF8 | RNode shim, split marker, Reticulum header type, packet and destination type, context, hops, hash prefixes, outer-header protection marker. LXMF messages that were never encrypted are read out of the payload: destination and source hashes, timestamp, title, body, and a count of structured fields | RNode PHY settings are deployment-defined. IFAC-marked content stays opaque and unverified without an interface key. LXMF to a SINGLE destination is encrypted end to end and stays that way. The included profiles are starting points, not universal Reticulum channels. |
 | **Unknown LoRa** | User code can add `RadioProfile` entries | Raw frame, integrity state, and all RF metadata supplied by the radio | No protocol labels are invented. The frame is still inspectable and exportable. |
 
 The decoder API preserves uncertainty. MeshCore transport codes are not presented as node IDs, and Reticulum's 32-bit hash prefixes are not presented as complete identities.
+
+No decoder here attacks a cipher. Two payload formats are readable because of what they are, not because anything was broken: a Meshtastic channel using the published default key, which every radio ships with, and an LXMF message sent to a destination type that carries no encryption. Both give up the moment the bytes stop parsing, because noise must never be presented as a message. A real PSK, and an LXMF message to a SINGLE destination, stay opaque -- exactly as they should.
 
 ### Built-in PHY profiles
 
@@ -594,6 +609,10 @@ anchor tx `0x5c56d7bfce7c45a7d16c242a45e9d7f9711511fd4b3fd8f1f152dfaac1a73aee`.
 The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/releases) contains the current T-Deck factory image, application-only image, debug symbols, and SHA-256 checksums. For a fresh install, use the [prebuilt-release steps](docs/FLASHING.md#install-the-prebuilt-developer-alpha); a local firmware build is not required. Do not flash the `.elf` file.
 
 ## Flash a T-Deck
+
+> Adding a new deck to an existing mesh? [docs/join-the-mesh.md](docs/join-the-mesh.md)
+> is the whole path — clone, flash, verify it hears, and put your own location's
+> imagery on a microSD card.
 
 **The fast path needs no toolchain at all: [lilyshark.com/flash](https://lilyshark.com/flash/)** installs the current factory image from Chrome or Edge over Web Serial — plug the T-Deck in, click install, pick the port. The page shows the image's SHA-256 and the recovery steps.
 
@@ -781,11 +800,11 @@ The T-Deck is the first hardware target. The capture record, decoder registry, a
 
 | Area | Evidence in this repository | Physical T-Deck status |
 | --- | --- | --- |
-| Product shell and analyzer UI | Exact 320x240 framebuffer comparisons cover 13 analyzer routes, six onboarding stages, Home, menus, confirmations, all five packet tabs, extra HEX pages, and Event Detail. Interaction tests cover keyboard, trackball-equivalent navigation, mouse/touch hit targets, back-stack behavior, first-run persistence, filtering, and failure rollback. | Pending display and input smoke test |
-| Embedded wordmark | A generated 264x128 A8 mask keeps the SVG's antialiased edge detail, lives in flash, and is recolored Lily Pink at draw time. A source/payload hash test and device-shell framebuffer check protect the asset. | Pending physical panel confirmation |
-| T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts. A host test checks every command, data byte, and delay in the panel initialization sequence against LilyGO T-Deck commit `274ddaa`. TFT_eSPI 2.5.43 is pinned with the upstream one-line SPI2 register fix at [`880ec0e`](https://github.com/maxmoneycash/TFT_eSPI/commit/880ec0e4657c0de56d28cc250bdbbe863386021e), and a compile-time guard rejects an invalid ESP32-S3 register base. The device shell also runs against host peripheral fakes. | Boot and panel output not yet observed on hardware |
-| SX1262 frame capture | The real radio service runs against host fakes covering configure, IRQ/read/rearm order, CRC mismatch, retry, scan, restore, and recovery | Reception and long-run recovery pending |
-| Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Live over-air sample pending |
+| Product shell and analyzer UI | Exact 320x240 framebuffer comparisons cover 14 analyzer routes, six onboarding stages, Home, menus, confirmations, all five packet tabs, extra HEX pages, and Event Detail. Interaction tests cover keyboard, trackball-equivalent navigation, mouse/touch hit targets, back-stack behavior, first-run persistence, filtering, and failure rollback. | Running on two T-Deck Plus units |
+| Embedded wordmark | A generated 264x128 A8 mask keeps the SVG's antialiased edge detail, lives in flash, and is recolored Lily Pink at draw time. A source/payload hash test and device-shell framebuffer check protect the asset. | Confirmed on the 320x240 panel |
+| T-Deck hardware target | Pinned PlatformIO builds app, factory, and ELF artifacts. A host test checks every command, data byte, and delay in the panel initialization sequence against LilyGO T-Deck commit `274ddaa`. TFT_eSPI 2.5.43 is pinned with the upstream one-line SPI2 register fix at [`880ec0e`](https://github.com/maxmoneycash/TFT_eSPI/commit/880ec0e4657c0de56d28cc250bdbbe863386021e), and a compile-time guard rejects an invalid ESP32-S3 register base. The device shell also runs against host peripheral fakes. | Boots and drives the panel on two units |
+| SX1262 frame capture | The real radio service runs against host fakes covering configure, IRQ/read/rearm order, CRC mismatch, retry, scan, restore, and recovery | Receives live traffic (rx counter climbing, 0 CRC errors); long-run recovery pending |
+| Meshtastic decoder | Profile-gated outer-header tests, including malformed input | Decoded live between two T-Decks at -65 dBm |
 | MeshCore decoder | Version 1 structural and malformed-frame tests, including the legal empty `RAW_CUSTOM` form | Live over-air sample pending |
 | Reticulum/RNode decoder | Header-one/header-two, IFAC-marker, split, and malformed-frame tests | Live RNode sample pending |
 | Radio profile tuning | Sanitizer tests cover regional frequency stepping, BW, SF, CR, and persisted-value validation | Keyboard tuning and restart persistence pending |
@@ -793,7 +812,7 @@ The T-Deck is the first hardware target. The capture record, decoder registry, a
 | LoRaTap PCAP | Byte-exact writer tests for the DLT 270 record layout | microSD and desktop-open test pending |
 | BMP screenshots | RGB565-to-BMP tests and unique-path device writer | Display readback and microSD test pending |
 | Touch, keyboard, and trackball | Input services compile; host tests cover the touch transform and polling deadlines across the 32-bit `millis()` rollover | On-device input, calibration, and interaction tests pending |
-| Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | ADC calibration and serial receiver test pending |
+| Battery and optional GPS | Battery model tests; TinyGPS++ hardware service compiles | GPS fix observed (up to 12 satellites); ADC calibration against a reference pending |
 | Spectrum scan | Request/result tests plus radio restore state machine | Experimental; complete hardware validation pending |
 
 The standalone C++ tests compile with warnings as errors and run under AddressSanitizer and UndefinedBehaviorSanitizer. The simulator renders every analyzer and product-shell route into a full 320x240 RGB565 buffer and checks exact pixels, content thresholds, and uniqueness. A separate region-based motion test proves that eleven live diagnostic views change through the production update path; packet selection remains a deliberate snapshot. The telemetry model has sanitizer-backed tests for deterministic replay, bounded state, rolling windows, scan-time capture pause, and changing measurements. The serial checker is fixture-tested and reads without writing to the port. Alpha.7 also executes the real device setup and loop under the sanitizers through host peripheral fakes, including first-frame/backlight ordering, six-stage onboarding persistence, missing-hardware recovery, menu navigation, settings rollback, a radio frame flowing into both capture formats and the UI, five packet tabs, HEX paging, Traffic Filter, Protocol Detail, and event-history detail. These checks do not replace the pending physical display and input smoke tests. The checked-in GitHub Actions workflow runs the same suite, builds both targets, and uploads firmware artifacts after a successful workflow run.
@@ -811,8 +830,10 @@ The standalone C++ tests compile with warnings as errors and run under AddressSa
 - [x] Add keyboard, trackball, GT911 touch, battery, and optional-GPS services.
 - [x] Add an interruptible SX1262 spectral-scan state machine with receive restoration.
 - [x] Add sanitizer-backed host tests and a two-target GitHub Actions build.
-- [ ] Boot the factory image on a physical T-Deck and verify every hardware service.
-- [ ] Capture known Meshtastic, MeshCore, and RNode fixtures over the air and compare bytes with desktop captures.
+- [x] Boot the factory image on a physical T-Deck and verify the display, input, GPS, battery, and radio services.
+- [x] Pass live traffic between two T-Decks and decode it, including direct messages.
+- [x] Read LXMF messages out of Reticulum payloads.
+- [ ] Capture known MeshCore and RNode fixtures over the air and compare bytes with desktop captures.
 - [ ] Calibrate touch orientation, battery voltage, and spectral power against known references.
 - [ ] Exercise scan cancellation, SD removal, CRC bursts, missing peripherals, and radio recovery.
 - [ ] Run an overnight capture and spectrum endurance test on hardware.

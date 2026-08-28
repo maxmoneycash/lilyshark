@@ -32,7 +32,7 @@ int main()
     assert(serial.begin_calls == 1U);
     assert(serial.end_calls == 1U);
     assert(serial.last_baud == lilyshark::tdeck::gps_baud);
-    assert(status.snapshot().gps.state == lilyshark::GpsState::Absent);
+    assert(status.snapshot().gps.state == lilyshark::GpsState::Searching);
     assertClearedFix(status.snapshot().gps);
 
     serial.push('F');
@@ -65,7 +65,7 @@ int main()
     assert(serial.begin_calls == 2U);
     assert(serial.end_calls == 3U);
     assert(serial.read_calls == reads_before_enable + 1U);
-    assert(status.snapshot().gps.state == lilyshark::GpsState::Absent);
+    assert(status.snapshot().gps.state == lilyshark::GpsState::Searching);
     assertClearedFix(status.snapshot().gps);
 
     serial.push('S');
@@ -81,23 +81,34 @@ int main()
     assert(status.snapshot().gps.state == lilyshark::GpsState::Fix);
     assert(status.snapshot().gps.position_valid);
 
-    // Official T-Deck Plus GPSShield firmware writes these before listening.
-    // A silent listener never re-enables GGA/RMC after another image disabled
-    // them, so SEARCH can last forever with only TXT checksums.
+    // Config commands go out only after a checksum-valid sentence, so a
+    // factory flash cannot leave the module on a silent baud.
     HardwareSerial configured{};
     lilyshark::TDeckHardwareStatus bringup{configured};
     bringup.begin(true);
+    assert(configured.written.find("$PCAS03,1,1,1,1,1,1,1,1,1,1,,,0,0*02") ==
+           std::string::npos);
+    configured.push('S');
+    hardware_status_fake::now_ms = 500U;
+    bringup.poll();
     assert(configured.written.find("$PCAS04,5*1C") != std::string::npos);
     assert(configured.written.find("$PCAS03,1,1,1,1,1,1,1,1,1,1,,,0,0*02") !=
            std::string::npos);
     assert(configured.written.find("$PCAS11,3*1E") != std::string::npos);
-    const std::size_t after_begin = configured.written.size();
-    configured.push('S');
-    hardware_status_fake::now_ms = 500U;
-    bringup.poll();
-    assert(configured.written.size() > after_begin);
-    assert(configured.written.find("$PCAS03,1,1,1,1,1,1,1,1,1,1,,,0,0*02", after_begin) !=
-           std::string::npos);
+
+    // After two silent baud walks, send config so a module left with GGA/RMC
+    // off can recover. Until then the UI stays Searching, not Absent.
+    HardwareSerial silent{};
+    lilyshark::TDeckHardwareStatus hunter{silent};
+    hunter.begin(true);
+    assert(silent.written.empty());
+    assert(hunter.snapshot().gps.state == lilyshark::GpsState::Searching);
+    for (unsigned step = 0; step < 8U; ++step) {
+        hardware_status_fake::now_ms += 2500U;
+        hunter.poll();
+        assert(hunter.snapshot().gps.state == lilyshark::GpsState::Searching);
+    }
+    assert(silent.written.find("$PCAS04,5*1C") != std::string::npos);
 
     std::puts("hardware status GPS session tests passed");
     return 0;

@@ -1,4 +1,5 @@
 import { disconnectDeviceLink, useDeviceLink, type DeviceTelemetry } from "../lib/deviceLink";
+import { fmtHemisphere } from "./fmt";
 
 export function SimulateBadge({ on }: { on?: boolean }) {
 	if (!on) return null;
@@ -83,7 +84,7 @@ export function ThisDevicePanel() {
 								{telem.sat !== undefined && <small>{telem.sat} SAT</small>}
 								{telem.lat !== undefined && telem.lon !== undefined ? (
 									<small>
-										{telem.lat.toFixed(5)}N {telem.lon.toFixed(5)}E
+										{fmtHemisphere(telem.lat, telem.lon, 5, 5)}
 									</small>
 								) : telem.gps.includes("SEARCH") ? (
 									<small>RECEIVER FOUND · WAITING FOR SATELLITES · NEEDS SKY</small>
@@ -169,9 +170,10 @@ export function ThisDevicePanel() {
 						<button onClick={() => void disconnectDeviceLink()}>UNLINK</button>
 					</div>
 					<p className="dim device-note">
-						This firmware now transmits on Meshtastic LongFast (default key)
-						from CHAT. MeshCore send still needs a MeshCore identity — same
-						radio, next encoder. Heard default-key texts also land in CHAT.
+						This firmware chats on Meshtastic LongFast (default key) from the
+						web CHAT tab and from the T-Deck itself (Home → C CHAT). Direct
+						messages go to a heard node. MeshCore send still needs a MeshCore
+						identity — same radio, next encoder.
 					</p>
 					{link.frames.length > 0 && (
 						<div className="device-heard">
@@ -223,7 +225,7 @@ export function ThisDeviceRow() {
 			<td>—</td>
 			<td>
 				{telem?.lat !== undefined && telem.lon !== undefined
-					? `${telem.lat.toFixed(4)}N ${telem.lon.toFixed(4)}E`
+					? fmtHemisphere(telem.lat, telem.lon)
 					: telem?.gps === "GPS SEARCH"
 						? "GPS SEARCH · NO FIX"
 						: (telem?.gps ?? "NO GPS FIX")}
