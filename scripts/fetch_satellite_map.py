@@ -336,10 +336,12 @@ def main():
         default=os.path.join(os.path.expanduser("~"), ".cache", "lilyshark-tiles"),
     )
     parser.epilog = (
-        "The T-Deck has no Wi-Fi tile fetch. Copy rgb565 files to the microSD "
-        "as /maps/{sat|dark}_LAT_LON_zZ.rgb565 (lat/lon rounded to 3 decimals) "
-        "to show real imagery on device. Without that file the firmware paints "
-        "a georeferenced field chart instead of a black radar plot."
+        "The T-Deck has no Wi-Fi tile fetch. For a card that works across an "
+        "area, use scripts/build_map_card.py, which lays a tile pyramid on the "
+        "Web Mercator grid under /maps/{sat|dark}/zN/. Single files from this "
+        "script can still be copied as /maps/{sat|dark}_LAT_LON_zZ.rgb565 "
+        "(lat/lon rounded to 3 decimals), but that cell naming cannot tile at "
+        "deep zoom -- cells are 55 m apart where a z20 tile spans 37 m."
     )
     args = parser.parse_args()
     image = render_view(
