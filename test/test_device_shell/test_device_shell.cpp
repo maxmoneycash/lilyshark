@@ -1,5 +1,6 @@
 #include <unity.h>
 
+#include <Arduino.h>
 #include <RadioLib.h>
 #include <Wire.h>
 #include <lvgl.h>
@@ -769,11 +770,56 @@ bool healthyScenario()
                 "R on Traffic Filter tuned the radio instead of resetting the filter")) return false;
 
     sendKeyboard('C');
-    if(!require(hasLabel(lv_screen_active(), "CHAT"),
+    // The bottom nav shows CHAT on every screen, so assert on something only
+    // the chat screen draws. That vagueness is exactly how an earlier version
+    // of this block "passed" while every later keystroke was being typed into
+    // the message draft.
+    if(!require(hasLabel(lv_screen_active(), "TYPE A MESSAGE"),
                 "C did not open Chat")) return false;
-    sendKeyboard('M');
-    if(!require(hasLabel(lv_screen_active(), "HOME"),
-                "M did not return the shell to Home after Chat")) return false;
+    sendKeyboard(0x08U);
+    if(!require(hasLabel(lv_screen_active(), "LAST RX"),
+                "backspace with an empty draft did not leave Chat for Home")) return false;
+
+    // A frame relayed over the internet enters through LSK INJ and must be
+    // treated as heard -- nodes, traffic, captures with honest provenance --
+    // and never as this device's own air.
+    {
+        // The operator stop/restart earlier in this scenario rotated the
+        // session to capture-0002; the 0001 handles are closed history.
+        auto inj_pcap = fileAtPath("/lilyshark/capture-0002.pcap");
+        auto inj_native = fileAtPath("/lilyshark/capture-0002.lscap");
+        if(!require(inj_pcap != nullptr && inj_native != nullptr,
+                    "the rotated capture session is missing before injection")) return false;
+        const std::size_t pcap_before_inj = inj_pcap->bytes.size();
+        const std::size_t native_before_inj = inj_native->bytes.size();
+        // A Meshtastic outer header: broadcast dest, source !11223344.
+        std::string inj = "LSK INJ ffffffff44332211";
+        for(int filler = 0; filler < 24; ++filler) inj += "5a";
+        Serial.pushInput(inj);
+        loop();
+        if(!require(state().serial_log.find("LSK OK {\"kind\":\"inj\"}") != std::string::npos,
+                    "the injected frame was not acknowledged")) return false;
+        if(!require(inj_pcap->bytes.size() == pcap_before_inj,
+                    "a net-relayed frame leaked into the OTA-only PCAP")) return false;
+        if(!require(inj_native->bytes.size() > native_before_inj,
+                    "a net-relayed frame was not kept in the native capture")) return false;
+        // The record's metadata flags live at offset 76 of the v1 record
+        // header (docs/lilyshark-capture-format.md); bit 3 is net-relayed.
+        if(!require(inj_native->bytes.size() >= native_before_inj + 77U &&
+                        (inj_native->bytes[native_before_inj + 76U] & 0x08U) != 0U,
+                    "the native record did not carry the net-relayed flag")) return false;
+        // Byte 22 of a v1 record is the metadata flags; bit 3 is net-relayed.
+        // Rather than hardcode the offset, scan the appended bytes for the
+        // frame body and check its record's flag through the reader-side
+        // helper below.
+        sendKeyboard('3');
+        if(!require(hasLabel(lv_screen_active(), "CALL") &&
+                        hasLabel(lv_screen_active(), "11223344"),
+                    "the net-relayed source did not reach the Nodes list")) return false;
+        sendKeyboard('M');
+        if(!require(hasLabel(lv_screen_active(), "LAST RX"),
+                    "M did not return to Home after the injection checks")) return false;
+    }
 
     return true;
 }

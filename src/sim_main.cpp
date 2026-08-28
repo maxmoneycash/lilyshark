@@ -3335,9 +3335,16 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
         LiveNodeSummary &summary = summaries[index];
         if(contributesToNodeSummary(*record) && frameIsFromAnotherNode(*record)) {
             summary.last_seen_us = record->raw.rf.timestamp_us;
-            summary.latest_snr_x10 = record->raw.rf.snr_db_x10;
-            summary.latest_rssi_x10 = record->raw.rf.rssi_dbm_x10;
-            summary.snr_sum_x10 += record->raw.rf.snr_db_x10;
+            // A net-relayed frame carries no local measurement; writing its
+            // zeros here would turn a neighbour's real signal history into
+            // "+0.0" the moment one bridged frame arrived.
+            if (record->raw.rf.hasField(RfFieldSnr)) {
+                summary.latest_snr_x10 = record->raw.rf.snr_db_x10;
+                summary.snr_sum_x10 += record->raw.rf.snr_db_x10;
+            }
+            if (record->raw.rf.hasField(RfFieldRssi)) {
+                summary.latest_rssi_x10 = record->raw.rf.rssi_dbm_x10;
+            }
             if (record->decoded.hasField(FieldHopStart) &&
                 record->decoded.hop_start >= record->decoded.hop_limit) {
                 const unsigned hops = record->decoded.hop_start - record->decoded.hop_limit;
@@ -5345,9 +5352,12 @@ void build_packet_detail(lv_obj_t * parent)
         put_label(parent, line, 49, 168,
                   record->raw.wasTruncated() ? theme::amber() : theme::lime(), &font_pixel_6x8);
         const char *origin = record->raw.rf.origin == FrameOrigin::Synthetic ? "SYNTHETIC" :
-                             (record->raw.rf.origin == FrameOrigin::Radio ? "RADIO" : "UNKNOWN");
+                             (record->raw.rf.origin == FrameOrigin::Net ? "NET" :
+                              (record->raw.rf.origin == FrameOrigin::Radio ? "RADIO" : "UNKNOWN"));
         std::snprintf(line, sizeof(line), "ORIGIN %s%s", origin,
-                      record->raw.rf.origin == FrameOrigin::Synthetic ? " / NOT OTA" : "");
+                      record->raw.rf.origin == FrameOrigin::Synthetic ||
+                              record->raw.rf.origin == FrameOrigin::Net
+                          ? " / NOT OTA" : "");
         put_label(parent, line, 49, 182, theme::text(), &font_pixel_6x8);
         if(record->raw.rf.origin == FrameOrigin::Synthetic) {
             std::snprintf(line, sizeof(line), "FNV32 %08lX   LSCAP %s  PCAP SKIP",
@@ -8622,7 +8632,8 @@ void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
                   static_cast<unsigned>(lsk_rf.crc),
                   static_cast<unsigned>((lsk_rf.implicit_header ? 1U : 0U) |
                                         (lsk_rf.inverted_iq ? 2U : 0U) |
-                                        (lsk_rf.origin == FrameOrigin::Synthetic ? 4U : 0U)),
+                                        (lsk_rf.origin == FrameOrigin::Synthetic ? 4U : 0U) |
+                                        (lsk_rf.origin == FrameOrigin::Net ? 8U : 0U)),
                   static_cast<unsigned>(record.raw.original_length));
     Serial.printf(",\"hex\":\"");
     for (std::uint16_t i = 0; i < record.raw.captured_length; ++i) {
@@ -13993,6 +14004,63 @@ void handle_mesh_tx_command(const char *line) noexcept
 }
 #endif
 
+#if defined(LILYSHARK_DEVICE)
+void handle_mesh_inject_command(const char *line) noexcept
+{
+    // A frame heard by a radio somewhere else, relayed here over the
+    // internet by the linked analyzer. It enters through the same ingest
+    // as an over-the-air frame -- nodes, map, chat, notifications, chime
+    // -- marked FrameOrigin::Net so provenance survives: the packet
+    // inspector says NET, the OTA-only PCAP refuses it, and the .lscap
+    // record carries the net-relayed flag. It is never retransmitted on
+    // RF; injecting is hearing, not repeating.
+    const char *cursor = line + 8;
+    std::uint8_t bytes[kMaxFrameBytes]{};
+    std::size_t length = 0;
+    bool bad = *cursor == '\0';
+    while (!bad && *cursor != '\0' && length < kMaxFrameBytes) {
+        std::uint8_t value = 0;
+        for (int nibble = 0; nibble < 2 && !bad; ++nibble) {
+            const char hex = *cursor++;
+            value = static_cast<std::uint8_t>(value << 4U);
+            if (hex >= '0' && hex <= '9') value |= static_cast<std::uint8_t>(hex - '0');
+            else if (hex >= 'a' && hex <= 'f') value |= static_cast<std::uint8_t>(hex - 'a' + 10);
+            else if (hex >= 'A' && hex <= 'F') value |= static_cast<std::uint8_t>(hex - 'A' + 10);
+            else bad = true;
+        }
+        if (!bad) bytes[length++] = value;
+    }
+    if (bad || length == 0U || *cursor != '\0') {
+        Serial.println("LSK ERR {\"reason\":\"bad-inj\"}");
+        return;
+    }
+    RawFrame frame{};
+    (void)frame.assignPayload(bytes, length);
+    const RadioProfile &profile = radio_service.activeProfile();
+    #if defined(ESP_PLATFORM)
+    frame.rf.timestamp_us = static_cast<std::uint64_t>(esp_timer_get_time());
+#else
+    frame.rf.timestamp_us = static_cast<std::uint64_t>(millis()) * 1000ULL;
+#endif
+    frame.rf.center_frequency_hz = profile.center_frequency_hz;
+    frame.rf.bandwidth_hz = profile.bandwidth_hz;
+    frame.rf.spreading_factor = profile.spreading_factor;
+    frame.rf.coding_rate_denominator = profile.coding_rate_denominator;
+    frame.rf.sync_word = profile.sync_word;
+    frame.rf.profile_id = profile.id;
+    frame.rf.present_fields = RfFieldTimestamp | RfFieldFrequency | RfFieldBandwidth;
+    frame.rf.modulation = Modulation::LoRa;
+    frame.rf.direction = FrameDirection::Receive;
+    // The bridging radio validated the CRC before the frame left its air;
+    // relaying preserves that claim rather than re-judging it.
+    frame.rf.crc = CrcStatus::Valid;
+    frame.rf.origin = FrameOrigin::Net;
+    ingest_analyzer_frame(frame, profile, true);
+    Serial.println("LSK OK {\"kind\":\"inj\"}");
+    return;
+}
+#endif
+
 void handle_analyzer_link_command(const char *line) noexcept
 {
     if(std::strcmp(line, "LSK HELLO") == 0) {
@@ -14021,6 +14089,8 @@ void handle_analyzer_link_command(const char *line) noexcept
 #if defined(LILYSHARK_DEVICE)
     } else if(std::strncmp(line, "LSK TX ", 7) == 0) {
         handle_mesh_tx_command(line);
+    } else if(std::strncmp(line, "LSK INJ ", 8) == 0) {
+        handle_mesh_inject_command(line);
 #endif
     }
 }

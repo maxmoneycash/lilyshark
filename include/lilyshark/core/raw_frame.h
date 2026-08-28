@@ -31,6 +31,10 @@ enum class FrameOrigin : std::uint8_t {
     Unknown = 0,
     Radio,
     Synthetic,
+    /// Heard by a real radio somewhere else and relayed here over the
+    /// internet by a linked analyzer. Real traffic, but not this device's
+    /// air: it never belongs in an OTA-only export.
+    Net,
 };
 
 enum RfField : std::uint32_t {

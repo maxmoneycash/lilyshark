@@ -19,6 +19,7 @@ static_assert(static_cast<std::uint8_t>(CrcStatus::Invalid) == 3);
 static_assert(static_cast<std::uint8_t>(FrameOrigin::Unknown) == 0);
 static_assert(static_cast<std::uint8_t>(FrameOrigin::Radio) == 1);
 static_assert(static_cast<std::uint8_t>(FrameOrigin::Synthetic) == 2);
+static_assert(static_cast<std::uint8_t>(FrameOrigin::Net) == 3);
 static_assert(RfFieldTimestamp == (1U << 0));
 static_assert(RfFieldFrequency == (1U << 1));
 static_assert(RfFieldBandwidth == (1U << 2));
@@ -65,9 +66,11 @@ std::uint8_t metadataFlags(const RfMetadata &metadata) noexcept
     constexpr std::uint8_t kImplicitHeader = 1U << 0;
     constexpr std::uint8_t kInvertedIq = 1U << 1;
     constexpr std::uint8_t kSynthetic = 1U << 2;
+    constexpr std::uint8_t kNetRelayed = 1U << 3;
     return static_cast<std::uint8_t>((metadata.implicit_header ? kImplicitHeader : 0U) |
                                      (metadata.inverted_iq ? kInvertedIq : 0U) |
-                                     (metadata.origin == FrameOrigin::Synthetic ? kSynthetic : 0U));
+                                     (metadata.origin == FrameOrigin::Synthetic ? kSynthetic : 0U) |
+                                     (metadata.origin == FrameOrigin::Net ? kNetRelayed : 0U));
 }
 
 } // namespace

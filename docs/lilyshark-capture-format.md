@@ -86,7 +86,7 @@ payload bytes.
 | 73 | 1 | modulation | `Modulation` enum value |
 | 74 | 1 | direction | `FrameDirection` enum value |
 | 75 | 1 | CRC state | `CrcStatus` enum value |
-| 76 | 1 | metadata flags | bit 0 implicit header; bit 1 inverted IQ; bit 2 synthetic |
+| 76 | 1 | metadata flags | bit 0 implicit header; bit 1 inverted IQ; bit 2 synthetic; bit 3 net-relayed (heard by a remote radio, bridged over the internet — real traffic, but not this device's air) |
 | 77 | 3 | reserved | zero |
 
 ### Version 1 enum values

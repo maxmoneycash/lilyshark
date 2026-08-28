@@ -137,11 +137,28 @@ class HardwareSerial {
     void flush() noexcept {}
     void setRxBufferSize(std::size_t) noexcept {}
     std::size_t write(const std::uint8_t *, std::size_t size) noexcept { return size; }
-    int available() const noexcept { return 0; }
-    int read() noexcept { return -1; }
+
+    // Host-side input, so tests can drive the analyzer link the way the web
+    // analyzer does: bytes arrive on the console port and loop() consumes
+    // them. Only the console instance carries input; the GPS port stays mute.
+    void pushInput(const std::string &line)
+    {
+        if(!console_) return;
+        pending_ += line;
+        pending_.push_back('\n');
+    }
+    int available() const noexcept { return pending_.empty() ? 0 : 1; }
+    int read() noexcept
+    {
+        if(pending_.empty()) return -1;
+        const char value = pending_.front();
+        pending_.erase(pending_.begin());
+        return static_cast<unsigned char>(value);
+    }
 
   private:
     bool console_ = false;
+    std::string pending_{};
 };
 
 inline HardwareSerial Serial{true};

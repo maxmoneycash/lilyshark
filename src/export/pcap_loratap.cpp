@@ -138,7 +138,9 @@ PcapWriteResult PcapLoraTapWriter::write(const RawFrame &frame) noexcept
     if (!started_) {
         return PcapWriteResult::NotStarted;
     }
-    if (frame.rf.origin == FrameOrigin::Synthetic) {
+    // OTA-only means this device's air. A synthetic frame was never on any
+    // air; a net-relayed one was on somebody else's. Neither belongs here.
+    if (frame.rf.origin == FrameOrigin::Synthetic || frame.rf.origin == FrameOrigin::Net) {
         return PcapWriteResult::SyntheticFrame;
     }
     if (frame.captured_length > kMaxFrameBytes || frame.original_length < frame.captured_length) {
