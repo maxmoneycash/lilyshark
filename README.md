@@ -610,6 +610,10 @@ The public [GitHub Releases page](https://github.com/maxmoneycash/lilyshark/rele
 
 ## Flash a T-Deck
 
+> Adding a new deck to an existing mesh? [docs/join-the-mesh.md](docs/join-the-mesh.md)
+> is the whole path — clone, flash, verify it hears, and put your own location's
+> imagery on a microSD card.
+
 **The fast path needs no toolchain at all: [lilyshark.com/flash](https://lilyshark.com/flash/)** installs the current factory image from Chrome or Edge over Web Serial — plug the T-Deck in, click install, pick the port. The page shows the image's SHA-256 and the recovery steps.
 
 For a scripted install, the guarded flash script accepts an explicit serial device, verifies the factory image against `SHA256SUMS`, pins esptool 4.11.0, and writes the merged image at `0x0`.

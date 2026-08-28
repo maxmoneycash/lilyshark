@@ -482,7 +482,11 @@ enum class FieldTab : std::uint8_t {
 };
 FieldTab field_tab = FieldTab::Lily;
 
-constexpr int kMapZoomMin = 12;
+// z8 spans about 150 km at this latitude. The floor was z12 -- 9.6 km --
+// which meant a peer past Santa Rosa could be *heard*, listed with a range,
+// and still be impossible to put on the map at any zoom. A mesh whose whole
+// point is distance needs a map that can hold one.
+constexpr int kMapZoomMin = 8;
 // z20 is ~0.12 m/px: two operators standing five metres apart are ~43 px
 // apart on screen, which is the point of zooming in this far.
 constexpr int kMapZoomMax = 23;
@@ -2804,6 +2808,41 @@ void put_map_label(lv_obj_t *parent, const char *text, lv_coord_t x, lv_coord_t 
     put_clipped_label(parent, text, x, y, width, color, font);
 }
 
+/// Where the line from the view centre toward an off-screen mark crosses the
+/// edge of the map area. Pure, so the clamp arithmetic is testable -- edge
+/// markers that drift off the visible area are worse than none.
+struct MapEdgePoint {
+    lv_coord_t x = 0;
+    lv_coord_t y = 0;
+};
+
+MapEdgePoint map_edge_point(double dx, double dy, lv_coord_t cx, lv_coord_t cy,
+                            lv_coord_t left, lv_coord_t right, lv_coord_t top_edge,
+                            lv_coord_t bottom_edge) noexcept
+{
+    MapEdgePoint out{cx, cy};
+    if (dx == 0.0 && dy == 0.0) return out;
+    // Scale the direction until it touches the first edge in its own quadrant.
+    // Measured from the view centre to that edge, not by half the rect: the
+    // centre is not the rect's centre (the HUD eats more of the top than the
+    // bottom), and a half-extent scale left the marker floating short of the
+    // bezel on the nearer side.
+    const double avail_x = dx > 0.0 ? static_cast<double>(right - cx)
+                                    : static_cast<double>(cx - left);
+    const double avail_y = dy > 0.0 ? static_cast<double>(bottom_edge - cy)
+                                    : static_cast<double>(cy - top_edge);
+    const double sx = dx != 0.0 ? avail_x / (dx < 0.0 ? -dx : dx) : 1.0e12;
+    const double sy = dy != 0.0 ? avail_y / (dy < 0.0 ? -dy : dy) : 1.0e12;
+    const double scale = sx < sy ? sx : sy;
+    out.x = static_cast<lv_coord_t>(cx + static_cast<lv_coord_t>(dx * scale));
+    out.y = static_cast<lv_coord_t>(cy + static_cast<lv_coord_t>(dy * scale));
+    if (out.x < left) out.x = left;
+    if (out.x > right) out.x = right;
+    if (out.y < top_edge) out.y = top_edge;
+    if (out.y > bottom_edge) out.y = bottom_edge;
+    return out;
+}
+
 void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_count,
                     const char *fix_line, const char *detail_line,
                     double meters_per_pixel = 0.0,
@@ -3006,6 +3045,10 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
     }
 
     map_hit_count = 0;
+    // Edge markers are capped: four arrows say "the mesh continues out there";
+    // nine say nothing louder.
+    constexpr std::size_t kMapEdgeMarkLimit = 4;
+    std::size_t edge_marks = 0;
     struct LabelBox {
         lv_coord_t x = 0;
         lv_coord_t y = 0;
@@ -3018,8 +3061,56 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
         lv_coord_t x = cx;
         lv_coord_t y = cy;
         project(mark, x, y);
-        if (georef) {
-            if (x < 4 || x > 272 || y < top + 28 || y > bottom - 20) continue;
+        if (georef && (x < 4 || x > 272 || y < top + 28 || y > bottom - 20)) {
+            // A heard node beyond the view still exists. Point at it from the
+            // edge with its name and range, instead of silently pretending
+            // the mesh ends at the bezel -- at 100 km between operators, the
+            // edge marker IS the map.
+            if (!mark.you && edge_marks < kMapEdgeMarkLimit) {
+                const MapEdgePoint edge = map_edge_point(
+                    static_cast<double>(x - cx), static_cast<double>(y - cy), cx, cy,
+                    10, 264, top + 34, bottom - 26);
+                char edge_tag[24]{};
+                char edge_range[12]{};
+                format_map_range(edge_range, sizeof(edge_range),
+                                 std::hypot(mark.east_m, mark.north_m));
+                std::snprintf(edge_tag, sizeof(edge_tag), "%s %s",
+                              mark.name != nullptr && mark.name[0] != '\0' ? mark.name
+                                                                            : "NODE",
+                              edge_range);
+                lv_coord_t tag_x = edge.x + 8;
+                const lv_coord_t tag_w =
+                    static_cast<lv_coord_t>(std::strlen(edge_tag) * 6);
+                if (tag_x + tag_w > 262) tag_x = edge.x - tag_w - 8;
+                lv_coord_t tag_y = edge.y - 4;
+                if (tag_y < top + 30) tag_y = top + 30;
+                if (tag_y > bottom - 18) tag_y = bottom - 18;
+                // Several neighbours usually sit the same general direction,
+                // and their edge tags all land on the same stretch of bezel.
+                // They share the label collision list with the on-screen tags:
+                // a tag that would overprint is dropped, chevron and all --
+                // one clean arrow beats three unreadable ones.
+                bool edge_collide = false;
+                for (std::size_t prior = 0; prior < label_count; ++prior) {
+                    const LabelBox &box = labels[prior];
+                    const lv_coord_t ddx =
+                        tag_x > box.x ? tag_x - box.x : box.x - tag_x;
+                    const lv_coord_t ddy =
+                        tag_y > box.y ? tag_y - box.y : box.y - tag_y;
+                    if (ddx < tag_w + 4 && ddy < 10) { edge_collide = true; break; }
+                }
+                if (!edge_collide) {
+                    ++edge_marks;
+                    draw_map_chevron(parent, edge.x, edge.y, mark.east_m, -mark.north_m);
+                    put_map_label(parent, edge_tag, tag_x, tag_y, tag_w + 8,
+                                  mark.selected ? theme::pink() : theme::lime(),
+                                  &font_pixel_6x8);
+                    if (label_count < labels.size()) {
+                        labels[label_count++] = {tag_x, tag_y, tag_w};
+                    }
+                }
+            }
+            continue;
         }
         if (map_hit_count < map_hits.size()) {
             map_hits[map_hit_count++] = {x, y, mark.node_index};
@@ -11565,6 +11656,27 @@ bool run_simulator_interaction_test() noexcept
                                    "clicking the trackball must return the view to here")) return false;
     }
 
+    // Edge markers point at heard nodes beyond the view. The clamp is pure so
+    // its boundaries are asserted here -- an edge marker that lands outside
+    // the map area is worse than the silent clipping it replaced.
+    {
+        const MapEdgePoint north = map_edge_point(0.0, -500.0, 160, 124, 10, 264, 56, 200);
+        if(!expect_simulator_state(north.y == 56 && north.x == 160,
+                                   "a node due north must mark the top edge at centre x")) return false;
+        const MapEdgePoint east = map_edge_point(900.0, 0.0, 160, 124, 10, 264, 56, 200);
+        if(!expect_simulator_state(east.x == 264 && east.y == 124,
+                                   "a node due east must mark the right edge at centre y")) return false;
+        const MapEdgePoint diag = map_edge_point(400.0, 400.0, 160, 124, 10, 264, 56, 200);
+        if(!expect_simulator_state(diag.x >= 10 && diag.x <= 264 && diag.y >= 56 &&
+                                       diag.y <= 200,
+                                   "a diagonal edge mark must stay inside the map area")) return false;
+        if(!expect_simulator_state(diag.y == 200,
+                                   "a 45-degree mark on a wide view must hit the nearer edge")) return false;
+        const MapEdgePoint still = map_edge_point(0.0, 0.0, 160, 124, 10, 264, 56, 200);
+        if(!expect_simulator_state(still.x == 160 && still.y == 124,
+                                   "a zero direction must stay at the centre")) return false;
+    }
+
     // Keys that two handlers both answer to, where the first one returns.
     // Chat took C and silently killed coding-rate tuning; moving coding rate
     // to R then silently killed the Traffic Filter reset, which also answers
@@ -12015,7 +12127,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0xa9a8caf8710d718cULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
         0x932ca408b25d655fULL, 0x3b6ca3507efcd29cULL, 0x3d61199a6d61d28cULL,
-        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x2d79e348284dfd29ULL,
+        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x05657ac310c74b68ULL,
         0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xae5f04f11f7d4fb1ULL,
         0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
     }};
@@ -12250,7 +12362,7 @@ bool run_simulator_render_test() noexcept
         // Hashed as well as written: the marks used to draw over the card,
         // and no behavioural test noticed because every assertion about it
         // passed while it was being painted through.
-        constexpr std::uint64_t kMapNodeCardHash = 0x76448995245a4bf6ULL;
+        constexpr std::uint64_t kMapNodeCardHash = 0x08a759d471b2f8a7ULL;
         const std::uint64_t card_hash = hash_simulator_frame();
         std::fprintf(stderr, "Lilyshark render MAP NODE CARD: fnv1a=%016llx\n",
                      static_cast<unsigned long long>(card_hash));
