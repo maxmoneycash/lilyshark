@@ -402,7 +402,7 @@ export default function Config() {
 								{!net.enabled
 									? "OFF"
 									: net.connected
-										? `CONNECTED · ROOM ${net.room} · ${net.published} SENT / ${net.received} HEARD`
+										? `CONNECTED · ${net.via.toUpperCase()} · ROOM ${net.room} · ${net.published} SENT / ${net.received} HEARD`
 										: "CONNECTING…"}
 							</span>
 						</div>

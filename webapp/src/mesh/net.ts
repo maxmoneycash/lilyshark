@@ -4,49 +4,59 @@
  * Two decks a hundred kilometres apart will never hear each other on the air,
  * but each one sits on a USB cable next to this analyzer. So the analyzer
  * bridges: every frame the linked deck hears (or sends) is published to a
- * shared MQTT room, and every frame another analyzer publishes is shown here
- * and handed down the cable with `LSK INJ`, where the firmware treats it as
+ * shared room, and every frame another analyzer publishes is shown here and
+ * handed down the cable with `LSK INJ`, where the firmware treats it as
  * heard — nodes, map, chat, notification chime — while marking its origin NET
  * so provenance survives into the packet inspector and captures.
  *
- * The default room rides a public broker, so treat it like the radio channel
- * it mirrors — LongFast with the published default key is public speech on RF
- * and it is public speech here. A private mesh would set its own room and its
- * own broker; both persist in localStorage.
+ * The room rides whichever transport the local network permits — the ladder
+ * in netTransport tries MQTT over WebSocket first and falls back to plain
+ * HTTPS via ntfy.sh, because some networks kill WebSocket upgrades outright.
+ * Either way the room is public, the same standing as the LongFast radio
+ * channel it mirrors. A private mesh sets its own room and broker in
+ * localStorage.
+ *
+ * Loop safety is structural, not heuristic: a frame is only published from a
+ * device link (never from the room), the firmware marks injected frames with
+ * the net metadata bit so their serial echoes are never re-published, and
+ * every envelope carries the publisher's client id so an echo of our own
+ * message drops on sight.
  */
-import mqtt, { type MqttClient } from 'mqtt';
 import { useSyncExternalStore } from 'react';
 import type { HeardFrame } from '../lib/deviceLink';
 import { getDeviceLinkState, sendDeviceLine } from '../lib/deviceLink';
 import { applyNetFrame } from './analyzerMesh';
-import { decodeEnvelope, encodeEnvelope, netTopic, shouldPublish } from './netProtocol';
+import { decodeEnvelope, encodeEnvelope, shouldPublish } from './netProtocol';
+import { buildLadder, CONNECT_WINDOW_MS, type NetTransport } from './netTransport';
 
-export const NET_BROKER_DEFAULT = 'wss://broker.emqx.io:8084/mqtt';
 export const NET_ROOM_DEFAULT = 'longfast';
+/** Pause after the whole ladder fails before starting over. */
+const LADDER_RETRY_MS = 20000;
 
 export interface NetState {
   enabled: boolean;
   connected: boolean;
   room: string;
-  broker: string;
+  /** Which transport carries the room right now, e.g. "ntfy https://ntfy.sh". */
+  via: string;
   published: number;
   received: number;
   injected: number;
 }
 
-function loadSetting(key: string, fallback: string): string {
+function loadSetting(key: string): string | undefined {
   try {
-    return localStorage.getItem(key) ?? fallback;
+    return localStorage.getItem(key) ?? undefined;
   } catch {
-    return fallback;
+    return undefined;
   }
 }
 
 let state: NetState = {
-  enabled: loadSetting('lilyshark-net-enabled', 'on') !== 'off',
+  enabled: loadSetting('lilyshark-net-enabled') !== 'off',
   connected: false,
-  room: loadSetting('lilyshark-net-room', NET_ROOM_DEFAULT),
-  broker: loadSetting('lilyshark-net-broker', NET_BROKER_DEFAULT),
+  room: loadSetting('lilyshark-net-room') ?? NET_ROOM_DEFAULT,
+  via: '',
   published: 0,
   received: 0,
   injected: 0,
@@ -73,20 +83,15 @@ export function useNetState(): NetState {
 /** Ephemeral per-tab identity; not a secret, only an echo filter. */
 const clientId = `lsk-${Math.random().toString(36).slice(2, 10)}`;
 
-let client: MqttClient | undefined;
+let ladder: NetTransport[] = [];
+let rung = 0;
+let active: NetTransport | undefined;
+let windowTimer: ReturnType<typeof setTimeout> | undefined;
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+let running = false;
 
-/** Called by analyzerMesh for every frame the linked deck reports. */
-export function publishHeardFrame(frame: HeardFrame): void {
-  if (!state.enabled || !client || !state.connected) return;
-  if (!shouldPublish(frame)) return;
-  client.publish(netTopic(state.room), JSON.stringify(encodeEnvelope(frame, clientId, Date.now())), {
-    qos: 0,
-  });
-  set({ published: state.published + 1 });
-}
-
-function onMessage(payload: Uint8Array): void {
-  const env = decodeEnvelope(new TextDecoder().decode(payload), clientId);
+function onMessage(payload: string): void {
+  const env = decodeEnvelope(payload, clientId);
   if (!env) return;
   set({ received: state.received + 1 });
   applyNetFrame(env);
@@ -99,30 +104,66 @@ function onMessage(payload: Uint8Array): void {
   }
 }
 
+function climb(): void {
+  if (!running) return;
+  active?.disconnect();
+  active = undefined;
+  set({ connected: false, via: '' });
+  if (rung >= ladder.length) {
+    // Every rung failed; rest, then start the ladder again. Networks change —
+    // a laptop walks between the hotspot and home wifi.
+    rung = 0;
+    retryTimer = setTimeout(climb, LADDER_RETRY_MS);
+    return;
+  }
+  const transport = ladder[rung++];
+  active = transport;
+  let settled = false;
+  windowTimer = setTimeout(() => {
+    if (!settled) climb();
+  }, CONNECT_WINDOW_MS);
+  transport.connect(
+    state.room,
+    onMessage,
+    () => {
+      settled = true;
+      if (windowTimer) clearTimeout(windowTimer);
+      // A rung that connects wins outright; a later drop restarts from the
+      // top, since whatever broke may have healed.
+      rung = 0;
+      set({ connected: true, via: `${transport.name} ${transport.endpoint}` });
+    },
+    () => {
+      if (!running) return;
+      if (windowTimer) clearTimeout(windowTimer);
+      climb();
+    },
+  );
+}
+
+/** Called by analyzerMesh for every frame the linked deck reports. */
+export function publishHeardFrame(frame: HeardFrame): void {
+  if (!state.enabled || !active || !state.connected) return;
+  if (!shouldPublish(frame)) return;
+  active.publish(state.room, JSON.stringify(encodeEnvelope(frame, clientId, Date.now())));
+  set({ published: state.published + 1 });
+}
+
 export function netConnect(): void {
-  if (!state.enabled || client) return;
-  const connecting = mqtt.connect(state.broker, {
-    clientId: `${clientId}-${Date.now()}`,
-    clean: true,
-    reconnectPeriod: 5000,
-    connectTimeout: 15000,
-  });
-  client = connecting;
-  connecting.on('connect', () => {
-    connecting.subscribe(netTopic(state.room), { qos: 0 });
-    set({ connected: true });
-  });
-  connecting.on('close', () => set({ connected: false }));
-  connecting.on('message', (_topic, payload) => onMessage(payload));
-  connecting.on('error', () => {
-    /* reconnectPeriod owns retries; surfacing every blip is noise */
-  });
+  if (!state.enabled || running) return;
+  running = true;
+  ladder = buildLadder(loadSetting('lilyshark-net-broker'));
+  rung = 0;
+  climb();
 }
 
 export function netDisconnect(): void {
-  client?.end(true);
-  client = undefined;
-  set({ connected: false });
+  running = false;
+  if (windowTimer) clearTimeout(windowTimer);
+  if (retryTimer) clearTimeout(retryTimer);
+  active?.disconnect();
+  active = undefined;
+  set({ connected: false, via: '' });
 }
 
 export function setNetEnabled(enabled: boolean): void {

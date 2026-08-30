@@ -98,3 +98,39 @@ test("rooms cannot escape the topic namespace", () => {
 test("hex encoding is exact", () => {
 	assert.equal(bytesToHex(new Uint8Array([0, 15, 16, 255])), "000f10ff");
 });
+
+import {
+	MQTT_BROKERS,
+	buildLadder,
+	ntfyTopic,
+	payloadFromNtfyEvent,
+} from "./netTransport";
+
+test("the ladder tries every public broker and always ends on ntfy", () => {
+	const ladder = buildLadder(undefined);
+	assert.equal(ladder.length, MQTT_BROKERS.length + 1);
+	assert.equal(ladder[ladder.length - 1].name, "ntfy");
+	assert.deepEqual(ladder.slice(0, -1).map((t) => t.endpoint), MQTT_BROKERS);
+});
+
+test("a pinned broker replaces the MQTT rungs but keeps the ntfy fallback", () => {
+	// A user's explicitly configured broker that is down must still not
+	// strand the mesh on a network where only plain HTTPS survives.
+	const ladder = buildLadder("wss://my.private.broker/mqtt");
+	assert.equal(ladder.length, 2);
+	assert.equal(ladder[0].endpoint, "wss://my.private.broker/mqtt");
+	assert.equal(ladder[1].name, "ntfy");
+});
+
+test("ntfy topics cannot escape their namespace", () => {
+	assert.equal(ntfyTopic("longfast"), "lilyshark-mesh-v1-longfast");
+	assert.equal(ntfyTopic("../#/+"), "lilyshark-mesh-v1-______");
+});
+
+test("only real ntfy message events yield a payload", () => {
+	const wrapped = JSON.stringify({ event: "message", message: '{"v":1}' });
+	assert.equal(payloadFromNtfyEvent(wrapped), '{"v":1}');
+	assert.equal(payloadFromNtfyEvent(JSON.stringify({ event: "keepalive" })), undefined);
+	assert.equal(payloadFromNtfyEvent(JSON.stringify({ event: "open", topic: "x" })), undefined);
+	assert.equal(payloadFromNtfyEvent("not json"), undefined);
+});
