@@ -22,6 +22,12 @@ struct MeshtasticEncodeRequest {
     std::uint32_t to_node = 0xffffffffU;
     std::uint32_t packet_id = 1;
     std::uint8_t hop_limit = 3;
+    /// Sets the header's want-ack bit, so official firmware replies with a
+    /// Routing acknowledgement carrying this packet's id.
+    bool want_ack = false;
+    /// For a Routing acknowledgement: the id of the packet being confirmed.
+    /// Written as the Data message's request_id when non-zero.
+    std::uint32_t request_id = 0;
     MeshtasticPort port = MeshtasticPort::TextMessage;
     const char *text = nullptr;
     double latitude_degrees = 0.0;

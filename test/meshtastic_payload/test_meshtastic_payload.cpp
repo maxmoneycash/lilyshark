@@ -241,9 +241,80 @@ void testEmptyAndOversizedInputsAreRefused()
 
 } // namespace
 
+void testWantAckBitReachesTheHeader()
+{
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0x11111111U;
+    request.to_node = 0x22222222U;
+    request.packet_id = 77U;
+    request.port = MeshtasticPort::TextMessage;
+    request.text = "CONFIRM ME";
+    request.want_ack = true;
+    std::uint8_t frame[256]{};
+    const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(n > 16U);
+    // Byte 12 is the flags byte: hop_limit low, want-ack at bit 3.
+    assert((frame[12] & 0x08U) != 0U);
+
+    request.want_ack = false;
+    const std::size_t m = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(m > 16U);
+    assert((frame[12] & 0x08U) == 0U);
+}
+
+void testRoutingAckRoundTrips()
+{
+    // The acknowledgement official firmware sends: an empty Routing message
+    // whose request_id names the packet being confirmed. Encoded by our
+    // sender, read back by our reader -- and the plaintext protobuf checked
+    // byte for byte against the spec, so a field-number mistake shared by
+    // both sides cannot cancel out.
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0x778899aaU;
+    request.to_node = 0x33445566U;
+    request.packet_id = 424242U;
+    request.port = MeshtasticPort::Routing;
+    request.request_id = 0x12345678U;
+    std::uint8_t frame[256]{};
+    const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(n > 16U);
+
+    MeshtasticPayload payload{};
+    assert(readMeshtasticPayload(frame + 16, n - 16, request.from_node, request.packet_id,
+                                 payload));
+    assert(payload.readable);
+    assert(payload.portnum == static_cast<std::uint16_t>(MeshtasticPort::Routing));
+    assert(payload.has_request_id);
+    assert(payload.request_id == 0x12345678U);
+    assert(!payload.has_text);
+
+    // Decrypt with the same nonce construction and compare the plaintext to
+    // the hand-derived protobuf: Data{ portnum=5, payload="", request_id }.
+    //   08 05        field 1 varint 5
+    //   12 00        field 2 length 0
+    //   30 f8 ac d1 91 01   field 6 varint 0x12345678
+    std::uint8_t nonce[16]{};
+    nonce[0] = static_cast<std::uint8_t>(request.packet_id);
+    nonce[1] = static_cast<std::uint8_t>(request.packet_id >> 8U);
+    nonce[2] = static_cast<std::uint8_t>(request.packet_id >> 16U);
+    nonce[3] = static_cast<std::uint8_t>(request.packet_id >> 24U);
+    nonce[8] = static_cast<std::uint8_t>(request.from_node);
+    nonce[9] = static_cast<std::uint8_t>(request.from_node >> 8U);
+    nonce[10] = static_cast<std::uint8_t>(request.from_node >> 16U);
+    nonce[11] = static_cast<std::uint8_t>(request.from_node >> 24U);
+    std::uint8_t plain[64]{};
+    crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, frame + 16, n - 16, plain);
+    const std::uint8_t expected[] = {0x08, 0x05, 0x12, 0x00,
+                                     0x30, 0xf8, 0xac, 0xd1, 0x91, 0x01};
+    assert(n - 16 == sizeof(expected));
+    assert(std::memcmp(plain, expected, sizeof(expected)) == 0);
+}
+
 int main()
 {
     testFips197BlockVector();
+    testWantAckBitReachesTheHeader();
+    testRoutingAckRoundTrips();
     testCounterModeRoundTripsAcrossBlockBoundary();
     testReadsTextMessageFromRealFrame();
     testWrongNonceIsRejectedRatherThanGuessed();

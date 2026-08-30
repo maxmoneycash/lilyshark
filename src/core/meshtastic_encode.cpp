@@ -138,6 +138,9 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
             !writeBytesField(inner, sizeof(inner), inner_used, 2, user, user_used)) {
             return 0;
         }
+    } else if (request.port == MeshtasticPort::Routing) {
+        // An empty Routing message is error_reason NONE -- the acknowledgement.
+        inner_used = 0;
     } else {
         return 0;
     }
@@ -149,6 +152,11 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
         !writeBytesField(data, sizeof(data), data_used, 2, inner, inner_used)) {
         return 0;
     }
+    if (request.request_id != 0 &&
+        (!writeTag(data, sizeof(data), data_used, 6, 0) ||
+         !writeVarint(data, sizeof(data), data_used, request.request_id))) {
+        return 0;
+    }
 
     if (kHeader + data_used > out_size) return 0;
 
@@ -156,7 +164,8 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
     writeLe32(out + 4, request.from_node);
     writeLe32(out + 8, request.packet_id);
     const std::uint8_t hop = static_cast<std::uint8_t>(request.hop_limit & 0x07U);
-    out[12] = static_cast<std::uint8_t>(hop | static_cast<std::uint8_t>(hop << 5U));
+    out[12] = static_cast<std::uint8_t>(hop | (request.want_ack ? 0x08U : 0U) |
+                                        static_cast<std::uint8_t>(hop << 5U));
     out[13] = meshtasticChannelHash(kMeshtasticDefaultChannelName, kMeshtasticDefaultPsk,
                                     sizeof(kMeshtasticDefaultPsk));
     out[14] = 0;

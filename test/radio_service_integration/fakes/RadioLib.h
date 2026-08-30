@@ -92,6 +92,8 @@ struct State {
     std::int16_t scan_result_result = RADIOLIB_ERR_NONE;
 
     std::vector<std::uint8_t> packet{};
+    /// Every frame the firmware asked the radio to send, in order.
+    std::vector<std::vector<std::uint8_t>> transmitted{};
     std::size_t packet_length = 0;
     RadioLibIrqFlags_t irq_flags = 0;
     std::uint8_t header_coding_rate = 1;
@@ -215,8 +217,10 @@ class SX1262
         return fake.nextStartReceiveResult();
     }
 
-    std::int16_t transmit(const std::uint8_t *, std::size_t)
+    std::int16_t transmit(const std::uint8_t *data, std::size_t length)
     {
+        auto &fake = radiolib_fake::state();
+        fake.transmitted.emplace_back(data, data + length);
         return RADIOLIB_ERR_NONE;
     }
 

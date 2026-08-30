@@ -259,6 +259,9 @@ bool readMeshtasticPayload(const std::uint8_t *ciphertext,
                 if (value > 0xffffU) return false;
                 parsed.portnum = static_cast<std::uint16_t>(value);
                 saw_portnum = true;
+            } else if (field == 6U) {
+                parsed.request_id = value;
+                parsed.has_request_id = true;
             }
         } else if (wire == kWireLengthDelimited) {
             std::uint32_t size = 0;

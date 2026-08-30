@@ -80,6 +80,7 @@
 #if defined(LILYSHARK_DEVICE)
 bool transmit_meshtastic(lilyshark::MeshtasticPort port, const char *text,
                          std::uint32_t to_node = 0xffffffffU) noexcept;
+void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id) noexcept;
 void announce_local_mesh_identity() noexcept;
 #endif
 
@@ -440,7 +441,12 @@ struct ChatLine {
     char text[kChatTextCapacity]{};
     char when[6]{};
     std::uint32_t peer = 0xffffffffU;
+    /// For a direct message this device sent with the want-ack bit: the
+    /// packet id a Routing acknowledgement will name. Zero otherwise.
+    std::uint32_t pending_id = 0;
     bool mine = false;
+    /// The peer's radio confirmed delivery of this exact packet.
+    bool acked = false;
 };
 struct ChatPeer {
     std::uint32_t node = 0xffffffffU;
@@ -759,7 +765,9 @@ struct ChatArchiveHeader {
     std::uint16_t reserved;
 };
 constexpr std::uint32_t kChatArchiveMagic = 0x4C534348UL;  // "LSCH"
-constexpr std::uint16_t kChatArchiveVersion = 1U;
+// v2: ChatLine gained delivery state. A v1 archive has a different record
+// size and is refused, which costs one saved conversation once.
+constexpr std::uint16_t kChatArchiveVersion = 2U;
 constexpr std::size_t kChatArchiveSize = sizeof(ChatArchiveHeader) + sizeof(chat_log);
 
 /// The log as bytes. Kept apart from the NVS call so the round trip can be
@@ -792,11 +800,14 @@ bool decode_chat_archive(const std::uint8_t *bytes, std::size_t size) noexcept
 }
 
 void chat_push(const char *from, const char *text, bool mine,
-               std::uint32_t peer = 0xffffffffU, const char *when = nullptr) noexcept
+               std::uint32_t peer = 0xffffffffU, const char *when = nullptr,
+               std::uint32_t pending_id = 0) noexcept
 {
     if (from == nullptr || text == nullptr || text[0] == '\0') return;
     const std::size_t slot = (chat_log_start + chat_log_count) % kChatLogCapacity;
     ChatLine &line = chat_log[slot];
+    line.pending_id = pending_id;
+    line.acked = false;
     std::snprintf(line.from, sizeof(line.from), "%.7s", from);
     std::snprintf(line.text, sizeof(line.text), "%s", text);
     if (when != nullptr && when[0] != '\0') {
@@ -6143,22 +6154,40 @@ void build_messages(lv_obj_t * parent)
     for (std::size_t age = 0; age < store.size() && count < rows.size(); ++age) {
         const FrameRecord *record = store.newest(age);
         if (record == nullptr) continue;
-        if (record->decoded.protocol != ProtocolId::Meshtastic) continue;
-        if (!record->decoded.hasAttribute(AttributeDefaultKeyReadable)) continue;
         if (record->decoded.payload_length == 0U) continue;
         if (record->raw.captured_length <
             static_cast<std::uint16_t>(record->decoded.payload_offset +
                                        record->decoded.payload_length)) {
             continue;
         }
+        // Either kind of readable text lands here: a default-key Meshtastic
+        // message, or an unencrypted LXMF message inside a Reticulum frame.
+        // The screen says "every text message heard", and without the second
+        // branch it was quietly Meshtastic-only.
+        char lxmf_text[kChatTextCapacity]{};
         MeshtasticPayload payload{};
-        if (!readMeshtasticPayload(record->raw.bytes + record->decoded.payload_offset,
-                                   record->decoded.payload_length,
-                                   record->decoded.source, record->decoded.packet_id,
-                                   payload)) {
+        bool is_lxmf = false;
+        if (record->decoded.protocol == ProtocolId::Meshtastic &&
+            record->decoded.hasAttribute(AttributeDefaultKeyReadable)) {
+            if (!readMeshtasticPayload(record->raw.bytes + record->decoded.payload_offset,
+                                       record->decoded.payload_length,
+                                       record->decoded.source, record->decoded.packet_id,
+                                       payload)) {
+                continue;
+            }
+            if (!payload.has_text) continue;
+        } else if (record->decoded.protocol == ProtocolId::Reticulum) {
+            LxmfMessage lxmf{};
+            if (!readLxmfMessage(record->raw.bytes + record->decoded.payload_offset,
+                                 record->decoded.payload_length, lxmf)) {
+                continue;
+            }
+            if (!lxmf.has_content) continue;
+            std::snprintf(lxmf_text, sizeof(lxmf_text), "%s", lxmf.content);
+            is_lxmf = true;
+        } else {
             continue;
         }
-        if (!payload.has_text) continue;
         MessageRow &row = rows[count];
         row.mine = record->decoded.source == localMeshtasticNodeNum();
         if (row.mine) {
@@ -6180,10 +6209,12 @@ void build_messages(lv_obj_t * parent)
         }
         format_age(row.when, sizeof(row.when), record->raw.rf.timestamp_us);
         std::snprintf(row.route, sizeof(row.route), "%s",
-                      record->decoded.destination == 0xffffffffU ? "ALL" : "DM");
+                      is_lxmf ? "LXMF"
+                              : (record->decoded.destination == 0xffffffffU ? "ALL" : "DM"));
         std::snprintf(row.snr, sizeof(row.snr), "%+.1f",
                       static_cast<double>(record->raw.rf.snr_db_x10) / 10.0);
-        std::snprintf(texts[count], kChatTextCapacity, "%s", payload.text);
+        std::snprintf(texts[count], kChatTextCapacity, "%s",
+                      is_lxmf ? lxmf_text : payload.text);
         row.text = texts[count];
         bool seen = false;
         for (std::size_t index = 0; index < sender_count; ++index) {
@@ -8322,11 +8353,16 @@ void build_chat(lv_obj_t * parent)
             // The destination is already stated once above the log; repeating
             // ALL or PRIVATE on every line was noise, and the operator's own
             // call sign told them nothing they did not know.
+            // DELIVERED appears once the peer's radio confirms the exact
+            // packet; a pending direct message shows nothing extra, because
+            // absence of confirmation is not an error worth shouting about.
+            const char *delivery = line.mine && line.acked ? "  DELIVERED" : "";
             if (line.when[0] != '\0') {
-                std::snprintf(who, sizeof(who), "%s  %s", line.when,
-                              line.mine ? "YOU" : line.from);
+                std::snprintf(who, sizeof(who), "%s  %s%s", line.when,
+                              line.mine ? "YOU" : line.from, delivery);
             } else {
-                std::snprintf(who, sizeof(who), "%s", line.mine ? "YOU" : line.from);
+                std::snprintf(who, sizeof(who), "%s%s", line.mine ? "YOU" : line.from,
+                              delivery);
             }
             put_label(parent, who, text_x, y,
                       line.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
@@ -8719,6 +8755,50 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 (void)announce_new_node(stored->decoded.source,
                                         chat_payload.has_names ? chat_payload.short_name
                                                                : nullptr);
+            }
+#endif
+            // Delivery confirmations, both directions.
+            //
+            // Inbound: a Routing message addressed to us whose request_id
+            // names a message we sent -- the peer's radio confirming receipt.
+            // Marked on the chat line so the sender can see "did it arrive"
+            // without asking, which in the field is the entire question.
+            if (chat_payload.portnum ==
+                    static_cast<std::uint16_t>(MeshtasticPort::Routing) &&
+                chat_payload.has_request_id &&
+                stored->decoded.destination == localMeshtasticNodeNum() &&
+                stored->decoded.source != localMeshtasticNodeNum()) {
+                for (std::size_t index = 0; index < chat_log_count; ++index) {
+                    ChatLine &line =
+                        chat_log[(chat_log_start + index) % kChatLogCapacity];
+                    if (line.mine && !line.acked &&
+                        line.pending_id == chat_payload.request_id) {
+                        line.acked = true;
+                        live_data_dirty = true;
+#if defined(LILYSHARK_DEVICE)
+                        chat_log_dirty = true;
+                        chat_log_save_due_ms = millis() + kChatSaveDebounceMs;
+#endif
+                        break;
+                    }
+                }
+            }
+#if defined(LILYSHARK_DEVICE)
+            // Outbound: a want-ack packet addressed to us gets the Routing
+            // acknowledgement official firmware would send, so a stock
+            // Meshtastic sender -- or another Lilyshark -- sees delivered.
+            // Only for frames that were really on some air (radio or the
+            // net bridge), and never for our own or for Routing itself,
+            // which would ack acks forever.
+            if (stored->decoded.hasAttribute(AttributeAcknowledgementRequested) &&
+                stored->decoded.destination == localMeshtasticNodeNum() &&
+                stored->decoded.source != localMeshtasticNodeNum() &&
+                chat_payload.portnum !=
+                    static_cast<std::uint16_t>(MeshtasticPort::Routing) &&
+                stored->raw.rf.origin != FrameOrigin::Synthetic &&
+                !app_settings.simulate_mode) {
+                transmit_meshtastic_ack(stored->decoded.source,
+                                        stored->decoded.packet_id);
             }
 #endif
             if (chat_payload.has_text) {
@@ -13880,25 +13960,11 @@ void announce_local_mesh_identity() noexcept
     }
 }
 
-bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to_node) noexcept
+/// Encode and send one request, and ingest the transmitted frame so it shows
+/// in traffic and captures like anything else on the air. Shared by messages,
+/// beacons, and Routing acknowledgements.
+bool transmit_meshtastic_request(const MeshtasticEncodeRequest &request) noexcept
 {
-    char short_name[8]{};
-    char long_name[24]{};
-    formatLocalMeshtasticShortName(short_name, sizeof(short_name));
-    formatLocalMeshtasticLongName(long_name, sizeof(long_name));
-    MeshtasticEncodeRequest request{};
-    request.from_node = localMeshtasticNodeNum();
-    request.to_node = to_node;
-    request.packet_id = next_meshtastic_packet_id();
-    request.port = port;
-    request.text = text;
-    request.short_name = short_name;
-    request.long_name = long_name;
-    const GpsStatus &gps = hardware_status.snapshot().gps;
-    if (gps.state == GpsState::Fix && gps.position_valid) {
-        request.latitude_degrees = gps.latitude_degrees;
-        request.longitude_degrees = gps.longitude_degrees;
-    }
     std::uint8_t frame[kMaxFrameBytes]{};
     const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
     if (n == 0) return false;
@@ -13923,14 +13989,56 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to
                             RfFieldCodingRate | RfFieldSyncWord | RfFieldPreamble | RfFieldProfile;
     ingest_analyzer_frame(raw, profile, true);
     live_data_dirty = true;
+    return true;
+}
+
+bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to_node) noexcept
+{
+    char short_name[8]{};
+    char long_name[24]{};
+    formatLocalMeshtasticShortName(short_name, sizeof(short_name));
+    formatLocalMeshtasticLongName(long_name, sizeof(long_name));
+    MeshtasticEncodeRequest request{};
+    request.from_node = localMeshtasticNodeNum();
+    request.to_node = to_node;
+    request.packet_id = next_meshtastic_packet_id();
+    request.port = port;
+    request.text = text;
+    request.short_name = short_name;
+    request.long_name = long_name;
+    // A direct text asks the peer's radio to confirm receipt; official
+    // firmware answers a want-ack packet with a Routing acknowledgement, and
+    // so do we. Broadcasts stay fire-and-forget like the rest of the channel.
+    request.want_ack =
+        port == MeshtasticPort::TextMessage && to_node != 0xffffffffU && to_node != 0U;
+    const GpsStatus &gps = hardware_status.snapshot().gps;
+    if (gps.state == GpsState::Fix && gps.position_valid) {
+        request.latitude_degrees = gps.latitude_degrees;
+        request.longitude_degrees = gps.longitude_degrees;
+    }
+    if (!transmit_meshtastic_request(request)) return false;
     if (text != nullptr && text[0] != '\0') {
         std::snprintf(shell_notice, sizeof(shell_notice), "TX  %.40s", text);
         char event[80]{};
         std::snprintf(event, sizeof(event), "TX LongFast  %.48s", text);
         record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Radio, event);
-        chat_push("ME", text, true, to_node);
+        chat_push("ME", text, true, to_node, nullptr,
+                  request.want_ack ? request.packet_id : 0U);
     }
     return true;
+}
+
+/// Confirm a received want-ack packet the way official firmware does: an
+/// empty Routing message whose request_id names the packet being confirmed.
+void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id) noexcept
+{
+    MeshtasticEncodeRequest request{};
+    request.from_node = localMeshtasticNodeNum();
+    request.to_node = to_node;
+    request.packet_id = next_meshtastic_packet_id();
+    request.port = MeshtasticPort::Routing;
+    request.request_id = packet_id;
+    (void)transmit_meshtastic_request(request);
 }
 
 void handle_mesh_tx_command(const char *line) noexcept

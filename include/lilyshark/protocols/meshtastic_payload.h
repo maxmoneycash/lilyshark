@@ -51,6 +51,9 @@ struct MeshtasticPayload {
     bool has_position = false;
     double latitude_degrees = 0.0;
     double longitude_degrees = 0.0;
+    /// A Routing acknowledgement names the packet it confirms here.
+    bool has_request_id = false;
+    std::uint32_t request_id = 0;
     bool has_names = false;
     char long_name[40]{};
     char short_name[8]{};

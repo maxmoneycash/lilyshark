@@ -8,6 +8,8 @@
 #include "device_shell_fake.h"
 #include "lilyshark/core/app_settings.h"
 #include "lilyshark/core/profile_settings.h"
+#include "lilyshark/protocols/meshtastic_encode.h"
+#include "lilyshark/protocols/meshtastic_payload.h"
 #include "lilyshark/device/tdeck_display_init.h"
 #include "lilyshark/tdeck.h"
 #include "theme.h"
@@ -819,6 +821,100 @@ bool healthyScenario()
         sendKeyboard('M');
         if(!require(hasLabel(lv_screen_active(), "LAST RX"),
                     "M did not return to Home after the injection checks")) return false;
+    }
+
+    // Delivery confirmation, both directions, over the real serial and radio
+    // paths. In the field "did it arrive" is the entire question a sender
+    // has; this proves the want-ack bit leaves on the wire, a peer's Routing
+    // acknowledgement flips the chat line to DELIVERED, and an incoming
+    // want-ack message is confirmed the way official firmware would.
+    {
+        const std::size_t sent_before = radiolib_fake::state().transmitted.size();
+        Serial.pushInput("LSK TX meshtastic dm 778899aa checking in");
+        loop();
+        auto &sent = radiolib_fake::state().transmitted;
+        if(!require(sent.size() == sent_before + 1U,
+                    "the direct message did not reach the radio")) return false;
+        const std::vector<std::uint8_t> &dm = sent.back();
+        if(!require(dm.size() > 16U && (dm[12] & 0x08U) != 0U,
+                    "the direct message did not request an acknowledgement")) return false;
+        const std::uint32_t dm_id = static_cast<std::uint32_t>(dm[8]) |
+                                    (static_cast<std::uint32_t>(dm[9]) << 8U) |
+                                    (static_cast<std::uint32_t>(dm[10]) << 16U) |
+                                    (static_cast<std::uint32_t>(dm[11]) << 24U);
+
+        // The peer's radio answers with a Routing acknowledgement.
+        lilyshark::MeshtasticEncodeRequest ack{};
+        ack.from_node = 0x778899aaU;
+        ack.to_node = 0x33445566U;  // this build's mesh identity, per the serial log
+        ack.packet_id = 900001U;
+        ack.port = lilyshark::MeshtasticPort::Routing;
+        ack.request_id = dm_id;
+        std::uint8_t ack_frame[256]{};
+        const std::size_t ack_len =
+            lilyshark::encodeMeshtasticFrame(ack, ack_frame, sizeof(ack_frame));
+        if(!require(ack_len > 16U, "the test could not encode the peer ack")) return false;
+        radio.packet.assign(ack_frame, ack_frame + ack_len);
+        radio.packet_length = radio.packet.size();
+        radio.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+        radio.triggerDio1();
+        device_shell_fake::advance_ms(250U);
+        loop();
+
+        sendKeyboard('C');
+        if(!require(hasLabel(lv_screen_active(), "TYPE A MESSAGE"),
+                    "C did not open Chat for the delivery check")) return false;
+        // The DM conversation lives on its own tab; cycle to it.
+        bool saw_delivered = hasLabel(lv_screen_active(), "YOU  DELIVERED");
+        for(int hop = 0; hop < 4 && !saw_delivered; ++hop) {
+            sendKeyboard('\t');
+            saw_delivered = hasLabel(lv_screen_active(), "YOU  DELIVERED");
+        }
+        if(!require(saw_delivered,
+                    "the peer acknowledgement did not mark the message DELIVERED")) return false;
+        sendKeyboard(0x08U);
+        if(!require(hasLabel(lv_screen_active(), "LAST RX"),
+                    "backspace did not leave Chat after the delivery check")) return false;
+
+        // Inbound: a want-ack message to us must be confirmed on the air.
+        lilyshark::MeshtasticEncodeRequest incoming{};
+        incoming.from_node = 0x778899aaU;
+        incoming.to_node = 0x33445566U;
+        incoming.packet_id = 900002U;
+        incoming.port = lilyshark::MeshtasticPort::TextMessage;
+        incoming.text = "are you there";
+        incoming.want_ack = true;
+        std::uint8_t in_frame[256]{};
+        const std::size_t in_len =
+            lilyshark::encodeMeshtasticFrame(incoming, in_frame, sizeof(in_frame));
+        if(!require(in_len > 16U, "the test could not encode the incoming DM")) return false;
+        const std::size_t sent_before_ack = sent.size();
+        radio.packet.assign(in_frame, in_frame + in_len);
+        radio.packet_length = radio.packet.size();
+        radio.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+        radio.triggerDio1();
+        device_shell_fake::advance_ms(250U);
+        loop();
+        if(!require(sent.size() == sent_before_ack + 1U,
+                    "the want-ack message was not acknowledged on the air")) return false;
+        const std::vector<std::uint8_t> &our_ack = sent.back();
+        const std::uint32_t ack_dest = static_cast<std::uint32_t>(our_ack[0]) |
+                                       (static_cast<std::uint32_t>(our_ack[1]) << 8U) |
+                                       (static_cast<std::uint32_t>(our_ack[2]) << 16U) |
+                                       (static_cast<std::uint32_t>(our_ack[3]) << 24U);
+        const std::uint32_t ack_src_id = static_cast<std::uint32_t>(our_ack[8]) |
+                                         (static_cast<std::uint32_t>(our_ack[9]) << 8U) |
+                                         (static_cast<std::uint32_t>(our_ack[10]) << 16U) |
+                                         (static_cast<std::uint32_t>(our_ack[11]) << 24U);
+        lilyshark::MeshtasticPayload confirmed{};
+        if(!require(ack_dest == 0x778899aaU &&
+                        lilyshark::readMeshtasticPayload(our_ack.data() + 16,
+                                                         our_ack.size() - 16U, 0x33445566U,
+                                                         ack_src_id, confirmed) &&
+                        confirmed.portnum ==
+                            static_cast<std::uint16_t>(lilyshark::MeshtasticPort::Routing) &&
+                        confirmed.has_request_id && confirmed.request_id == 900002U,
+                    "our acknowledgement did not name the confirmed packet")) return false;
     }
 
     return true;
