@@ -27,6 +27,10 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
+        with:
+          # The pin lives in webapp/package.json; the action defaults to the
+          # repository root, where there is no package.json at all.
+          package_json_file: webapp/package.json
 
       - name: Install dependencies
         working-directory: webapp
