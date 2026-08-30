@@ -11,6 +11,35 @@ permissions:
   contents: read
 
 jobs:
+  webapp:
+    # The analyzer is half the product and now carries the net relay; a
+    # regression here used to merge green because CI never ran it.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        working-directory: webapp
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        working-directory: webapp
+        run: pnpm test
+
+      - name: Build
+        working-directory: webapp
+        run: pnpm run build
+
   test-and-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
