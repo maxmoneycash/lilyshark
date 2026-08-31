@@ -8,6 +8,30 @@
 #include <cstring>
 
 namespace lilyshark {
+namespace {
+
+#if LILYSHARK_HAS_TINYGPSPLUS
+// Proleptic-Gregorian civil date to unix seconds (days-from-civil, Hinnant).
+// GPS reports UTC, and unix time ignores leap seconds by definition, so no
+// leap-second table is needed. Callers guard the year range.
+std::uint64_t unixFromUtc(std::uint16_t year, std::uint8_t month, std::uint8_t day,
+                          std::uint8_t hour, std::uint8_t minute, std::uint8_t second) noexcept
+{
+    const std::int64_t shifted_year = static_cast<std::int64_t>(year) - (month <= 2U ? 1 : 0);
+    const std::int64_t era = shifted_year / 400;
+    const std::int64_t year_of_era = shifted_year - era * 400;
+    const std::int64_t day_of_year =
+        (153 * (static_cast<std::int64_t>(month) + (month > 2U ? -3 : 9)) + 2) / 5 + day - 1;
+    const std::int64_t day_of_era =
+        year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    const std::int64_t days_since_epoch = era * 146097 + day_of_era - 719468;
+    return static_cast<std::uint64_t>(days_since_epoch) * 86400ULL +
+           static_cast<std::uint64_t>(hour) * 3600ULL +
+           static_cast<std::uint64_t>(minute) * 60ULL + second;
+}
+#endif
+
+} // namespace
 
 TDeckHardwareStatus::TDeckHardwareStatus(HardwareSerial &gps_serial) noexcept
     : gps_serial_(gps_serial)
@@ -132,6 +156,8 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
         snapshot_.gps.state = GpsState::Disabled;
         snapshot_.gps.receiver_detected = false;
         snapshot_.gps.position_valid = false;
+        snapshot_.gps.time_valid = false;
+        snapshot_.gps.unix_time_seconds = 0;
         snapshot_.gps.last_sentence_age_ms = UINT32_MAX;
         return;
     }
@@ -192,6 +218,29 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
         }
     }
 
+    // The wall clock rides RMC independently of the position fix, but a stale
+    // or unset receiver clock (year before 2020: cold start, or week-number
+    // rollover garbage) must never anchor witness keys.
+    const bool time_is_fresh = receiver_active && gps_parser_.date.isValid() &&
+                               gps_parser_.time.isValid() &&
+                               gps_parser_.time.age() <= gps_fix_stale_ms_ &&
+                               gps_parser_.date.year() >= 2020U;
+    if (time_is_fresh) {
+        const std::uint64_t sentence_unix =
+            unixFromUtc(static_cast<std::uint16_t>(gps_parser_.date.year()),
+                        static_cast<std::uint8_t>(gps_parser_.date.month()),
+                        static_cast<std::uint8_t>(gps_parser_.date.day()),
+                        static_cast<std::uint8_t>(gps_parser_.time.hour()),
+                        static_cast<std::uint8_t>(gps_parser_.time.minute()),
+                        static_cast<std::uint8_t>(gps_parser_.time.second()));
+        snapshot_.gps.unix_time_seconds =
+            static_cast<std::uint32_t>(sentence_unix + gps_parser_.time.age() / 1000U);
+        snapshot_.gps.time_valid = true;
+    } else {
+        snapshot_.gps.time_valid = false;
+        snapshot_.gps.unix_time_seconds = 0;
+    }
+
     if (receiver_active) {
         snapshot_.gps.satellites = gps_parser_.satellites.isValid()
                                        ? static_cast<std::uint8_t>(gps_parser_.satellites.value() > 255U
@@ -207,6 +256,8 @@ void TDeckHardwareStatus::pollGps(std::uint32_t now_ms) noexcept
     snapshot_.gps.state = GpsState::Absent;
     snapshot_.gps.receiver_detected = false;
     snapshot_.gps.position_valid = false;
+    snapshot_.gps.time_valid = false;
+    snapshot_.gps.unix_time_seconds = 0;
     snapshot_.gps.last_sentence_age_ms = UINT32_MAX;
 #endif
 }

@@ -31,6 +31,11 @@ struct GpsStatus {
     bool parser_available = false;
     bool receiver_detected = false;
     bool position_valid = false;
+    // GPS-derived UTC wall clock — the witness sidecar's anchor source. Valid
+    // only while fresh date+time sentences arrive; unix_time_seconds is the
+    // unix time as of the most recent poll() call.
+    bool time_valid = false;
+    std::uint32_t unix_time_seconds = 0;
     double latitude_degrees = 0.0;
     double longitude_degrees = 0.0;
     float altitude_meters = 0.0F;

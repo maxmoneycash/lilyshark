@@ -54,6 +54,7 @@
 #include "lilyshark/device/tdeck_sd_sink.h"
 #include "lilyshark/export/lilyshark_capture.h"
 #include "lilyshark/export/pcap_loratap.h"
+#include "lilyshark/export/witness_sidecar.h"
 #include "lilyshark/protocols/meshcore_decoder.h"
 #include "lilyshark/protocols/meshcore_encode.h"
 #include "lilyshark/protocols/meshtastic_decoder.h"
@@ -182,6 +183,12 @@ TDeckSdByteSink pcap_sink{};
 PcapLoraTapWriter pcap_writer{pcap_sink};
 TDeckSdByteSink native_capture_sink{};
 LilysharkCaptureWriter native_capture_writer{native_capture_sink};
+// Field Receipts witness sidecar: <capture>.witness next to the .lscap. It
+// only opens when a wall-clock anchor exists (GPS time), because a frame
+// without one is ineligible per the frozen spec; no anchor means no sidecar,
+// and the event log says why.
+TDeckSdByteSink witness_sink{};
+WitnessSidecarWriter witness_writer{witness_sink};
 std::size_t active_profile_index = 0;
 bool live_data_dirty = false;
 bool sd_mounted = false;
@@ -190,6 +197,8 @@ bool keyboard_ready = false;
 bool screenshot_attempted = false;
 bool pcap_recording = false;
 bool native_capture_recording = false;
+bool witness_recording = false;
+bool witness_synthetic_warning_recorded = false;
 bool survey_running = false;
 bool survey_has_result = false;
 SurveyAccumulator survey_accumulator{};
@@ -236,6 +245,7 @@ LilysharkCaptureWriteResult last_native_capture_result = LilysharkCaptureWriteRe
 ScreenshotWriteResult last_screenshot_result = ScreenshotWriteResult::StorageError;
 char pcap_path[48]{};
 char native_capture_path[48]{};
+char witness_path[56]{};
 char screenshot_path[48]{};
 char live_battery_label[16] = "BAT --";
 char live_gps_label[16] = "GPS --";
@@ -4628,6 +4638,30 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
             native_capture_sink.close();
             record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Capture,
                                  "Native capture write failed; recording stopped");
+            // The sidecar attests frames of this capture; without the capture
+            // there is nothing a witness key could corroborate against.
+            if(witness_recording) {
+                witness_recording = false;
+                witness_sink.close();
+            }
+        }
+    }
+    if(allow_capture && witness_recording && stored != nullptr) {
+        const WitnessSidecarWriteResult witness_result = witness_writer.write(*stored);
+        if(witness_result == WitnessSidecarWriteResult::SinkError) {
+            witness_recording = false;
+            sd_io_error = true;
+            witness_sink.close();
+            record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Capture,
+                                 "Witness sidecar write failed; sidecar stopped");
+        } else if(witness_result == WitnessSidecarWriteResult::Ineligible &&
+                  witness_writer.lastIneligibility() == WitnessEligibility::Synthetic &&
+                  !witness_synthetic_warning_recorded) {
+            // The spec refuses simulated frames loudly rather than skipping
+            // them silently; once per session keeps the log readable.
+            record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Capture,
+                                 "Witness sidecar refuses simulated frames");
+            witness_synthetic_warning_recorded = true;
         }
     }
     if(allow_capture && pcap_recording) {
@@ -7875,16 +7909,21 @@ void stop_capture_session() noexcept
     bool flushed = true;
     if(pcap_recording) flushed = pcap_sink.flush() && flushed;
     if(native_capture_recording) flushed = native_capture_sink.flush() && flushed;
+    if(witness_recording) flushed = witness_sink.flush() && flushed;
     pcap_sink.close();
     native_capture_sink.close();
+    witness_sink.close();
     pcap_writer.reset();
     native_capture_writer.reset();
+    witness_writer.reset();
     pcap_recording = false;
     native_capture_recording = false;
+    witness_recording = false;
     last_pcap_result = PcapWriteResult::NotStarted;
     last_native_capture_result = LilysharkCaptureWriteResult::NotStarted;
     pcap_bandwidth_warning_recorded = false;
     pcap_synthetic_warning_recorded = false;
+    witness_synthetic_warning_recorded = false;
     if(!flushed) {
         sd_io_error = true;
         record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Storage,
@@ -7898,6 +7937,7 @@ bool start_capture_session() noexcept
     if(sd_io_error) {
         pcap_sink.close();
         native_capture_sink.close();
+        witness_sink.close();
         SD.end();
         sd_mounted = false;
         sd_io_error = false;
@@ -7911,10 +7951,14 @@ bool start_capture_session() noexcept
 
     pcap_writer.reset();
     native_capture_writer.reset();
+    witness_writer.reset();
     pcap_bandwidth_warning_recorded = false;
     pcap_synthetic_warning_recorded = false;
+    witness_synthetic_warning_recorded = false;
     pcap_path[0] = '\0';
     native_capture_path[0] = '\0';
+    witness_path[0] = '\0';
+    witness_recording = false;
     if(pcap_sink.openNextCapture(pcap_path, sizeof(pcap_path))) {
         last_pcap_result = pcap_writer.begin();
         pcap_recording = last_pcap_result == PcapWriteResult::Ok;
@@ -7926,6 +7970,51 @@ bool start_capture_session() noexcept
         native_capture_recording =
             last_native_capture_result == LilysharkCaptureWriteResult::Ok;
         if(!native_capture_recording) native_capture_sink.close();
+    }
+
+    // Witness sidecar, next to the .lscap. Frames need a wall-clock anchor to
+    // be eligible for witness keys, and v1 .lscap timestamps are boot-relative
+    // ticks, so the anchor comes from GPS time sampled now: the sidecar epoch
+    // is the unix time of tick 0. Second-level precision suffices — the frozen
+    // 60 s bucket absorbs it. Without GPS time, no sidecar: recording nothing
+    // is the spec's behavior for anchorless frames, and the event log says so.
+    if(native_capture_recording) {
+        const GpsStatus &gps = hardware_status.snapshot().gps;
+        const std::uint64_t boot_seconds =
+            static_cast<std::uint64_t>(esp_timer_get_time()) / 1000000ULL;
+        if(!gps.time_valid || gps.unix_time_seconds <= boot_seconds) {
+            record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::Capture,
+                                 "Witness sidecar off: no GPS time anchor");
+        } else {
+            const std::size_t native_length = std::strlen(native_capture_path);
+            constexpr std::size_t lscap_length = sizeof(kLilysharkCaptureExtension) - 1U;
+            const bool path_derived =
+                native_length > lscap_length &&
+                std::strcmp(native_capture_path + native_length - lscap_length,
+                            kLilysharkCaptureExtension) == 0 &&
+                native_length - lscap_length + sizeof(kWitnessSidecarExtension) <=
+                    sizeof(witness_path);
+            if(path_derived) {
+                std::memcpy(witness_path, native_capture_path, native_length - lscap_length);
+                std::memcpy(witness_path + native_length - lscap_length,
+                            kWitnessSidecarExtension, sizeof(kWitnessSidecarExtension));
+            }
+            if(path_derived && witness_sink.open(witness_path)) {
+                const std::uint64_t epoch_unix_seconds = gps.unix_time_seconds - boot_seconds;
+                witness_recording = witness_writer.begin(WitnessAnchorSource::Gps,
+                                                         epoch_unix_seconds) ==
+                                    WitnessSidecarWriteResult::Ok;
+                if(!witness_recording) witness_sink.close();
+            }
+            if(witness_recording) {
+                record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Capture,
+                                     "Witness sidecar started (GPS time anchor)");
+            } else {
+                witness_path[0] = '\0';
+                record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Capture,
+                                     "Witness sidecar file could not be opened");
+            }
+        }
     }
 
     if(app_settings.simulate_mode) {
@@ -8619,6 +8708,14 @@ void loop()
             native_capture_sink.close();
             record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Storage,
                                  "Native capture flush failed; recording stopped");
+            live_data_dirty = true;
+        }
+        if(witness_recording && !witness_sink.flush()) {
+            witness_recording = false;
+            sd_io_error = true;
+            witness_sink.close();
+            record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Storage,
+                                 "Witness sidecar flush failed; sidecar stopped");
             live_data_dirty = true;
         }
     }

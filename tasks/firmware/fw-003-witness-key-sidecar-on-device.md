@@ -4,7 +4,7 @@ title: Witness-key sidecar on device
 area: firmware
 size: M
 priority: P1
-status: todo
+status: done
 depends_on:
 - PR-001
 eval:

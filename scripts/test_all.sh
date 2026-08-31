@@ -190,6 +190,21 @@ build_and_run shelby_pointer \
   src/shelby/shelby_pointer_decoder.cpp \
   test/shelby_pointer/test_shelby_pointer.cpp
 
+build_and_run sha256 \
+  src/crypto/sha256.cpp \
+  test/sha256/test_sha256.cpp
+
+build_and_run witness_key \
+  src/crypto/sha256.cpp \
+  src/shelby/witness_key.cpp \
+  test/witness_key/test_witness_key.cpp
+
+build_and_run witness_sidecar \
+  src/crypto/sha256.cpp \
+  src/shelby/witness_key.cpp \
+  src/export/witness_sidecar.cpp \
+  test/witness_sidecar/test_witness_sidecar.cpp
+
 build_and_run shelby_registry \
   src/core/decoder_registry.cpp \
   src/core/meshtastic_decoder.cpp \

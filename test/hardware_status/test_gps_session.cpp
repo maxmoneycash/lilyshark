@@ -17,6 +17,8 @@ void assertClearedFix(const lilyshark::GpsStatus &gps)
     assert(gps.hdop == 0.0F);
     assert(gps.satellites == 0U);
     assert(gps.last_sentence_age_ms == UINT32_MAX);
+    assert(!gps.time_valid);
+    assert(gps.unix_time_seconds == 0U);
 }
 
 } // namespace
@@ -44,6 +46,10 @@ int main()
     assert(status.snapshot().gps.latitude_degrees == 37.7749);
     assert(status.snapshot().gps.longitude_degrees == -122.4194);
     assert(status.snapshot().gps.satellites == 7U);
+    // The fix carries the GPS wall clock: 2030-01-01T00:00:00Z, the same
+    // instant WITNESS-VECTOR-1 freezes, so the witness anchor is pinned here.
+    assert(status.snapshot().gps.time_valid);
+    assert(status.snapshot().gps.unix_time_seconds == 1893456000U);
 
     // This unread sentence belongs to the old session and must be discarded.
     serial.push('F');
@@ -74,6 +80,17 @@ int main()
     assert(status.snapshot().gps.state == lilyshark::GpsState::Searching);
     assert(status.snapshot().gps.receiver_detected);
     assert(!status.snapshot().gps.position_valid);
+    assert(!status.snapshot().gps.time_valid);
+
+    // RMC time can be valid before a position fix; the wall clock (and so the
+    // witness anchor) must not wait for satellites the sidecar never reads.
+    serial.push('T');
+    hardware_status_fake::now_ms = 350U;
+    status.poll();
+    assert(status.snapshot().gps.state == lilyshark::GpsState::Searching);
+    assert(!status.snapshot().gps.position_valid);
+    assert(status.snapshot().gps.time_valid);
+    assert(status.snapshot().gps.unix_time_seconds == 1893455970U);
 
     serial.push('F');
     hardware_status_fake::now_ms = 400U;
