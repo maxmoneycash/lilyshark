@@ -4,7 +4,7 @@ title: 'Anchor on publish: browser publishes must register on-chain'
 area: ui
 size: M
 priority: P0
-status: doing
+status: done
 eval:
   auto:
   - grep -rn 'capture_registry' webapp/api webapp/services | grep -qi register

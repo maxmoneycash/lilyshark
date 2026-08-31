@@ -4,7 +4,7 @@ title: 'IO graph on TRAFFIC: the capture on one clock'
 area: ui
 size: M
 priority: P1
-status: todo
+status: done
 depends_on:
 - UI-003
 eval:

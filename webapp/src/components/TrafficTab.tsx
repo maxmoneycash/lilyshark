@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import uPlot from "uplot";
+import "uplot/dist/uPlot.min.css";
 import {
 	captureByteLength,
 	captureElapsedMs,
@@ -15,6 +17,7 @@ import {
 	disconnectDeviceLink,
 	useDeviceLink,
 } from "../lib/deviceLink";
+import { buildCsv, buildJson, buildLoraTapPcap } from "../lib/export";
 import { type FramePredicate, parseFrameFilter } from "../lib/frameFilter";
 import {
 	findShelbyPointer,
@@ -30,18 +33,31 @@ import {
 import {
 	APTOS_EXPLORER_ACCOUNT,
 	aptosExplorerAccount,
+	aptosExplorerTxn,
 	CAPTURE_REGISTRY,
 	CAPTURE_REGISTRY_URL,
 	DEMO_BLOB,
 	fetchAnchor,
 	fetchBlob as fetchBlobBytes,
 	fetchUploadInfo,
+	type PublishAnchor,
 	type PublishResult,
 	publishCapture,
 	resolveByCommitment,
 	type UploadServiceInfo,
 } from "../lib/shelby";
+import {
+	applyBrush,
+	assembleExportView,
+	type BrushRange,
+	brushLabel,
+	buildIoSeries,
+	exportFileName,
+	normalizeBrush,
+	pcapExclusionNote,
+} from "../lib/trafficView";
 import { demoNextFrame, isDemo } from "../mesh/demo";
+import { fg, useThemeTick } from "../mesh/theme";
 import { startTrafficDemoInterval } from "./trafficDemo";
 
 /** The live table stops growing here; old frames age out on the left. */
@@ -64,6 +80,56 @@ const fmtFreq = (hz: number) =>
 
 const crcClass = (c: LscapFrame["crc"]) =>
 	c === "valid" ? "ok" : c === "invalid" ? "err" : "dim";
+
+/** Canvas height of the IO graph strip, in CSS pixels. */
+const IO_GRAPH_HEIGHT = 140;
+
+const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/**
+ * The on-chain anchor outcome of a publish, one honest line per state
+ * (.wave-notes/ui-002-integration.md). A failed or skipped anchor is NOT a
+ * publish error — the blob is on Shelby either way — so it renders here as
+ * a not-anchored state and never routes through publishError.
+ */
+function AnchorStatus({ anchor }: { anchor: PublishAnchor | undefined }) {
+	if (anchor === undefined)
+		// Server predates anchoring: unknown is the only honest word.
+		return <span className="dim">anchor status unknown</span>;
+	if (anchor.status === "anchored") {
+		if (anchor.txHash)
+			return (
+				<span className="ok">
+					anchored on-chain by {shortAddr(anchor.publisher)} ·{" "}
+					<a
+						href={aptosExplorerTxn(anchor.txHash)}
+						target="_blank"
+						rel="noreferrer"
+					>
+						TXN {anchor.txHash.slice(0, 10)}… ON EXPLORER
+					</a>
+				</span>
+			);
+		// txHash is null only when the service found this commitment already in
+		// its registry; the original tx hash is not retained, so the link goes
+		// to the publisher account instead.
+		return (
+			<span className="ok">
+				already anchored (earlier publish of the same capture) ·{" "}
+				<a
+					href={aptosExplorerAccount(anchor.publisher)}
+					target="_blank"
+					rel="noreferrer"
+				>
+					PUBLISHER ON EXPLORER
+				</a>
+			</span>
+		);
+	}
+	if (anchor.status === "failed")
+		return <span className="warn">not anchored — {anchor.reason}</span>;
+	return <span className="dim">not anchored ({anchor.reason})</span>;
+}
 
 /* ── display-filter ⇄ URL hash ─────────────────────────────────────────
  * The filter text lives in the hash as `#traffic?filter=…` so a filtered
@@ -137,6 +203,10 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 			const c = parseLscap(buf);
 			setCapture(c);
 			setName(from);
+			// A new capture is a new clock: a brush or export note from the old
+			// one would describe frames that are no longer on screen.
+			setBrush(null);
+			setExportNote(null);
 			// Land on the most interesting frame: the first one carrying a Shelby
 			// pointer, so the decoded pointer detail is on screen from the start.
 			const ptrIdx = c.frames.findIndex((fr) => findShelbyPointer(fr.bytes));
@@ -566,8 +636,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	}, [filterText]);
 	const filterError = filterParse.ok ? null : filterParse.error;
 
-	/** Indices into `frames` that pass the applied filter — the table rows. */
-	const shown = useMemo(() => {
+	/** Indices into `frames` that pass the applied text filter. */
+	const filterShown = useMemo(() => {
 		if (!applied) return frames.map((_, i) => i);
 		const idx: number[] = [];
 		for (let i = 0; i < frames.length; i++) {
@@ -575,6 +645,21 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		}
 		return idx;
 	}, [frames, pointers, applied]);
+
+	// ── time brush ─────────────────────────────────────────────────────
+	// A range brushed on the IO graph is one more predicate over the text
+	// filter's output: the graph plots the FILTERED set, the table shows the
+	// filtered-and-brushed set, and clearing the brush restores the filter's
+	// rows exactly. Times are seconds on the capture clock (first frame = 0),
+	// the same clock the table's TIME column reads.
+	const [brush, setBrush] = useState<BrushRange | null>(null);
+	const t0 = frames.length ? frames[0].timestampUs : 0n;
+
+	/** The table rows: text filter ∘ brush. */
+	const shown = useMemo(
+		() => applyBrush(filterShown, frames, t0, brush),
+		[filterShown, frames, t0, brush],
+	);
 	const shownFrames = useMemo(
 		() => shown.map((i) => frames[i]),
 		[shown, frames],
@@ -597,7 +682,212 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		setSelected(shown[0] ?? -1);
 	}, [selectedVisible, shown]);
 
-	const t0 = frames.length ? frames[0].timestampUs : 0n;
+	// ── IO graph (UI-005) ──────────────────────────────────────────────
+	// One strip over the capture clock: packet rate, mean SNR, CRC-failure
+	// marks, fed from the FILTERED frame set so it re-renders with the
+	// display filter. Binned in lib/trafficView so 5,000 frames collapse to
+	// a few hundred plotted points. Nothing here animates — uPlot draws each
+	// state directly and the collapse is instant — so prefers-reduced-motion
+	// is honored by construction.
+	const [ioOpen, setIoOpen] = useState(true);
+	const ioDiv = useRef<HTMLDivElement>(null);
+	const ioPlot = useRef<uPlot | null>(null);
+	const themeTick = useThemeTick();
+	const ioFrames = useMemo(
+		() => filterShown.map((i) => frames[i]),
+		[filterShown, frames],
+	);
+	const ioSeries = useMemo(() => buildIoSeries(ioFrames, t0), [ioFrames, t0]);
+	// The brush survives a plot rebuild (live frames, theme change) but must
+	// not itself rebuild the plot — read through a ref, redrawn after build.
+	const brushRef = useRef(brush);
+	brushRef.current = brush;
+
+	const clearBrush = () => {
+		setBrush(null);
+		ioPlot.current?.setSelect({ left: 0, width: 0, top: 0, height: 0 }, false);
+	};
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: themeTick is the repaint trigger — the canvas paints with fg(), which reads the theme imperatively
+	useEffect(() => {
+		const box = ioDiv.current;
+		ioPlot.current?.destroy();
+		ioPlot.current = null;
+		if (!box || !ioOpen || ioSeries.xs.length === 0) return;
+		// Semantic colors come from the theme's CSS vars; the canvas cannot
+		// read them, so they are resolved here from the box itself.
+		const errColor =
+			getComputedStyle(box).getPropertyValue("--err").trim() || "#ff3b30";
+		const u = new uPlot(
+			{
+				width: Math.max(100, box.clientWidth),
+				height: IO_GRAPH_HEIGHT,
+				// Dragging brushes — it must never zoom, or "clear" could not
+				// honestly promise to restore the table.
+				cursor: { drag: { x: true, y: false, setScale: false }, y: false },
+				scales: { x: { time: false }, rate: {}, snr: {} },
+				series: [
+					{},
+					{
+						label: "FRAMES/S",
+						scale: "rate",
+						stroke: fg(),
+						width: 1.5,
+						points: { show: false },
+					},
+					{
+						label: "SNR dB",
+						scale: "snr",
+						stroke: fg("77"),
+						width: 1,
+						points: { show: false },
+						spanGaps: true,
+					},
+					{
+						label: "CRC FAIL/S",
+						scale: "rate",
+						stroke: errColor,
+						// Marks, not a line: a failure is an event on the clock.
+						paths: () => null,
+						points: { show: true, size: 6, fill: errColor },
+					},
+				],
+				axes: [
+					{
+						stroke: fg("88"),
+						grid: { stroke: fg("22"), dash: [2, 6] },
+						ticks: { stroke: fg("44") },
+						font: "11px JetBrains Mono",
+					},
+					{
+						scale: "rate",
+						stroke: fg("88"),
+						grid: { stroke: fg("22"), dash: [2, 6] },
+						ticks: { stroke: fg("44") },
+						font: "11px JetBrains Mono",
+						size: 40,
+					},
+					{
+						scale: "snr",
+						side: 1,
+						stroke: fg("77"),
+						grid: { show: false },
+						ticks: { stroke: fg("44") },
+						font: "11px JetBrains Mono",
+						size: 40,
+					},
+				],
+				legend: { show: false },
+				hooks: {
+					setSelect: [
+						(self) => {
+							// A drag with width brushes; a bare click clears.
+							const a = self.posToVal(self.select.left, "x");
+							const b = self.posToVal(
+								self.select.left + self.select.width,
+								"x",
+							);
+							setBrush(self.select.width > 0 ? normalizeBrush(a, b) : null);
+						},
+					],
+				},
+			},
+			[ioSeries.xs, ioSeries.rate, ioSeries.snr, ioSeries.crcFail],
+			box,
+		);
+		// uPlot's stock selection overlay is a light-theme gray; repaint it in
+		// the theme's own ink so the brushed range is visible on dark ground.
+		const sel = u.root.querySelector<HTMLElement>(".u-select");
+		if (sel) sel.style.background = fg("2e");
+		// Redraw the standing brush onto the fresh canvas without re-firing
+		// the hook (the second argument), or every rebuild would loop.
+		const b = brushRef.current;
+		if (b) {
+			const left = u.valToPos(b.startS, "x");
+			const right = u.valToPos(b.endS, "x");
+			u.setSelect(
+				{
+					left,
+					width: Math.max(0, right - left),
+					top: 0,
+					height: u.bbox.height / devicePixelRatio,
+				},
+				false,
+			);
+		}
+		ioPlot.current = u;
+		return () => {
+			ioPlot.current?.destroy();
+			ioPlot.current = null;
+		};
+	}, [ioSeries, ioOpen, themeTick]);
+
+	// Canvas is sized in pixels once; follow the panel through resizes.
+	useEffect(() => {
+		const box = ioDiv.current;
+		if (!box || !ioOpen || typeof ResizeObserver === "undefined") return;
+		const ro = new ResizeObserver(() => {
+			ioPlot.current?.setSize({
+				width: Math.max(100, box.clientWidth),
+				height: IO_GRAPH_HEIGHT,
+			});
+		});
+		ro.observe(box);
+		return () => ro.disconnect();
+	}, [ioOpen]);
+
+	// ── export of the current view (UI-006) ────────────────────────────
+	// pcap/CSV/JSON of exactly what the table shows: text filter ∘ brush.
+	// Saved through the same object-URL mechanism as the .lscap download.
+	const [exportNote, setExportNote] = useState<{
+		text: string;
+		warn: boolean;
+	} | null>(null);
+
+	const saveFile = (part: BlobPart, fileName: string, type: string) => {
+		const url = URL.createObjectURL(new Blob([part], { type }));
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = fileName;
+		a.click();
+		URL.revokeObjectURL(url);
+	};
+
+	const onExport = (kind: "pcap" | "csv" | "json") => {
+		if (!capture) return;
+		const view = assembleExportView(frames, shown);
+		const fileName = exportFileName(
+			name,
+			{ filtered: applied !== null, brushed: brush !== null },
+			kind,
+		);
+		if (kind === "pcap") {
+			const res = buildLoraTapPcap(view);
+			saveFile(
+				res.bytes.slice().buffer as ArrayBuffer,
+				fileName,
+				"application/vnd.tcpdump.pcap",
+			);
+			// The counts are surfaced whether or not anything was excluded —
+			// a pcap silently missing frames would be a lie about the air.
+			setExportNote({
+				text: `${fileName} · ${pcapExclusionNote(res)}`,
+				warn: res.excludedSynthetic + res.excludedUnencodable > 0,
+			});
+		} else {
+			const body = kind === "csv" ? buildCsv(view) : buildJson(view);
+			saveFile(
+				body,
+				fileName,
+				kind === "csv" ? "text/csv" : "application/json",
+			);
+			setExportNote({
+				text: `${fileName} · ${view.frames.length} frame(s) written`,
+				warn: false,
+			});
+		}
+	};
+
 	const f = frames[selected];
 	const ptr = f ? pointers[selected] : null;
 
@@ -686,6 +976,35 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							if (x) void openFile(x);
 						}}
 					/>
+					{/* Export the CURRENT VIEW — text filter ∘ brush — not the file. */}
+					{capture && (
+						<>
+							<button
+								type="button"
+								onClick={() => onExport("pcap")}
+								disabled={busy || shown.length === 0}
+								title="LoRaTap DLT-270 pcap of the shown frames (synthetic frames cannot ride along)"
+							>
+								⭳ PCAP
+							</button>
+							<button
+								type="button"
+								onClick={() => onExport("csv")}
+								disabled={busy || shown.length === 0}
+								title="Decoded columns of the shown frames, RFC 4180"
+							>
+								⭳ CSV
+							</button>
+							<button
+								type="button"
+								onClick={() => onExport("json")}
+								disabled={busy || shown.length === 0}
+								title="Decoded columns of the shown frames, one object per frame"
+							>
+								⭳ JSON
+							</button>
+						</>
+					)}
 					<input
 						placeholder="shelby blob name_"
 						value={blob}
@@ -703,6 +1022,20 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 				</div>
 
 				{error && <div className="panel-foot err">{error}</div>}
+
+				{/* What the last export actually wrote — including, honestly, what
+				    pcap had to leave out. */}
+				{exportNote && (
+					<div className="panel-foot">
+						<span className={exportNote.warn ? "warn" : "ok"}>
+							EXPORT · {exportNote.text}
+						</span>
+						<span className="spacer" />
+						<button type="button" onClick={() => setExportNote(null)}>
+							DISMISS
+						</button>
+					</div>
+				)}
 
 				{/* What the capture is, and where its chain of custody would live. */}
 				{haveCapture && (
@@ -792,6 +1125,39 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 								</>
 							)}
 						</span>
+						{/* The anchor is the publish's second half: did the service
+						    also register this capture's commitment on-chain? Rendered
+						    per state (see AnchorStatus) — a publish with a failed
+						    anchor is still a successful publish. */}
+						{published && (
+							<>
+								<span className="k">ANCHOR</span>
+								<span className="v">
+									<AnchorStatus anchor={published.publish.anchor} />
+									{published.publish.commitment && (
+										<>
+											{" "}
+											<button
+												type="button"
+												disabled={resolving}
+												title="Run the full resolve trace on the capture just published"
+												onClick={() => {
+													const p = published.publish;
+													if (p.commitment)
+														void runResolve({
+															owner: p.owner,
+															commitment: p.commitment,
+															sizeBytes: p.size,
+														});
+												}}
+											>
+												{resolving ? "RESOLVING…" : "⇓ RESOLVE THIS PUBLISH"}
+											</button>
+										</>
+									)}
+								</span>
+							</>
+						)}
 					</div>
 				)}
 
@@ -893,7 +1259,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 								[
 									[
 										"FRAMES",
-										applied ? (
+										applied || brush ? (
 											// The strip must say it is reading a subset, or its
 											// numbers would quietly stop describing the capture.
 											<span className="ok" key="filtered">
@@ -903,6 +1269,25 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 											stats.frames
 										),
 									],
+									// The brushed range reads in the same seconds as the
+									// TIME column; ✕ restores the un-brushed table.
+									...((brush
+										? [
+												[
+													"TIME BRUSH",
+													<span className="ok" key="brush">
+														{brushLabel(brush)}{" "}
+														<button
+															type="button"
+															onClick={clearBrush}
+															title="Clear the brushed time range"
+														>
+															✕
+														</button>
+													</span>,
+												],
+											]
+										: []) as [string, ReactNode][]),
 									["PAYLOAD", <>{stats.bytes.toLocaleString()} B</>],
 									[
 										"CRC",
@@ -1020,6 +1405,64 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							</div>
 						)}
 
+						{/* IO graph: the (filtered) capture on one clock. Fixed height,
+						    canvas clipped inside its box — no scrollbars ever. Drag on
+						    the plot to brush a time range into the table. */}
+						<div
+							style={{
+								borderBottom: "1px solid var(--border)",
+								flexShrink: 0,
+							}}
+						>
+							<div
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: 10,
+									padding: "4px 12px",
+								}}
+							>
+								<span
+									className="dim"
+									style={{ fontSize: 10, letterSpacing: 1 }}
+								>
+									IO GRAPH{applied ? " · FILTERED SET" : ""}
+								</span>
+								{ioOpen && (
+									<span className="dim" style={{ fontSize: 10 }}>
+										FRAMES/S · <span style={{ opacity: 0.6 }}>SNR dB</span> ·{" "}
+										<span className="err">● CRC FAIL</span> · drag to brush
+									</span>
+								)}
+								<span className="spacer" />
+								<button
+									type="button"
+									onClick={() => setIoOpen((v) => !v)}
+									title={ioOpen ? "Collapse the IO graph" : "Show the IO graph"}
+								>
+									{ioOpen ? "▾ HIDE" : "▸ IO GRAPH"}
+								</button>
+							</div>
+							{ioOpen &&
+								(ioSeries.xs.length > 0 ? (
+									<div
+										ref={ioDiv}
+										style={{
+											height: IO_GRAPH_HEIGHT,
+											overflow: "hidden",
+											padding: "0 8px",
+										}}
+									/>
+								) : (
+									<div
+										className="dim"
+										style={{ padding: "4px 12px 8px", fontSize: 11 }}
+									>
+										nothing to plot — no frames pass the filter
+									</div>
+								))}
+						</div>
+
 						<div className="scroll-y" ref={tableRef}>
 							<div className="scroll-x">
 								<table className="grid">
@@ -1124,10 +1567,16 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 												</tr>
 											);
 										})}
-										{applied && shown.length === 0 && (
+										{(applied || brush) && shown.length === 0 && (
 											<tr>
 												<td colSpan={10} className="dim">
-													no frames match the filter — {frames.length} hidden
+													no frames match the{" "}
+													{applied && brush
+														? "filter and time range"
+														: applied
+															? "filter"
+															: "brushed time range"}{" "}
+													— {frames.length} hidden
 												</td>
 											</tr>
 										)}
@@ -1137,9 +1586,10 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 						</div>
 
 						<div className="panel-foot">
-							{applied ? (
+							{applied || brush ? (
 								<span className="ok">
 									FILTERED {shown.length}/{frames.length} FRAMES
+									{brush && ` · ${brushLabel(brush)}`}
 								</span>
 							) : (
 								<>{frames.length} FRAMES</>
