@@ -1,0 +1,186 @@
+{
+	"comment": "Byte fixtures for the Reticulum-over-RNode dissector, extracted from the firmware C++ tests. Entries marked 'constructed' were built from the flag layout in src/core/reticulum_decoder.cpp because no C++ test pins those exact bytes. 'expect' keys compare against ReticulumDissection fields; hex strings compare as numbers.",
+	"fixtures": [
+		{
+			"name": "header-one-plain-data",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumRNodeHeaderOneAndTwo (header_one_bytes)",
+			"hex": "a00802000102030405060708090a0b0c0d0e0f006869",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"rnodeShim": "0xa0",
+				"splitFrame": false,
+				"ifacProtected": false,
+				"headerType": 1,
+				"destinationType": 2,
+				"packetType": 0,
+				"hops": 2,
+				"transportIdPrefix": null,
+				"destinationHashPrefix": "0x00010203",
+				"context": 0,
+				"payloadOffset": 20,
+				"payloadLength": 2,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "header-two-transport-single-data",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumRNodeHeaderOneAndTwo (header_two_bytes)",
+			"hex": "b05003101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f09010203",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "encrypted-payload",
+			"expect": {
+				"rnodeShim": "0xb0",
+				"headerType": 2,
+				"transportPacket": true,
+				"destinationType": 0,
+				"packetType": 0,
+				"hops": 3,
+				"transportIdPrefix": "0x10111213",
+				"destinationHashPrefix": "0x20212223",
+				"context": "0x09",
+				"payloadOffset": 36,
+				"payloadLength": 3,
+				"encrypted": true
+			}
+		},
+		{
+			"name": "ifac-protected",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (ifac_bytes)",
+			"hex": "c08000000000000000000000000000000000000000",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "encrypted-payload",
+			"expect": {
+				"rnodeShim": "0xc0",
+				"splitFrame": false,
+				"ifacProtected": true,
+				"headerType": null,
+				"packetType": null,
+				"payloadOffset": 1,
+				"payloadLength": 20,
+				"encrypted": true
+			}
+		},
+		{
+			"name": "split-frame",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (split_bytes)",
+			"hex": "d10802",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"rnodeShim": "0xd1",
+				"splitFrame": true,
+				"rnsFlags": null,
+				"headerType": null,
+				"payloadOffset": 1,
+				"payloadLength": 2,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "shim-only",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (shim_only_bytes)",
+			"hex": "a0",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "short-header-one",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_header_one_bytes)",
+			"hex": "a00802",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "short-header-two",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_header_two_bytes)",
+			"hex": "a04002",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "excessive-hops",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (excessive_hops_bytes)",
+			"hex": "a008800000000000000000000000000000000000",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "short-ifac",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_ifac_bytes)",
+			"hex": "a08000",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "announce",
+			"source": "constructed — HEADER_1 SINGLE/ANNOUNCE flags (0x01) per the masks in src/core/reticulum_decoder.cpp; announces are cleartext by protocol rule (payloadIsClear) and this payload is below the announce fixed length, so structurally this stays header-only (semantic announce parsing is UI-013)",
+			"hex": "a00101303132333435363738393a3b3c3d3e3f00deadbeef",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "advertisement",
+			"expect": {
+				"headerType": 1,
+				"destinationType": 0,
+				"packetType": 1,
+				"hops": 1,
+				"destinationHashPrefix": "0x30313233",
+				"payloadOffset": 20,
+				"payloadLength": 4,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "link-request",
+			"source": "constructed — HEADER_1 SINGLE/LINK REQUEST flags (0x02); link requests are cleartext by protocol rule (payloadIsClear in src/core/reticulum_decoder.cpp)",
+			"hex": "a00200404142434445464748494a4b4c4d4e4f00aabb",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "control",
+			"expect": {
+				"packetType": 2,
+				"destinationType": 0,
+				"hops": 0,
+				"payloadOffset": 20,
+				"payloadLength": 2,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "proof-resource-proof-context",
+			"source": "constructed — HEADER_1 SINGLE/PROOF flags (0x03) with context 0x05 (RESOURCE PROOF), which payloadIsClear in src/core/reticulum_decoder.cpp treats as cleartext",
+			"hex": "a00301505152535455565758595a5b5c5d5e5f05cc",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "control",
+			"expect": {
+				"packetType": 3,
+				"context": "0x05",
+				"payloadOffset": 20,
+				"payloadLength": 1,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "shelby-pointer-payload",
+			"source": "test/shelby_registry/test_shelby_registry.cpp makeReticulumFrameWithPointer / nestedPointerEnrichesMeshCoreAndReticulum",
+			"hex": "a00802000102030405060708090a0b0c0d0e0f0053484c420105202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f0010000000b33f7100000100",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"headerType": 1,
+				"destinationType": 2,
+				"packetType": 0,
+				"payloadOffset": 20,
+				"payloadLength": 82,
+				"encrypted": false
+			},
+			"expectShelby": { "offset": 20, "sizeBytes": 4096, "chunkCount": 1 }
+		}
+	]
+}

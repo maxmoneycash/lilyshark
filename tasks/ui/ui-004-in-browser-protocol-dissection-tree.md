@@ -4,7 +4,7 @@ title: In-browser protocol dissection tree
 area: ui
 size: L
 priority: P1
-status: todo
+status: doing
 eval:
   auto:
   - test -d webapp/src/lib/dissect
