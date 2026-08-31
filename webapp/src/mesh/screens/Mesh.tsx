@@ -129,7 +129,9 @@ export default function Mesh() {
 	const [sel, setSel] = useState<number | undefined>();
 	const [reload, setReload] = useState(0);
 	const [vista, setVista] = useState<"grafo" | "actividad">("grafo");
-	const [act, setAct] = useState<{ node: number; hhmm: number; n: number }[]>(
+	const [act, setAct] = useState<
+		{ node: number; hourBucket: number; n: number }[]
+	>(
 		[],
 	);
 	const [actHoras, setActHoras] = useState(48);
@@ -202,7 +204,7 @@ export default function Mesh() {
 		let max = 1;
 		for (const r of act) {
 			const m = porNodo.get(r.node) ?? new Map<number, number>();
-			m.set(r.hhmm, (m.get(r.hhmm) ?? 0) + r.n);
+			m.set(r.hourBucket, (m.get(r.hourBucket) ?? 0) + r.n);
 			porNodo.set(r.node, m);
 			if (r.n > max) max = r.n;
 		}

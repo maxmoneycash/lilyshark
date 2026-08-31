@@ -4,7 +4,7 @@ title: Make the webapp typecheck-clean, and keep it that way
 area: ui
 size: S
 priority: P1
-status: todo
+status: done
 eval:
   auto:
   - cd webapp && pnpm exec tsc --noEmit

@@ -489,20 +489,24 @@ async function readAvailable(candidate: SerialPort): Promise<void> {
   const decoder = new TextDecoder();
   let pending = '';
   while (reading) {
-    if (!activeReader) {
+    // Local alias: teardown() clears the module-level activeReader from
+    // another task, so TypeScript cannot keep it narrowed across the awaits.
+    let reader = activeReader;
+    if (!reader) {
       const readable = candidate.readable;
       if (!readable) return;
       try {
-        activeReader = readable.getReader();
+        reader = readable.getReader();
       } catch {
         return;
       }
+      activeReader = reader;
     }
     try {
-      const { value, done } = await activeReader.read();
+      const { value, done } = await reader.read();
       if (done) {
         try {
-          activeReader.releaseLock();
+          reader.releaseLock();
         } catch {
           /* already released */
         }
@@ -519,7 +523,7 @@ async function readAvailable(candidate: SerialPort): Promise<void> {
       }
     } catch {
       try {
-        activeReader.releaseLock();
+        reader.releaseLock();
       } catch {
         /* already released */
       }
@@ -600,15 +604,23 @@ async function openAndWait(candidate: SerialPort): Promise<HandshakeResult> {
   });
 }
 
+/** True when a disconnect flipped the link off. A function call, not a direct
+ *  read: set() reassigns the module-level state during openAndWait/teardown,
+ *  which TypeScript's narrowing cannot see, so an inline second comparison
+ *  would be flagged as having no overlap with the first. */
+function linkTurnedOff(): boolean {
+  return state.status === 'off';
+}
+
 /** Open one port and ask it to identify. Survives the ESP32-S3 USB reboot
  *  that almost always happens on the first open. */
 async function attemptPort(candidate: SerialPort): Promise<boolean> {
   for (let attempt = 0; attempt < HANDSHAKE_MAX_ATTEMPTS; attempt++) {
-    if (state.status === 'off') return false;
+    if (linkTurnedOff()) return false;
     const result = await openAndWait(candidate);
     if (result === 'linked') return true;
     await teardown();
-    if (state.status === 'off') return false;
+    if (linkTurnedOff()) return false;
     const action = nextSerialAction({
       event: result === 'timeout' ? 'timeout' : 'stream-drop',
       deliberate: false,

@@ -1,0 +1,39 @@
+name: Webapp
+
+# Vite builds do not typecheck, so `tsc --noEmit` is the only gate that keeps
+# latent compiler errors from accumulating in the webapp (UI-018).
+
+on:
+  push:
+    branches: [main]
+    paths: ['webapp/**', '.github/workflows/webapp.yml']
+  pull_request:
+    paths: ['webapp/**', '.github/workflows/webapp.yml']
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: webapp/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
