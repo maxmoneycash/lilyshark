@@ -4,7 +4,7 @@ title: Decrypt Meshtastic default-channel payloads in the browser
 area: ui
 size: M
 priority: P1
-status: todo
+status: doing
 depends_on:
 - UI-004
 eval:

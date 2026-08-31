@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
@@ -17,6 +17,15 @@ import {
 	disconnectDeviceLink,
 	useDeviceLink,
 } from "../lib/deviceLink";
+import type { FrameDissection } from "../lib/dissect/registry";
+import { dissectFrame } from "../lib/dissect/registry";
+import {
+	deepestRowAt,
+	flattenTree,
+	profileProtocolHint,
+	treeKeyNav,
+} from "../lib/dissect/tree";
+import type { NodeTone } from "../lib/dissect/types";
 import { buildCsv, buildJson, buildLoraTapPcap } from "../lib/export";
 import { type FramePredicate, parseFrameFilter } from "../lib/frameFilter";
 import {
@@ -30,6 +39,13 @@ import {
 	RF_FIELD,
 	summarize,
 } from "../lib/lscap";
+import {
+	type CaptureRef,
+	permalinkHash,
+	readPermalink,
+	splitHash,
+	updateHashParams,
+} from "../lib/permalink";
 import {
 	APTOS_EXPLORER_ACCOUNT,
 	aptosExplorerAccount,
@@ -131,32 +147,354 @@ function AnchorStatus({ anchor }: { anchor: PublishAnchor | undefined }) {
 	return <span className="dim">not anchored ({anchor.reason})</span>;
 }
 
-/* ── display-filter ⇄ URL hash ─────────────────────────────────────────
- * The filter text lives in the hash as `#traffic?filter=…` so a filtered
- * view is one link. TerminalApp's deep links are plain `#traffic` /
- * `#resolve` tokens, so the base token is kept verbatim and only the
- * query part after `?` belongs to us — non-destructive in both
- * directions. Written with replaceState: typing a filter is not a
- * navigation, and must not scroll or grow history. */
-
-function readHashFilter(): string {
-	const h = window.location.hash;
-	const q = h.indexOf("?");
-	if (q < 0) return "";
-	return new URLSearchParams(h.slice(q + 1)).get("filter") ?? "";
+/**
+ * Copy-a-permalink affordance (UI-007): one button that copies the link and
+ * says so. Where the clipboard is unavailable (permissions, older WebViews)
+ * the link itself appears in a selectable input instead — never a dead end.
+ */
+function PermalinkAction({ url }: { url: string }) {
+	const [state, setState] = useState<"idle" | "copied" | "shown">("idle");
+	useEffect(() => {
+		if (state !== "copied") return;
+		const id = setTimeout(() => setState("idle"), 2000);
+		return () => clearTimeout(id);
+	}, [state]);
+	return (
+		<>
+			<button
+				type="button"
+				title={url}
+				onClick={() => {
+					if (navigator.clipboard?.writeText) {
+						navigator.clipboard.writeText(url).then(
+							() => setState("copied"),
+							() => setState("shown"),
+						);
+					} else {
+						setState("shown");
+					}
+				}}
+			>
+				{state === "copied" ? "✓ LINK COPIED" : "⧉ PERMALINK"}
+			</button>
+			{state === "shown" && (
+				<input
+					readOnly
+					value={url}
+					style={{ width: 220 }}
+					onFocus={(e) => e.currentTarget.select()}
+				/>
+			)}
+		</>
+	);
 }
 
-function writeHashFilter(text: string): void {
+/* ── dissection tree pane (UI-004) ──────────────────────────────────────
+ * The selected frame's dissectFrame tree, one node per line, over an
+ * interactive hex dump. Hover or select a node and its byte range lights
+ * up in the hex; hover a hex byte and the deepest visible node covering it
+ * lights up in the tree. All pure tree logic lives in lib/dissect/tree. */
+
+interface ByteRange {
+	offset: number;
+	length: number;
+}
+
+/** Tones mark limits of decoding (types.ts); map them to the terminal ink. */
+const toneClass = (tone: NodeTone | undefined): string =>
+	tone === "error"
+		? "err"
+		: tone === "encrypted"
+			? "warn"
+			: tone !== undefined
+				? "dim"
+				: "";
+
+const inRange = (r: ByteRange | null, i: number): boolean =>
+	r !== null && i >= r.offset && i < r.offset + r.length;
+
+/** Above this size the hex pane drops per-byte spans and interactivity. */
+const HEX_INTERACTIVE_LIMIT = 4096;
+
+/**
+ * Hex dump with per-byte highlight, 8 bytes per row (the 360px detail pane
+ * fits it without a horizontal scrollbar, where the classic 16 did not).
+ */
+function HexPane({
+	bytes,
+	highlight,
+	onHoverByte,
+}: {
+	bytes: Uint8Array;
+	highlight: ByteRange | null;
+	onHoverByte: (i: number | null) => void;
+}) {
+	const [hot, setHot] = useState<number | null>(null);
+	if (bytes.length === 0)
+		return <pre style={{ margin: 0 }}>no payload captured</pre>;
+	if (bytes.length > HEX_INTERACTIVE_LIMIT)
+		return <pre style={{ margin: 0 }}>{hexDump(bytes, 8)}</pre>;
+
+	const mark = (i: number) => ({
+		...(inRange(highlight, i)
+			? { background: "var(--fg)", color: "var(--bg)" }
+			: null),
+		...(hot === i ? { textDecoration: "underline" } : null),
+	});
+	const rows: ReactNode[] = [];
+	for (let off = 0; off < bytes.length; off += 8) {
+		const n = Math.min(8, bytes.length - off);
+		const cells: ReactNode[] = [];
+		const ascii: ReactNode[] = [];
+		for (let j = 0; j < n; j++) {
+			const i = off + j;
+			const b = bytes[i];
+			cells.push(
+				// biome-ignore lint/a11y/noStaticElementInteractions: hover-only hex inspection; the tree rows are the accessible path to the same byte ranges
+				<span
+					key={i}
+					style={mark(i)}
+					onMouseEnter={() => {
+						setHot(i);
+						onHoverByte(i);
+					}}
+				>
+					{b.toString(16).padStart(2, "0")}
+				</span>,
+			);
+			if (j < n - 1) cells.push(" ");
+			ascii.push(
+				<span key={i} style={mark(i)}>
+					{b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : "."}
+				</span>,
+			);
+		}
+		rows.push(
+			<div key={off}>
+				<span className="dim">{off.toString(16).padStart(6, "0")}</span>
+				{"  "}
+				{cells}
+				{" ".repeat((8 - n) * 3)}
+				{"  "}
+				{ascii}
+			</div>,
+		);
+	}
+	return (
+		<pre
+			style={{ margin: 0 }}
+			onMouseLeave={() => {
+				setHot(null);
+				onHoverByte(null);
+			}}
+		>
+			{rows}
+		</pre>
+	);
+}
+
+/**
+ * The dissection pane: decrypt state (UI-011), the expandable tree, and the
+ * hex dump it highlights. Mounted with a key per frame so expand/collapse
+ * and selection state reset with the frame they describe.
+ */
+function DissectPane({
+	bytes,
+	dissection,
+}: {
+	bytes: Uint8Array;
+	dissection: FrameDissection;
+}) {
+	const primary = dissection.primary;
+	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+	// Roving tab stop and pinned hex highlight; always a visible row.
+	const [activePath, setActivePath] = useState("0");
+	const [hoverPath, setHoverPath] = useState<string | null>(null);
+	const [hoverByte, setHoverByte] = useState<number | null>(null);
+	const treeRef = useRef<HTMLDivElement>(null);
+
+	const rows = useMemo(
+		() => flattenTree(primary.root, collapsed),
+		[primary, collapsed],
+	);
+	const activeRow = rows.find((r) => r.path === activePath) ?? rows[0];
+
+	const toggle = (path: string, dir?: "expand" | "collapse") => {
+		setCollapsed((prev) => {
+			const next = new Set(prev);
+			const want = dir ?? (next.has(path) ? "expand" : "collapse");
+			if (want === "expand") next.delete(path);
+			else next.add(path);
+			return next;
+		});
+	};
+
+	const focusRow = (path: string) => {
+		setActivePath(path);
+		requestAnimationFrame(() => {
+			treeRef.current
+				?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`)
+				?.focus();
+		});
+	};
+
+	const onRowKeyDown = (e: ReactKeyboardEvent, path: string) => {
+		const nav = treeKeyNav(rows, path, e.key);
+		if (!nav) return;
+		e.preventDefault();
+		if (nav.toggle) toggle(nav.path, nav.toggle);
+		if (nav.path !== path) focusRow(nav.path);
+		else setActivePath(nav.path);
+	};
+
+	// Hex hover lights the deepest visible node covering that byte.
+	const hexHitPath =
+		hoverByte !== null ? (deepestRowAt(rows, hoverByte)?.path ?? null) : null;
+
+	// Tree hover is a transient highlight over the pinned selection.
+	const hoverRow =
+		hoverPath !== null ? rows.find((r) => r.path === hoverPath) : undefined;
+	const rangeOf = (row: typeof activeRow): ByteRange | null =>
+		row && row.node.byteLength > 0
+			? { offset: row.node.byteOffset, length: row.node.byteLength }
+			: null;
+	const highlight = rangeOf(hoverRow ?? activeRow);
+
+	// Decrypt state, said out loud (UI-011). Only Meshtastic frames attempt
+	// decryption here, and only with the published default channel PSK; the
+	// tree's own node labels carry the same words.
+	const meshtasticPayload =
+		primary.protocol === "Meshtastic" &&
+		primary.fields !== null &&
+		primary.fields.payloadLength > 0
+			? primary.fields
+			: null;
+
+	return (
+		<>
+			<div className="panel-title">
+				DISSECTION · {primary.protocol.toUpperCase()}
+				<span className="spacer" />
+				<span className={primary.result === "malformed" ? "err" : "dim"}>
+					{primary.state}
+				</span>
+			</div>
+			{meshtasticPayload && (
+				<div style={{ padding: "6px 12px 0", fontSize: 11 }}>
+					{meshtasticPayload.defaultKeyReadable ? (
+						<span className="ok">
+							DECRYPTED · AES-128-CTR under the published Meshtastic default
+							channel PSK — this traffic was never private
+						</span>
+					) : (
+						<span className="warn">
+							CIPHERTEXT · not readable with the published default channel PSK
+							(private key or non-default traffic) — payload stays raw bytes
+						</span>
+					)}
+				</div>
+			)}
+			<div
+				role="tree"
+				aria-label="protocol dissection"
+				ref={treeRef}
+				style={{ padding: "6px 0" }}
+			>
+				{rows.map((row) => {
+					const active = row.path === activeRow?.path;
+					const hexHit = row.path === hexHitPath;
+					return (
+						<div
+							key={row.path}
+							role="treeitem"
+							aria-level={row.depth + 1}
+							aria-expanded={row.hasChildren ? row.expanded : undefined}
+							aria-selected={active}
+							data-path={row.path}
+							tabIndex={active ? 0 : -1}
+							title={
+								row.node.byteLength > 0
+									? `bytes ${row.node.byteOffset}–${row.node.byteOffset + row.node.byteLength - 1}`
+									: undefined
+							}
+							onClick={() => setActivePath(row.path)}
+							onKeyDown={(e) => onRowKeyDown(e, row.path)}
+							onMouseEnter={() => setHoverPath(row.path)}
+							onMouseLeave={() =>
+								setHoverPath((p) => (p === row.path ? null : p))
+							}
+							style={{
+								display: "flex",
+								gap: 6,
+								alignItems: "baseline",
+								padding: `2px 12px 2px ${12 + row.depth * 14}px`,
+								cursor: "pointer",
+								fontSize: 12,
+								lineHeight: "16px",
+								...(active
+									? { background: "var(--fg)", color: "var(--bg)" }
+									: hexHit
+										? { background: "var(--border)" }
+										: null),
+							}}
+						>
+							<span
+								aria-hidden
+								style={{ width: 10, flexShrink: 0 }}
+								onClick={(e) => {
+									// The glyph is a pointer shortcut; ArrowLeft/Right and
+									// Enter are the accessible way to the same toggle.
+									if (!row.hasChildren) return;
+									e.stopPropagation();
+									setActivePath(row.path);
+									toggle(row.path);
+								}}
+							>
+								{row.hasChildren ? (row.expanded ? "▾" : "▸") : ""}
+							</span>
+							<span className={active ? undefined : toneClass(row.node.tone)}>
+								{row.node.label}
+								{row.node.value !== undefined && (
+									<span className={active ? undefined : "dim"}>
+										{" "}
+										· {row.node.value}
+									</span>
+								)}
+							</span>
+						</div>
+					);
+				})}
+			</div>
+
+			<div className="panel-title">RAW BYTES</div>
+			<div style={{ padding: "8px 12px", overflowX: "auto" }}>
+				<HexPane
+					bytes={bytes}
+					highlight={highlight}
+					onHoverByte={setHoverByte}
+				/>
+			</div>
+		</>
+	);
+}
+
+/* ── URL hash query bag ────────────────────────────────────────────────
+ * The view's shareable state lives in the hash: `filter=` (UI-003) plus
+ * the permalink params `blob=` / `commit=` / `owner=` / `frame=` (UI-007).
+ * TerminalApp's deep links are plain `#traffic` / `#resolve` tokens, so
+ * the base token is kept verbatim and only the query part after `?`
+ * belongs to us — non-destructive in both directions (lib/permalink owns
+ * the arithmetic). Written with replaceState: typing a filter or clicking
+ * a frame is not a navigation, and must not scroll or grow history. */
+
+function readHashFilter(): string {
+	return splitHash(window.location.hash).params.get("filter") ?? "";
+}
+
+/** Apply `updates` to the hash's query bag in place; null deletes a param. */
+function writeHashParams(updates: Record<string, string | null>): void {
 	const h = window.location.hash;
-	const q = h.indexOf("?");
-	const base = q >= 0 ? h.slice(0, q) : h;
-	const params = new URLSearchParams(q >= 0 ? h.slice(q + 1) : "");
-	if (text) params.set("filter", text);
-	else params.delete("filter");
-	const qs = params.toString();
-	// No hash grows one only when there is something to say; an empty filter
-	// never plants `#traffic` on a URL that did not have it.
-	const next = qs ? `${base || "#traffic"}?${qs}` : base;
+	const next = updateHashParams(h, updates);
 	if (next === h) return;
 	history.replaceState(
 		null,
@@ -198,19 +536,54 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		if (!demoActive) setLive(false);
 	}, [demoActive]);
 
-	const load = (buf: ArrayBuffer, from: string) => {
+	// ── permalinks (UI-007) ───────────────────────────────────────────────
+	// The hash a visitor arrived with, read once: a capture reference decides
+	// what the boot effect opens, and `frame=` names the frame to land on
+	// (consumed by the first load that can honor it).
+	const bootPermalink = useRef(
+		readPermalink(window.location.hash, DEMO_BLOB.owner),
+	);
+	const pendingFrame = useRef<number | null>(bootPermalink.current.frame);
+	const scrollToSelected = useRef(false);
+	/** Where the open capture lives on Shelby — null for a local, unpublished
+	 *  capture, which therefore has no permalink until it is published. */
+	const [captureRef, setCaptureRef] = useState<CaptureRef | null>(
+		bootPermalink.current.ref,
+	);
+
+	const load = (
+		buf: ArrayBuffer,
+		from: string,
+		ref: CaptureRef | null = null,
+	) => {
 		try {
 			const c = parseLscap(buf);
 			setCapture(c);
 			setName(from);
+			setCaptureRef(ref);
 			// A new capture is a new clock: a brush or export note from the old
 			// one would describe frames that are no longer on screen.
 			setBrush(null);
 			setExportNote(null);
-			// Land on the most interesting frame: the first one carrying a Shelby
+			// A permalink names its frame by sequence number; otherwise land on
+			// the most interesting frame — the first one carrying a Shelby
 			// pointer, so the decoded pointer detail is on screen from the start.
-			const ptrIdx = c.frames.findIndex((fr) => findShelbyPointer(fr.bytes));
-			setSelected(ptrIdx >= 0 ? ptrIdx : 0);
+			const want = pendingFrame.current;
+			pendingFrame.current = null;
+			const wantIdx =
+				want !== null
+					? c.frames.findIndex((fr) => Number(fr.sequence) === want)
+					: -1;
+			if (wantIdx >= 0) {
+				setSelected(wantIdx);
+				scrollToSelected.current = true;
+			} else {
+				const ptrIdx = c.frames.findIndex((fr) => findShelbyPointer(fr.bytes));
+				setSelected(ptrIdx >= 0 ? ptrIdx : 0);
+			}
+			// The frame param survives only when this load honored it; any other
+			// load would leave a stale frame= describing the previous capture.
+			writeHashParams({ frame: wantIdx >= 0 ? String(want) : null });
 			// Live frames continue the capture's own numbering; a jump from 23 to
 			// 1000 read as a glitch, not a stream.
 			liveSeq.current =
@@ -222,11 +595,40 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 			);
 		} catch (e) {
 			setCapture(null);
+			setCaptureRef(null);
 			setError(
 				e instanceof LscapParseError ? e.message : "not a .lscap capture",
 			);
 		}
 	};
+
+	// The address bar itself carries the capture reference, so the URL of a
+	// resolved or published capture IS its permalink; a local capture clears
+	// the ref rather than leaving a stale link in the bar. The owner is
+	// omitted when it is the demo account — readPermalink fills it back in.
+	useEffect(() => {
+		if (!captureRef) {
+			writeHashParams({ blob: null, commit: null, owner: null });
+			return;
+		}
+		const defaultOwner =
+			captureRef.owner.toLowerCase() === DEMO_BLOB.owner.toLowerCase();
+		if (captureRef.kind === "commit") {
+			writeHashParams({
+				commit: captureRef.commitment,
+				owner: defaultOwner ? null : captureRef.owner,
+				blob: null,
+			});
+		} else {
+			writeHashParams({
+				blob: defaultOwner
+					? captureRef.name
+					: `${captureRef.owner}/${captureRef.name}`,
+				commit: null,
+				owner: null,
+			});
+		}
+	}, [captureRef]);
 
 	const openFile = async (f: File) => {
 		setBusy(true);
@@ -308,6 +710,16 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 			const bytes = captureToLscap(session);
 			const res = await publishCapture(bytes, captureFileName(session));
 			setPublished({ publish: res, verified: "pending" });
+			// The capture opened at STOP now has an address on Shelby — carry it
+			// as the permalink, but only while the viewer still shows this
+			// session's capture (the user may have opened another file since).
+			if (name === captureFileName(session) && res.owner) {
+				setCaptureRef(
+					res.commitment
+						? { kind: "commit", owner: res.owner, commitment: res.commitment }
+						: { kind: "blob", owner: res.owner, name: res.blobName },
+				);
+			}
 			// Prove the loop instead of asserting it: read the blob back from the
 			// Shelby RPC and compare every byte with what was just sent.
 			try {
@@ -341,26 +753,38 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	}, [haveCapture, uploadInfo]);
 
 	/**
-	 * Fetch a capture straight from the Shelby RPC. Accepts "owner/blob/name"
-	 * or a bare blob name, which reads from the demo blob's account.
+	 * Fetch a capture straight from the Shelby RPC by owner + object name —
+	 * the FETCH button and the `blob=` permalink share this one path, so a
+	 * link opens exactly the way a typed name does.
 	 */
-	const fetchBlob = async () => {
-		const n = blob.trim();
-		if (!n) return;
+	const openBlobRef = async (owner: string, name: string) => {
 		setBusy(true);
 		setError(null);
 		setLive(false);
 		try {
-			const [owner, name] = n.startsWith("0x")
-				? [n.slice(0, n.indexOf("/")), n.slice(n.indexOf("/") + 1)]
-				: [DEMO_BLOB.owner, n];
-			load(await fetchBlobBytes(owner, name), name);
+			load(await fetchBlobBytes(owner, name), name, {
+				kind: "blob",
+				owner,
+				name,
+			});
 		} catch (e) {
 			setCapture(null);
 			setError(e instanceof Error ? e.message : "fetch failed");
 		} finally {
 			setBusy(false);
 		}
+	};
+
+	/** The FETCH input: "0x<owner>/<name>" or a bare name on the demo account. */
+	const fetchBlob = async () => {
+		const n = blob.trim();
+		if (!n) return;
+		const slash = n.indexOf("/");
+		const [owner, name] =
+			n.startsWith("0x") && slash > 0
+				? [n.slice(0, slash), n.slice(slash + 1)]
+				: [DEMO_BLOB.owner, n];
+		await openBlobRef(owner, name);
 	};
 
 	/**
@@ -387,16 +811,29 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	// session. A second attempt here raced the header CONNECT button and
 	// held the USB CDC port while the board was rebooting.
 
-	// Shared by the selected frame's RESOLVE and the device link's pointer
-	// hand-off: both are the same walk from coordinates to opened capture.
+	// Shared by the selected frame's RESOLVE, the device link's pointer
+	// hand-off, and the `commit=` permalink: all are the same walk from
+	// coordinates to opened capture. A pointer knows the blob size it
+	// promised; a permalink does not, so the size check falls back to the
+	// indexer's own record and the trace says which it used.
 	const runResolve = async (p: {
 		owner: string;
 		commitment: string;
-		sizeBytes: number;
+		sizeBytes?: number;
 	}) => {
 		setLive(false);
 		const steps: TraceStep[] = [
-			{ label: "POINTER", detail: `82 B decoded from the frame`, state: "ok" },
+			p.sizeBytes !== undefined
+				? {
+						label: "POINTER",
+						detail: `82 B decoded from the frame`,
+						state: "ok",
+					}
+				: {
+						label: "PERMALINK",
+						detail: "capture reference from the link",
+						state: "ok",
+					},
 			{ label: "INDEXER", detail: "commitment → object name…", state: "run" },
 		];
 		const show = () => setTrace([...steps]);
@@ -436,12 +873,15 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 				detail: `${bytes.byteLength.toLocaleString()} B · ${Math.round(performance.now() - t0)} ms`,
 				state: "ok",
 			};
-			const sizeOk = bytes.byteLength === p.sizeBytes;
+			const expectedSize = p.sizeBytes ?? found.sizeBytes;
+			const sizeSource =
+				p.sizeBytes !== undefined ? "pointer" : "indexer record";
+			const sizeOk = bytes.byteLength === expectedSize;
 			steps.push({
 				label: "VERIFY",
 				detail: sizeOk
-					? `size matches the pointer: ${p.sizeBytes.toLocaleString()} B`
-					: `size mismatch: pointer said ${p.sizeBytes.toLocaleString()} B`,
+					? `size matches the ${sizeSource}: ${expectedSize.toLocaleString()} B`
+					: `size mismatch: ${sizeSource} said ${expectedSize.toLocaleString()} B`,
 				state: sizeOk ? "ok" : "err",
 			});
 			steps.push({
@@ -477,7 +917,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 			show();
 
 			keepTrace.current = true;
-			load(bytes, found.name);
+			load(bytes, found.name, {
+				kind: "commit",
+				owner: p.owner,
+				commitment: p.commitment,
+			});
 			steps.push({ label: "OPENED", detail: `${found.name}`, state: "ok" });
 			show();
 		} catch (e) {
@@ -547,12 +991,32 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		}
 	};
 
-	// The bundled capture opens itself: an analyzer that lands on an empty panel
-	// shows nothing about what it does, and the sample costs one small fetch.
-	// Anything the user opens afterwards replaces it as usual.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: mount-only — the sample opens itself exactly once
+	// Boot: a permalink's capture reference opens through the exact path a
+	// user would drive by hand — `commit=` runs the full resolve trace,
+	// `blob=` the plain RPC fetch. Without one, the bundled capture opens
+	// itself: an analyzer that lands on an empty panel shows nothing about
+	// what it does, and the sample costs one small fetch. Anything the user
+	// opens afterwards replaces it as usual. Guarded by a ref because
+	// StrictMode runs mount effects twice in dev and a resolve must not
+	// double-trace.
+	const bootRan = useRef(false);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: mount-only — the boot capture opens exactly once
 	useEffect(() => {
-		void openSample();
+		if (bootRan.current) return;
+		bootRan.current = true;
+		const ref = bootPermalink.current.ref;
+		if (ref) {
+			// The link says exactly what to open; the #resolve token's auto-play
+			// must not fire a second resolve on top of it.
+			autoResolveRef.current = false;
+		}
+		if (ref?.kind === "commit") {
+			void runResolve({ owner: ref.owner, commitment: ref.commitment });
+		} else if (ref?.kind === "blob") {
+			void openBlobRef(ref.owner, ref.name);
+		} else {
+			void openSample();
+		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -632,7 +1096,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		);
 	}, [filterParse, filterText]);
 	useEffect(() => {
-		writeHashFilter(filterText);
+		writeHashParams({ filter: filterText || null });
 	}, [filterText]);
 	const filterError = filterParse.ok ? null : filterParse.error;
 
@@ -679,8 +1143,35 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	const selectedVisible = shown.includes(selected);
 	useEffect(() => {
 		if (selectedVisible) return;
-		setSelected(shown[0] ?? -1);
-	}, [selectedVisible, shown]);
+		const next = shown[0] ?? -1;
+		setSelected(next);
+		// A URL already naming a frame keeps naming the one on screen; a URL
+		// that never carried frame= is not grown by a passive snap.
+		if (splitHash(window.location.hash).params.has("frame")) {
+			const fr = next >= 0 ? frames[next] : undefined;
+			writeHashParams({ frame: fr ? String(Number(fr.sequence)) : null });
+		}
+	}, [selectedVisible, shown, frames]);
+
+	/** User-driven selection: the row and the URL's `frame=` move together. */
+	const selectFrame = (i: number) => {
+		setSelected(i);
+		const fr = frames[i];
+		writeHashParams({ frame: fr ? String(Number(fr.sequence)) : null });
+	};
+
+	// A permalink's frame must land on screen, not just be selected: scroll
+	// the row into view once, after the load that consumed `frame=`.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: selected is the trigger; the effect only reads refs
+	useEffect(() => {
+		if (!scrollToSelected.current) return;
+		scrollToSelected.current = false;
+		requestAnimationFrame(() => {
+			tableRef.current
+				?.querySelector("tr.sel")
+				?.scrollIntoView({ block: "center" });
+		});
+	}, [selected]);
 
 	// ── IO graph (UI-005) ──────────────────────────────────────────────
 	// One strip over the capture clock: packet rate, mean SNR, CRC-failure
@@ -890,6 +1381,57 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 
 	const f = frames[selected];
 	const ptr = f ? pointers[selected] : null;
+
+	// ── dissection tree (UI-004) ───────────────────────────────────────
+	// The selected frame through the registry's profile-gated dissectors.
+	// The hint comes from the frame's own capture profile — the dissector
+	// never guesses a protocol the radio did not name.
+	const dissection = useMemo(
+		() =>
+			f
+				? dissectFrame(
+						f.bytes,
+						profileProtocolHint(
+							hasField(f, RF_FIELD.profile) ? f.profileId : null,
+						),
+						{ truncated: f.truncated },
+					)
+				: null,
+		[f],
+	);
+
+	// The permalink for exactly what is on screen: capture reference plus the
+	// selected frame and the applied filter (UI-007). Null while the open
+	// capture has no address on Shelby.
+	const permalinkUrl = useMemo(
+		() =>
+			captureRef
+				? `${window.location.origin}${window.location.pathname}${permalinkHash(
+						captureRef,
+						{
+							frame: f ? Number(f.sequence) : null,
+							filter: applied?.text,
+							defaultOwner: DEMO_BLOB.owner,
+						},
+					)}`
+				: null,
+		[captureRef, f, applied],
+	);
+
+	// The published capture's own permalink, shown beside the publish result —
+	// prefer the commitment (what the on-chain anchor vouches for) over the
+	// blob name. Null while nothing is published or the owner never parsed.
+	const publishedPermalink = useMemo(() => {
+		if (!published || !published.publish.owner) return null;
+		const p = published.publish;
+		const ref: CaptureRef = p.commitment
+			? { kind: "commit", owner: p.owner, commitment: p.commitment }
+			: { kind: "blob", owner: p.owner, name: p.blobName };
+		return `${window.location.origin}${window.location.pathname}${permalinkHash(
+			ref,
+			{ defaultOwner: DEMO_BLOB.owner },
+		)}`;
+	}, [published]);
 
 	return (
 		<main>
@@ -1106,6 +1648,12 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 									>
 										OWNER ON APTOS EXPLORER
 									</a>
+									{publishedPermalink && (
+										<>
+											{" · "}
+											<PermalinkAction url={publishedPermalink} />
+										</>
+									)}
 								</>
 							) : (
 								<>
@@ -1487,7 +2035,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 												<tr
 													key={i}
 													className={i === selected ? "sel" : undefined}
-													onClick={() => setSelected(i)}
+													onClick={() => selectFrame(i)}
 													// Roving tabIndex: the selected row is the table's one
 													// tab stop, arrows walk the *visible* rows. Filtering
 													// or clearing never drops the table out of the tab
@@ -1512,12 +2060,12 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 																next !== undefined &&
 																sib instanceof HTMLTableRowElement
 															) {
-																setSelected(next);
+																selectFrame(next);
 																sib.focus();
 															}
 														} else if (e.key === "Enter" || e.key === " ") {
 															e.preventDefault();
-															setSelected(i);
+															selectFrame(i);
 														}
 													}}
 													style={{ cursor: "pointer" }}
@@ -1604,6 +2152,19 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							)}
 							{shownFrames.some((fr) => fr.truncated) && (
 								<span className="dim">* = FRAME TRUNCATED AT CAPTURE</span>
+							)}
+							<span className="spacer" />
+							{/* One link to exactly this view (UI-007) — or the honest
+							    alternative: a local capture has no address to link to. */}
+							{permalinkUrl ? (
+								<PermalinkAction url={permalinkUrl} />
+							) : (
+								<span
+									className="dim"
+									title="A permalink needs an address on Shelby — publish this capture (or open one by blob name or pointer) and the link appears here"
+								>
+									NO PERMALINK — PUBLISH TO GET A LINK
+								</span>
 							)}
 						</div>
 					</>
@@ -1717,14 +2278,15 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							</>
 						)}
 
-						<div className="panel-title">RAW BYTES</div>
-						<div style={{ padding: "8px 12px", overflowX: "auto" }}>
-							<pre style={{ margin: 0 }}>
-								{/* 8 bytes per row: the 360px detail pane fits it without a
-                    horizontal scrollbar, where the classic 16 did not. */}
-								{f.capturedLength ? hexDump(f.bytes, 8) : "no payload captured"}
-							</pre>
-						</div>
+						{dissection && (
+							// Keyed per frame so tree expansion, node selection and hex
+							// hover always describe the frame on screen.
+							<DissectPane
+								key={`${selected}·${Number(f.sequence)}`}
+								bytes={f.bytes}
+								dissection={dissection}
+							/>
+						)}
 					</div>
 				</div>
 			)}

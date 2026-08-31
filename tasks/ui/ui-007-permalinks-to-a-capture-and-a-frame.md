@@ -4,7 +4,7 @@ title: Permalinks to a capture and a frame
 area: ui
 size: M
 priority: P1
-status: todo
+status: done
 eval:
   rubric:
   - 'A published capture has a stable URL (blob name or commitment) that opens TRAFFIC on it; #frame=N
