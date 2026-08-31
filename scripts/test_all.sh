@@ -174,6 +174,11 @@ build_and_run simulate_source \
   src/shelby/shelby_pointer.cpp \
   test/simulate_source/test_simulate_source.cpp
 
+build_and_run meshcore_tx \
+  src/core/meshcore_encode.cpp \
+  src/core/meshcore_decoder.cpp \
+  test/meshcore_tx/test_meshcore_tx.cpp
+
 build_and_run meshtastic_payload \
   src/crypto/aes128.cpp \
   src/core/meshtastic_payload.cpp \

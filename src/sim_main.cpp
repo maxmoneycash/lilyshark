@@ -55,6 +55,7 @@
 #include "lilyshark/export/lilyshark_capture.h"
 #include "lilyshark/export/pcap_loratap.h"
 #include "lilyshark/protocols/meshcore_decoder.h"
+#include "lilyshark/protocols/meshcore_encode.h"
 #include "lilyshark/protocols/meshtastic_decoder.h"
 #include "lilyshark/protocols/meshtastic_encode.h"
 #include "lilyshark/protocols/meshtastic_payload.h"
@@ -8248,6 +8249,30 @@ std::uint32_t next_meshtastic_packet_id() noexcept
     return packet_id++;
 }
 
+void ingest_transmitted_frame(const std::uint8_t *frame, std::size_t length,
+                              FrameOrigin origin) noexcept
+{
+    RawFrame raw{};
+    (void)raw.assignPayload(frame, length);
+    const RadioProfile &profile = radio_service.activeProfile();
+    raw.rf.direction = FrameDirection::Transmit;
+    raw.rf.origin = origin;
+    raw.rf.modulation = profile.modulation;
+    raw.rf.center_frequency_hz = profile.center_frequency_hz;
+    raw.rf.bandwidth_hz = profile.bandwidth_hz;
+    raw.rf.spreading_factor = profile.spreading_factor;
+    raw.rf.coding_rate_denominator = profile.coding_rate_denominator;
+    raw.rf.sync_word = profile.sync_word;
+    raw.rf.preamble_symbols = profile.preamble_symbols;
+    raw.rf.tx_power_dbm = profile.tx_power_dbm;
+    raw.rf.profile_id = profile.id;
+    raw.rf.crc = CrcStatus::Valid;
+    raw.rf.present_fields = RfFieldFrequency | RfFieldBandwidth | RfFieldSpreadingFactor |
+                            RfFieldCodingRate | RfFieldSyncWord | RfFieldPreamble | RfFieldProfile;
+    ingest_analyzer_frame(raw, profile, true);
+    live_data_dirty = true;
+}
+
 bool transmit_meshtastic(MeshtasticPort port, const char *text) noexcept
 {
     MeshtasticEncodeRequest request{};
@@ -8265,25 +8290,7 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text) noexcept
     if (n == 0) return false;
     if (!radio_service.transmit(frame, n)) return false;
 
-    RawFrame raw{};
-    (void)raw.assignPayload(frame, n);
-    const RadioProfile &profile = radio_service.activeProfile();
-    raw.rf.direction = FrameDirection::Transmit;
-    raw.rf.origin = FrameOrigin::Radio;
-    raw.rf.modulation = profile.modulation;
-    raw.rf.center_frequency_hz = profile.center_frequency_hz;
-    raw.rf.bandwidth_hz = profile.bandwidth_hz;
-    raw.rf.spreading_factor = profile.spreading_factor;
-    raw.rf.coding_rate_denominator = profile.coding_rate_denominator;
-    raw.rf.sync_word = profile.sync_word;
-    raw.rf.preamble_symbols = profile.preamble_symbols;
-    raw.rf.tx_power_dbm = profile.tx_power_dbm;
-    raw.rf.profile_id = profile.id;
-    raw.rf.crc = CrcStatus::Valid;
-    raw.rf.present_fields = RfFieldFrequency | RfFieldBandwidth | RfFieldSpreadingFactor |
-                            RfFieldCodingRate | RfFieldSyncWord | RfFieldPreamble | RfFieldProfile;
-    ingest_analyzer_frame(raw, profile, true);
-    live_data_dirty = true;
+    ingest_transmitted_frame(frame, n, FrameOrigin::Radio);
     if (text != nullptr && text[0] != '\0') {
         std::snprintf(shell_notice, sizeof(shell_notice), "TX  %.40s", text);
         char event[80]{};
@@ -8293,10 +8300,77 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text) noexcept
     return true;
 }
 
+/// Send the one MeshCore frame this firmware can put on air honestly: a v1
+/// RAW_CUSTOM flood carrying the boot-announce node id and the text. Returns
+/// nullptr on success, otherwise the LSK error reason. In simulate mode the
+/// SX1262 stays paused and the frame joins the synthetic analyzer traffic
+/// instead — sending in demo mode joins the fiction rather than failing.
+const char *transmit_meshcore_text(const char *text) noexcept
+{
+    const RadioProfile &profile = radio_service.activeProfile();
+    if (profile.protocol_hint != ProtocolId::MeshCore) return "profile-not-meshcore";
+    if (text == nullptr || text[0] == '\0') return "empty-text";
+    if (std::strlen(text) > kMeshCoreMaxRawTextBytes) return "payload-too-long";
+    std::uint8_t frame[kMaxFrameBytes]{};
+    const std::size_t n = encodeMeshCoreRawText(kLilysharkMeshCoreNodeId, text, frame,
+                                                sizeof(frame));
+    if (n == 0) return "encode-failed";
+    if (app_settings.simulate_mode) {
+        // Synthetic origin keeps the documented invariant: PCAP excludes
+        // simulated frames, the native capture keeps them marked.
+        ingest_transmitted_frame(frame, n, FrameOrigin::Synthetic);
+    } else {
+        if (!radio_service.transmit(frame, n)) return "radio-busy";
+        ingest_transmitted_frame(frame, n, FrameOrigin::Radio);
+    }
+    std::snprintf(shell_notice, sizeof(shell_notice), "TX  %.40s", text);
+    char event[80]{};
+    std::snprintf(event, sizeof(event), "TX MeshCore raw  %.44s", text);
+    record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Radio, event);
+    return nullptr;
+}
+
 void handle_mesh_tx_command(const char *line) noexcept
 {
+    if (std::strncmp(line, "LSK TX meshcore text ", 21) == 0) {
+        const char *reason = transmit_meshcore_text(line + 21);
+        if (reason == nullptr) {
+            Serial.printf("LSK OK {\"proto\":\"meshcore\",\"kind\":\"text\","
+                          "\"container\":\"raw\",\"node\":\"0x%08x\",\"sim\":%s}\n",
+                          static_cast<unsigned>(kLilysharkMeshCoreNodeId),
+                          app_settings.simulate_mode ? "true" : "false");
+            record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
+                                 "MeshCore raw text transmitted");
+        } else {
+            Serial.printf("LSK ERR {\"proto\":\"meshcore\",\"kind\":\"text\",\"reason\":\"%s\"}\n",
+                          reason);
+        }
+        return;
+    }
+    if (std::strcmp(line, "LSK TX meshcore advert") == 0) {
+        // A MeshCore advert is pubkey + timestamp + Ed25519 signature. The
+        // firmware holds no Ed25519 keypair, and fabricating those 96 bytes
+        // would put a forged identity on air. Refuse loudly instead.
+        Serial.println("LSK ERR {\"proto\":\"meshcore\",\"kind\":\"advert\","
+                       "\"reason\":\"no-identity\",\"missing\":\"ed25519-keypair\"}");
+        return;
+    }
+    if (std::strncmp(line, "LSK TX meshcore dm ", 19) == 0) {
+        // Direct messages are encrypted under an ECDH shared secret; without
+        // the keypair there is no secret to encrypt under.
+        Serial.println("LSK ERR {\"proto\":\"meshcore\",\"kind\":\"dm\","
+                       "\"reason\":\"no-identity\",\"missing\":\"ecdh-shared-secret\"}");
+        return;
+    }
+    if (std::strncmp(line, "LSK TX meshcore channel ", 24) == 0) {
+        // Group texts need the channel key and its MAC; the device stores no
+        // MeshCore channel keys (that is FW-007's ground to cover).
+        Serial.println("LSK ERR {\"proto\":\"meshcore\",\"kind\":\"channel\","
+                       "\"reason\":\"no-channel-key\"}");
+        return;
+    }
     if (std::strncmp(line, "LSK TX meshcore", 15) == 0) {
-        Serial.println("LSK ERR {\"proto\":\"meshcore\",\"reason\":\"identity-pending\"}");
+        Serial.println("LSK ERR {\"proto\":\"meshcore\",\"reason\":\"bad-tx\"}");
         return;
     }
     if (std::strncmp(line, "LSK TX meshtastic text ", 23) == 0) {

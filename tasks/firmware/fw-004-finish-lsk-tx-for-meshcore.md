@@ -4,7 +4,7 @@ title: Finish LSK TX for MeshCore
 area: firmware
 size: M
 priority: P1
-status: todo
+status: done
 eval:
   auto:
   - '! grep -rn ''identity-pending'' src/sim_main.cpp'
