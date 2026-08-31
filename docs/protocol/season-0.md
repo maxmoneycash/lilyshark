@@ -14,6 +14,7 @@ Values below marked **Season 0 parameter** are placeholders chosen
 conservatively for a first season with no usage data; they are frozen for
 this season and expected to change in Season 1 based on what Season 0
 measures.
+The machine-readable freeze of every parameter below is [season-0-rules.json](season-0-rules.json), the file the scorer (`scripts/field_receipts_score.py --rules`) pins by hash in its output.
 
 ## What counts, and what it pays
 

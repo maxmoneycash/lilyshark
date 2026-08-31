@@ -4,7 +4,7 @@ title: 'Season scorer: deterministic, reproducible, published'
 area: protocol
 size: L
 priority: P1
-status: todo
+status: done
 depends_on:
 - CO-002
 eval:
