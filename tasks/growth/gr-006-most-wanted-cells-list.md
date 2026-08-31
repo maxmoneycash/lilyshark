@@ -4,7 +4,7 @@ title: Most-wanted cells list
 area: growth
 size: S
 priority: P2
-status: todo
+status: doing
 depends_on:
 - PR-005
 eval:

@@ -93,6 +93,7 @@ the module is deployed (CO-002).
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import json
 import re
@@ -595,6 +596,199 @@ def command_fetch(args: argparse.Namespace) -> int:
     return 2
 
 
+# ------------------------------------------------------------- most wanted
+#
+# Flightradar24 publishes "most wanted receiver locations"; Hivemapper's
+# live gap map steers drivers to unmapped roads. `most-wanted` is that
+# mechanism over Field Receipts data: cells adjacent to verified activity
+# that are unsurveyed or stale, ranked so contributors know where a walk
+# is worth the most. Deterministic like `score`: same inputs, same bytes.
+
+GEOHASH32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+
+
+def geohash_decode(geohash: str) -> tuple[float, float, float, float]:
+    """Return the (lat_min, lat_max, lon_min, lon_max) box of a geohash."""
+    lat = [-90.0, 90.0]
+    lon = [-180.0, 180.0]
+    even = True
+    for ch in geohash:
+        idx = GEOHASH32.find(ch)
+        _require(idx >= 0, f"invalid geohash character {ch!r} in {geohash!r}")
+        for bit in (16, 8, 4, 2, 1):
+            rng = lon if even else lat
+            mid = (rng[0] + rng[1]) / 2
+            if idx & bit:
+                rng[0] = mid
+            else:
+                rng[1] = mid
+            even = not even
+    return lat[0], lat[1], lon[0], lon[1]
+
+
+def geohash_encode(lat: float, lon: float, length: int) -> str:
+    out = []
+    lat_rng = [-90.0, 90.0]
+    lon_rng = [-180.0, 180.0]
+    even = True
+    idx = 0
+    bits = 0
+    while len(out) < length:
+        rng, value = (lon_rng, lon) if even else (lat_rng, lat)
+        mid = (rng[0] + rng[1]) / 2
+        idx <<= 1
+        if value >= mid:
+            idx |= 1
+            rng[0] = mid
+        else:
+            rng[1] = mid
+        even = not even
+        bits += 1
+        if bits == 5:
+            out.append(GEOHASH32[idx])
+            idx = 0
+            bits = 0
+    return "".join(out)
+
+
+def geohash_neighbors(geohash: str) -> list[str]:
+    """The up-to-8 same-length neighbors, by center-shift re-encoding.
+
+    Longitude wraps at the antimeridian; a shift past a pole is dropped
+    rather than clamped, so polar cells report fewer neighbors.
+    """
+    lat_min, lat_max, lon_min, lon_max = geohash_decode(geohash)
+    lat_c = (lat_min + lat_max) / 2
+    lon_c = (lon_min + lon_max) / 2
+    dlat = lat_max - lat_min
+    dlon = lon_max - lon_min
+    neighbors = set()
+    for step_lat in (-dlat, 0.0, dlat):
+        for step_lon in (-dlon, 0.0, dlon):
+            if step_lat == 0.0 and step_lon == 0.0:
+                continue
+            lat = lat_c + step_lat
+            if not -90.0 < lat < 90.0:
+                continue
+            lon = lon_c + step_lon
+            if lon >= 180.0:
+                lon -= 360.0
+            elif lon < -180.0:
+                lon += 360.0
+            candidate = geohash_encode(lat, lon, len(geohash))
+            if candidate != geohash:
+                neighbors.add(candidate)
+    return sorted(neighbors)
+
+
+def _week_index(iso_week: str) -> int:
+    """Comparable index of an ISO week: ordinal of its Monday // 7."""
+    year, week = int(iso_week[:4]), int(iso_week[6:])
+    return datetime.date.fromisocalendar(year, week, 1).toordinal() // 7
+
+
+def build_most_wanted(events: list[dict], cell_records: list[dict],
+                      rules: dict, rules_sha256: str,
+                      stale_after_weeks: int, as_of_week: str | None,
+                      limit: int) -> dict:
+    replay = replay_onchain(events, rules)
+    anchors = replay["anchors"]
+
+    # Last verified iso_week per (geohash5, band) — verified exactly as
+    # score_cells defines it: the record's commitment is anchored by the
+    # same publisher.
+    last_week: dict[tuple[str, str], str] = {}
+    for record in cell_records:
+        anchor = anchors.get(record["commitment"])
+        if anchor is None or anchor[2] != record["publisher"]:
+            continue
+        cell = (record["geohash5"], record["band"])
+        if cell not in last_week or _week_index(record["iso_week"]) > \
+                _week_index(last_week[cell]):
+            last_week[cell] = record["iso_week"]
+
+    if as_of_week is None and last_week:
+        as_of_week = max(last_week.values(), key=_week_index)
+    _require(as_of_week is not None,
+             "no verified cell records and no --as-of week given")
+    as_of_idx = _week_index(as_of_week)
+
+    def is_active(cell: tuple[str, str]) -> bool:
+        week = last_week.get(cell)
+        return week is not None and as_of_idx - _week_index(week) < stale_after_weeks
+
+    active = sorted(c for c in last_week if is_active(c))
+    wanted: dict[tuple[str, str], int] = {}
+    for geohash5, band in active:
+        for neighbor in geohash_neighbors(geohash5):
+            cell = (neighbor, band)
+            if is_active(cell):
+                continue
+            wanted[cell] = wanted.get(cell, 0) + 1
+
+    def rank(item):
+        (geohash5, band), adjacent = item
+        week = last_week.get((geohash5, band))
+        # Never-surveyed outranks stale at equal adjacency; then stalest.
+        surveyed = 0 if week is None else 1
+        staleness = 0 if week is None else -(as_of_idx - _week_index(week))
+        return (-adjacent, surveyed, staleness, geohash5, band)
+
+    rows = [{
+        "geohash5": geohash5,
+        "band": band,
+        "adjacent_active_cells": adjacent,
+        "last_surveyed_week": last_week.get((geohash5, band)),
+    } for (geohash5, band), adjacent in sorted(wanted.items(), key=rank)[:limit]]
+
+    return {
+        "method": {
+            "generator": "scripts/field_receipts_score.py most-wanted",
+            "rules_season": rules.get("season"),
+            "rules_sha256": rules_sha256,
+            "as_of_week": as_of_week,
+            "stale_after_weeks": stale_after_weeks,
+            "active_cell_count": len(active),
+            "verified_cell_count": len(last_week),
+        },
+        "most_wanted": rows,
+    }
+
+
+def command_most_wanted(args: argparse.Namespace) -> int:
+    rules, rules_sha256 = load_rules(args.rules)
+    events = load_events(args.events)
+    cell_records = load_cell_records(args.cells) if args.cells else []
+    _require(args.stale_after_weeks >= 1, "--stale-after-weeks must be >= 1")
+    if args.as_of is not None:
+        _require(bool(ISO_WEEK_RE.match(args.as_of)),
+                 f"--as-of: expected 'YYYY-Www', got {args.as_of!r}")
+    output = build_most_wanted(events, cell_records, rules, rules_sha256,
+                               args.stale_after_weeks, args.as_of, args.limit)
+    if args.markdown:
+        method = output["method"]
+        lines = [
+            f"# Most-wanted cells — week {method['as_of_week']}",
+            "",
+            f"Cells adjacent to verified activity with no verified capture "
+            f"in the last {method['stale_after_weeks']} weeks. Generated by "
+            f"`{method['generator']}` from public receipts; re-run it to "
+            f"dispute it.",
+            "",
+            "| Cell | Band | Adjacent active | Last surveyed |",
+            "| --- | --- | ---: | --- |",
+        ]
+        for row in output["most_wanted"]:
+            lines.append(
+                f"| `{row['geohash5']}` | {row['band']} "
+                f"| {row['adjacent_active_cells']} "
+                f"| {row['last_surveyed_week'] or 'never'} |")
+        sys.stdout.write("\n".join(lines) + "\n")
+    else:
+        sys.stdout.write(json.dumps(output, indent=2, sort_keys=True) + "\n")
+    return 0
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Score a Field Receipts season from public chain events."
@@ -621,6 +815,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "season-0-rules.json, the Season 0 freeze)",
     )
     score.set_defaults(func=command_score)
+
+    wanted = commands.add_parser(
+        "most-wanted",
+        help="rank unsurveyed or stale cells adjacent to verified activity "
+        "(deterministic JSON, or --markdown for the published list)",
+    )
+    wanted.add_argument("--events", type=Path, required=True,
+                        help="JSON extract of chain events")
+    wanted.add_argument("--cells", type=Path, default=None,
+                        help="capture sidecar metadata (cell records)")
+    wanted.add_argument("--rules", type=Path, default=DEFAULT_RULES,
+                        help="pinned season rules JSON")
+    wanted.add_argument("--stale-after-weeks", type=int, default=4,
+                        help="a cell with no verified capture in this many "
+                        "weeks counts as wanted (default 4)")
+    wanted.add_argument("--as-of", type=str, default=None,
+                        help="ISO week 'YYYY-Www' to evaluate at (default: "
+                        "the latest verified record's week, for determinism)")
+    wanted.add_argument("--limit", type=int, default=50,
+                        help="maximum cells listed (default 50)")
+    wanted.add_argument("--markdown", action="store_true",
+                        help="emit the human-readable list instead of JSON")
+    wanted.set_defaults(func=command_most_wanted)
 
     fetch = commands.add_parser(
         "fetch",
