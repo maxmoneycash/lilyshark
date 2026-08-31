@@ -447,6 +447,10 @@ struct ChatLine {
     bool mine = false;
     /// The peer's radio confirmed delivery of this exact packet.
     bool acked = false;
+    /// Arrived through the internet bridge rather than over the air. Shown on
+    /// the line, because a message that did not cross the radio must never
+    /// read like one that did.
+    bool via_net = false;
 };
 struct ChatPeer {
     std::uint32_t node = 0xffffffffU;
@@ -521,6 +525,8 @@ struct MapPopup {
     double lat = 0.0;
     double lon = 0.0;
     bool has_position = false;
+    /// Only ever heard through the internet bridge, never on this radio.
+    bool via_net = false;
 };
 MapPopup map_popup{};
 
@@ -767,7 +773,10 @@ struct ChatArchiveHeader {
 constexpr std::uint32_t kChatArchiveMagic = 0x4C534348UL;  // "LSCH"
 // v2: ChatLine gained delivery state. A v1 archive has a different record
 // size and is refused, which costs one saved conversation once.
-constexpr std::uint16_t kChatArchiveVersion = 2U;
+// v3: ChatLine records whether a message arrived over the air or over the
+// internet bridge. A v2 archive has a different record size and is refused,
+// which costs one saved conversation once.
+constexpr std::uint16_t kChatArchiveVersion = 3U;
 constexpr std::size_t kChatArchiveSize = sizeof(ChatArchiveHeader) + sizeof(chat_log);
 
 /// The log as bytes. Kept apart from the NVS call so the round trip can be
@@ -801,13 +810,14 @@ bool decode_chat_archive(const std::uint8_t *bytes, std::size_t size) noexcept
 
 void chat_push(const char *from, const char *text, bool mine,
                std::uint32_t peer = 0xffffffffU, const char *when = nullptr,
-               std::uint32_t pending_id = 0) noexcept
+               std::uint32_t pending_id = 0, bool via_net = false) noexcept
 {
     if (from == nullptr || text == nullptr || text[0] == '\0') return;
     const std::size_t slot = (chat_log_start + chat_log_count) % kChatLogCapacity;
     ChatLine &line = chat_log[slot];
     line.pending_id = pending_id;
     line.acked = false;
+    line.via_net = via_net;
     std::snprintf(line.from, sizeof(line.from), "%.7s", from);
     std::snprintf(line.text, sizeof(line.text), "%s", text);
     if (when != nullptr && when[0] != '\0') {
@@ -3208,8 +3218,9 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
             char range[12]{};
             format_map_range(range, sizeof(range), map_popup.range_m);
             // "BRG" is chart shorthand. The card has the width for the word.
-            std::snprintf(range_line, sizeof(range_line), "%s AWAY  BEARING %03.0f",
-                          range, map_popup.bearing_deg);
+            std::snprintf(range_line, sizeof(range_line), "%s AWAY  BEARING %03.0f%s",
+                          range, map_popup.bearing_deg,
+                          map_popup.via_net ? "  VIA NET" : "");
         } else {
             std::snprintf(range_line, sizeof(range_line), "NO POSITION REPORTED");
         }
@@ -3292,6 +3303,12 @@ struct LiveNodeSummary {
     bool has_position = false;
     double latitude_degrees = 0.0;
     double longitude_degrees = 0.0;
+    /// How this node reached us. A node we have heard on our own radio is a
+    /// neighbour; one that has only ever arrived through the internet bridge
+    /// is somebody else's neighbour, and saying so is the difference between
+    /// an instrument and a rumour.
+    bool heard_on_radio = false;
+    bool heard_via_net = false;
     // What the peer reported about itself on port 67. Absent until it sends
     // telemetry; a node that never does keeps showing "--" rather than zero.
     bool has_battery_level = false;
@@ -3356,6 +3373,11 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
         LiveNodeSummary &summary = summaries[index];
         if(contributesToNodeSummary(*record) && frameIsFromAnotherNode(*record)) {
             summary.last_seen_us = record->raw.rf.timestamp_us;
+            if (record->raw.rf.origin == FrameOrigin::Net) {
+                summary.heard_via_net = true;
+            } else {
+                summary.heard_on_radio = true;
+            }
             // A net-relayed frame carries no local measurement; writing its
             // zeros here would turn a neighbour's real signal history into
             // "+0.0" the moment one bridged frame arrived.
@@ -4401,8 +4423,16 @@ void build_nodes(lv_obj_t * parent)
         char age[10]{};
         char snr[10]{};
         format_age(age, sizeof(age), live_nodes[node_index].last_seen_us);
-        std::snprintf(snr, sizeof(snr), "%+.1f",
-                      static_cast<double>(live_nodes[node_index].latest_snr_x10) / 10.0);
+        // A node we have never heard on our own radio has no signal to report,
+        // and printing one would present somebody else's reception as ours.
+        const bool net_only = live_nodes[node_index].heard_via_net &&
+                              !live_nodes[node_index].heard_on_radio;
+        if (net_only) {
+            std::snprintf(snr, sizeof(snr), "NET");
+        } else {
+            std::snprintf(snr, sizeof(snr), "%+.1f",
+                          static_cast<double>(live_nodes[node_index].latest_snr_x10) / 10.0);
+        }
         put_clipped_label(parent,
                           live_nodes[node_index].label[0] != '\0' ? live_nodes[node_index].label : "NODE",
                           8, y, 76, value_color, &font_mono_10);
@@ -4411,7 +4441,8 @@ void build_nodes(lv_obj_t * parent)
         put_label(parent, age, 146, y,
                   node_age_color(live_nodes[node_index].last_seen_us), &font_mono_10);
         put_label(parent, snr, 184, y,
-                  selected ? theme::pink() : theme::lime(), &font_mono_10);
+                  net_only ? theme::cyan()
+                           : (selected ? theme::pink() : theme::lime()), &font_mono_10);
         // How far away a neighbour is, not merely whether they said. In the
         // field that is the question this screen exists to answer.
         char range[12]{};
@@ -8404,7 +8435,8 @@ void build_chat(lv_obj_t * parent)
             const lv_coord_t text_x = line.mine ? 58 : 14;
             const lv_coord_t text_w = line.mine ? 248 : 292;
             theme::rect(parent, line.mine ? 310 : 4, y, 6, 24,
-                        line.mine ? theme::pink() : theme::cyan());
+                        line.mine ? theme::pink()
+                                  : (line.via_net ? theme::amber() : theme::cyan()));
             char who[28]{};
             // The destination is already stated once above the log; repeating
             // ALL or PRIVATE on every line was noise, and the operator's own
@@ -8413,12 +8445,16 @@ void build_chat(lv_obj_t * parent)
             // packet; a pending direct message shows nothing extra, because
             // absence of confirmation is not an error worth shouting about.
             const char *delivery = line.mine && line.acked ? "  DELIVERED" : "";
+            // A message relayed over the internet is real traffic somebody
+            // else heard -- but it never crossed this radio, and the line has
+            // to say so where the eye already is.
+            const char *route = line.via_net ? "  VIA NET" : "";
             if (line.when[0] != '\0') {
-                std::snprintf(who, sizeof(who), "%s  %s%s", line.when,
-                              line.mine ? "YOU" : line.from, delivery);
+                std::snprintf(who, sizeof(who), "%s  %s%s%s", line.when,
+                              line.mine ? "YOU" : line.from, delivery, route);
             } else {
-                std::snprintf(who, sizeof(who), "%s%s", line.mine ? "YOU" : line.from,
-                              delivery);
+                std::snprintf(who, sizeof(who), "%s%s%s", line.mine ? "YOU" : line.from,
+                              delivery, route);
             }
             put_label(parent, who, text_x, y,
                       line.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
@@ -8864,7 +8900,8 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 const bool from_us = stored->decoded.source == localMeshtasticNodeNum();
                 if (!from_us && (broadcast || to_us)) {
                     const std::uint32_t peer = broadcast ? 0xffffffffU : stored->decoded.source;
-                    chat_push(from, chat_payload.text, false, peer);
+                    chat_push(from, chat_payload.text, false, peer, nullptr, 0U,
+                              stored->raw.rf.origin == FrameOrigin::Net);
                     chat_remember_peer(stored->decoded.source, from);
                     // Announce it. An unread badge on a screen the operator is
                     // not looking at is not a notification; this banner shows
@@ -10353,6 +10390,7 @@ void handle_touch_tap(std::uint16_t x, std::uint16_t y)
             std::snprintf(map_popup.name, sizeof(map_popup.name), "%s",
                           tapped.label[0] != '\0' ? tapped.label : "NODE");
             map_popup.has_position = tapped.has_position;
+            map_popup.via_net = tapped.heard_via_net && !tapped.heard_on_radio;
             map_popup.lat = tapped.latitude_degrees;
             map_popup.lon = tapped.longitude_degrees;
             node_selected_protocol = tapped.protocol;

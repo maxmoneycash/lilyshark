@@ -818,6 +818,12 @@ bool healthyScenario()
         if(!require(hasLabel(lv_screen_active(), "CALL") &&
                         hasLabel(lv_screen_active(), "11223344"),
                     "the net-relayed source did not reach the Nodes list")) return false;
+        // ...and it must be visible there as something that never crossed
+        // this radio. An operator seeing a bridged message rendered exactly
+        // like an over-the-air one is the failure this guards: it looks like
+        // the instrument is inventing traffic.
+        if(!require(hasLabel(lv_screen_active(), "NET"),
+                    "a node heard only over the bridge was not marked NET")) return false;
         sendKeyboard('M');
         if(!require(hasLabel(lv_screen_active(), "LAST RX"),
                     "M did not return to Home after the injection checks")) return false;
