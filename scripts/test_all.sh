@@ -91,6 +91,11 @@ build_and_run decoder_stress \
   src/core/reticulum_decoder.cpp \
   test/decoder_stress/test_decoder_stress.cpp
 
+build_and_run reticulum_announce \
+  src/core/decoder_registry.cpp \
+  src/core/reticulum_decoder.cpp \
+  test/reticulum_announce/test_reticulum_announce.cpp
+
 build_and_run profile_tuning \
   src/core/builtin_profiles.cpp \
   src/core/profile_tuning.cpp \

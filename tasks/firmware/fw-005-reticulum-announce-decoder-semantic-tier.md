@@ -4,7 +4,7 @@ title: Reticulum announce decoder, semantic tier
 area: firmware
 size: L
 priority: P1
-status: todo
+status: done
 eval:
   auto:
   - ls test | grep -q reticulum
