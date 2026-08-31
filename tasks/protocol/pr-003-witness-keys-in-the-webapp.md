@@ -4,7 +4,7 @@ title: Witness keys in the webapp
 area: protocol
 size: M
 priority: P0
-status: todo
+status: done
 depends_on:
 - PR-001
 eval:
