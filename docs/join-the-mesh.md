@@ -24,9 +24,15 @@ Requirements: Python 3 with `uv` (`pip install uv`), and the T-Deck on USB.
 The build bootstraps its own pinned PlatformIO — nothing global to install.
 
 ```sh
-./scripts/build_release.sh          # ~1 min; ends with "Release artifacts are in .../dist"
-./scripts/flash_tdeck.sh --auto     # finds the single connected USB serial device
+./scripts/build_release.sh                    # ~1 min; ends with "Release artifacts are in .../dist"
+./scripts/flash_tdeck.sh --factory --auto     # first flash on a new deck
 ```
+
+`--factory` writes the whole image and erases any saved settings, which is
+what a deck that has never run Lilyshark needs. **Afterwards, update with plain
+`./scripts/flash_tdeck.sh --auto`** — that writes only the application and
+keeps the radio profile, so an update cannot silently move a deck onto a
+different frequency from the rest of your mesh.
 
 A fresh clone builds **without map imagery** (the baked tiles are generated,
 not committed) — the map shows a georeferenced field chart instead. That is
@@ -95,6 +101,8 @@ tiles for each zoom with `scripts/fetch_satellite_map.py`, run
 
 - `heard nothing` from `listen_tdeck.py` with other nodes nearby: confirm the
   device shows `US LF 906.875` on Home; press `P` to reopen the profile picker.
+  Two decks on different profiles are on different frequencies and will never
+  hear each other, however close they are — this is the first thing to check.
 - Port busy: only one program can hold the serial port — close the web
   analyzer tab or the monitor before flashing.
 - Map all chart, no imagery: that is a fresh clone without tiles — step 3.
