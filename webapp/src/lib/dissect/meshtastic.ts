@@ -7,14 +7,18 @@
  *   34680833b88b37bbcffca0b31dffe45f29e9d35c);
  * - src/core/meshtastic_payload.cpp — the default-key payload reader.
  *
- * The payload reader applies only the *published* default channel PSK that
- * every Meshtastic radio ships with. Success proves the traffic was never
- * private; failure leaves the payload opaque, which is the honest outcome for
- * a real PSK — the outer header cannot prove whether protobuf bytes are
- * encrypted at all (an empty/zero PSK sends them in cleartext).
+ * The payload reader applies the *published* default channel PSK that every
+ * Meshtastic radio ships with, then any user-supplied channel keys (UI-011),
+ * in order. Success under the default key proves the traffic was never
+ * private; success under a user key is labeled with that key's name and
+ * claims nothing more. Failure leaves the payload opaque, which is the
+ * honest outcome for an unknown PSK — the outer header cannot prove whether
+ * protobuf bytes are encrypted at all (an empty/zero PSK sends them in
+ * cleartext).
  */
 
 import type {
+	ChannelKey,
 	DecodeState,
 	Dissection,
 	DissectNode,
@@ -79,11 +83,17 @@ export function meshtasticPortLabel(portnum: number): string {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * AES-128 counter mode — port of src/crypto/aes128.cpp.
+ * AES counter mode — port of src/crypto/aes128.cpp.
  *
  * Encryption direction only: counter mode uses the forward cipher for both
  * encrypting and decrypting. Checked against the same FIPS-197 vector the
  * firmware pins in test/meshtastic_payload/test_meshtastic_payload.cpp.
+ *
+ * The firmware ships AES-128 only (kAes128KeySize); this port additionally
+ * accepts 32-byte keys (14-round AES-256, the size Meshtastic uses for
+ * non-default channel PSKs) so user-supplied channel keys of either size can
+ * be tried in the browser. The 256-bit schedule follows FIPS-197 and is
+ * pinned against its Appendix C vectors in meshtasticCrypto.test.ts.
  * ──────────────────────────────────────────────────────────────────────── */
 
 const SBOX = new Uint8Array(256);
@@ -123,33 +133,47 @@ function xtime(x: number): number {
 	return ((x << 1) ^ (x & 0x80 ? 0x1b : 0)) & 0xff;
 }
 
-function expandKey(key: Uint8Array): Uint8Array {
-	const rk = new Uint8Array(176);
-	rk.set(key.subarray(0, 16));
-	for (let i = 16; i < 176; i += 4) {
+interface KeySchedule {
+	rk: Uint8Array;
+	rounds: number;
+}
+
+/** FIPS-197 key expansion: 16-byte key → 10 rounds, 32-byte key → 14. */
+function expandKey(key: Uint8Array): KeySchedule {
+	const nk = key.length; // 16 or 32, validated by aesCtrXcrypt
+	const rounds = nk / 4 + 6;
+	const rk = new Uint8Array(16 * (rounds + 1));
+	rk.set(key);
+	for (let i = nk; i < rk.length; i += 4) {
 		let t0 = rk[i - 4];
 		let t1 = rk[i - 3];
 		let t2 = rk[i - 2];
 		let t3 = rk[i - 1];
-		if (i % 16 === 0) {
+		if (i % nk === 0) {
 			const tmp = t0;
-			t0 = SBOX[t1] ^ RCON[i / 16];
+			t0 = SBOX[t1] ^ RCON[i / nk];
 			t1 = SBOX[t2];
 			t2 = SBOX[t3];
 			t3 = SBOX[tmp];
+		} else if (nk === 32 && i % nk === 16) {
+			// AES-256 only: an extra SubWord halfway through each key block.
+			t0 = SBOX[t0];
+			t1 = SBOX[t1];
+			t2 = SBOX[t2];
+			t3 = SBOX[t3];
 		}
-		rk[i] = rk[i - 16] ^ t0;
-		rk[i + 1] = rk[i - 15] ^ t1;
-		rk[i + 2] = rk[i - 14] ^ t2;
-		rk[i + 3] = rk[i - 13] ^ t3;
+		rk[i] = rk[i - nk] ^ t0;
+		rk[i + 1] = rk[i - nk + 1] ^ t1;
+		rk[i + 2] = rk[i - nk + 2] ^ t2;
+		rk[i + 3] = rk[i - nk + 3] ^ t3;
 	}
-	return rk;
+	return { rk, rounds };
 }
 
-function encryptBlock(rk: Uint8Array, block: Uint8Array): void {
+function encryptBlock(rk: Uint8Array, rounds: number, block: Uint8Array): void {
 	const s = block;
 	for (let i = 0; i < 16; i++) s[i] ^= rk[i];
-	for (let round = 1; round <= 10; round++) {
+	for (let round = 1; round <= rounds; round++) {
 		// SubBytes
 		for (let i = 0; i < 16; i++) s[i] = SBOX[s[i]];
 		// ShiftRows
@@ -170,7 +194,7 @@ function encryptBlock(rk: Uint8Array, block: Uint8Array): void {
 		s[11] = s[7];
 		s[7] = t;
 		// MixColumns (skipped in the final round)
-		if (round < 10) {
+		if (round < rounds) {
 			for (let c = 0; c < 16; c += 4) {
 				const a0 = s[c];
 				const a1 = s[c + 1];
@@ -189,9 +213,10 @@ function encryptBlock(rk: Uint8Array, block: Uint8Array): void {
 }
 
 /**
- * AES-128-CTR over `input`. Symmetric — the same call decrypts. Only the last
- * `counterBytes` bytes of the IV advance (big-endian), matching Meshtastic's
- * CTR<AES128> with its 4-byte counter (crypto::aesCtrXcrypt in the firmware).
+ * AES-CTR over `input` with a 16- or 32-byte key (AES-128 / AES-256).
+ * Symmetric — the same call decrypts. Only the last `counterBytes` bytes of
+ * the IV advance (big-endian), matching Meshtastic's CTR<AESxxx> with its
+ * 4-byte counter (crypto::aesCtrXcrypt in the firmware).
  */
 export function aesCtrXcrypt(
 	key: Uint8Array,
@@ -199,13 +224,16 @@ export function aesCtrXcrypt(
 	input: Uint8Array,
 	counterBytes = 4,
 ): Uint8Array {
-	const rk = expandKey(key);
+	if (key.length !== 16 && key.length !== 32) {
+		throw new RangeError(`AES key must be 16 or 32 bytes, got ${key.length}`);
+	}
+	const { rk, rounds } = expandKey(key);
 	const counter = Uint8Array.from(iv);
 	const keystream = new Uint8Array(16);
 	const output = new Uint8Array(input.length);
 	for (let offset = 0; offset < input.length; offset += 16) {
 		keystream.set(counter);
-		encryptBlock(rk, keystream);
+		encryptBlock(rk, rounds, keystream);
 		const chunk = Math.min(16, input.length - offset);
 		for (let i = 0; i < chunk; i++)
 			output[offset + i] = input[offset + i] ^ keystream[i];
@@ -248,9 +276,19 @@ interface Span {
 	length: number;
 }
 
+/**
+ * Which key produced a readable plaintext. The default PSK proves the
+ * traffic was never private; a user key proves only that the user knew the
+ * channel's secret, so labels must name the key and nothing more.
+ */
+export type MeshtasticDecryptSource =
+	| { kind: "default" }
+	| { kind: "user"; name: string; bits: 128 | 256 };
+
 interface PayloadParse {
 	fields: MeshtasticPayloadFields;
 	plain: Uint8Array;
+	source: MeshtasticDecryptSource;
 	portnumSpan: Span;
 	payloadSpan: Span | null;
 	latitudeSpan: Span | null;
@@ -481,22 +519,15 @@ function decodeText(bytes: Uint8Array, offset: number, length: number): string {
 }
 
 /**
- * Try to read ciphertext taken from immediately after the 16-byte outer
- * header under the published default key. The nonce is rebuilt the way the
- * firmware does: packet id as a 64-bit little-endian value, then the sender's
- * node number. Returns null whenever the plaintext does not parse — a wrong
- * key produces noise, and noise must never be presented as a message.
+ * CryptoEngine::initNonce — the packet id occupies a 64-bit little-endian
+ * slot (so the upper four bytes are zero for every packet a radio actually
+ * sends), followed by the sender's node number. Exported so tests can build
+ * ciphertext with the exact construction the reader reverses.
  */
-export function readMeshtasticPayload(
-	ciphertext: Uint8Array,
+export function meshtasticNonce(
 	fromNode: number,
 	packetId: number,
-): PayloadParse | null {
-	const length = ciphertext.length;
-	if (length === 0 || length > MAX_CIPHERTEXT) return null;
-
-	// CryptoEngine::initNonce — the packet id occupies a 64-bit slot, so the
-	// upper four bytes are zero for every packet a radio actually sends.
+): Uint8Array {
 	const nonce = new Uint8Array(16);
 	nonce[0] = packetId & 0xff;
 	nonce[1] = (packetId >>> 8) & 0xff;
@@ -506,11 +537,19 @@ export function readMeshtasticPayload(
 	nonce[9] = (fromNode >>> 8) & 0xff;
 	nonce[10] = (fromNode >>> 16) & 0xff;
 	nonce[11] = (fromNode >>> 24) & 0xff;
+	return nonce;
+}
 
-	const plain = aesCtrXcrypt(MESHTASTIC_DEFAULT_PSK, nonce, ciphertext);
-
-	// Parse the Data message strictly. Anything unexpected means this was not
-	// default-key traffic, and the caller must keep treating it as opaque.
+/**
+ * Parse candidate plaintext strictly as a Data message. Anything unexpected
+ * means the key that produced these bytes was wrong, and the caller must
+ * keep treating the payload as opaque — noise must never be presented as a
+ * message.
+ */
+function parseDataMessage(
+	plain: Uint8Array,
+): Omit<PayloadParse, "source"> | null {
+	const length = plain.length;
 	let portnum: number | null = null;
 	let portnumSpan: Span | null = null;
 	let payloadSpan: Span | null = null;
@@ -557,7 +596,7 @@ export function readMeshtasticPayload(
 		longName: null,
 		shortName: null,
 	};
-	const parse: PayloadParse = {
+	const parse: Omit<PayloadParse, "source"> = {
 		fields,
 		plain,
 		portnumSpan,
@@ -607,6 +646,48 @@ export function readMeshtasticPayload(
 	return parse;
 }
 
+/**
+ * Try to read ciphertext taken from immediately after the 16-byte outer
+ * header. The published default PSK is tried first — exactly the keyless
+ * behavior — then each user-supplied key in the order given (16- or 32-byte;
+ * other lengths are skipped). The first key whose plaintext parses as a Data
+ * message wins, and the result names it. Returns null when no key works — a
+ * wrong key produces noise, and noise must never be presented as a message.
+ */
+export function readMeshtasticPayload(
+	ciphertext: Uint8Array,
+	fromNode: number,
+	packetId: number,
+	userKeys: readonly ChannelKey[] = [],
+): PayloadParse | null {
+	const length = ciphertext.length;
+	if (length === 0 || length > MAX_CIPHERTEXT) return null;
+
+	const nonce = meshtasticNonce(fromNode, packetId);
+	const byDefault = parseDataMessage(
+		aesCtrXcrypt(MESHTASTIC_DEFAULT_PSK, nonce, ciphertext),
+	);
+	if (byDefault) return { ...byDefault, source: { kind: "default" } };
+
+	for (const candidate of userKeys) {
+		if (candidate.key.length !== 16 && candidate.key.length !== 32) continue;
+		const parsed = parseDataMessage(
+			aesCtrXcrypt(candidate.key, nonce, ciphertext),
+		);
+		if (parsed) {
+			return {
+				...parsed,
+				source: {
+					kind: "user",
+					name: candidate.name,
+					bits: candidate.key.length === 32 ? 256 : 128,
+				},
+			};
+		}
+	}
+	return null;
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * Outer-header dissection — port of MeshtasticDecoder::decode.
  * ──────────────────────────────────────────────────────────────────────── */
@@ -629,6 +710,12 @@ export interface MeshtasticFields {
 	payloadLength: number;
 	/** Readable under the published default key — never a broken secret. */
 	defaultKeyReadable: boolean;
+	/**
+	 * Set when a user-supplied channel key (UI-011) read the payload instead.
+	 * Mutually exclusive with defaultKeyReadable — the default PSK is always
+	 * tried first.
+	 */
+	userKey: { name: string; bits: 128 | 256 } | null;
 	payload: MeshtasticPayloadFields | null;
 }
 
@@ -640,6 +727,7 @@ export interface MeshtasticDissection extends Dissection {
 function payloadNodes(
 	bytes: Uint8Array,
 	fields: MeshtasticFields,
+	userKeys: readonly ChannelKey[],
 ): DissectNode[] {
 	const base = fields.payloadOffset;
 	const length = fields.payloadLength;
@@ -651,16 +739,21 @@ function payloadNodes(
 		bytes.subarray(base, base + length),
 		fields.source,
 		fields.packetId,
+		userKeys,
 	);
 	if (!parse) {
 		// The outer header does not prove whether the protobuf bytes are
 		// encrypted: channels with an empty/zero PSK send them in cleartext.
+		const triedKeys =
+			userKeys.length > 0
+				? `the published default key or the ${userKeys.length} supplied channel key(s) `
+				: "the published default key ";
 		return [
 			node(
 				"Payload",
 				base,
 				length,
-				`opaque — ${length} bytes, not readable with the published default key ` +
+				`opaque — ${length} bytes, not readable with ${triedKeys}` +
 					"(private PSK or non-default traffic); shown as raw bytes",
 				[],
 				"opaque",
@@ -668,7 +761,11 @@ function payloadNodes(
 		];
 	}
 
-	fields.defaultKeyReadable = true;
+	if (parse.source.kind === "default") {
+		fields.defaultKeyReadable = true;
+	} else {
+		fields.userKey = { name: parse.source.name, bits: parse.source.bits };
+	}
 	fields.payload = parse.fields;
 	const p = parse.fields;
 
@@ -760,7 +857,12 @@ function payloadNodes(
 			"Data message",
 			base,
 			length,
-			"decrypted with the published default channel key (traffic was never private)",
+			// The default key proves the traffic was never private; a user key
+			// proves only that the user knew the channel secret — the label must
+			// not claim more than that.
+			parse.source.kind === "default"
+				? "decrypted with the published default channel key (traffic was never private)"
+				: `decrypted with channel key "${parse.source.name}" (user-supplied, AES-${parse.source.bits})`,
 			children,
 		),
 	];
@@ -825,6 +927,7 @@ export function dissectMeshtastic(
 		payloadOffset: MESHTASTIC_OUTER_HEADER_LENGTH,
 		payloadLength: n - MESHTASTIC_OUTER_HEADER_LENGTH,
 		defaultKeyReadable: false,
+		userKey: null,
 		payload: null,
 	};
 
@@ -889,11 +992,11 @@ export function dissectMeshtastic(
 		};
 	}
 
-	root.children.push(...payloadNodes(bytes, fields));
+	root.children.push(...payloadNodes(bytes, fields, opts.channelKeys ?? []));
 
 	let state: DecodeState = "header-only";
 	let kind: PacketKind = "opaque-payload";
-	if (fields.defaultKeyReadable) {
+	if (fields.defaultKeyReadable || fields.userKey !== null) {
 		state = "payload-decoded";
 		kind = "data";
 	}

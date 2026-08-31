@@ -25,7 +25,7 @@ import {
 	profileProtocolHint,
 	treeKeyNav,
 } from "../lib/dissect/tree";
-import type { NodeTone } from "../lib/dissect/types";
+import type { ChannelKey, NodeTone } from "../lib/dissect/types";
 import { buildCsv, buildJson, buildLoraTapPcap } from "../lib/export";
 import { type FramePredicate, parseFrameFilter } from "../lib/frameFilter";
 import {
@@ -293,6 +293,157 @@ function HexPane({
 	);
 }
 
+/* ── user-supplied channel keys (UI-011) ────────────────────────────────
+ * Keys live ONLY in React state: never localStorage, never the URL hash,
+ * never any request. A reload clears them, and the panel says so. */
+
+/** Parse a channel key typed as hex (32/64 digits) or base64 (16/32 bytes). */
+function parseKeyText(raw: string): { key: Uint8Array } | { error: string } {
+	const text = raw.trim();
+	if (text === "") return { error: "enter the key as hex or base64" };
+	const need = "need 16 bytes (AES-128) or 32 (AES-256)";
+	if (/^(?:0x)?[0-9a-fA-F\s]+$/.test(text)) {
+		const digits = text.replace(/^0x/, "").replace(/\s+/g, "");
+		if (digits.length % 2 === 0) {
+			const bytes = new Uint8Array(digits.length / 2);
+			for (let i = 0; i < bytes.length; i++)
+				bytes[i] = Number.parseInt(digits.slice(i * 2, i * 2 + 2), 16);
+			if (bytes.length === 16 || bytes.length === 32) return { key: bytes };
+			return { error: `hex key is ${bytes.length} bytes — ${need}` };
+		}
+		// Odd digit count cannot be hex; fall through and try base64.
+	}
+	try {
+		const bin = atob(text);
+		const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+		if (bytes.length === 16 || bytes.length === 32) return { key: bytes };
+		return { error: `base64 key is ${bytes.length} bytes — ${need}` };
+	} catch {
+		return { error: "not valid hex or base64" };
+	}
+}
+
+/**
+ * Compact key manager for the dissection pane: add (name + hex/base64,
+ * validated inline like the filter row), list, remove. Hoisted state — the
+ * parent owns the list so a frame change never drops the keys.
+ */
+function ChannelKeysPanel({
+	keys,
+	onAdd,
+	onRemove,
+}: {
+	keys: readonly ChannelKey[];
+	onAdd: (key: ChannelKey) => void;
+	onRemove: (index: number) => void;
+}) {
+	const [name, setName] = useState("");
+	const [keyText, setKeyText] = useState("");
+	const [error, setError] = useState<string | null>(null);
+
+	const add = () => {
+		const label = name.trim();
+		if (!label) {
+			setError("name the key — decodes report which key read the frame");
+			return;
+		}
+		if (keys.some((k) => k.name === label)) {
+			setError(`a key named "${label}" is already listed`);
+			return;
+		}
+		const parsed = parseKeyText(keyText);
+		if ("error" in parsed) {
+			setError(parsed.error);
+			return;
+		}
+		onAdd({ name: label, key: parsed.key });
+		setName("");
+		setKeyText("");
+		setError(null);
+	};
+
+	return (
+		<>
+			<div className="panel-title">
+				CHANNEL KEYS{keys.length > 0 ? ` · ${keys.length}` : ""}
+			</div>
+			<div
+				style={{
+					padding: "6px 12px 8px",
+					fontSize: 11,
+					display: "flex",
+					flexDirection: "column",
+					gap: 6,
+				}}
+			>
+				<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+					<input
+						placeholder="name_"
+						aria-label="channel key name"
+						value={name}
+						spellCheck={false}
+						autoComplete="off"
+						style={{ width: 90, flexShrink: 0 }}
+						onChange={(e) => setName(e.target.value)}
+						onKeyDown={(e) => e.key === "Enter" && add()}
+					/>
+					<input
+						placeholder="hex or base64 key_"
+						aria-label="channel key (hex or base64)"
+						value={keyText}
+						spellCheck={false}
+						autoComplete="off"
+						aria-invalid={error !== null}
+						aria-describedby={error ? "channel-key-error" : undefined}
+						style={{
+							flex: 1,
+							minWidth: 0,
+							...(error ? { borderColor: "var(--err)" } : null),
+						}}
+						onChange={(e) => setKeyText(e.target.value)}
+						onKeyDown={(e) => e.key === "Enter" && add()}
+					/>
+					<button type="button" onClick={add}>
+						ADD
+					</button>
+				</div>
+				{error && (
+					// The filter row's error idiom: the offense pointed out inline,
+					// in warn ink, right under the input that caused it.
+					<div id="channel-key-error" role="alert" className="warn">
+						{error}
+					</div>
+				)}
+				{keys.map((k, i) => (
+					<div
+						key={k.name}
+						style={{ display: "flex", gap: 6, alignItems: "center" }}
+					>
+						<span className="ok">◆</span>
+						<span>{k.name}</span>
+						<span className="dim">
+							AES-{k.key.length === 32 ? 256 : 128} · tried after the default
+							PSK
+						</span>
+						<span className="spacer" />
+						<button
+							type="button"
+							title={`Forget channel key "${k.name}"`}
+							onClick={() => onRemove(i)}
+						>
+							✕
+						</button>
+					</div>
+				))}
+				<div className="dim">
+					keys stay in this tab — memory only, never stored or uploaded; reload
+					clears them
+				</div>
+			</div>
+		</>
+	);
+}
+
 /**
  * The dissection pane: decrypt state (UI-011), the expandable tree, and the
  * hex dump it highlights. Mounted with a key per frame so expand/collapse
@@ -301,9 +452,12 @@ function HexPane({
 function DissectPane({
 	bytes,
 	dissection,
+	userKeyCount,
 }: {
 	bytes: Uint8Array;
 	dissection: FrameDissection;
+	/** How many user channel keys were tried — the ciphertext line says so. */
+	userKeyCount: number;
 }) {
 	const primary = dissection.primary;
 	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
@@ -386,9 +540,19 @@ function DissectPane({
 							DECRYPTED · AES-128-CTR under the published Meshtastic default
 							channel PSK — this traffic was never private
 						</span>
+					) : meshtasticPayload.userKey ? (
+						// A user key does NOT get the "never private" phrasing: it only
+						// proves this tab was handed the channel secret.
+						<span className="ok">
+							DECRYPTED · AES-{meshtasticPayload.userKey.bits}-CTR under channel
+							key "{meshtasticPayload.userKey.name}" — supplied in this tab,
+							held in memory only
+						</span>
 					) : (
 						<span className="warn">
 							CIPHERTEXT · not readable with the published default channel PSK
+							{userKeyCount > 0 &&
+								` or any of the ${userKeyCount} channel key(s) supplied here`}{" "}
 							(private key or non-default traffic) — payload stays raw bytes
 						</span>
 					)}
@@ -1382,6 +1546,12 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	const f = frames[selected];
 	const ptr = f ? pointers[selected] : null;
 
+	// ── user channel keys (UI-011) ─────────────────────────────────────
+	// React state only — never persisted, never in the URL, never uploaded;
+	// a reload clears them. A change re-dissects the selected frame via the
+	// memo below.
+	const [channelKeys, setChannelKeys] = useState<readonly ChannelKey[]>([]);
+
 	// ── dissection tree (UI-004) ───────────────────────────────────────
 	// The selected frame through the registry's profile-gated dissectors.
 	// The hint comes from the frame's own capture profile — the dissector
@@ -1394,10 +1564,10 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 						profileProtocolHint(
 							hasField(f, RF_FIELD.profile) ? f.profileId : null,
 						),
-						{ truncated: f.truncated },
+						{ truncated: f.truncated, channelKeys },
 					)
 				: null,
-		[f],
+		[f, channelKeys],
 	);
 
 	// The permalink for exactly what is on screen: capture reference plus the
@@ -2278,6 +2448,19 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							</>
 						)}
 
+						{/* Channel keys apply to Meshtastic decryption only, so the
+						    manager appears with a Meshtastic dissection — hoisted state,
+						    NOT keyed per frame, so keys and half-typed input survive
+						    frame switches. */}
+						{dissection && dissection.primary.protocol === "Meshtastic" && (
+							<ChannelKeysPanel
+								keys={channelKeys}
+								onAdd={(k) => setChannelKeys((prev) => [...prev, k])}
+								onRemove={(i) =>
+									setChannelKeys((prev) => prev.filter((_, at) => at !== i))
+								}
+							/>
+						)}
 						{dissection && (
 							// Keyed per frame so tree expansion, node selection and hex
 							// hover always describe the frame on screen.
@@ -2285,6 +2468,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 								key={`${selected}·${Number(f.sequence)}`}
 								bytes={f.bytes}
 								dissection={dissection}
+								userKeyCount={channelKeys.length}
 							/>
 						)}
 					</div>

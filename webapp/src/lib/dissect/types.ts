@@ -70,6 +70,18 @@ export interface Dissection {
 	root: DissectNode;
 }
 
+/**
+ * A user-supplied channel key (UI-011). The name is the user's own label for
+ * the key and is what decrypted-state labels report, so a decode always says
+ * WHICH key read it. Key material lives only in the caller's memory — the
+ * dissectors never copy it anywhere else.
+ */
+export interface ChannelKey {
+	name: string;
+	/** Raw key bytes — Meshtastic accepts 16 (AES-128) or 32 (AES-256). */
+	key: Uint8Array;
+}
+
 export interface DissectOptions {
 	/**
 	 * True when the radio truncated the frame (RawFrame::wasTruncated in the
@@ -77,6 +89,14 @@ export interface DissectOptions {
 	 * report truncated frames as malformed; Meshtastic only flags them.
 	 */
 	truncated?: boolean;
+	/**
+	 * User-supplied channel keys, tried in the given order AFTER the published
+	 * default PSK (Meshtastic is the only consumer today). A key that fails to
+	 * produce a parseable plaintext is skipped — a wrong key never changes the
+	 * output, so omitting this (or passing []) keeps every dissection
+	 * byte-identical to the keyless behavior.
+	 */
+	channelKeys?: readonly ChannelKey[];
 }
 
 /** Build a tree node. */
