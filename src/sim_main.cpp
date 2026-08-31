@@ -3292,6 +3292,16 @@ struct LiveNodeSummary {
     bool has_position = false;
     double latitude_degrees = 0.0;
     double longitude_degrees = 0.0;
+    // What the peer reported about itself on port 67. Absent until it sends
+    // telemetry; a node that never does keeps showing "--" rather than zero.
+    bool has_battery_level = false;
+    std::uint8_t battery_level = 0;
+    bool has_voltage = false;
+    float voltage = 0.0F;
+    bool has_channel_utilization = false;
+    float channel_utilization = 0.0F;
+    bool has_temperature = false;
+    float temperature_c = 0.0F;
     char label[9]{};
 };
 
@@ -3373,6 +3383,22 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
                                           record->decoded.payload_length,
                                           record->decoded.source, record->decoded.packet_id,
                                           payload)) {
+                    if (payload.has_battery_level) {
+                        summary.battery_level = payload.battery_level;
+                        summary.has_battery_level = true;
+                    }
+                    if (payload.has_voltage) {
+                        summary.voltage = payload.voltage;
+                        summary.has_voltage = true;
+                    }
+                    if (payload.has_channel_utilization) {
+                        summary.channel_utilization = payload.channel_utilization;
+                        summary.has_channel_utilization = true;
+                    }
+                    if (payload.has_temperature) {
+                        summary.temperature_c = payload.temperature_c;
+                        summary.has_temperature = true;
+                    }
                     if (payload.has_position) {
                         summary.has_position = true;
                         summary.latitude_degrees = payload.latitude_degrees;
@@ -4967,6 +4993,36 @@ void build_node_detail(lv_obj_t * parent)
               node.crc_errors == 0 ? theme::cyan() : theme::fault(), &font_mono_10);
     draw_live_node_history(parent, node, 8, 156, 304, 44, true);
     draw_node_detail_axis_chips(parent);
+    // What the peer says about itself, when it has said anything. Every field
+    // is separately optional -- a node reporting voltage but no percentage is
+    // ordinary, and printing 0% for it would invent a reading.
+    {
+        char telem[56]{};
+        std::size_t used = 0;
+        if (node.has_battery_level) {
+            used += static_cast<std::size_t>(std::snprintf(
+                telem + used, sizeof(telem) - used, "BAT %u%%",
+                static_cast<unsigned>(node.battery_level)));
+        }
+        if (node.has_voltage && used < sizeof(telem)) {
+            used += static_cast<std::size_t>(std::snprintf(
+                telem + used, sizeof(telem) - used, "%s%.2fV", used ? "  " : "",
+                static_cast<double>(node.voltage)));
+        }
+        if (node.has_channel_utilization && used < sizeof(telem)) {
+            used += static_cast<std::size_t>(std::snprintf(
+                telem + used, sizeof(telem) - used, "%sCH %.0f%%", used ? "  " : "",
+                static_cast<double>(node.channel_utilization)));
+        }
+        if (node.has_temperature && used < sizeof(telem)) {
+            (void)std::snprintf(telem + used, sizeof(telem) - used, "%s%.0fC",
+                                used ? "  " : "", static_cast<double>(node.temperature_c));
+        }
+        if (telem[0] != '\0') {
+            put_label(parent, "REPORTS", 8, 202, theme::pink(), &font_pixel_6x8);
+            put_clipped_label(parent, telem, 60, 202, 252, theme::text(), &font_mono_10);
+        }
+    }
     draw_back_strip(parent);
     return;
     }

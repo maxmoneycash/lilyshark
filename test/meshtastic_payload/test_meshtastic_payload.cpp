@@ -310,10 +310,124 @@ void testRoutingAckRoundTrips()
     assert(std::memcmp(plain, expected, sizeof(expected)) == 0);
 }
 
+// Telemetry vectors built from the published protobuf field numbers rather
+// than from our own encoder, so a field-number mistake cannot be shared by
+// the writer and the reader and cancel out.
+const std::uint8_t kTelemetryDevice[] = {
+    0x0d, 0x00, 0x93, 0x9e, 0x69, 0x12, 0x15, 0x08, 0x4d, 0x15, 0x66, 0x66, 0x76, 0x40,
+    0x1d, 0x00, 0x00, 0x48, 0x41, 0x25, 0x00, 0x00, 0xa0, 0x3f, 0x28, 0xcd, 0x83, 0x06
+};
+
+const std::uint8_t kTelemetryEnvironment[] = {
+    0x0d, 0x01, 0x93, 0x9e, 0x69, 0x1a, 0x0a, 0x0d, 0x00, 0x00, 0xac, 0x41, 0x15, 0x00,
+    0x00, 0x41, 0x42
+};
+
+bool nearly(float value, double want)
+{
+    const double delta = static_cast<double>(value) - want;
+    return delta < 0.01 && delta > -0.01;
+}
+
+MeshtasticPayload readTelemetryFixture(const std::uint8_t *body, std::size_t length)
+{
+    // Wrap the Telemetry message in a Data message on port 67, encrypt it the
+    // way a radio would, and read it back through the public entry point.
+    std::uint8_t data[128]{};
+    std::size_t used = 0;
+    data[used++] = 0x08;  // field 1 varint: portnum
+    data[used++] = 67;    // TELEMETRY
+    data[used++] = 0x12;  // field 2 length-delimited: payload
+    data[used++] = static_cast<std::uint8_t>(length);
+    std::memcpy(data + used, body, length);
+    used += length;
+
+    constexpr std::uint32_t from_node = 0x0badf00dU;
+    constexpr std::uint32_t packet_id = 4242U;
+    std::uint8_t nonce[16]{};
+    nonce[0] = static_cast<std::uint8_t>(packet_id);
+    nonce[1] = static_cast<std::uint8_t>(packet_id >> 8U);
+    nonce[2] = static_cast<std::uint8_t>(packet_id >> 16U);
+    nonce[3] = static_cast<std::uint8_t>(packet_id >> 24U);
+    nonce[8] = static_cast<std::uint8_t>(from_node);
+    nonce[9] = static_cast<std::uint8_t>(from_node >> 8U);
+    nonce[10] = static_cast<std::uint8_t>(from_node >> 16U);
+    nonce[11] = static_cast<std::uint8_t>(from_node >> 24U);
+    std::uint8_t cipher[128]{};
+    crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, data, used, cipher);
+
+    MeshtasticPayload payload{};
+    assert(readMeshtasticPayload(cipher, used, from_node, packet_id, payload));
+    return payload;
+}
+
+void testDeviceTelemetryIsRead()
+{
+    const MeshtasticPayload payload =
+        readTelemetryFixture(kTelemetryDevice, sizeof(kTelemetryDevice));
+    assert(payload.portnum == static_cast<std::uint16_t>(MeshtasticPort::Telemetry));
+    assert(payload.has_telemetry);
+    assert(payload.has_battery_level && payload.battery_level == 77);
+    assert(payload.has_voltage && nearly(payload.voltage, 3.85));
+    assert(payload.has_channel_utilization && nearly(payload.channel_utilization, 12.5));
+    assert(payload.has_air_util_tx && nearly(payload.air_util_tx, 1.25));
+    assert(payload.has_uptime && payload.uptime_seconds == 98765U);
+    // A device-metrics packet says nothing about the weather.
+    assert(!payload.has_temperature);
+    assert(!payload.has_relative_humidity);
+}
+
+void testEnvironmentTelemetryIsRead()
+{
+    const MeshtasticPayload payload =
+        readTelemetryFixture(kTelemetryEnvironment, sizeof(kTelemetryEnvironment));
+    assert(payload.has_telemetry);
+    assert(payload.has_temperature && nearly(payload.temperature_c, 21.5));
+    assert(payload.has_relative_humidity && nearly(payload.relative_humidity, 48.25));
+    // ...and an environment packet says nothing about the battery, so a
+    // display must not invent 0%.
+    assert(!payload.has_battery_level);
+    assert(!payload.has_voltage);
+}
+
+void testTruncatedTelemetryIsNeverHalfRead()
+{
+    // Every prefix must either parse cleanly or be refused; what must never
+    // happen is a payload that claims telemetry it did not read.
+    for (std::size_t length = 0; length < sizeof(kTelemetryDevice); ++length) {
+        std::uint8_t data[128]{};
+        std::size_t used = 0;
+        data[used++] = 0x08;
+        data[used++] = 67;
+        data[used++] = 0x12;
+        data[used++] = static_cast<std::uint8_t>(length);
+        std::memcpy(data + used, kTelemetryDevice, length);
+        used += length;
+
+        constexpr std::uint32_t from_node = 0x0badf00dU;
+        constexpr std::uint32_t packet_id = 99U;
+        std::uint8_t nonce[16]{};
+        nonce[0] = static_cast<std::uint8_t>(packet_id);
+        nonce[8] = static_cast<std::uint8_t>(from_node);
+        nonce[9] = static_cast<std::uint8_t>(from_node >> 8U);
+        nonce[10] = static_cast<std::uint8_t>(from_node >> 16U);
+        nonce[11] = static_cast<std::uint8_t>(from_node >> 24U);
+        std::uint8_t cipher[128]{};
+        crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, data, used, cipher);
+        MeshtasticPayload payload{};
+        if (readMeshtasticPayload(cipher, used, from_node, packet_id, payload)) {
+            if (payload.has_battery_level) assert(payload.battery_level <= 100U);
+        }
+    }
+}
+
 int main()
 {
     testFips197BlockVector();
     testWantAckBitReachesTheHeader();
+    testDeviceTelemetryIsRead();
+    testEnvironmentTelemetryIsRead();
+    testTruncatedTelemetryIsNeverHalfRead();
     testRoutingAckRoundTrips();
     testCounterModeRoundTripsAcrossBlockBoundary();
     testReadsTextMessageFromRealFrame();

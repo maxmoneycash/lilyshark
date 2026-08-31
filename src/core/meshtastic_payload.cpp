@@ -94,6 +94,109 @@ bool parsePosition(const std::uint8_t *bytes, std::size_t length, MeshtasticPayl
     return true;
 }
 
+/// A protobuf float is a fixed32 carrying IEEE-754 bits. Assembled through
+/// memcpy rather than a cast so this stays defined behaviour.
+float floatFromFixed32(std::uint32_t bits) noexcept
+{
+    float value = 0.0F;
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+/// Telemetry.DeviceMetrics: what a node says about its own health.
+bool parseDeviceMetrics(const std::uint8_t *bytes, std::size_t length,
+                        MeshtasticPayload &parsed) noexcept
+{
+    std::size_t cursor = 0;
+    while (cursor < length) {
+        std::uint32_t tag = 0;
+        if (!readVarint(bytes, length, cursor, tag)) return false;
+        const std::uint32_t field = tag >> 3U;
+        const std::uint8_t wire = static_cast<std::uint8_t>(tag & 0x07U);
+        std::uint32_t bits = 0;
+        if (field == 1U && wire == kWireVarint) {
+            std::uint32_t level = 0;
+            if (!readVarint(bytes, length, cursor, level)) return false;
+            // Above 100 means externally powered; clamp so the display never
+            // shows a percentage that cannot exist.
+            parsed.battery_level = static_cast<std::uint8_t>(level > 100U ? 100U : level);
+            parsed.has_battery_level = true;
+        } else if (field == 2U && wire == kWire32) {
+            if (!readFixed32(bytes, length, cursor, bits)) return false;
+            parsed.voltage = floatFromFixed32(bits);
+            parsed.has_voltage = true;
+        } else if (field == 3U && wire == kWire32) {
+            if (!readFixed32(bytes, length, cursor, bits)) return false;
+            parsed.channel_utilization = floatFromFixed32(bits);
+            parsed.has_channel_utilization = true;
+        } else if (field == 4U && wire == kWire32) {
+            if (!readFixed32(bytes, length, cursor, bits)) return false;
+            parsed.air_util_tx = floatFromFixed32(bits);
+            parsed.has_air_util_tx = true;
+        } else if (field == 5U && wire == kWireVarint) {
+            if (!readVarint(bytes, length, cursor, parsed.uptime_seconds)) return false;
+            parsed.has_uptime = true;
+        } else if (!skipField(bytes, length, cursor, wire)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// Telemetry.EnvironmentMetrics: a node with sensors attached.
+bool parseEnvironmentMetrics(const std::uint8_t *bytes, std::size_t length,
+                             MeshtasticPayload &parsed) noexcept
+{
+    std::size_t cursor = 0;
+    while (cursor < length) {
+        std::uint32_t tag = 0;
+        if (!readVarint(bytes, length, cursor, tag)) return false;
+        const std::uint32_t field = tag >> 3U;
+        const std::uint8_t wire = static_cast<std::uint8_t>(tag & 0x07U);
+        std::uint32_t bits = 0;
+        if (field == 1U && wire == kWire32) {
+            if (!readFixed32(bytes, length, cursor, bits)) return false;
+            parsed.temperature_c = floatFromFixed32(bits);
+            parsed.has_temperature = true;
+        } else if (field == 2U && wire == kWire32) {
+            if (!readFixed32(bytes, length, cursor, bits)) return false;
+            parsed.relative_humidity = floatFromFixed32(bits);
+            parsed.has_relative_humidity = true;
+        } else if (!skipField(bytes, length, cursor, wire)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// Telemetry (port 67). The metrics are a oneof, so at most one of these
+/// submessages is present in any packet.
+bool parseTelemetry(const std::uint8_t *bytes, std::size_t length,
+                    MeshtasticPayload &parsed) noexcept
+{
+    std::size_t cursor = 0;
+    while (cursor < length) {
+        std::uint32_t tag = 0;
+        if (!readVarint(bytes, length, cursor, tag)) return false;
+        const std::uint32_t field = tag >> 3U;
+        const std::uint8_t wire = static_cast<std::uint8_t>(tag & 0x07U);
+        if (wire == kWireLengthDelimited && (field == 2U || field == 3U)) {
+            std::uint32_t size = 0;
+            if (!readVarint(bytes, length, cursor, size)) return false;
+            if (size > length - cursor) return false;
+            const bool ok = field == 2U
+                ? parseDeviceMetrics(bytes + cursor, size, parsed)
+                : parseEnvironmentMetrics(bytes + cursor, size, parsed);
+            if (!ok) return false;
+            cursor += size;
+            parsed.has_telemetry = true;
+        } else if (!skipField(bytes, length, cursor, wire)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool copyName(char *out, std::size_t cap, const std::uint8_t *bytes, std::size_t length) noexcept
 {
     if (cap == 0) return false;
@@ -298,6 +401,8 @@ bool readMeshtasticPayload(const std::uint8_t *ciphertext,
             (void)parsePosition(payload_bytes, payload_length, parsed);
         } else if (parsed.portnum == static_cast<std::uint16_t>(MeshtasticPort::NodeInfo)) {
             (void)parseNodeInfo(payload_bytes, payload_length, parsed);
+        } else if (parsed.portnum == static_cast<std::uint16_t>(MeshtasticPort::Telemetry)) {
+            (void)parseTelemetry(payload_bytes, payload_length, parsed);
         }
     }
 

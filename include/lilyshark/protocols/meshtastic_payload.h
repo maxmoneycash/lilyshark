@@ -51,6 +51,26 @@ struct MeshtasticPayload {
     bool has_position = false;
     double latitude_degrees = 0.0;
     double longitude_degrees = 0.0;
+    /// Telemetry a node reports about itself (port 67). Each flag says the
+    /// field was actually present -- a peer that reports voltage but not
+    /// battery percent is common, and showing 0% for it would be a lie.
+    bool has_telemetry = false;
+    bool has_battery_level = false;
+    /// 0-100. Meshtastic sends values above 100 to mean externally powered.
+    std::uint8_t battery_level = 0;
+    bool has_voltage = false;
+    float voltage = 0.0F;
+    bool has_channel_utilization = false;
+    float channel_utilization = 0.0F;
+    bool has_air_util_tx = false;
+    float air_util_tx = 0.0F;
+    bool has_uptime = false;
+    std::uint32_t uptime_seconds = 0;
+    bool has_temperature = false;
+    float temperature_c = 0.0F;
+    bool has_relative_humidity = false;
+    float relative_humidity = 0.0F;
+
     /// A Routing acknowledgement names the packet it confirms here.
     bool has_request_id = false;
     std::uint32_t request_id = 0;
