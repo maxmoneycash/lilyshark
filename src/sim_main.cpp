@@ -479,9 +479,11 @@ bool chat_tx_failed = false;
 constexpr std::size_t kChatVisible = 5;
 constexpr std::size_t kChatTabVisible = 4;
 constexpr lv_coord_t kChatSendX = 256;
-constexpr lv_coord_t kChatSendY = 198;
+// SEND shares the compose box's top edge and height. It used to be 20 tall
+// against a 26 tall box, two pixels lower, so the pair read as misaligned.
+constexpr lv_coord_t kChatSendY = 196;
 constexpr lv_coord_t kChatSendW = 56;
-constexpr lv_coord_t kChatSendH = 20;
+constexpr lv_coord_t kChatSendH = 26;
 
 enum class FieldTab : std::uint8_t {
     Lily = 0,
@@ -509,7 +511,10 @@ constexpr int kMapZoomMin = 8;
 constexpr int kMapZoomMax = 23;
 // Open as tight as the imagery is real. Past z20 the picture is
 // magnified rather than sharper, so that is not a useful default.
-constexpr int kMapZoomDefault = 20;
+// z20 is about 38 m across this panel -- close enough that two operators in
+// one room share a pixel and anybody further is off-screen. A mesh map should
+// open at mesh distances: z13 spans roughly 5 km.
+constexpr int kMapZoomDefault = 13;
 int map_zoom = kMapZoomDefault;
 bool map_satellite = true;
 bool map_chart = false;
@@ -8167,7 +8172,7 @@ void build_help(lv_obj_t * parent)
     // reader comes to find one, and a gap here is the whole cost of that.
     constexpr std::array<std::array<const char *, 2>, 10> keys = {{
         {{"BACKSPACE", "BACK"}},
-        {{"C", "CHAT"}},
+        {{"C / E", "CHAT/MESSAGES"}},
         {{"M OR 0", "HOME"}},
         {{"8", "SETTINGS"}},
         {{"1-7", "LIVE VIEWS"}},
@@ -8432,19 +8437,32 @@ void build_chat(lv_obj_t * parent)
         put_label(parent, "TYPE, THEN PRESS ENTER TO SEND.", 28, 132,
                   theme::text_muted(), &font_pixel_6x8);
     } else {
+        // A short conversation settles on the bottom of the log, against the
+        // box you type in, the way every messaging app puts it. Top-aligning
+        // left a band of dead space between the newest message and the cursor
+        // and made a live channel look abandoned.
+        const lv_coord_t settle =
+            visible < kChatVisible
+                ? static_cast<lv_coord_t>((kChatVisible - visible) *
+                                          static_cast<std::size_t>(kChatRowH))
+                : 0;
         for (std::size_t index = 0; index < visible; ++index) {
             const ChatLine &line = chat_log[match_slots[first + index]];
-            const lv_coord_t y = kChatMsgY + static_cast<lv_coord_t>(index) * kChatRowH;
+            const lv_coord_t y = kChatMsgY + settle +
+                                 static_cast<lv_coord_t>(index) * kChatRowH;
             // Your own lines are indented and edged in pink, theirs are flush
             // left and edged in cyan. The only mark before was an 8 px bar at
             // the far right, which reads as a scrollbar, so a conversation
             // looked like one voice talking to itself.
             const lv_coord_t text_x = line.mine ? 58 : 14;
             const lv_coord_t text_w = line.mine ? 248 : 292;
-            theme::rect(parent, line.mine ? 310 : 4, y, 6, 24,
+            // Both markers hug their own text now. The pink one sat at x=310,
+            // hard against the right edge -- exactly where a scrollbar lives --
+            // so a run of your own messages read as a scrollbar rather than as
+            // you speaking.
+            theme::rect(parent, line.mine ? 46 : 4, y, 6, 24,
                         line.mine ? theme::pink()
                                   : (line.via_net ? theme::amber() : theme::cyan()));
-            char who[28]{};
             // The destination is already stated once above the log; repeating
             // ALL or PRIVATE on every line was noise, and the operator's own
             // call sign told them nothing they did not know.
@@ -8456,17 +8474,30 @@ void build_chat(lv_obj_t * parent)
             // else heard -- but it never crossed this radio, and the line has
             // to say so where the eye already is.
             const char *route = line.via_net ? "  VIA NET" : "";
-            if (line.when[0] != '\0') {
-                std::snprintf(who, sizeof(who), "%s  %s%s%s", line.when,
-                              line.mine ? "YOU" : line.from, delivery, route);
-            } else {
-                std::snprintf(who, sizeof(who), "%s%s%s", line.mine ? "YOU" : line.from,
-                              delivery, route);
+            // Consecutive messages from one speaker are a single turn, so the
+            // name belongs on the first of them only. Five rows each captioned
+            // YOU said nothing, five times over, and cost half the log's
+            // height to say it.
+            const ChatLine *previous =
+                index > 0U ? &chat_log[match_slots[first + index - 1U]] : nullptr;
+            const bool same_speaker =
+                previous != nullptr && previous->mine == line.mine &&
+                (line.mine || std::strcmp(previous->from, line.from) == 0);
+            const bool header = !same_speaker || delivery[0] != '\0' || route[0] != '\0';
+            if (header) {
+                char who[28]{};
+                if (line.when[0] != '\0') {
+                    std::snprintf(who, sizeof(who), "%s  %s%s%s", line.when,
+                                  line.mine ? "YOU" : line.from, delivery, route);
+                } else {
+                    std::snprintf(who, sizeof(who), "%s%s%s",
+                                  line.mine ? "YOU" : line.from, delivery, route);
+                }
+                put_label(parent, who, text_x, y,
+                          line.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
             }
-            put_label(parent, who, text_x, y,
-                      line.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
-            put_clipped_label(parent, line.text, text_x, y + 11, text_w, theme::text(),
-                              &font_mono_semibold_12);
+            put_clipped_label(parent, line.text, text_x, header ? y + 11 : y + 5, text_w,
+                              theme::text(), &font_mono_semibold_12);
         }
     }
     if (chat_tx_failed || std::strstr(shell_notice, "TX FAILED") != nullptr) {
@@ -8490,7 +8521,7 @@ void build_chat(lv_obj_t * parent)
                   left < 10U ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
     }
     draw_outline_rect(parent, kChatSendX, kChatSendY, kChatSendW, kChatSendH, theme::pink());
-    put_label(parent, "SEND", kChatSendX + 10, kChatSendY + 6, theme::pink(),
+    put_label(parent, "SEND", kChatSendX + 16, kChatSendY + 9, theme::pink(),
               &font_pixel_6x8);
 }
 
@@ -10740,14 +10771,22 @@ void handle_navigation_key(uint32_t key)
         build_current_screen();
         return;
     }
-    if((key == '9' || key == 't' || key == 'T' || key == 'c' || key == 'C') &&
+    if((key == '9' || key == 't' || key == 'T' || key == 'c' || key == 'C' ||
+        key == 'e' || key == 'E') &&
        onboarding_complete && !isOnboardingRoute(app_shell.route()) &&
        app_shell.route() != ShellRoute::Splash) {
         if (key == 'c' || key == 'C') {
             open_field_tab(FieldTab::Chat);
             return;
         } else {
-            current_screen = key == '9' ? Screen::protocols : Screen::timeline;
+            // MESSAGES gathers the readable text pulled out of captured
+            // traffic. It had no key at all: the only door was finishing a
+            // survey and tapping one of three result buttons, so the screen
+            // that answers "what did the air actually say" was unreachable
+            // for anyone who had not run a capture.
+            if (key == '9') current_screen = Screen::protocols;
+            else if (key == 'e' || key == 'E') current_screen = Screen::messages;
+            else current_screen = Screen::timeline;
             chat_open = false;
             app_shell.closeToAnalyzer();
             remember_primary_screen(current_screen);
@@ -12319,7 +12358,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0xa9a8caf8710d718cULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
         0x932ca408b25d655fULL, 0x3b6ca3507efcd29cULL, 0x3d61199a6d61d28cULL,
-        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x05657ac310c74b68ULL,
+        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x57277dd5eba9eb3eULL,
         0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xae5f04f11f7d4fb1ULL,
         0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
     }};
@@ -12353,7 +12392,7 @@ bool run_simulator_render_test() noexcept
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
         0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0x22ed3faf3d1304e6ULL,
         0x7e1363de7108f530ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
-        0xde0a7b1d16ecf53aULL, 0xd62b50d326551431ULL, 0x14f80c364b5d4568ULL,
+        0xde0a7b1d16ecf53aULL, 0x7ed210334475e24aULL, 0x14f80c364b5d4568ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
     }};
 
@@ -12554,7 +12593,7 @@ bool run_simulator_render_test() noexcept
         // Hashed as well as written: the marks used to draw over the card,
         // and no behavioural test noticed because every assertion about it
         // passed while it was being painted through.
-        constexpr std::uint64_t kMapNodeCardHash = 0x08a759d471b2f8a7ULL;
+        constexpr std::uint64_t kMapNodeCardHash = 0x05517ec23aad4883ULL;
         const std::uint64_t card_hash = hash_simulator_frame();
         std::fprintf(stderr, "Lilyshark render MAP NODE CARD: fnv1a=%016llx\n",
                      static_cast<unsigned long long>(card_hash));
@@ -12578,7 +12617,7 @@ bool run_simulator_render_test() noexcept
         if (render_directory != nullptr) {
             (void)write_simulator_frame(render_directory, "chat", 0);
         }
-        constexpr std::uint64_t kChatHash = 0x7f4c3203cdc46d58ULL;
+        constexpr std::uint64_t kChatHash = 0xce68cfe6c5188638ULL;
         const std::uint64_t chat_hash = hash_simulator_frame();
         std::size_t chat_ink = 0U;
         for(const std::uint16_t pixel : simulator_frame_buffer) {
