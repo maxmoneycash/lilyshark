@@ -4,7 +4,7 @@ title: Coverage cell map with most-wanted cells
 area: ui
 size: M
 priority: P2
-status: todo
+status: done
 depends_on:
 - PR-005
 eval:

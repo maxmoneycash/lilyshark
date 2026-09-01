@@ -29,6 +29,7 @@ import { ShelbyScreen } from "./screens/Shelby";
 // PAPER is eager — it is the landing screen, and since the pages became
 // pre-rendered images its code is a few kilobytes.
 const MapView = lazy(() => import("./screens/MapView"));
+const Coverage = lazy(() => import("./screens/Coverage"));
 const Telemetry = lazy(() => import("./screens/Telemetry"));
 const Docs = lazy(() => import("./screens/Docs"));
 import { fmtFreq, useHourTick } from "./fmt";
@@ -53,6 +54,7 @@ const TABS = [
   "CHAT",
   "NODES",
   "MAP",
+  "COVERAGE",
   "MESH",
   "TELEMETRY",
   "CONFIG",
@@ -814,6 +816,7 @@ function App() {
           }}
         />
       )}
+      {tab === "COVERAGE" && <Coverage />}
       {tab === "MESH" && <Mesh />}
       {tab === "CONFIG" && <Config />}
       {tab === "TELEMETRY" && <Telemetry />}
