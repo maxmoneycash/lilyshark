@@ -59,6 +59,7 @@
 #include "lilyshark/core/survey_accumulator.h"
 #include "lilyshark/device/hardware_status.h"
 #include "lilyshark/device/tdeck_chime.h"
+#include "lilyshark/device/tdeck_ble.h"
 #include "lilyshark/device/radio_service.h"
 #include "lilyshark/device/screenshot.h"
 #include "lilyshark/device/tdeck_display_init.h"
@@ -14028,6 +14029,16 @@ void setup()
     }
     build_current_screen();
     lv_refr_now(display);
+    {
+        // A phone app finds the deck by the Meshtastic service UUID, so the
+        // advertised name only has to be recognisable to a human.
+        char ble_name[24]{};
+        char ble_short[8]{};
+        formatLocalMeshtasticShortName(ble_short, sizeof(ble_short));
+        std::snprintf(ble_name, sizeof(ble_name), "Lilyshark %s", ble_short);
+        Serial.printf("Lilyshark bluetooth: %s\n",
+                      startTDeckBle(ble_name) ? "advertising" : "unavailable");
+    }
     Serial.println("Lilyshark UI ready");
     Serial.printf(
         "LSK ID {\"app\":\"lilyshark\",\"fw\":\"%s\",\"board\":\"t-deck\",\"node\":\"!%08lx\"}\n",
