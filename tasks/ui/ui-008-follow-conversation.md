@@ -4,7 +4,7 @@ title: Follow conversation
 area: ui
 size: M
 priority: P2
-status: todo
+status: done
 depends_on:
 - UI-004
 eval:

@@ -4,7 +4,7 @@ title: Diff two captures
 area: ui
 size: M
 priority: P2
-status: todo
+status: done
 eval:
   rubric:
   - Two captures open side by side with frames matched by payload hash and time offset; unmatched frames
