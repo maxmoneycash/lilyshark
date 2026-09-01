@@ -18,6 +18,16 @@ export interface ExportOptions {
 	/** Frames to export, already filtered by the caller. */
 	frames: LscapFrame[];
 	/**
+	 * Frame annotations (UI-010), keyed by SEQUENCE NUMBER — the sidecar's own
+	 * key, not a row index. Supplying this adds one `note` column to the CSV
+	 * and JSON; omitting it leaves both formats byte-identical to what they
+	 * wrote before annotations existed, so an unannotated export never grows a
+	 * column of empty cells. pcap takes no annotations at all: LoRaTap v0 has
+	 * no channel to carry one, exactly as it has none for the synthetic marker
+	 * (see loratap.ts), and inventing one would break the format.
+	 */
+	annotations?: ReadonlyMap<number, string>;
+	/**
 	 * Timestamp the `time` column is measured from. Defaults to the first
 	 * frame's timestamp, matching the on-screen relative clock. Pass the
 	 * unfiltered capture's first timestamp to keep exported times aligned
@@ -58,6 +68,11 @@ export interface ExportRow {
 	pointer: boolean;
 	/** Provenance: true when the frame was generated, not received OTA. */
 	synthetic: boolean;
+	/**
+	 * The frame's annotation (UI-010) — present only when the export was given
+	 * annotations, `null` on an unannotated frame of an annotated export.
+	 */
+	note?: string | null;
 }
 
 /** Column order shared by the CSV header and the JSON objects. */
@@ -77,6 +92,26 @@ export const EXPORT_COLUMNS: readonly (keyof ExportRow)[] = [
 	"pointer",
 	"synthetic",
 ] as const;
+
+/**
+ * The same columns plus the annotation, used only when the caller supplies
+ * annotations. Additive by construction: an export without them writes
+ * EXPORT_COLUMNS and nothing else, so every existing consumer's column list
+ * is unchanged.
+ */
+export const ANNOTATED_EXPORT_COLUMNS: readonly (keyof ExportRow)[] = [
+	...EXPORT_COLUMNS,
+	"note",
+] as const;
+
+/** Which columns this export writes — the annotation one only if asked. */
+export function exportColumns(
+	options: ExportOptions,
+): readonly (keyof ExportRow)[] {
+	return options.annotations !== undefined
+		? ANNOTATED_EXPORT_COLUMNS
+		: EXPORT_COLUMNS;
+}
 
 /**
  * Protocol label for a frame, from its capture profile ID. Mirrors the
@@ -105,7 +140,7 @@ export function protocolLabel(frame: LscapFrame): string {
 
 /** Decode the frames of an export into the shared row shape. */
 export function buildExportRows(options: ExportOptions): ExportRow[] {
-	const { frames } = options;
+	const { frames, annotations } = options;
 	const referenceUs = options.timeReferenceUs ?? frames[0]?.timestampUs ?? 0n;
 	return frames.map((f) => ({
 		seq: Number(f.sequence),
@@ -122,5 +157,10 @@ export function buildExportRows(options: ExportOptions): ExportRow[] {
 		protocol: protocolLabel(f),
 		pointer: findShelbyPointer(f.bytes) !== null,
 		synthetic: f.synthetic,
+		// Present only in an annotated export, and null — never "" — on a frame
+		// that carries no note, the same way an unreported radio field is null.
+		...(annotations !== undefined
+			? { note: annotations.get(Number(f.sequence)) ?? null }
+			: null),
 	}));
 }

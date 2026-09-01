@@ -14,6 +14,20 @@ import {
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import {
+	type AnnotationSidecar,
+	annotatedSequences,
+	describeCapture,
+	emptySidecar,
+	noteFor,
+	noteMap,
+	parseSidecar,
+	serializeSidecar,
+	setNote,
+	sidecarFileName,
+	sidecarMismatches,
+	sidecarSummary,
+} from "../lib/annotations";
+import {
 	type AnnounceDestination,
 	type AnnounceOverview,
 	announceTicks,
@@ -21,6 +35,14 @@ import {
 	hopRangeLabel,
 	summarizeAnnounces,
 } from "../lib/announceView";
+import {
+	type CaptureDiff,
+	type DiffRow,
+	diffCaptures,
+	diffRows,
+	diffSummaryNote,
+	witnessSummary,
+} from "../lib/captureDiff";
 import {
 	captureByteLength,
 	captureElapsedMs,
@@ -45,6 +67,14 @@ import {
 	slotsReducer,
 	slotTitle,
 } from "../lib/captureSlots";
+import {
+	conversationCoverage,
+	conversationExpression,
+	conversationLabel,
+	coverageNote,
+	frameAddressing,
+	parseConversationExpression,
+} from "../lib/conversation";
 import {
 	connectDeviceLink,
 	disconnectDeviceLink,
@@ -937,6 +967,387 @@ function AnnouncesPanel({
 	);
 }
 
+/* ── frame note (UI-010) ───────────────────────────────────────────────
+ * One frame's field note. It attaches to the frame's SEQUENCE NUMBER and is
+ * stored in a JSON sidecar (lib/annotations) — never in the .lscap, whose
+ * bytes must stay byte-identical to the commitment that was published and
+ * anchored. Mounted with a key per frame so the draft belongs to the frame
+ * on screen and never leaks onto the next one. */
+
+function FrameNotePanel({
+	sequence,
+	saved,
+	onSave,
+}: {
+	sequence: number;
+	/** The note this frame already carries, or "" for none. */
+	saved: string;
+	/** Writes the note; returns an error to show, or null on success. */
+	onSave: (text: string) => string | null;
+}) {
+	const [draft, setDraft] = useState(saved);
+	const [error, setError] = useState<string | null>(null);
+	const [savedAt, setSavedAt] = useState(false);
+	const dirty = draft.trim() !== saved.trim();
+
+	const commit = () => {
+		const failure = onSave(draft);
+		setError(failure);
+		setSavedAt(failure === null);
+	};
+
+	return (
+		<>
+			<div className="panel-title">
+				NOTE · FRAME {sequence}
+				<span className="spacer" />
+				{saved !== "" && (
+					<span className="ok" title="This frame carries a note">
+						✎
+					</span>
+				)}
+			</div>
+			<div
+				style={{
+					padding: "6px 12px 8px",
+					fontSize: 11,
+					display: "flex",
+					flexDirection: "column",
+					gap: 6,
+				}}
+			>
+				<textarea
+					aria-label={`note on frame ${sequence}`}
+					placeholder="what happened here_"
+					value={draft}
+					rows={2}
+					spellCheck={false}
+					aria-invalid={error !== null}
+					aria-describedby={error ? "frame-note-error" : undefined}
+					style={{
+						width: "100%",
+						resize: "vertical",
+						font: "inherit",
+						...(error ? { borderColor: "var(--err)" } : null),
+					}}
+					onChange={(e) => {
+						setDraft(e.target.value);
+						setError(null);
+						setSavedAt(false);
+					}}
+					onKeyDown={(e) => {
+						// Enter saves; Shift+Enter is a line break, as in every
+						// comment box. ESC restores what is stored.
+						if (e.key === "Enter" && !e.shiftKey) {
+							e.preventDefault();
+							commit();
+						}
+						if (e.key === "Escape") {
+							setDraft(saved);
+							setError(null);
+						}
+					}}
+				/>
+				<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+					<button type="button" onClick={commit} disabled={!dirty}>
+						{saved === "" ? "SAVE NOTE" : "UPDATE NOTE"}
+					</button>
+					{saved !== "" && (
+						<button
+							type="button"
+							title="Remove this frame's note"
+							onClick={() => {
+								setDraft("");
+								setError(onSave(""));
+								setSavedAt(true);
+							}}
+						>
+							✕ REMOVE
+						</button>
+					)}
+					{savedAt && !dirty && <span className="ok">saved</span>}
+				</div>
+				{error && (
+					<div id="frame-note-error" role="alert" className="warn">
+						{error}
+					</div>
+				)}
+				<div className="dim">
+					kept in a JSON sidecar beside the capture, keyed by sequence number —
+					the .lscap bytes never change, so its commitment stays valid
+				</div>
+			</div>
+		</>
+	);
+}
+
+/* ── DIFF panel (UI-009) ───────────────────────────────────────────────
+ * Two open captures side by side. Two T-Decks in the field produce two
+ * captures of one RF event, and comparing them is how a coverage or witness
+ * claim gets checked by hand: the same transmission, heard twice, with each
+ * device's own RSSI and SNR next to each other.
+ *
+ * All the matching lives in lib/captureDiff — identical payloads, confirmed
+ * byte for byte, paired one-to-one within a tolerance around an estimated
+ * clock offset (two devices' boot clocks are unrelated numbers). This is the
+ * view: one row per transmission on the common clock, unmatched frames
+ * marked per side, and the alignment's own provenance said out loud above
+ * the table. Nothing here decides which capture is right. */
+
+/** Rows rendered before the table stops and says how many it left. */
+const DIFF_ROW_LIMIT = 500;
+
+const dbCell = (value: number | null, digits = 1) =>
+	value === null ? <span className="dim">n/r</span> : value.toFixed(digits);
+
+/** A signed difference, where "signed" is the point: +3.0 dB, −7.5 dB. */
+const deltaCell = (value: number | null) =>
+	value === null ? (
+		<span className="dim">—</span>
+	) : (
+		<span className={value === 0 ? "dim" : ""}>
+			{value > 0 ? "+" : value < 0 ? "−" : ""}
+			{Math.abs(value).toFixed(1)}
+		</span>
+	);
+
+function DiffPanel({
+	nameA,
+	nameB,
+	framesA,
+	framesB,
+	diff,
+	rows,
+	onSelectA,
+	onClose,
+}: {
+	nameA: string;
+	nameB: string;
+	framesA: LscapFrame[];
+	framesB: LscapFrame[];
+	diff: CaptureDiff;
+	rows: DiffRow[];
+	/** Select a frame of the ACTIVE capture (side A) from a diff row. */
+	onSelectA: (index: number) => void;
+	onClose: () => void;
+}) {
+	const [open, setOpen] = useState(true);
+	const summary = witnessSummary(diff);
+	const shownRows = rows.slice(0, DIFF_ROW_LIMIT);
+
+	return (
+		<div style={{ borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					gap: 10,
+					padding: "4px 12px",
+					flexWrap: "wrap",
+				}}
+			>
+				<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+					DIFF
+				</span>
+				<span style={{ fontSize: 11 }}>
+					<span className="ok">A</span> {nameA} · <span className="ok">B</span>{" "}
+					{nameB}
+				</span>
+				<span className="dim" style={{ fontSize: 10 }}>
+					{diffSummaryNote(diff)}
+				</span>
+				<span className="spacer" />
+				<button type="button" onClick={() => setOpen((v) => !v)}>
+					{open ? "▾ HIDE" : "▸ DIFF"}
+				</button>
+				<button type="button" onClick={onClose} title="Stop comparing">
+					✕
+				</button>
+			</div>
+			{open && (
+				<>
+					<div style={{ padding: "0 12px 6px", fontSize: 11 }}>
+						{summary.bothHeard === 0 ? (
+							<span className="warn">
+								no transmission appears in both captures — nothing here
+								corroborates anything
+							</span>
+						) : (
+							<>
+								<span className="ok">
+									{summary.bothHeard} transmission(s) heard by both devices
+								</span>
+								{" · "}
+								<span className={summary.onlyA > 0 ? "warn" : "dim"}>
+									{summary.onlyA} only in A
+								</span>
+								{" · "}
+								<span className={summary.onlyB > 0 ? "warn" : "dim"}>
+									{summary.onlyB} only in B
+								</span>
+								{summary.meanRssiDeltaDb !== null && (
+									<span
+										className="dim"
+										title={`Mean of B − A over the ${summary.rssiPairs} matched pair(s) where BOTH radios reported RSSI`}
+									>
+										{" · "}B heard them{" "}
+										{Math.abs(summary.meanRssiDeltaDb).toFixed(1)} dB{" "}
+										{summary.meanRssiDeltaDb >= 0 ? "stronger" : "weaker"} on
+										average ({summary.rssiPairs} pair(s))
+									</span>
+								)}
+								{summary.meanSnrDeltaDb !== null && (
+									<span
+										className="dim"
+										title={`Mean of B − A over the ${summary.snrPairs} matched pair(s) where BOTH radios reported SNR`}
+									>
+										{" · "}ΔSNR {summary.meanSnrDeltaDb >= 0 ? "+" : "−"}
+										{Math.abs(summary.meanSnrDeltaDb).toFixed(1)} dB mean
+									</span>
+								)}
+							</>
+						)}
+					</div>
+					<div className="scroll-x" style={{ padding: "0 8px 8px" }}>
+						<table className="grid">
+							<thead>
+								<tr>
+									<th title="Seconds on the common clock, measured from A's first frame">
+										TIME
+									</th>
+									<th>HEARD</th>
+									<th>A #</th>
+									<th>B #</th>
+									<th>LEN</th>
+									<th>RSSI A</th>
+									<th>RSSI B</th>
+									<th>Δ dB</th>
+									<th>SNR A</th>
+									<th>SNR B</th>
+									<th>Δ dB</th>
+									<th title="B's clock minus A's, less the estimated offset">
+										Δt ms
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{shownRows.map((row) => {
+									const frameA =
+										row.aIndex !== null ? framesA[row.aIndex] : null;
+									const frameB =
+										row.bIndex !== null ? framesB[row.bIndex] : null;
+									const pair = row.pair;
+									return (
+										<tr
+											key={`${row.kind}:${row.aIndex ?? "-"}:${row.bIndex ?? "-"}`}
+											tabIndex={frameA ? 0 : -1}
+											style={frameA ? { cursor: "pointer" } : undefined}
+											title={
+												frameA
+													? "Select this frame in the open capture (A)"
+													: "This frame is in capture B, which is not the one on screen"
+											}
+											onClick={() =>
+												row.aIndex !== null && onSelectA(row.aIndex)
+											}
+											onKeyDown={(e) => {
+												if (
+													row.aIndex !== null &&
+													(e.key === "Enter" || e.key === " ")
+												) {
+													e.preventDefault();
+													onSelectA(row.aIndex);
+												}
+											}}
+										>
+											<td>{row.timeS.toFixed(3)}</td>
+											<td
+												className={row.kind === "both" ? "ok" : "warn"}
+												title={
+													row.kind === "both"
+														? "Both devices heard this transmission"
+														: `Only capture ${row.kind === "a-only" ? "A" : "B"} holds this frame`
+												}
+											>
+												{row.kind === "both"
+													? "A+B"
+													: row.kind === "a-only"
+														? "A ONLY"
+														: "B ONLY"}
+											</td>
+											<td className={frameA ? "" : "dim"}>
+												{frameA ? Number(frameA.sequence) : "—"}
+											</td>
+											<td className={frameB ? "" : "dim"}>
+												{frameB ? Number(frameB.sequence) : "—"}
+											</td>
+											<td>{(frameA ?? frameB)?.capturedLength ?? 0}</td>
+											<td>
+												{frameA
+													? dbCell(
+															hasField(frameA, RF_FIELD.rssi)
+																? frameA.rssiDbm
+																: null,
+														)
+													: "—"}
+											</td>
+											<td>
+												{frameB
+													? dbCell(
+															hasField(frameB, RF_FIELD.rssi)
+																? frameB.rssiDbm
+																: null,
+														)
+													: "—"}
+											</td>
+											<td>{pair ? deltaCell(pair.rssiDeltaDb) : "—"}</td>
+											<td>
+												{frameA
+													? dbCell(
+															hasField(frameA, RF_FIELD.snr)
+																? frameA.snrDb
+																: null,
+														)
+													: "—"}
+											</td>
+											<td>
+												{frameB
+													? dbCell(
+															hasField(frameB, RF_FIELD.snr)
+																? frameB.snrDb
+																: null,
+														)
+													: "—"}
+											</td>
+											<td>{pair ? deltaCell(pair.snrDeltaDb) : "—"}</td>
+											<td className="dim">
+												{pair ? (pair.residualUs / 1000).toFixed(1) : "—"}
+											</td>
+										</tr>
+									);
+								})}
+								{rows.length === 0 && (
+									<tr>
+										<td colSpan={12} className="dim">
+											both captures are empty
+										</td>
+									</tr>
+								)}
+							</tbody>
+						</table>
+						{rows.length > shownRows.length && (
+							<div className="dim" style={{ paddingTop: 6, fontSize: 11 }}>
+								showing the first {shownRows.length} of{" "}
+								{rows.length.toLocaleString()} rows on the common clock
+							</div>
+						)}
+					</div>
+				</>
+			)}
+		</div>
+	);
+}
+
 /* ── URL hash query bag ────────────────────────────────────────────────
  * The view's shareable state lives in the hash: `filter=` (UI-003) plus
  * the permalink params `blob=` / `commit=` / `owner=` / `frame=` (UI-007).
@@ -1008,6 +1419,13 @@ interface CaptureView {
 	liveSeq: number;
 	/** True when any frame in it was generated rather than heard. */
 	containsSynthetic: boolean;
+	/**
+	 * This capture's field notes (UI-010). It belongs to the slot, so switching
+	 * captures switches notes with everything else, and it is never written
+	 * into the .lscap — the sidecar is a separate document, downloadable and
+	 * uploadable beside the capture.
+	 */
+	annotations: AnnotationSidecar;
 }
 
 const BLANK_VIEW: CaptureView = {
@@ -1023,6 +1441,7 @@ const BLANK_VIEW: CaptureView = {
 	publishError: null,
 	liveSeq: 1000,
 	containsSynthetic: false,
+	annotations: emptySidecar(),
 };
 
 /** The one slot the capture session records into; reused every recording. */
@@ -1170,6 +1589,13 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 					// 23 to 1000 read as a glitch, not a stream.
 					liveSeq: Number(c.frames[c.frames.length - 1]?.sequence ?? -1n) + 1,
 					containsSynthetic: c.frames.some((fr) => fr.synthetic),
+					// A fresh, empty sidecar that knows which capture it describes;
+					// an existing one is uploaded onto it (⭱ NOTES).
+					annotations: emptySidecar({
+						name: from,
+						frameCount: c.frames.length,
+						commitment: ref?.kind === "commit" ? ref.commitment : null,
+					}),
 					note:
 						c.trailingBytes > 0
 							? `${c.trailingBytes} trailing byte(s) were not a complete record`
@@ -1804,6 +2230,15 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		[frames],
 	);
 
+	// Every frame's addressing (UI-008), read once from its own protocol's
+	// header: the follow-conversation filter would otherwise re-read every
+	// header on every keystroke. Frames whose protocol proves no address carry
+	// the reason why, which is what the panel and the footer say out loud.
+	const addressings = useMemo(
+		() => frames.map((fr) => frameAddressing(fr.bytes, profileOf(fr))),
+		[frames],
+	);
+
 	// ── display filter ─────────────────────────────────────────────────
 	// The text is parsed on every keystroke; only a parse that succeeds is
 	// APPLIED. While the text is broken the table keeps the last valid
@@ -1838,11 +2273,18 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		if (!applied) return frames.map((_, i) => i);
 		const idx: number[] = [];
 		for (let i = 0; i < frames.length; i++) {
-			if (applied.predicate(frames[i], pointers[i] !== null, destHashes[i]))
+			if (
+				applied.predicate(
+					frames[i],
+					pointers[i] !== null,
+					destHashes[i],
+					addressings[i],
+				)
+			)
 				idx.push(i);
 		}
 		return idx;
-	}, [frames, pointers, destHashes, applied]);
+	}, [frames, pointers, destHashes, addressings, applied]);
 
 	// ── time brush ─────────────────────────────────────────────────────
 	// A range brushed on the IO graph is one more predicate over the text
@@ -1916,6 +2358,139 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 			current.trim() === expression ? "" : expression,
 		);
 	};
+
+	// ── follow conversation (UI-008) ───────────────────────────────────
+	// The analyzer's follow-stream gesture, composed as an ORDINARY display
+	// filter (lib/conversation) exactly the way the ANNOUNCES panel writes
+	// `dest ==`: it lands in the same box, stays editable, composes with what
+	// is already typed, and rides along in the permalink. The rows it leaves
+	// are in capture order, which is the capture clock.
+	const selectedAddress = addressings[selected] ?? null;
+	const followExpression = selectedAddress
+		? conversationExpression(selectedAddress)
+		: null;
+	/** The conversation the applied filter is following, if it is one. */
+	const following = useMemo(
+		() => (applied ? parseConversationExpression(applied.text) : null),
+		[applied],
+	);
+	const followingSelected =
+		followExpression !== null && applied?.text.trim() === followExpression;
+	// What a conversation filter can reach at all — and, explicitly, what it
+	// cannot: frames whose protocol proves no addressing are excluded from
+	// every conversation, and the footer below says so rather than dropping
+	// them silently.
+	const addressCoverage = useMemo(
+		() => conversationCoverage(addressings),
+		[addressings],
+	);
+	const followConversation = () => {
+		if (!followExpression) return;
+		setFilterText((current) =>
+			current.trim() === followExpression ? "" : followExpression,
+		);
+	};
+
+	// ── frame annotations (UI-010) ─────────────────────────────────────
+	// Notes belong to the capture (so they switch with the slot) and live in a
+	// sidecar keyed by sequence number. Nothing here writes a byte into the
+	// .lscap: the capture's commitment has to stay valid, which is the whole
+	// reason the notes are a separate document.
+	const annotations = view.annotations;
+	const noteBySequence = useMemo(() => noteMap(annotations), [annotations]);
+	const annotatedSeqs = useMemo(
+		() => annotatedSequences(annotations),
+		[annotations],
+	);
+	const notesFileRef = useRef<HTMLInputElement>(null);
+
+	/** Write one frame's note; returns an error to show, or null. */
+	const writeNote = (sequence: number, text: string): string | null => {
+		const result = setNote(annotations, sequence, text);
+		if (!result.ok) return result.error;
+		patch({ annotations: result.sidecar });
+		return null;
+	};
+
+	const onDownloadNotes = () => {
+		const fileName = sidecarFileName(name);
+		saveFile(
+			serializeSidecar(
+				describeCapture(annotations, {
+					name,
+					frameCount: frames.length,
+					commitment:
+						captureRef?.kind === "commit" ? captureRef.commitment : null,
+				}),
+			),
+			fileName,
+			"application/json",
+		);
+		setExportNote({
+			text: `${fileName} · ${annotations.notes.length} note(s) — a sidecar, not part of the capture's committed bytes`,
+			warn: false,
+		});
+	};
+
+	const onUploadNotes = async (file: File) => {
+		const parsed = parseSidecar(await file.text());
+		if (!parsed.ok) {
+			setExportNote({ text: `${file.name} · ${parsed.error}`, warn: true });
+			return;
+		}
+		const mismatches = sidecarMismatches(parsed.sidecar, {
+			name,
+			sequences: new Set(frames.map((fr) => Number(fr.sequence))),
+		});
+		patch({
+			annotations: describeCapture(parsed.sidecar, {
+				name,
+				frameCount: frames.length,
+			}),
+		});
+		const problems = [...parsed.skipped, ...mismatches];
+		setExportNote({
+			text: `${file.name} · ${parsed.sidecar.notes.length} note(s) loaded${
+				problems.length > 0 ? ` · ${problems.join(" · ")}` : ""
+			}`,
+			warn: problems.length > 0,
+		});
+	};
+
+	// ── diff two captures (UI-009) ─────────────────────────────────────
+	// The capture on screen is side A; the operator picks any other open slot
+	// as side B. The comparison belongs to the pair, not to either capture, so
+	// it lives here rather than in a slot's view — and it is computed only
+	// while a comparison is actually open, because matching two 100,000-frame
+	// captures is not something to do on every keystroke of a filter.
+	const [diffAgainstId, setDiffAgainstId] = useState<string | null>(null);
+	const diffSlot =
+		diffAgainstId && diffAgainstId !== slotState.activeId
+			? (slotState.slots.find((s) => s.id === diffAgainstId) ?? null)
+			: null;
+	const diffFrames = diffSlot?.view.capture?.frames ?? NO_FRAMES;
+	const diff = useMemo(
+		() => (diffSlot ? diffCaptures(frames, diffFrames) : null),
+		[diffSlot, frames, diffFrames],
+	);
+	const diffViewRows = useMemo(
+		() => (diff ? diffRows(frames, diffFrames, diff) : null),
+		[diff, frames, diffFrames],
+	);
+	/** Frames of the capture on screen that the other capture never heard. */
+	const diffUnmatchedHere = useMemo(
+		() => (diff ? new Set(diff.unmatchedA) : null),
+		[diff],
+	);
+	// A slot that closes, or becomes the active one, is no longer a side B.
+	useEffect(() => {
+		if (!diffAgainstId) return;
+		if (
+			diffAgainstId === slotState.activeId ||
+			!slotState.slots.some((s) => s.id === diffAgainstId)
+		)
+			setDiffAgainstId(null);
+	}, [diffAgainstId, slotState]);
 
 	// ── the virtualized frame table (UI-012) ───────────────────────────
 	// The table renders only the rows the scrollport can show; two spacer
@@ -2292,6 +2867,10 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 			{ filtered: applied !== null, brushed: brush !== null },
 			kind,
 		);
+		// Notes ride along in CSV and JSON, and only when there are notes —
+		// an unannotated capture must not export a column of empty cells.
+		const annotationsForExport =
+			noteBySequence.size > 0 ? noteBySequence : undefined;
 		if (kind === "pcap") {
 			const res = buildLoraTapPcap(exported);
 			saveFile(
@@ -2299,21 +2878,39 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 				fileName,
 				"application/vnd.tcpdump.pcap",
 			);
+			// pcap has no annotation channel any more than it has a provenance
+			// one, so the notes on the exported frames are counted and named
+			// rather than quietly dropped.
+			const annotationsOmitted = exported.frames.filter((fr) =>
+				noteBySequence.has(Number(fr.sequence)),
+			).length;
 			// The counts are surfaced whether or not anything was excluded —
 			// a pcap silently missing frames would be a lie about the air.
 			setExportNote({
-				text: `${fileName} · ${pcapExclusionNote(res)}`,
-				warn: res.excludedSynthetic + res.excludedUnencodable > 0,
+				text: `${fileName} · ${pcapExclusionNote({ ...res, annotationsOmitted })}`,
+				warn:
+					res.excludedSynthetic + res.excludedUnencodable + annotationsOmitted >
+					0,
 			});
 		} else {
-			const body = kind === "csv" ? buildCsv(exported) : buildJson(exported);
+			const options = { ...exported, annotations: annotationsForExport };
+			const body = kind === "csv" ? buildCsv(options) : buildJson(options);
 			saveFile(
 				body,
 				fileName,
 				kind === "csv" ? "text/csv" : "application/json",
 			);
+			const annotated = annotationsForExport
+				? exported.frames.filter((fr) =>
+						noteBySequence.has(Number(fr.sequence)),
+					).length
+				: 0;
 			setExportNote({
-				text: `${fileName} · ${exported.frames.length} frame(s) written`,
+				text: `${fileName} · ${exported.frames.length} frame(s) written${
+					annotationsForExport
+						? ` · note column included (${annotated} annotated)`
+						: ""
+				}`,
 				warn: false,
 			});
 		}
@@ -2487,6 +3084,39 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							>
 								⭳ JSON
 							</button>
+							{/* The notes sidecar (UI-010): a separate JSON document,
+							    downloadable and uploadable beside the capture. The
+							    .lscap itself is never rewritten. */}
+							<button
+								type="button"
+								onClick={onDownloadNotes}
+								disabled={annotations.notes.length === 0}
+								title={
+									annotations.notes.length === 0
+										? "No notes yet — select a frame and write one"
+										: `Save ${sidecarFileName(name)} — ${annotations.notes.length} note(s), stored beside the capture and never inside it`
+								}
+							>
+								⭳ NOTES
+							</button>
+							<button
+								type="button"
+								onClick={() => notesFileRef.current?.click()}
+								title="Load a notes sidecar written for this capture"
+							>
+								⭱ NOTES
+							</button>
+							<input
+								ref={notesFileRef}
+								type="file"
+								accept=".json,application/json"
+								hidden
+								onChange={(e) => {
+									const picked = e.target.files?.[0];
+									e.target.value = "";
+									if (picked) void onUploadNotes(picked);
+								}}
+							/>
 						</>
 					)}
 					<input
@@ -2572,6 +3202,41 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 								</span>
 							);
 						})}
+						{/* Compare the capture on screen against another open one
+						    (UI-009): two devices, one RF event. */}
+						{slotState.slots.length > 1 && (
+							<span
+								style={{
+									display: "flex",
+									gap: 6,
+									alignItems: "center",
+									flexShrink: 0,
+								}}
+							>
+								<label
+									className="dim"
+									htmlFor="traffic-diff-against"
+									style={{ fontSize: 10, letterSpacing: 1 }}
+								>
+									DIFF VS
+								</label>
+								<select
+									id="traffic-diff-against"
+									value={diffAgainstId ?? ""}
+									title="Match this capture against another open one, frame by frame"
+									onChange={(e) => setDiffAgainstId(e.target.value || null)}
+								>
+									<option value="">none</option>
+									{slotState.slots
+										.filter((s) => s.id !== slotState.activeId)
+										.map((s) => (
+											<option key={s.id} value={s.id}>
+												{s.name}
+											</option>
+										))}
+								</select>
+							</span>
+						)}
 					</div>
 				)}
 
@@ -2965,6 +3630,40 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							</div>
 						)}
 
+						{/* Following a conversation (UI-008): what is being followed, how
+						    much of the capture it left, and — explicitly — how many
+						    frames carry no decodable addressing at all and can never
+						    join any conversation. */}
+						{following && (
+							<div
+								className="panel-foot"
+								style={{
+									borderTop: "none",
+									alignItems: "baseline",
+									flexWrap: "wrap",
+									gap: 10,
+								}}
+							>
+								<span className="ok">
+									FOLLOWING {conversationLabel(following)}
+								</span>
+								<span>
+									{shown.length}/{frames.length} frame(s), in capture-clock
+									order
+								</span>
+								<span
+									className={addressCoverage.undecodable > 0 ? "warn" : "dim"}
+									title="A conversation filter can only match frames whose own protocol proves an address. Nothing is guessed for the rest."
+								>
+									{coverageNote(addressCoverage)}
+								</span>
+								<span className="spacer" />
+								<button type="button" onClick={() => setFilterText("")}>
+									CLEAR
+								</button>
+							</div>
+						)}
+
 						{/* IO graph: the (filtered) capture on one clock. Fixed height,
 						    canvas clipped inside its box — no scrollbars ever. Drag on
 						    the plot to brush a time range into the table. */}
@@ -3031,6 +3730,21 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							activeDestination={activeDestination}
 							onToggleDestination={toggleDestinationFilter}
 						/>
+
+						{/* DIFF: this capture against another open one, matched by
+						    payload and an estimated clock offset (UI-009). */}
+						{diffSlot && diff && diffViewRows && (
+							<DiffPanel
+								nameA={name}
+								nameB={diffSlot.name}
+								framesA={frames}
+								framesB={diffFrames}
+								diff={diff}
+								rows={diffViewRows}
+								onSelectA={selectFrame}
+								onClose={() => setDiffAgainstId(null)}
+							/>
+						)}
 
 						<div className="scroll-y" ref={tableRef}>
 							<div className="scroll-x">
@@ -3113,6 +3827,29 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 																◆
 															</span>
 														)}
+														{/* An annotated frame is marked by SHAPE, so it
+														    survives the inverted ink of a selected row
+														    and reads without colour vision. */}
+														{annotatedSeqs.has(Number(fr.sequence)) && (
+															<span
+																title={`note: ${noteBySequence.get(Number(fr.sequence))}`}
+															>
+																{" "}
+																✎
+															</span>
+														)}
+														{/* While a diff is open (UI-009), a frame the other
+														    capture never heard is marked here too — not only
+														    in the diff table. */}
+														{diffUnmatchedHere?.has(i) && (
+															<span
+																className="warn"
+																title={`not in ${diffSlot?.name ?? "the other capture"} — no matching payload within the aligned clock`}
+															>
+																{" "}
+																△
+															</span>
+														)}
 													</td>
 													<td>
 														{(Number(fr.timestampUs - t0) / 1e6).toFixed(3)}
@@ -3190,6 +3927,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							)}
 							{" · "}
 							{shownPointerCount} SHELBY POINTER(S)
+							{annotations.notes.length > 0 && (
+								<span title={sidecarSummary(annotations)}>
+									{" · "}✎ {annotations.notes.length} ANNOTATED
+								</span>
+							)}
 							{shownFlags.synthetic > 0 && (
 								<span className="warn">
 									{shownFlags.synthetic} SYNTHETIC · NOT OTA
@@ -3197,6 +3939,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							)}
 							{shownFlags.truncated && (
 								<span className="dim">* = FRAME TRUNCATED AT CAPTURE</span>
+							)}
+							{diffSlot && diffUnmatchedHere && (
+								<span className="dim">
+									△ = NOT IN {diffSlot.name} ({diffUnmatchedHere.size} HERE)
+								</span>
 							)}
 							<span className="spacer" />
 							{/* One link to exactly this view (UI-007) — or the honest
@@ -3266,7 +4013,47 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							<span className={`v ${f.synthetic ? "warn" : "dim"}`}>
 								{f.synthetic ? "SYNTHETIC · NOT OTA" : "UNMARKED"}
 							</span>
+							{/* Follow conversation (UI-008): one action, filtering the
+							    table to this frame's src/dst pair — where the protocol
+							    proves one. Where it does not, the frame says so instead
+							    of offering an action that would quietly do nothing. */}
+							<span className="k">CONVERSATION</span>
+							<span className="v">
+								{followExpression && selectedAddress ? (
+									<>
+										<button
+											type="button"
+											onClick={followConversation}
+											title={
+												followingSelected
+													? "Clear the display filter and show every frame again"
+													: `Filter the table to this conversation: ${followExpression}`
+											}
+										>
+											{followingSelected
+												? "✕ CLEAR FOLLOW"
+												: `⇄ FOLLOW ${conversationLabel(selectedAddress)}`}
+										</button>
+										{selectedAddress.reason && (
+											<span className="dim"> · {selectedAddress.reason}</span>
+										)}
+									</>
+								) : (
+									<span className="warn">
+										not addressable — {selectedAddress?.reason ?? "unknown"}
+									</span>
+								)}
+							</span>
 						</div>
+
+						{/* The frame's field note (UI-010). Keyed per frame so the
+						    draft always belongs to the frame on screen. */}
+						<FrameNotePanel
+							key={`note·${Number(f.sequence)}`}
+							sequence={Number(f.sequence)}
+							saved={noteFor(annotations, Number(f.sequence))?.text ?? ""}
+							onSave={(text) => writeNote(Number(f.sequence), text)}
+						/>
 
 						{ptr && (
 							<>

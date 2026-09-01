@@ -869,6 +869,30 @@ function payloadNodes(
 }
 
 /**
+ * The outer header's destination and source node numbers as 8-character
+ * lowercase hex — or null when the frame proves neither: shorter than the
+ * 16-byte outer header, or a zero sender (which the official firmware
+ * rejects as an altered packet, and `dissectMeshtastic` reports as
+ * malformed). This is the same header arithmetic `dissectMeshtastic`
+ * performs, without building a tree, for the follow-conversation filter
+ * (UI-008), which reads every frame of a capture on every keystroke.
+ * conversation.test.ts pins it against `dissectMeshtastic`'s own fields for
+ * fixtures, every prefix of them, and random bytes, so the two cannot drift.
+ */
+export function meshtasticAddressHex(
+	bytes: Uint8Array,
+): { src: string; dst: string } | null {
+	if (bytes.length < MESHTASTIC_OUTER_HEADER_LENGTH) return null;
+	const destination = readLe32(bytes, 0);
+	const source = readLe32(bytes, 4);
+	// Official firmware rejects a zero sender as an altered packet; a frame
+	// the dissector calls malformed names no conversation here either.
+	if (source === 0) return null;
+	const nodeHex = (value: number) => value.toString(16).padStart(8, "0");
+	return { src: nodeHex(source), dst: nodeHex(destination) };
+}
+
+/**
  * Dissect one Meshtastic frame. The caller (registry.ts) is responsible for
  * profile gating: Meshtastic's outer header has no magic bytes, so the
  * firmware only runs this decoder for an explicitly identified profile.

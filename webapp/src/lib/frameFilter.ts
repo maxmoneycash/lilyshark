@@ -23,11 +23,25 @@
  * readable destination hash (every non-Reticulum frame, and any split,
  * IFAC-masked or too-short RNS header) equal no hash at all.
  *
+ * Two address fields, `src` and `dst` (UI-008), are the same idea across
+ * protocols: the endpoints a frame's own dissector PROVES, written as the
+ * hex of the address bytes — 8 characters for a Meshtastic node number, 32
+ * for a Reticulum destination hash (so on a Reticulum frame `dst` and `dest`
+ * name the same 16 bytes). Like `dest` they take == and != only and match
+ * whole. Nothing is invented for a protocol whose dissector claims no
+ * address: MeshCore frames, frames whose profile named no protocol, and
+ * frames with an unreadable header have no `src` and no `dst`, so they equal
+ * no address at all — lib/conversation.ts owns that arithmetic and the words
+ * for it, and the follow-conversation gesture is nothing but the ordinary
+ * expression these fields make.
+ *
  * Errors never throw to the UI: parseFrameFilter returns a structured
  * error carrying the offending token's [start, end) offsets in the input,
  * so the caller can point at the exact token.
  */
 
+import type { FrameAddressing } from "./conversation";
+import { frameAddressing } from "./conversation";
 import { reticulumDestinationHashHex } from "./dissect/rnode";
 import { findShelbyPointer } from "./lscap";
 
@@ -55,12 +69,16 @@ export interface FilterFrame {
  * without it the predicate scans the frame's bytes itself. `destHashHex`
  * does the same for the Reticulum destination hash — pass the frame's
  * already-read hash (or null when it has none) and `dest ==` costs nothing
- * per keystroke; omit it and the predicate reads the header itself.
+ * per keystroke; omit it and the predicate reads the header itself. And
+ * `address` does the same again for `src`/`dst`: pass the frame's already-read
+ * addressing (lib/conversation) and following a conversation costs one array
+ * lookup per frame; omit it and the predicate reads the header itself.
  */
 export type FramePredicate = (
 	frame: FilterFrame,
 	hasPointer?: boolean,
 	destHashHex?: string | null,
+	address?: FrameAddressing | null,
 ) => boolean;
 
 export interface FilterError {
@@ -147,33 +165,81 @@ const ENUM_FIELDS: Record<string, EnumField> = {
 	},
 };
 
-/* ── hash fields ────────────────────────────────────────────────────── */
+/* ── hash and address fields ────────────────────────────────────────── */
 
 /** A destination hash is 16 bytes — 32 hex characters, nothing shorter. */
 export const DEST_HASH_HEX_LENGTH = 32;
 
 /**
- * Fields compared against a hash written as hex. `dest` reads the Reticulum
- * destination hash straight out of a frame's clear RNS header — the same
- * arithmetic dissect/rnode.ts uses, pinned to it by dissect.test.ts. The
- * read is gated on the frame's capture profile naming RNode, so no other
- * protocol's bytes are ever reinterpreted as an RNS header.
+ * Address literals are the hex of the address bytes a dissector proves: 8
+ * characters for a 4-byte Meshtastic node number, 32 for a 16-byte Reticulum
+ * destination hash. Any other width names no address any protocol here has.
  */
-const HASH_FIELDS: Record<
-	string,
-	(f: FilterFrame, precomputed?: string | null) => string | null
-> = {
-	dest: (f, precomputed) => {
-		if (precomputed !== undefined) return precomputed;
-		if (protoOfProfile(f.profileId) !== "rnode") return null;
-		return reticulumDestinationHashHex(f.bytes);
+export const ADDRESS_HEX_LENGTHS = [8, DEST_HASH_HEX_LENGTH] as const;
+
+/** A field compared against a hex literal of one of `lengths` characters. */
+interface HexField {
+	lengths: readonly number[];
+	/** How the error message describes an acceptable literal. */
+	describe: string;
+	get: (f: FilterFrame, precomputed: FilterPrecomputed) => string | null;
+}
+
+/** Whatever the caller already read for this frame, passed straight through. */
+interface FilterPrecomputed {
+	destHashHex?: string | null;
+	address?: FrameAddressing | null;
+}
+
+/**
+ * `dest` reads the Reticulum destination hash straight out of a frame's clear
+ * RNS header — the same arithmetic dissect/rnode.ts uses, pinned to it by
+ * dissect.test.ts. `src` and `dst` read whatever addressing the frame's own
+ * protocol proves (lib/conversation). Both reads are gated on the frame's
+ * capture profile, so no protocol's bytes are ever reinterpreted as another's
+ * header, and a frame that proves no address matches no address literal.
+ */
+const HEX_FIELDS: Record<string, HexField> = {
+	dest: {
+		lengths: [DEST_HASH_HEX_LENGTH],
+		describe: `a ${DEST_HASH_HEX_LENGTH}-character hex hash (16 bytes), matched whole — not a prefix`,
+		get: (f, pre) => {
+			if (pre.destHashHex !== undefined) return pre.destHashHex;
+			if (protoOfProfile(f.profileId) !== "rnode") return null;
+			return reticulumDestinationHashHex(f.bytes);
+		},
+	},
+	src: {
+		lengths: ADDRESS_HEX_LENGTHS,
+		describe:
+			"an address in hex, matched whole — 8 characters for a Meshtastic node, 32 for a Reticulum destination hash",
+		get: (f, pre) => addressOf(f, pre).src,
+	},
+	dst: {
+		lengths: ADDRESS_HEX_LENGTHS,
+		describe:
+			"an address in hex, matched whole — 8 characters for a Meshtastic node, 32 for a Reticulum destination hash",
+		get: (f, pre) => addressOf(f, pre).dst,
 	},
 };
+
+/** A caller-supplied `null` is the same claim `dest`'s null makes: this frame
+ *  proves no address, so it equals no address literal. */
+const NO_ADDRESS: FrameAddressing = {
+	src: null,
+	dst: null,
+	reason: "the caller read no addressing for this frame",
+};
+
+function addressOf(f: FilterFrame, pre: FilterPrecomputed): FrameAddressing {
+	if (pre.address !== undefined) return pre.address ?? NO_ADDRESS;
+	return frameAddressing(f.bytes, f.profileId);
+}
 
 export const FILTER_FIELDS = [
 	...Object.keys(NUMERIC_FIELDS),
 	...Object.keys(ENUM_FIELDS),
-	...Object.keys(HASH_FIELDS),
+	...Object.keys(HEX_FIELDS),
 	"has:pointer",
 	"has:synthetic",
 ] as const;
@@ -312,7 +378,7 @@ class Parser {
 		while (this.takeOp("||")) {
 			const l = left;
 			const r = this.parseAnd();
-			left = (f, hp, dh) => l(f, hp, dh) || r(f, hp, dh);
+			left = (f, hp, dh, ad) => l(f, hp, dh, ad) || r(f, hp, dh, ad);
 		}
 		return left;
 	}
@@ -322,7 +388,7 @@ class Parser {
 		while (this.takeOp("&&")) {
 			const l = left;
 			const r = this.parseUnary();
-			left = (f, hp, dh) => l(f, hp, dh) && r(f, hp, dh);
+			left = (f, hp, dh, ad) => l(f, hp, dh, ad) && r(f, hp, dh, ad);
 		}
 		return left;
 	}
@@ -330,7 +396,7 @@ class Parser {
 	private parseUnary(): FramePredicate {
 		if (this.takeOp("!")) {
 			const inner = this.parseUnary();
-			return (f, hp, dh) => !inner(f, hp, dh);
+			return (f, hp, dh, ad) => !inner(f, hp, dh, ad);
 		}
 		return this.parsePrimary();
 	}
@@ -383,11 +449,14 @@ class Parser {
 	 * `not` or `has` (n, o, r, s and t are not hex), so no operator keyword can
 	 * be swallowed by this.
 	 */
-	private readHashLiteral(field: Token): { text: string; token: Token } {
+	private readHashLiteral(
+		field: Token,
+		hexField: HexField,
+	): { text: string; token: Token } {
 		const first = this.peek();
 		if (first.kind !== "number" && first.kind !== "ident") {
 			fail(
-				`"${field.text}" compares against a ${DEST_HASH_HEX_LENGTH}-character hash in hex`,
+				`"${field.text}" compares against ${hexField.describe}`,
 				first.start,
 				first.end,
 			);
@@ -412,8 +481,8 @@ class Parser {
 		const field = this.next();
 		const numeric = NUMERIC_FIELDS[field.text];
 		const enumField = ENUM_FIELDS[field.text];
-		const hashField = HASH_FIELDS[field.text];
-		if (!numeric && !enumField && !hashField) {
+		const hexField = HEX_FIELDS[field.text];
+		if (!numeric && !enumField && !hexField) {
 			fail(
 				`unknown field "${field.text}" — one of ${FILTER_FIELDS.join(", ")}`,
 				field.start,
@@ -429,7 +498,7 @@ class Parser {
 		}
 		this.next();
 
-		if (hashField) {
+		if (hexField) {
 			if (ordered) {
 				fail(
 					`"${field.text}" has no ordering — use == or !=`,
@@ -437,21 +506,23 @@ class Parser {
 					op.end,
 				);
 			}
-			const literal = this.readHashLiteral(field);
+			const literal = this.readHashLiteral(field, hexField);
 			if (
-				literal.text.length !== DEST_HASH_HEX_LENGTH ||
+				!hexField.lengths.includes(literal.text.length) ||
 				!/^[0-9a-f]+$/.test(literal.text)
 			) {
 				fail(
-					`"${field.text}" is a ${DEST_HASH_HEX_LENGTH}-character hex hash (16 bytes), matched whole — not a prefix`,
+					`"${field.text}" is ${hexField.describe}`,
 					literal.token.start,
 					literal.token.end,
 				);
 			}
 			const want = literal.text;
 			return op.text === "=="
-				? (f, _hp, dh) => hashField(f, dh) === want
-				: (f, _hp, dh) => hashField(f, dh) !== want;
+				? (f, _hp, dh, ad) =>
+						hexField.get(f, { destHashHex: dh, address: ad }) === want
+				: (f, _hp, dh, ad) =>
+						hexField.get(f, { destHashHex: dh, address: ad }) !== want;
 		}
 
 		const value = this.next();

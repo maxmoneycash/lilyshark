@@ -201,6 +201,12 @@ export function pcapExclusionNote(result: {
 	written: number;
 	excludedSynthetic: number;
 	excludedUnencodable: number;
+	/**
+	 * Annotations (UI-010) the export was carrying and pcap could not: the
+	 * LoRaTap v0 header has no annotation channel, exactly as it has none for
+	 * provenance. Omitted when there were none to leave out.
+	 */
+	annotationsOmitted?: number;
 }): string {
 	const parts = [`${result.written} frame(s) written`];
 	if (result.excludedSynthetic > 0)
@@ -210,6 +216,10 @@ export function pcapExclusionNote(result: {
 	if (result.excludedUnencodable > 0)
 		parts.push(
 			`${result.excludedUnencodable} frame(s) LoRaTap v0 cannot encode`,
+		);
+	if ((result.annotationsOmitted ?? 0) > 0)
+		parts.push(
+			`${result.annotationsOmitted} annotation(s) not written — LoRaTap has no annotation channel; export CSV or JSON, or download the sidecar`,
 		);
 	return parts.join(" · ");
 }

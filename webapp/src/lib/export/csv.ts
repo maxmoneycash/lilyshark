@@ -5,9 +5,9 @@
  */
 import {
 	buildExportRows,
-	EXPORT_COLUMNS,
 	type ExportOptions,
 	type ExportRow,
+	exportColumns,
 } from "./rows";
 
 /**
@@ -20,15 +20,22 @@ export function csvField(value: string): string {
 }
 
 function cell(value: ExportRow[keyof ExportRow]): string {
-	if (value === null) return ""; // field not reported by the radio
+	// Null is a field the radio did not report; undefined is a column this
+	// export does not carry at all. Both are an empty cell, never a "null".
+	if (value === null || value === undefined) return "";
 	return csvField(String(value));
 }
 
-/** Build the complete CSV document, header row included. */
+/**
+ * Build the complete CSV document, header row included. The columns are the
+ * shared set, plus `note` only when the caller supplied annotations (UI-010)
+ * — an export without them is byte-identical to what this always wrote.
+ */
 export function buildCsv(options: ExportOptions): string {
-	const lines = [EXPORT_COLUMNS.join(",")];
+	const columns = exportColumns(options);
+	const lines = [columns.join(",")];
 	for (const row of buildExportRows(options)) {
-		lines.push(EXPORT_COLUMNS.map((column) => cell(row[column])).join(","));
+		lines.push(columns.map((column) => cell(row[column])).join(","));
 	}
 	return `${lines.join("\r\n")}\r\n`;
 }

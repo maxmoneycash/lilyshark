@@ -8,12 +8,14 @@ import assert from "node:assert";
 import test from "node:test";
 import { type LscapFrame, RF_FIELD, SHELBY_POINTER_SIZE } from "../lscap.ts";
 import {
+	ANNOTATED_EXPORT_COLUMNS,
 	buildCsv,
 	buildExportRows,
 	buildJson,
 	buildLoraTapPcap,
 	csvField,
 	EXPORT_COLUMNS,
+	exportColumns,
 	protocolLabel,
 } from "./index.ts";
 
@@ -317,4 +319,71 @@ test("JSON rows carry every column on every object", () => {
 	assert.equal(parsed[1].synthetic, true, "provenance survives JSON");
 	assert.equal(parsed[1].freq, null);
 	assert.equal(parsed[1].rssi, null);
+});
+
+// ── frame annotations (UI-010) ──────────────────────────────────────────
+
+test("without annotations the CSV and JSON are exactly what they always were", () => {
+	// The annotation column is additive by construction: an export that was
+	// never handed annotations must not grow a column of empty cells.
+	const frames = [frame(), frame({ sequence: 2n })];
+	assert.equal(buildCsv({ frames }).split("\r\n")[0], EXPORT_COLUMNS.join(","));
+	const parsed = JSON.parse(buildJson({ frames })) as Record<string, unknown>[];
+	for (const row of parsed) {
+		assert.ok(!("note" in row), "no note key without annotations");
+	}
+	assert.deepEqual(exportColumns({ frames }), EXPORT_COLUMNS);
+});
+
+test("annotations add one column, keyed by sequence number", () => {
+	const frames = [frame(), frame({ sequence: 2n })];
+	const annotations = new Map([[1, 'interferer starts, "loud"']]);
+	assert.deepEqual(
+		exportColumns({ frames, annotations }),
+		ANNOTATED_EXPORT_COLUMNS,
+	);
+
+	const lines = buildCsv({ frames, annotations }).split("\r\n");
+	assert.equal(lines[0], `${EXPORT_COLUMNS.join(",")},note`);
+	assert.ok(
+		lines[1].endsWith(',"interferer starts, ""loud"""'),
+		`annotated row quotes its note: ${lines[1]}`,
+	);
+	// A frame with no note gets an empty cell, not the word "null".
+	assert.ok(lines[2].endsWith(",false,"), `unannotated row: ${lines[2]}`);
+
+	const parsed = JSON.parse(buildJson({ frames, annotations })) as Record<
+		string,
+		unknown
+	>[];
+	assert.equal(parsed[0].note, 'interferer starts, "loud"');
+	assert.equal(parsed[1].note, null, "unannotated frames carry null, not ''");
+	for (const row of parsed) {
+		assert.deepEqual(
+			Object.keys(row).sort(),
+			[...ANNOTATED_EXPORT_COLUMNS].sort(),
+		);
+	}
+});
+
+test("a note for a frame outside the export simply does not appear", () => {
+	const rows = buildExportRows({
+		frames: [frame()],
+		annotations: new Map([[999, "about a frame that is not here"]]),
+	});
+	assert.equal(rows.length, 1);
+	assert.equal(rows[0].note, null);
+});
+
+test("pcap carries no annotation channel, so annotations change nothing", () => {
+	// LoRaTap v0 has no field for a note, exactly as it has none for
+	// provenance; the writer must not invent one.
+	const frames = [frame()];
+	const plain = buildLoraTapPcap({ frames });
+	const annotated = buildLoraTapPcap({
+		frames,
+		annotations: new Map([[1, "interferer starts"]]),
+	});
+	assert.deepEqual(annotated.bytes, plain.bytes);
+	assert.equal(annotated.written, plain.written);
 });

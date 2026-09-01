@@ -234,4 +234,26 @@ describe("pcapExclusionNote", () => {
 		assert.match(note, /no provenance channel/);
 		assert.match(note, /1 frame\(s\) LoRaTap v0 cannot encode/);
 	});
+
+	it("says when annotations could not ride along", () => {
+		const note = pcapExclusionNote({
+			written: 24,
+			excludedSynthetic: 0,
+			excludedUnencodable: 0,
+			annotationsOmitted: 2,
+		});
+		assert.match(note, /24 frame\(s\) written/);
+		assert.match(note, /2 annotation\(s\) not written/);
+		assert.match(note, /no annotation channel/);
+		// Nothing to leave out, nothing said.
+		assert.equal(
+			pcapExclusionNote({
+				written: 24,
+				excludedSynthetic: 0,
+				excludedUnencodable: 0,
+				annotationsOmitted: 0,
+			}),
+			"24 frame(s) written",
+		);
+	});
 });
