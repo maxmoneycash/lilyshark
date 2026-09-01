@@ -496,6 +496,12 @@ FieldTab field_tab = FieldTab::Lily;
 // which meant a peer past Santa Rosa could be *heard*, listed with a range,
 // and still be impossible to put on the map at any zoom. A mesh whose whole
 // point is distance needs a map that can hold one.
+//
+// The baked tile set must reach this floor. It once stopped at z12 while this
+// said 8, so zooming out past a town silently dropped to the drawn chart and
+// looked like the map had simply stopped working. scripts/embed_map_tiles.py
+// and scripts/build_map_card.py both take --min-zoom; keep them at or below
+// this value.
 constexpr int kMapZoomMin = 8;
 // z20 is ~0.12 m/px: two operators standing five metres apart are ~43 px
 // apart on screen, which is the point of zooming in this far.
