@@ -975,11 +975,22 @@ bool resetSettingsSaveFailureScenario()
                     hasLabel(lv_screen_active(), "1 / 6") &&
                     !hasLabel(lv_screen_active(), "RESET SETUP"),
                 "successful reset retry did not return to first-run setup")) return false;
+    // Compare against defaultAppSettings() rather than the numbers it happens
+    // to hold today: a reset must persist whatever the shipped defaults are,
+    // and hard-coded copies of them go stale the moment a default is retuned.
+    const lilyshark::AppSettings defaults = lilyshark::defaultAppSettings();
     if(!require(state().app_settings_put_calls == 2U && loadSavedAppSettings(persisted) &&
                     !persisted.onboarding_complete && persisted.onboarding_version == 0U &&
-                    persisted.display_brightness == 12U &&
-                    persisted.keyboard_brightness == 96U && persisted.gps_enabled &&
-                    !persisted.resume_last_view,
+                    persisted.display_brightness == defaults.display_brightness &&
+                    persisted.keyboard_brightness == defaults.keyboard_brightness &&
+                    persisted.gps_enabled == defaults.gps_enabled &&
+                    persisted.resume_last_view == defaults.resume_last_view &&
+                    persisted.capture_enabled == defaults.capture_enabled &&
+                    persisted.simulate_mode == defaults.simulate_mode &&
+                    persisted.spectrum_warning_acknowledged ==
+                        defaults.spectrum_warning_acknowledged &&
+                    persisted.last_primary_diagnostic_index ==
+                        defaults.last_primary_diagnostic_index,
                 "successful reset retry did not persist default settings")) return false;
     return true;
 }
@@ -989,7 +1000,14 @@ bool displayInputSaveFailureScenario()
     device_shell_fake::reset();
     Wire.reset();
     radiolib_fake::state().reset();
-    if(!require(seedCompletedAppSettings(),
+    // Seed a brightness that is neither a default nor an end of the 1..16
+    // range, so the screen is proven to show the persisted value and a
+    // rejected step is proven to restore it rather than to have been clamped.
+    lilyshark::AppSettings stored = lilyshark::defaultAppSettings();
+    stored.onboarding_version = lilyshark::kAppSettingsOnboardingVersion;
+    stored.onboarding_complete = true;
+    stored.display_brightness = 12U;
+    if(!require(seedAppSettings(stored),
                 "completed display settings could not be encoded")) return false;
 
     setup();

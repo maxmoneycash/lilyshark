@@ -4,7 +4,7 @@ title: Fix the device-shell test target at HEAD
 area: firmware
 size: S
 priority: P1
-status: todo
+status: done
 eval:
   rubric:
   - '`pio test -e device-shell-test` passes on a clean checkout: the fake HardwareSerial grows the print() overloads the shell code uses, and the reset-settings-save-failure scenario is diagnosed and fixed (test_device_shell.cpp:1500).'

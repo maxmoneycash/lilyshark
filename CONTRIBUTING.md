@@ -40,7 +40,21 @@
 ./scripts/test_all.sh                    # + simulator & t-deck builds, factory check
 uvx --from platformio==6.1.19 platformio run -e simulator
 uvx --from platformio==6.1.19 platformio run -e t-deck
+uvx --from platformio==6.1.19 platformio test -e device-shell-test
 cd webapp && npm test && npm run build   # webapp tests and production build
+```
+
+Every PlatformIO environment pulls LVGL 9.3.0 as a release archive from
+GitHub, which some corporate and sandboxed networks answer with a 403. Put the
+pinned tag in place by hand and PlatformIO uses it as-is — the `.piopm` marker
+is what tells the library manager the directory is that dependency, not one to
+re-download:
+
+```sh
+git clone --depth 1 --branch v9.3.0 https://github.com/lvgl/lvgl.git \
+  .pio/libdeps/device-shell-test/lvgl
+printf '%s' '{"type":"library","name":"lvgl","version":"9.3.0","spec":{"name":"lvgl","uri":"https://github.com/lvgl/lvgl/archive/refs/tags/v9.3.0.zip"}}' \
+  > .pio/libdeps/device-shell-test/lvgl/.piopm
 ```
 
 ## Pull requests
