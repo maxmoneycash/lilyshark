@@ -1,5 +1,5 @@
-// Palette and layout copied from src/sim_main.cpp (kIos6* / kChat*).
-// test/ios6_lab/test_ios6_lab.py fails if these drift from the firmware.
+// Palette and layout from agent/ios6-chat-ui @ 2ae8e70 (kIos6* / kChat*).
+// Main no longer carries that chrome. test/ios6_lab freezes these numbers.
 
 (function (global) {
     const Ios6 = global.Ios6 || (global.Ios6 = {});

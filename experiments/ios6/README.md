@@ -4,11 +4,15 @@ A 320×240 playground for iterating an iOS 6-style shell on the T-Deck
 panel. Nothing here is compiled into the firmware.
 
 The device is 320×240 RGB565 (76,800 pixels, 65,536 colours), ST7789 at
-rotation 1, LilyGO 2.8″ IPS. Firmware CHAT already uses this chrome —
-glossy `ios6_panel` fills, 4 bpp `font_condensed_12` on bubbles, 1 bpp
-`font_pixel_6x8` on chrome. HOME and the analyzer views still paint the
-1-bit face on the same 16-bit panel. This folder is where the rest of
-that language gets tried before anyone ports it.
+rotation 1, LilyGO 2.8″ IPS. The skeuomorphic Messages treatment that
+briefly lived on main now sits on `agent/ios6-chat-ui` (held at
+`2ae8e70`, moved off main by `a15bd3e`). Main is the terminal chat
+again. This folder is the sketchbook for taking that language further
+before anyone ports it back.
+
+HOME and the analyzer views still paint the 1-bit `font_pixel_6x8` face
+on the same 16-bit panel. The extra tones on the iOS 6 frames come from
+`font_condensed_12` (4 bpp) plus gradient fills and corner AA.
 
 ## Open it
 
@@ -31,7 +35,7 @@ lab still runs on Helvetica / Arial.
 | Lock | Wallpaper, clock, slide to unlock |
 | Home | SpringBoard icon grid + dock |
 | Field | HOME’s radio facts in grouped iOS 6 chrome |
-| Messages | Firmware CHAT layout, same `kIos6*` / `kChat*` numbers |
+| Messages | The `agent/ios6-chat-ui` CHAT layout, same `kIos6*` / `kChat*` numbers |
 | Nodes | Heard roster as a grouped table |
 | Radio | Felt face, LCD readout, LISTEN |
 | Settings | Grouped tables + the RGB565 switch |
@@ -50,11 +54,17 @@ Font faces:
 
 ## Palette
 
-`js/palette.js` copies `kIos6*` and `kChat*` from `src/sim_main.cpp`.
-`test/ios6_lab/test_ios6_lab.py` fails if those numbers drift.
+`js/palette.js` holds the kit from `agent/ios6-chat-ui` @ `2ae8e70`.
+`test/ios6_lab/test_ios6_lab.py` freezes those numbers. It does not
+read the terminal chat still in `src/sim_main.cpp`.
+
+The measured reference screenshot for bubbles is the kit’s
+`public/reference/chat.png` (content-sized multi-line blocks, not
+single-line strips).
 
 ## Porting
 
-A draft that earns its pixels goes into `src/sim_main.cpp` the same way
-CHAT did: `ios6_panel`, the existing LVGL fonts, no new flash cost.
-This folder stays the sketchbook.
+A draft that earns its pixels goes onto `agent/ios6-chat-ui` the same
+way CHAT did there: `ios6_panel`, the existing LVGL fonts, no new
+flash cost. This folder stays the sketchbook. Main stays the terminal
+chat until that branch is ready to come back.

@@ -532,7 +532,7 @@
         lock: { id: "lock", title: "Lock", hint: "Drag the slider, or click the knob’s right half.", draw: drawLock },
         home: { id: "home", title: "Home", hint: "SpringBoard icons open the other drafts.", draw: drawHome },
         field: { id: "field", title: "Field", hint: "HOME’s radio facts, in grouped iOS 6 chrome.", draw: drawField },
-        messages: { id: "messages", title: "Messages", hint: "Firmware CHAT layout. Type, then SEND.", draw: drawMessages },
+        messages: { id: "messages", title: "Messages", hint: "The agent/ios6-chat-ui layout. Type, then SEND.", draw: drawMessages },
         nodes: { id: "nodes", title: "Nodes", hint: "A row opens that conversation.", draw: drawNodes },
         radio: { id: "radio", title: "Radio", hint: "LISTEN toggles the receiver caption.", draw: drawRadio },
         settings: { id: "settings", title: "Settings", hint: "The switch mirrors the RGB565 checkbox.", draw: drawSettings },

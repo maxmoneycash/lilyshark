@@ -13,8 +13,55 @@ LAB = REPO / "experiments/ios6/js/lab.js"
 INDEX = REPO / "experiments/ios6/index.html"
 README = REPO / "experiments/ios6/README.md"
 
-IOS6_CPP = re.compile(r"constexpr std::uint32_t kIos6(\w+) = 0x([0-9a-fA-F]+);")
-CHAT_CPP = re.compile(r"constexpr lv_coord_t k(Chat\w+) = (-?\d+);")
+# Frozen from agent/ios6-chat-ui @ 2ae8e70. Main no longer carries this
+# chrome (a15bd3e moved it off). The lab is the sketchbook; do not pin
+# these against the terminal chat still in src/sim_main.cpp.
+KIT_COLORS = {
+    "Backdrop": 0xDBE4F1,
+    "NavTop": 0x8BA7C7,
+    "NavBottom": 0x31537C,
+    "NavEdge": 0x2B486B,
+    "BlueTop": 0xB9E3FF,
+    "BlueBottom": 0x68B4F6,
+    "BlueEdge": 0x5E95C9,
+    "GrayTop": 0xFFFFFF,
+    "GrayBottom": 0xD9D9D9,
+    "GrayEdge": 0xB7B7B7,
+    "BarTop": 0xCBD3DD,
+    "BarBottom": 0x81909E,
+    "BarEdge": 0x69717B,
+    "InputTop": 0xE1E1E1,
+    "InputBottom": 0xFFFFFF,
+    "SendTop": 0x8FC2FF,
+    "SendBottom": 0x1D58C4,
+    "SendEdge": 0x3568BA,
+    "ButtonTop": 0xFFFFFF,
+    "ButtonBottom": 0xD9E0E8,
+    "ButtonEdge": 0xA9B2BC,
+    "ButtonInk": 0x506994,
+    "Meta": 0x8C97A5,
+    "Ink": 0x000000,
+    "White": 0xFFFFFF,
+}
+
+KIT_LAYOUT = {
+    "ChatTabY": 26,
+    "ChatTabH": 16,
+    "ChatRuleY": 44,
+    "ChatOlderY": 3,
+    "ChatOlderH": 18,
+    "ChatOlderBtnX": 4,
+    "ChatOlderBtnW": 50,
+    "ChatNewerBtnX": 266,
+    "ChatNewerBtnW": 50,
+    "ChatMsgY": 46,
+    "ChatMetaY": 168,
+    "ChatSendX": 262,
+    "ChatSendY": 186,
+    "ChatSendW": 52,
+    "ChatSendH": 30,
+}
+
 JS_COLOR = re.compile(r"(\w+):\s*0x([0-9a-fA-F]+)")
 JS_LAYOUT = re.compile(r"(Chat\w+|SCREEN_WIDTH|SCREEN_HEIGHT|StatusH|NavH|DockH):\s*(-?\d+)")
 JS_WIDTH = re.compile(r"Ios6\.SCREEN_WIDTH = (\d+);")
@@ -61,38 +108,20 @@ class Ios6LabTests(unittest.TestCase):
         self.assertIn("kTDeckTouchWidth = 320", touch)
         self.assertIn("kTDeckTouchHeight = 240", touch)
 
-    def test_ios6_colors_match_firmware(self):
-        firmware = {name: int(value, 16) for name, value in IOS6_CPP.findall(self.sim)}
+    def test_firmware_on_this_tree_is_the_terminal_chat(self):
+        self.assertNotIn("kIos6Backdrop", self.sim)
+        self.assertIn("agent/ios6-chat-ui", README.read_text(encoding="utf-8"))
+
+    def test_palette_keeps_the_ios6_kit(self):
         lab = {name: int(value, 16) for name, value in JS_COLOR.findall(self.palette)}
-        self.assertGreaterEqual(len(firmware), 20)
-        missing = [name for name in firmware if name not in lab]
-        self.assertEqual(missing, [])
-        for name, value in firmware.items():
+        for name, value in KIT_COLORS.items():
+            self.assertIn(name, lab, name)
             self.assertEqual(lab[name], value, name)
 
-    def test_chat_layout_matches_firmware(self):
-        firmware = {name: int(value) for name, value in CHAT_CPP.findall(self.sim)}
+    def test_chat_layout_keeps_the_ios6_kit(self):
         lab = {name: int(value) for name, value in JS_LAYOUT.findall(self.palette)}
-        needed = (
-            "ChatTabY",
-            "ChatTabH",
-            "ChatRuleY",
-            "ChatOlderY",
-            "ChatOlderH",
-            "ChatOlderBtnX",
-            "ChatOlderBtnW",
-            "ChatNewerBtnX",
-            "ChatNewerBtnW",
-            "ChatMsgY",
-            "ChatMetaY",
-            "ChatSendX",
-            "ChatSendY",
-            "ChatSendW",
-            "ChatSendH",
-        )
-        for name in needed:
-            self.assertIn(name, firmware, name)
-            self.assertEqual(lab[name], firmware[name], name)
+        for name, value in KIT_LAYOUT.items():
+            self.assertEqual(lab[name], value, name)
 
     def test_screen_order_matches_registered_screens(self):
         order = [
