@@ -871,10 +871,13 @@ bool healthyScenario()
         if(!require(hasLabel(lv_screen_active(), "TYPE A MESSAGE"),
                     "C did not open Chat for the delivery check")) return false;
         // The DM conversation lives on its own tab; cycle to it.
-        bool saw_delivered = hasLabel(lv_screen_active(), "YOU  DELIVERED");
+        // DELIVERED is its own grey line under the bubble now, the way that
+        // system placed it, rather than a suffix on the speaker's name. It
+        // still only renders for a message of yours the peer has confirmed.
+        bool saw_delivered = hasLabel(lv_screen_active(), "DELIVERED");
         for(int hop = 0; hop < 4 && !saw_delivered; ++hop) {
             sendKeyboard('\t');
-            saw_delivered = hasLabel(lv_screen_active(), "YOU  DELIVERED");
+            saw_delivered = hasLabel(lv_screen_active(), "DELIVERED");
         }
         if(!require(saw_delivered,
                     "the peer acknowledgement did not mark the message DELIVERED")) return false;
