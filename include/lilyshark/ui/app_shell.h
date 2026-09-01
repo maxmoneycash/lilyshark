@@ -27,6 +27,13 @@ enum class ShellRoute : std::uint8_t {
     About,
     SpectrumConfirmation,
     ResetConfirmation,
+    // Sync word and preamble editing, alongside the tuning the profile screen
+    // already steps. Reached from the radio profile list and from Settings.
+    RadioTuning,
+    // Named channel keys stored on the device. See
+    // include/lilyshark/core/channel_keys.h for what that storage does and
+    // does not protect.
+    ChannelKeys,
     Count,
 };
 
@@ -67,6 +74,10 @@ enum class SettingsItem : std::uint8_t {
     Help,
     About,
     ResetSetup,
+    // Appended rather than inserted: the entries above keep their indices, so
+    // a stored menu position still means what it meant.
+    RadioTuning,
+    ChannelKeys,
     Count,
 };
 

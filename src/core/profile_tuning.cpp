@@ -20,6 +20,63 @@ struct FrequencyGrid {
 constexpr FrequencyBand kUs902Band{902000000U, 928000000U};
 constexpr FrequencyBand kEu863Band{863000000U, 870000000U};
 
+struct RegionalBand {
+    RegionCode region;
+    const char *label;
+    FrequencyBand band;
+};
+
+// Regional band plans. Each entry cites the band plan it encodes; the analyzer
+// is only as trustworthy as the numbers it tunes to, and an uncited edge is a
+// number nobody can check.
+//
+// The Meshtastic figures come from meshtastic/firmware `regions[]` in
+// src/mesh/RadioInterface.cpp at commit
+// 34680833b88b37bbcffca0b31dffe45f29e9d35c — the same commit this repository's
+// Meshtastic header parser is verified against — and each RDEF entry there
+// carries the regulatory citation reproduced below it.
+constexpr RegionalBand kRegionalBands[] = {
+    // US915. Meshtastic RDEF(US, 902.0, 928.0). FCC 47 CFR §15.247 digital
+    // modulation band 902-928 MHz; LoRa Alliance RP002 US902-928.
+    {RegionCode::US915, "US915", {902000000U, 928000000U}},
+    // EU868. Meshtastic RDEF(EU_868, 869.4, 869.65). ETSI EN 300 220-2 V3.2.1
+    // table B.1 item H (869.4-869.65 MHz, 500 mW e.r.p., 10 % duty cycle).
+    // Only 250 kHz wide, so it holds exactly one 250 kHz LoRa slot —
+    // 869.525 MHz, the centre Meshtastic's EU_868 LongFast lands on.
+    {RegionCode::EU868, "EU868", {869400000U, 869650000U}},
+    // EU863. The general ETSI EN 300 220-2 SRD allocation 863-870 MHz, which
+    // is the span RNode/Reticulum deployments tune freely inside; it is the
+    // band the existing "RNODE EXAMPLE EU" preset has always used.
+    {RegionCode::EU863, "EU863", {863000000U, 870000000U}},
+    // AU915. Meshtastic RDEF(ANZ, 915.0, 928.0), citing the ACMA Low
+    // Interference Potential Devices class licence and the NZ IoT Alliance
+    // spectrum briefing. Overlaps US915, which is exactly why the band plan
+    // has to be stored on the profile rather than guessed from the centre.
+    {RegionCode::AU915, "AU915", {915000000U, 928000000U}},
+    // AS923. LoRa Alliance RP002-1.0.4 groups AS923 as national sub-bands
+    // rather than one range, so this uses the 920.0-925.0 MHz span shared by
+    // Meshtastic's RDEF(TH, 920.0, 925.0) and RDEF(TW, 920.0, 925.0) entries
+    // (NBTC 1033-2565 for TH; NCC low-power RF regulations §5.8.1 for TW).
+    {RegionCode::AS923, "AS923", {920000000U, 925000000U}},
+    // IN865. Meshtastic RDEF(IN, 865.0, 867.0), citing LoRaWAN regional
+    // parameters v1.0.3revA IN865-867; India WPC delicensed 865-867 MHz.
+    {RegionCode::IN865, "IN865", {865000000U, 867000000U}},
+    // KR920. Meshtastic RDEF(KR, 920.0, 923.0), citing the Korean MSIT
+    // radio-equipment notice and LoRa Alliance RP002-1.0.4 KR920-923.
+    {RegionCode::KR920, "KR920", {920000000U, 923000000U}},
+};
+
+bool regionalBand(RegionCode region, FrequencyBand &band) noexcept
+{
+    for (const RegionalBand &entry : kRegionalBands) {
+        if (entry.region == region) {
+            band = entry.band;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool tuningBand(const RadioProfile &profile, FrequencyBand &band) noexcept
 {
     if (profile.modulation != Modulation::LoRa) {
@@ -27,6 +84,20 @@ bool tuningBand(const RadioProfile &profile, FrequencyBand &band) noexcept
     }
 
     const std::uint32_t frequency = profile.center_frequency_hz;
+    if (profile.region != RegionCode::Unspecified) {
+        // A declared band plan is authoritative. Nothing is inferred from the
+        // centre frequency, because overlapping plans make that ambiguous.
+        FrequencyBand declared{};
+        if (!regionalBand(profile.region, declared)) {
+            return false;
+        }
+        if (frequency < declared.lower_hz || frequency > declared.upper_hz) {
+            return false;
+        }
+        band = declared;
+        return true;
+    }
+
     if ((profile.protocol_hint == ProtocolId::Meshtastic ||
          profile.protocol_hint == ProtocolId::MeshCore) &&
         frequency >= kUs902Band.lower_hz && frequency <= kUs902Band.upper_hz) {
@@ -126,6 +197,13 @@ bool configuredMeshtasticSlot(const RadioProfile &profile, const FrequencyGrid &
                               std::uint64_t &slot) noexcept
 {
     if (profile.frequency_tuning_policy == FrequencyTuningPolicy::DefaultHashed) {
+        // The hashed slot table above is the US band's, and Meshtastic's slot
+        // hash is region- and channel-name-dependent. Rather than pretend the
+        // US answer generalises, every other band plan must name its slot.
+        if (profile.region != RegionCode::Unspecified &&
+            profile.region != RegionCode::US915) {
+            return false;
+        }
         return profile.frequency_slot == 0U && defaultHashedSlot(profile.bandwidth_hz, slot) &&
                slot < grid.slot_count;
     }
@@ -157,6 +235,15 @@ RadioProfile stepMeshtasticFrequency(const RadioProfile &profile, FrequencyBand 
     tuned.frequency_slot = static_cast<std::uint16_t>(slot);
     tuned.center_frequency_hz = static_cast<std::uint32_t>(gridCenter(grid, slot));
     return tuned;
+}
+
+/// Re-derive the preamble unless an operator has typed one. This is the single
+/// place bandwidth and spreading-factor changes decide whether to disturb it.
+void refreshDerivedPreamble(RadioProfile &profile) noexcept
+{
+    if (!profile.preamble_override) {
+        profile.preamble_symbols = derivePreambleSymbols(profile);
+    }
 }
 
 template <typename Value, std::size_t Count>
@@ -238,14 +325,14 @@ RadioProfile cycleProfileBandwidth(const RadioProfile &profile) noexcept
         FrequencyGrid new_grid{};
         if (!tuningBand(profile, band) ||
             !occupiedBandGrid(band, tuned.bandwidth_hz, new_grid)) {
-            tuned.preamble_symbols = derivePreambleSymbols(tuned);
+            refreshDerivedPreamble(tuned);
             return tuned;
         }
 
         std::uint64_t slot = 0;
         if (profile.frequency_tuning_policy == FrequencyTuningPolicy::DefaultHashed) {
             if (!defaultHashedSlot(tuned.bandwidth_hz, slot)) {
-                tuned.preamble_symbols = derivePreambleSymbols(tuned);
+                refreshDerivedPreamble(tuned);
                 return tuned;
             }
             tuned.frequency_slot = 0U;
@@ -253,13 +340,13 @@ RadioProfile cycleProfileBandwidth(const RadioProfile &profile) noexcept
             slot = static_cast<std::uint64_t>(profile.frequency_slot) % new_grid.slot_count;
             tuned.frequency_slot = static_cast<std::uint16_t>(slot);
         } else {
-            tuned.preamble_symbols = derivePreambleSymbols(tuned);
+            refreshDerivedPreamble(tuned);
             return tuned;
         }
         tuned.center_frequency_hz = static_cast<std::uint32_t>(
             gridCenter(new_grid, slot));
     }
-    tuned.preamble_symbols = derivePreambleSymbols(tuned);
+    refreshDerivedPreamble(tuned);
     return tuned;
 }
 
@@ -272,7 +359,7 @@ RadioProfile cycleProfileSpreadingFactor(const RadioProfile &profile) noexcept
     constexpr std::uint8_t values[] = {7U, 8U, 9U, 10U, 11U, 12U};
     RadioProfile tuned = profile;
     tuned.spreading_factor = nextValue(profile.spreading_factor, values);
-    tuned.preamble_symbols = derivePreambleSymbols(tuned);
+    refreshDerivedPreamble(tuned);
     return tuned;
 }
 
@@ -314,6 +401,109 @@ std::uint16_t derivePreambleSymbols(const RadioProfile &profile) noexcept
         }
     }
     return profile.preamble_symbols;
+}
+
+const char *regionLabel(RegionCode region) noexcept
+{
+    for (const RegionalBand &entry : kRegionalBands) {
+        if (entry.region == region) {
+            return entry.label;
+        }
+    }
+    return "AUTO";
+}
+
+bool regionBandLimits(RegionCode region, std::uint32_t &lower_hz,
+                      std::uint32_t &upper_hz) noexcept
+{
+    FrequencyBand band{};
+    if (!regionalBand(region, band)) {
+        return false;
+    }
+    lower_hz = band.lower_hz;
+    upper_hz = band.upper_hz;
+    return true;
+}
+
+bool isSupportedSyncWord(std::uint16_t sync_word) noexcept
+{
+    if (sync_word <= 0xffU) {
+        return true;
+    }
+    // Two-byte register form. SX1262 registers 0x0740/0x0741 hold the logical
+    // sync word in the upper nibble of each byte and RadioLib's control bits
+    // (0x4, 0x4) in the lower nibbles, which is why the private and public
+    // words read 0x1424 and 0x3444. Any other low nibble is not a value the
+    // driver can round-trip, so it is refused rather than masked into shape.
+    return (sync_word & 0x0f0fU) == 0x0404U;
+}
+
+bool isSupportedPreambleSymbols(const RadioProfile &profile,
+                                std::uint16_t symbols) noexcept
+{
+    if (symbols < kMinimumPreambleSymbols || symbols > kMaximumPreambleSymbols) {
+        return false;
+    }
+    return profile.preamble_override || symbols == derivePreambleSymbols(profile);
+}
+
+ProfileEditResult setProfileSyncWord(const RadioProfile &profile, std::uint16_t sync_word,
+                                     RadioProfile &out) noexcept
+{
+    if (profile.modulation != Modulation::LoRa) {
+        return ProfileEditResult::UnsupportedModulation;
+    }
+    if (!isSupportedSyncWord(sync_word)) {
+        return ProfileEditResult::OutOfRange;
+    }
+    out = profile;
+    if (profile.sync_word == sync_word) {
+        return ProfileEditResult::Unchanged;
+    }
+    out.sync_word = sync_word;
+    return ProfileEditResult::Applied;
+}
+
+ProfileEditResult setProfilePreambleSymbols(const RadioProfile &profile,
+                                            std::uint16_t symbols,
+                                            RadioProfile &out) noexcept
+{
+    if (profile.modulation != Modulation::LoRa) {
+        return ProfileEditResult::UnsupportedModulation;
+    }
+    if (symbols < kMinimumPreambleSymbols || symbols > kMaximumPreambleSymbols) {
+        return ProfileEditResult::OutOfRange;
+    }
+    out = profile;
+    if (profile.preamble_override && profile.preamble_symbols == symbols) {
+        return ProfileEditResult::Unchanged;
+    }
+    // Typing a value pins it, even when it happens to equal the derived one:
+    // the operator asked for that number, not for whatever the next bandwidth
+    // change would have produced.
+    out.preamble_override = true;
+    out.preamble_symbols = symbols;
+    return ProfileEditResult::Applied;
+}
+
+ProfileEditResult clearProfilePreambleOverride(const RadioProfile &profile,
+                                               RadioProfile &out) noexcept
+{
+    if (profile.modulation != Modulation::LoRa) {
+        return ProfileEditResult::UnsupportedModulation;
+    }
+    out = profile;
+    out.preamble_override = false;
+    const std::uint16_t derived = derivePreambleSymbols(out);
+    if (!profile.preamble_override && profile.preamble_symbols == derived) {
+        return ProfileEditResult::Unchanged;
+    }
+    if (derived < kMinimumPreambleSymbols || derived > kMaximumPreambleSymbols) {
+        out = profile;
+        return ProfileEditResult::OutOfRange;
+    }
+    out.preamble_symbols = derived;
+    return ProfileEditResult::Applied;
 }
 
 bool inferLegacyFrequencyTuningPolicy(RadioProfile &profile) noexcept
@@ -361,7 +551,8 @@ bool isSupportedTunedProfile(const RadioProfile &profile) noexcept
         !contains(profile.coding_rate_denominator, coding_rates)) {
         return false;
     }
-    if (profile.preamble_symbols != derivePreambleSymbols(profile)) {
+    if (!isSupportedSyncWord(profile.sync_word) ||
+        !isSupportedPreambleSymbols(profile, profile.preamble_symbols)) {
         return false;
     }
 

@@ -111,6 +111,17 @@ build_and_run app_settings \
   src/core/app_settings.cpp \
   test/app_settings/test_app_settings.cpp
 
+build_and_run channel_keys \
+  src/core/channel_keys.cpp \
+  src/crypto/sha256.cpp \
+  src/crypto/aes128.cpp \
+  src/core/meshtastic_payload.cpp \
+  src/core/meshtastic_encode.cpp \
+  src/core/meshtastic_decoder.cpp \
+  src/core/decoder_registry.cpp \
+  src/export/lilyshark_capture.cpp \
+  test/channel_keys/test_channel_keys.cpp
+
 build_and_run app_shell \
   src/ui/app_shell.cpp \
   test/app_shell/test_app_shell.cpp

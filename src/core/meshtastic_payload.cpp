@@ -214,17 +214,17 @@ const char *meshtasticPortLabel(std::uint16_t portnum) noexcept
     return fallback;
 }
 
-bool readMeshtasticPayload(const std::uint8_t *ciphertext,
-                           std::size_t length,
-                           std::uint32_t from_node,
-                           std::uint32_t packet_id,
-                           MeshtasticPayload &out) noexcept
-{
-    if (ciphertext == nullptr || length == 0 || length > kMaxCiphertext) return false;
+namespace {
 
-    // CryptoEngine::initNonce — the packet id occupies a 64-bit slot, so the
-    // upper four bytes are zero for every packet a radio actually sends.
-    std::uint8_t nonce[crypto::kAesBlockSize]{};
+/// Rebuild the CTR nonce the way CryptoEngine::initNonce does — the packet id
+/// occupies a 64-bit slot, so the upper four bytes are zero for every packet a
+/// radio actually sends.
+void meshtasticNonce(std::uint32_t from_node, std::uint32_t packet_id,
+                     std::uint8_t nonce[crypto::kAesBlockSize]) noexcept
+{
+    for (std::size_t index = 0; index < crypto::kAesBlockSize; ++index) {
+        nonce[index] = 0U;
+    }
     nonce[0] = static_cast<std::uint8_t>(packet_id & 0xffU);
     nonce[1] = static_cast<std::uint8_t>((packet_id >> 8U) & 0xffU);
     nonce[2] = static_cast<std::uint8_t>((packet_id >> 16U) & 0xffU);
@@ -233,10 +233,13 @@ bool readMeshtasticPayload(const std::uint8_t *ciphertext,
     nonce[9] = static_cast<std::uint8_t>((from_node >> 8U) & 0xffU);
     nonce[10] = static_cast<std::uint8_t>((from_node >> 16U) & 0xffU);
     nonce[11] = static_cast<std::uint8_t>((from_node >> 24U) & 0xffU);
+}
 
-    std::uint8_t plain[kMaxCiphertext];
-    crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, ciphertext, length, plain);
-
+/// Parse one candidate plaintext as a Data message. `plain` holds `length`
+/// decrypted bytes. False means the key that produced them was wrong.
+bool parseDataMessage(const std::uint8_t *plain, std::size_t length,
+                      MeshtasticPayload &out) noexcept
+{
     // Parse the Data message strictly. Anything unexpected means this was not
     // default-key traffic, and the caller must keep treating it as opaque.
     MeshtasticPayload parsed{};
@@ -300,6 +303,62 @@ bool readMeshtasticPayload(const std::uint8_t *ciphertext,
 
     out = parsed;
     return true;
+}
+
+} // namespace
+
+bool readMeshtasticPayload(const std::uint8_t *ciphertext,
+                           std::size_t length,
+                           std::uint32_t from_node,
+                           std::uint32_t packet_id,
+                           MeshtasticPayload &out) noexcept
+{
+    MeshtasticKeyState ignored{};
+    return readMeshtasticPayloadWithKeys(ciphertext, length, from_node, packet_id, nullptr,
+                                         out, ignored);
+}
+
+bool readMeshtasticPayloadWithKeys(const std::uint8_t *ciphertext,
+                                   std::size_t length,
+                                   std::uint32_t from_node,
+                                   std::uint32_t packet_id,
+                                   const ChannelKeyProvider *keys,
+                                   MeshtasticPayload &out,
+                                   MeshtasticKeyState &key_state) noexcept
+{
+    if (ciphertext == nullptr || length == 0 || length > kMaxCiphertext) return false;
+
+    std::uint8_t nonce[crypto::kAesBlockSize]{};
+    meshtasticNonce(from_node, packet_id, nonce);
+
+    // The published default key comes first, always. It is the one key whose
+    // success carries a claim — that this traffic was never private — so a
+    // stored key must never be able to take credit for a default-key packet.
+    std::uint8_t plain[kMaxCiphertext];
+    MeshtasticPayload parsed{};
+    crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, ciphertext, length, plain);
+    if (parseDataMessage(plain, length, parsed)) {
+        out = parsed;
+        key_state.source = MeshtasticKeySource::DefaultKey;
+        key_state.slot = 0U;
+        return true;
+    }
+
+    const std::size_t count = keys == nullptr ? 0U : keys->channelKeyCount();
+    for (std::size_t index = 0; index < count; ++index) {
+        const std::uint8_t *key = keys->channelKeyBytes(index);
+        if (key == nullptr) continue;
+        crypto::aesCtrXcrypt(key, nonce, ciphertext, length, plain);
+        if (!parseDataMessage(plain, length, parsed)) continue;
+        out = parsed;
+        key_state.source = MeshtasticKeySource::StoredKey;
+        key_state.slot = static_cast<std::uint8_t>(index);
+        return true;
+    }
+
+    // Nothing read it. Fail closed: the caller keeps the bytes opaque rather
+    // than presenting a wrong key's noise as a message.
+    return false;
 }
 
 } // namespace lilyshark

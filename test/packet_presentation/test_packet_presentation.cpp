@@ -255,6 +255,50 @@ void testExistingNodeCrcErrorPolicy()
     assert(incrementedNodeCrcErrorCount(maximum) == maximum);
 }
 
+void testKeyStateIsVisiblePerFrameAndNamesNoSecret()
+{
+    // An opaque Meshtastic payload: nothing read it, and the label says so.
+    DecodedPacket opaque = decodeMeshtastic(0x2bU);
+    assert(opaque.kind == PacketKind::OpaquePayload);
+    assert(std::strcmp(packetKeyStateLabel(opaque), "NO KEY MATCH") == 0);
+
+    // The published default key is the strongest claim: never private.
+    DecodedPacket by_default = opaque;
+    by_default.attributes |= AttributeDefaultKeyReadable;
+    by_default.kind = PacketKind::Data;
+    by_default.state = DecodeState::PayloadDecoded;
+    assert(std::strcmp(packetKeyStateLabel(by_default), "DEFAULT KEY") == 0);
+
+    // A stored key claims only that the operator knew the channel's secret,
+    // and the slot — not the key — is what identifies it.
+    DecodedPacket by_stored = opaque;
+    by_stored.attributes |= AttributeStoredKeyReadable;
+    by_stored.kind = PacketKind::Data;
+    by_stored.state = DecodeState::PayloadDecoded;
+    by_stored.channel_key_slot = 3U;
+    assert(std::strcmp(packetKeyStateLabel(by_stored), "STORED KEY") == 0);
+    assert(by_stored.channel_key_slot == 3U);
+
+    // The default key wins the label when both bits are somehow set: it is
+    // tried first, so it is the honest answer.
+    DecodedPacket both = by_stored;
+    both.attributes |= AttributeDefaultKeyReadable;
+    assert(std::strcmp(packetKeyStateLabel(both), "DEFAULT KEY") == 0);
+
+    // Frames where the question never arose say so rather than implying one.
+    DecodedPacket malformed{};
+    malformed.state = DecodeState::Malformed;
+    assert(std::strcmp(packetKeyStateLabel(malformed), "N/A") == 0);
+
+    DecodedPacket advertisement{};
+    advertisement.kind = PacketKind::Advertisement;
+    assert(std::strcmp(packetKeyStateLabel(advertisement), "N/A") == 0);
+
+    DecodedPacket encrypted{};
+    encrypted.kind = PacketKind::EncryptedPayload;
+    assert(std::strcmp(packetKeyStateLabel(encrypted), "NO KEY MATCH") == 0);
+}
+
 } // namespace
 
 int main()
@@ -266,6 +310,7 @@ int main()
     testMeshtasticOpaqueLabelDoesNotDependOnChannelHash();
     testNodeSummaryAdmissionPolicy();
     testExistingNodeCrcErrorPolicy();
+    testKeyStateIsVisiblePerFrameAndNamesNoSecret();
     std::puts("packet presentation tests passed");
     return 0;
 }

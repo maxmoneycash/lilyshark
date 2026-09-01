@@ -29,22 +29,24 @@ void testRouteClassification()
         assert(isOnboardingRoute(route));
     }
 
-    constexpr std::array<ShellRoute, 3> menus = {{
+    constexpr std::array<ShellRoute, 4> menus = {{
         ShellRoute::Home,
         ShellRoute::RadioProfiles,
         ShellRoute::Settings,
+        ShellRoute::ChannelKeys,
     }};
     for (const ShellRoute route : menus) {
         assert(classifyShellRoute(route) == ShellRouteClass::Menu);
         assert(!isOnboardingRoute(route));
     }
 
-    constexpr std::array<ShellRoute, 5> details = {{
+    constexpr std::array<ShellRoute, 6> details = {{
         ShellRoute::Storage,
         ShellRoute::DeviceStatus,
         ShellRoute::DisplayInput,
         ShellRoute::Help,
         ShellRoute::About,
+        ShellRoute::RadioTuning,
     }};
     for (const ShellRoute route : details) {
         assert(classifyShellRoute(route) == ShellRouteClass::Detail);
@@ -54,6 +56,8 @@ void testRouteClassification()
            ShellRouteClass::Confirmation);
     assert(classifyShellRoute(ShellRoute::SpectrumConfirmation) ==
            ShellRouteClass::Confirmation);
+    assert(classifyShellRoute(ShellRoute::RadioTuning) == ShellRouteClass::Detail);
+    assert(classifyShellRoute(ShellRoute::ChannelKeys) == ShellRouteClass::Menu);
     assert(classifyShellRoute(ShellRoute::Count) == ShellRouteClass::Invalid);
     assert(classifyShellRoute(static_cast<ShellRoute>(0xffU)) ==
            ShellRouteClass::Invalid);
@@ -114,7 +118,7 @@ void testWrappedSelections()
            static_cast<std::size_t>(HomeItem::Count));
 
     shell.moveSettingsSelection(SelectionMove::Previous);
-    assert(shell.settingsSelection() == SettingsItem::ResetSetup);
+    assert(shell.settingsSelection() == SettingsItem::ChannelKeys);
     shell.moveSettingsSelection(SelectionMove::Next);
     assert(shell.settingsSelection() == SettingsItem::RadioProfiles);
     shell.setSettingsSelection(std::numeric_limits<std::size_t>::max());
@@ -186,6 +190,8 @@ void testSettingsTargets()
     assert(routeForSettingsItem(SettingsItem::Help) == ShellRoute::Help);
     assert(routeForSettingsItem(SettingsItem::About) == ShellRoute::About);
     assert(routeForSettingsItem(SettingsItem::ResetSetup) == ShellRoute::ResetConfirmation);
+    assert(routeForSettingsItem(SettingsItem::RadioTuning) == ShellRoute::RadioTuning);
+    assert(routeForSettingsItem(SettingsItem::ChannelKeys) == ShellRoute::ChannelKeys);
     assert(routeForSettingsItem(SettingsItem::Count) == ShellRoute::Settings);
     assert(routeForSettingsItem(static_cast<SettingsItem>(0xffU)) == ShellRoute::Settings);
 }

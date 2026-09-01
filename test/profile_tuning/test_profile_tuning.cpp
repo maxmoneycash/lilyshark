@@ -409,6 +409,241 @@ void testPersistedProfileValidation()
     assert(!isSupportedTunedProfile(profile));
 }
 
+void testSyncWordLimitsFollowTheSx1262Register()
+{
+    // Every one-byte logical sync word is programmable.
+    for (unsigned value = 0; value <= 0xffU; ++value) {
+        assert(isSupportedSyncWord(static_cast<std::uint16_t>(value)));
+    }
+    // Register form: the low nibble of each byte is RadioLib's control field.
+    assert(isSupportedSyncWord(0x1424U));
+    assert(isSupportedSyncWord(0x3444U));
+    assert(isSupportedSyncWord(0xf4f4U));
+    assert(!isSupportedSyncWord(0x1425U));
+    assert(!isSupportedSyncWord(0x1524U));
+    assert(!isSupportedSyncWord(0x2b00U));
+    assert(!isSupportedSyncWord(0xffffU));
+}
+
+void testSyncWordEditsApplyOrAreRefusedOutright()
+{
+    const RadioProfile profile = makeProfile(ProtocolId::Meshtastic, 906875000U, 250000U);
+    RadioProfile out{};
+
+    assert(setProfileSyncWord(profile, 0x2bU, out) == ProfileEditResult::Applied);
+    assert(out.sync_word == 0x2bU);
+    RadioProfile normalized = out;
+    normalized.sync_word = profile.sync_word;
+    assert(sameProfile(profile, normalized));
+
+    assert(setProfileSyncWord(out, 0x2bU, out) == ProfileEditResult::Unchanged);
+    assert(out.sync_word == 0x2bU);
+
+    // A refused value leaves the radio exactly where it was. No clamping, no
+    // masking the low nibbles into a shape the register happens to accept.
+    RadioProfile refused = profile;
+    refused.sync_word = 0xabcdU;
+    assert(setProfileSyncWord(profile, 0x1425U, refused) == ProfileEditResult::OutOfRange);
+    assert(refused.sync_word == 0xabcdU);
+
+    RadioProfile fsk = profile;
+    fsk.modulation = Modulation::Fsk;
+    assert(setProfileSyncWord(fsk, 0x2bU, out) == ProfileEditResult::UnsupportedModulation);
+}
+
+void testPreambleEditsPinTheValueAndSurviveOtherTuning()
+{
+    const RadioProfile profile = makeProfile(ProtocolId::Meshtastic, 906875000U, 250000U);
+    assert(profile.preamble_symbols == 16U);
+    assert(!profile.preamble_override);
+
+    RadioProfile out{};
+    assert(setProfilePreambleSymbols(profile, kMinimumPreambleSymbols - 1U, out) ==
+           ProfileEditResult::OutOfRange);
+    assert(setProfilePreambleSymbols(profile, 0U, out) == ProfileEditResult::OutOfRange);
+
+    assert(setProfilePreambleSymbols(profile, kMaximumPreambleSymbols, out) ==
+           ProfileEditResult::Applied);
+    assert(out.preamble_symbols == kMaximumPreambleSymbols);
+    assert(setProfilePreambleSymbols(profile, kMinimumPreambleSymbols, out) ==
+           ProfileEditResult::Applied);
+    assert(out.preamble_symbols == kMinimumPreambleSymbols);
+    assert(out.preamble_override);
+    assert(setProfilePreambleSymbols(out, kMinimumPreambleSymbols, out) ==
+           ProfileEditResult::Unchanged);
+
+    // Typing the derived value still pins it: the operator asked for 16, not
+    // for whatever the next bandwidth change would have produced.
+    RadioProfile pinned{};
+    assert(setProfilePreambleSymbols(profile, 16U, pinned) == ProfileEditResult::Applied);
+    assert(pinned.preamble_override);
+
+    // Bandwidth and spreading-factor cycles leave a pinned preamble alone.
+    RadioProfile tuned = cycleProfileBandwidth(pinned);
+    assert(tuned.preamble_symbols == 16U);
+    assert(tuned.preamble_override);
+    tuned = cycleProfileSpreadingFactor(pinned);
+    assert(tuned.preamble_symbols == 16U);
+
+    // A Reticulum profile makes the difference visible: without the override
+    // the preamble tracks the derived table, with it the typed value holds.
+    RadioProfile reticulum = makeProfile(ProtocolId::Reticulum, 867200000U, 125000U);
+    reticulum.spreading_factor = 7U;
+    reticulum.preamble_symbols = derivePreambleSymbols(reticulum);
+    assert(reticulum.preamble_symbols == 24U);
+    assert(cycleProfileBandwidth(reticulum).preamble_symbols == 47U);
+
+    RadioProfile held{};
+    assert(setProfilePreambleSymbols(reticulum, 100U, held) == ProfileEditResult::Applied);
+    assert(cycleProfileBandwidth(held).preamble_symbols == 100U);
+
+    RadioProfile released{};
+    assert(clearProfilePreambleOverride(held, released) == ProfileEditResult::Applied);
+    assert(!released.preamble_override);
+    assert(released.preamble_symbols == 24U);
+    assert(clearProfilePreambleOverride(released, released) == ProfileEditResult::Unchanged);
+}
+
+void testPersistedValidationCoversSyncWordAndPreamble()
+{
+    RadioProfile profile = makeProfile(ProtocolId::Meshtastic, 906875000U, 250000U);
+    assert(isSupportedTunedProfile(profile));
+
+    profile.sync_word = 0x1425U;
+    assert(!isSupportedTunedProfile(profile));
+    profile.sync_word = 0x2bU;
+    assert(isSupportedTunedProfile(profile));
+
+    // Without an override the preamble must equal the derived value.
+    profile.preamble_symbols = 17U;
+    assert(!isSupportedTunedProfile(profile));
+    profile.preamble_override = true;
+    assert(isSupportedTunedProfile(profile));
+    profile.preamble_symbols = 0U;
+    assert(!isSupportedTunedProfile(profile));
+    profile.preamble_symbols = kMinimumPreambleSymbols;
+    assert(isSupportedTunedProfile(profile));
+}
+
+void testRegionalBandsAreDeclaredNotGuessed()
+{
+    std::uint32_t lower = 0;
+    std::uint32_t upper = 0;
+    assert(!regionBandLimits(RegionCode::Unspecified, lower, upper));
+    assert(!regionBandLimits(RegionCode::Count, lower, upper));
+    assert(!regionBandLimits(static_cast<RegionCode>(0xffU), lower, upper));
+
+    struct Expected {
+        RegionCode region;
+        const char *label;
+        std::uint32_t lower_hz;
+        std::uint32_t upper_hz;
+    };
+    const Expected expected[] = {
+        {RegionCode::US915, "US915", 902000000U, 928000000U},
+        {RegionCode::EU868, "EU868", 869400000U, 869650000U},
+        {RegionCode::EU863, "EU863", 863000000U, 870000000U},
+        {RegionCode::AU915, "AU915", 915000000U, 928000000U},
+        {RegionCode::AS923, "AS923", 920000000U, 925000000U},
+        {RegionCode::IN865, "IN865", 865000000U, 867000000U},
+        {RegionCode::KR920, "KR920", 920000000U, 923000000U},
+    };
+    for (const Expected &value : expected) {
+        assert(regionBandLimits(value.region, lower, upper));
+        assert(lower == value.lower_hz && upper == value.upper_hz);
+        assert(std::strcmp(regionLabel(value.region), value.label) == 0);
+    }
+    assert(std::strcmp(regionLabel(RegionCode::Unspecified), "AUTO") == 0);
+
+    // 916 MHz is legal under both US915 and AU915 with different band edges,
+    // so the declared plan decides, not the centre frequency.
+    RadioProfile profile = makeProfile(ProtocolId::Meshtastic, 916125000U, 250000U);
+    profile.frequency_tuning_policy = FrequencyTuningPolicy::ExplicitSlot;
+    profile.region = RegionCode::US915;
+    profile.frequency_slot = 56U;
+    assert(isSupportedTunedProfile(profile));
+    profile.region = RegionCode::AU915;
+    assert(!isSupportedTunedProfile(profile));
+    profile.frequency_slot = 4U;
+    assert(isSupportedTunedProfile(profile));
+
+    // A centre outside the declared plan is rejected rather than re-homed.
+    profile.region = RegionCode::EU868;
+    assert(!isSupportedTunedProfile(profile));
+    assert(sameProfile(profile, stepProfileFrequency(profile, 1)));
+
+    // The US hashed-slot table does not generalise, so no other band plan may
+    // claim the default-hashed policy.
+    profile = makeProfile(ProtocolId::Meshtastic, 906875000U, 250000U);
+    profile.region = RegionCode::US915;
+    assert(isSupportedTunedProfile(profile));
+    profile.region = RegionCode::AU915;
+    assert(!isSupportedTunedProfile(profile));
+}
+
+void testRegionalPresetsTuneInsideTheirOwnBand()
+{
+    struct Expected {
+        std::uint16_t id;
+        RegionCode region;
+        std::uint32_t center_hz;
+        std::uint32_t stepped_up_hz;
+    };
+    const Expected expected[] = {
+        // EU868 is one 250 kHz slot wide, so stepping wraps onto itself.
+        {6U, RegionCode::EU868, 869525000U, 869525000U},
+        {7U, RegionCode::AU915, 915125000U, 915375000U},
+        {8U, RegionCode::AS923, 920125000U, 920375000U},
+        {9U, RegionCode::IN865, 865125000U, 865375000U},
+        {10U, RegionCode::KR920, 920125000U, 920375000U},
+    };
+    for (const Expected &value : expected) {
+        const RadioProfile *profile = findBuiltinProfile(value.id);
+        assert(profile != nullptr);
+        assert(profile->region == value.region);
+        assert(profile->protocol_hint == ProtocolId::Meshtastic);
+        assert(profile->frequency_tuning_policy == FrequencyTuningPolicy::ExplicitSlot);
+        assert(profile->frequency_slot == 0U);
+        assert(profile->center_frequency_hz == value.center_hz);
+        assert(isSupportedTunedProfile(*profile));
+
+        const RadioProfile up = stepProfileFrequency(*profile, 1);
+        assert(up.center_frequency_hz == value.stepped_up_hz);
+        assert(isSupportedTunedProfile(up));
+
+        std::uint32_t lower = 0;
+        std::uint32_t upper = 0;
+        assert(regionBandLimits(value.region, lower, upper));
+        const RadioProfile down = stepProfileFrequency(*profile, -1);
+        assert(down.center_frequency_hz >= lower && down.center_frequency_hz <= upper);
+        assert(isSupportedTunedProfile(down));
+    }
+
+    // EU868 holds a single 250 kHz slot, so widening past it has no valid
+    // centre; the refusal happens at the validation boundary, not by clamping.
+    const RadioProfile *eu868 = findBuiltinProfile(6U);
+    assert(eu868 != nullptr);
+    RadioProfile widened = cycleProfileBandwidth(*eu868);
+    assert(widened.bandwidth_hz == 500000U);
+    assert(!isSupportedTunedProfile(widened));
+}
+
+void testBuiltinProfileIdsAreUniqueAndPersistable()
+{
+    const std::size_t count = builtinProfileCount();
+    assert(count == 10U);
+    for (std::size_t left = 0; left < count; ++left) {
+        const RadioProfile &profile = builtinProfiles()[left];
+        assert(profile.name[0] != '\0');
+        assert(isSupportedSyncWord(profile.sync_word));
+        assert(!profile.preamble_override);
+        assert(findBuiltinProfile(profile.id) == &profile);
+        for (std::size_t right = left + 1U; right < count; ++right) {
+            assert(profile.id != builtinProfiles()[right].id);
+        }
+    }
+}
+
 } // namespace
 
 int main()
@@ -427,6 +662,13 @@ int main()
     testCodingRateCycle();
     testNonLoRaCyclesAreNoOps();
     testPersistedProfileValidation();
+    testSyncWordLimitsFollowTheSx1262Register();
+    testSyncWordEditsApplyOrAreRefusedOutright();
+    testPreambleEditsPinTheValueAndSurviveOtherTuning();
+    testPersistedValidationCoversSyncWordAndPreamble();
+    testRegionalBandsAreDeclaredNotGuessed();
+    testRegionalPresetsTuneInsideTheirOwnBand();
+    testBuiltinProfileIdsAreUniqueAndPersistable();
     std::puts("profile tuning tests passed");
     return 0;
 }

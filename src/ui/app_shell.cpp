@@ -39,12 +39,14 @@ ShellRouteClass classifyShellRoute(ShellRoute route) noexcept
     case ShellRoute::Home:
     case ShellRoute::RadioProfiles:
     case ShellRoute::Settings:
+    case ShellRoute::ChannelKeys:
         return ShellRouteClass::Menu;
     case ShellRoute::Storage:
     case ShellRoute::DeviceStatus:
     case ShellRoute::DisplayInput:
     case ShellRoute::Help:
     case ShellRoute::About:
+    case ShellRoute::RadioTuning:
         return ShellRouteClass::Detail;
     case ShellRoute::SpectrumConfirmation:
     case ShellRoute::ResetConfirmation:
@@ -77,6 +79,10 @@ ShellRoute routeForSettingsItem(SettingsItem item) noexcept
         return ShellRoute::About;
     case SettingsItem::ResetSetup:
         return ShellRoute::ResetConfirmation;
+    case SettingsItem::RadioTuning:
+        return ShellRoute::RadioTuning;
+    case SettingsItem::ChannelKeys:
+        return ShellRoute::ChannelKeys;
     case SettingsItem::Count:
     default:
         return ShellRoute::Settings;

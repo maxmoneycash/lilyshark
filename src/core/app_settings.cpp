@@ -1,5 +1,7 @@
 #include "lilyshark/core/app_settings.h"
 
+#include "lilyshark/core/settings_checksum.h"
+
 #include <algorithm>
 #include <iterator>
 
@@ -35,19 +37,6 @@ void putU32(std::uint8_t *bytes, std::uint32_t value) noexcept
     bytes[1] = static_cast<std::uint8_t>(value >> 8U);
     bytes[2] = static_cast<std::uint8_t>(value >> 16U);
     bytes[3] = static_cast<std::uint8_t>(value >> 24U);
-}
-
-std::uint32_t crc32(const std::uint8_t *bytes, std::size_t size) noexcept
-{
-    std::uint32_t crc = 0xffffffffU;
-    for(std::size_t index = 0; index < size; ++index) {
-        crc ^= bytes[index];
-        for(std::uint8_t bit = 0; bit < 8U; ++bit) {
-            const std::uint32_t mask = 0U - (crc & 1U);
-            crc = (crc >> 1U) ^ (0xedb88320U & mask);
-        }
-    }
-    return ~crc;
 }
 
 bool hasMagic(const std::uint8_t *bytes) noexcept
@@ -102,7 +91,7 @@ bool encodeAppSettingsV1(const AppSettings &settings, std::uint8_t *bytes,
     encoded[7] = settings.display_brightness;
     encoded[8] = settings.keyboard_brightness;
     encoded[9] = settings.last_primary_diagnostic_index;
-    putU32(&encoded[kChecksumOffset], crc32(encoded, kChecksumOffset));
+    putU32(&encoded[kChecksumOffset], settingsCrc32(encoded, kChecksumOffset));
     std::copy(std::begin(encoded), std::end(encoded), bytes);
     return true;
 }
@@ -115,7 +104,7 @@ AppSettingsDecodeResult decodeAppSettings(const std::uint8_t *bytes,
        bytes[4] != kAppSettingsSchemaVersion ||
        (bytes[5] & static_cast<std::uint8_t>(~kKnownFlags)) != 0U ||
        bytes[10] != 0U || bytes[11] != 0U ||
-       getU32(&bytes[kChecksumOffset]) != crc32(bytes, kChecksumOffset)) {
+       getU32(&bytes[kChecksumOffset]) != settingsCrc32(bytes, kChecksumOffset)) {
         return AppSettingsDecodeResult::Invalid;
     }
 

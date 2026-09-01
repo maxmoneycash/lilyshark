@@ -2,14 +2,21 @@
 
 #include "lilyshark/core/builtin_profiles.h"
 #include "lilyshark/core/profile_tuning.h"
+#include "lilyshark/core/settings_checksum.h"
 
 #include <algorithm>
+#include <iterator>
 
 namespace lilyshark {
 namespace {
 
 constexpr std::uint8_t kVersion1 = 1U;
 constexpr std::uint8_t kVersion2 = 2U;
+constexpr std::uint8_t kVersion3 = 3U;
+
+constexpr std::size_t kV3ChecksumOffset = 24U;
+constexpr std::uint8_t kPreambleOverrideFlag = 1U << 0U;
+constexpr std::uint8_t kKnownV3Flags = kPreambleOverrideFlag;
 
 std::uint16_t getU16(const std::uint8_t *bytes) noexcept
 {
@@ -45,7 +52,8 @@ bool hasHeader(const std::uint8_t *bytes, std::size_t size) noexcept
         return false;
     }
     return (size == kSavedProfileV1Size && bytes[2] == kVersion1) ||
-           (size == kSavedProfileV2Size && bytes[2] == kVersion2);
+           (size == kSavedProfileV2Size && bytes[2] == kVersion2) ||
+           (size == kSavedProfileV3Size && bytes[2] == kVersion3);
 }
 
 } // namespace
@@ -53,7 +61,8 @@ bool hasHeader(const std::uint8_t *bytes, std::size_t size) noexcept
 SavedProfileDecodeResult decodeSavedProfile(const std::uint8_t *bytes, std::size_t size,
                                             RadioProfile &profile) noexcept
 {
-    if ((size != kSavedProfileV1Size && size != kSavedProfileV2Size) ||
+    if ((size != kSavedProfileV1Size && size != kSavedProfileV2Size &&
+         size != kSavedProfileV3Size) ||
         !hasHeader(bytes, size)) {
         return SavedProfileDecodeResult::Invalid;
     }
@@ -74,16 +83,48 @@ SavedProfileDecodeResult decodeSavedProfile(const std::uint8_t *bytes, std::size
         if (!inferLegacyFrequencyTuningPolicy(candidate)) {
             return SavedProfileDecodeResult::Invalid;
         }
+        candidate.preamble_override = false;
+        candidate.preamble_symbols = derivePreambleSymbols(candidate);
     } else {
         if (bytes[3] > static_cast<std::uint8_t>(FrequencyTuningPolicy::ExplicitSlot)) {
             return SavedProfileDecodeResult::Invalid;
         }
         candidate.frequency_tuning_policy = static_cast<FrequencyTuningPolicy>(bytes[3]);
         candidate.frequency_slot = getU16(&bytes[16]);
-        result = SavedProfileDecodeResult::LoadedV2;
+
+        if (size == kSavedProfileV2Size) {
+            // Version 2 predates stored sync words and preambles. Both come
+            // from the built-in preset the record's id names, which is where
+            // they came from when the record was written.
+            candidate.preamble_override = false;
+            candidate.preamble_symbols = derivePreambleSymbols(candidate);
+            result = SavedProfileDecodeResult::MigratedV2;
+        } else {
+            // Version 3 is the first checksummed profile record. Reject the
+            // whole thing before a single field is trusted.
+            if (getU32(&bytes[kV3ChecksumOffset]) !=
+                    settingsCrc32(bytes, kV3ChecksumOffset) ||
+                bytes[22] >= static_cast<std::uint8_t>(RegionCode::Count) ||
+                (bytes[23] & static_cast<std::uint8_t>(~kKnownV3Flags)) != 0U) {
+                return SavedProfileDecodeResult::Invalid;
+            }
+            candidate.sync_word = getU16(&bytes[18]);
+            candidate.region = static_cast<RegionCode>(bytes[22]);
+            candidate.preamble_override = (bytes[23] & kPreambleOverrideFlag) != 0U;
+            candidate.preamble_symbols = candidate.preamble_override
+                                             ? getU16(&bytes[20])
+                                             : derivePreambleSymbols(candidate);
+            // A record that claims a derived preamble but stores a different
+            // number was not written by this encoder. Refuse it rather than
+            // quietly substituting the derived value.
+            if (!candidate.preamble_override &&
+                getU16(&bytes[20]) != candidate.preamble_symbols) {
+                return SavedProfileDecodeResult::Invalid;
+            }
+            result = SavedProfileDecodeResult::LoadedV3;
+        }
     }
 
-    candidate.preamble_symbols = derivePreambleSymbols(candidate);
     if (!isSupportedTunedProfile(candidate)) {
         return SavedProfileDecodeResult::Invalid;
     }
@@ -92,27 +133,33 @@ SavedProfileDecodeResult decodeSavedProfile(const std::uint8_t *bytes, std::size
     return result;
 }
 
-bool encodeSavedProfileV2(const RadioProfile &profile, std::uint8_t *bytes,
+bool encodeSavedProfileV3(const RadioProfile &profile, std::uint8_t *bytes,
                           std::size_t size) noexcept
 {
     const RadioProfile *base = findBuiltinProfile(profile.id);
-    if (bytes == nullptr || size != kSavedProfileV2Size || base == nullptr ||
+    if (bytes == nullptr || size != kSavedProfileV3Size || base == nullptr ||
         base->protocol_hint != profile.protocol_hint || base->modulation != profile.modulation ||
-        !isSupportedTunedProfile(profile)) {
+        profile.region >= RegionCode::Count || !isSupportedTunedProfile(profile)) {
         return false;
     }
 
-    std::fill(bytes, bytes + size, 0U);
-    bytes[0] = 'L';
-    bytes[1] = 'P';
-    bytes[2] = kVersion2;
-    bytes[3] = static_cast<std::uint8_t>(profile.frequency_tuning_policy);
-    putU16(&bytes[4], profile.id);
-    putU32(&bytes[6], profile.center_frequency_hz);
-    putU32(&bytes[10], profile.bandwidth_hz);
-    bytes[14] = profile.spreading_factor;
-    bytes[15] = profile.coding_rate_denominator;
-    putU16(&bytes[16], profile.frequency_slot);
+    std::uint8_t encoded[kSavedProfileV3Size]{};
+    encoded[0] = 'L';
+    encoded[1] = 'P';
+    encoded[2] = kVersion3;
+    encoded[3] = static_cast<std::uint8_t>(profile.frequency_tuning_policy);
+    putU16(&encoded[4], profile.id);
+    putU32(&encoded[6], profile.center_frequency_hz);
+    putU32(&encoded[10], profile.bandwidth_hz);
+    encoded[14] = profile.spreading_factor;
+    encoded[15] = profile.coding_rate_denominator;
+    putU16(&encoded[16], profile.frequency_slot);
+    putU16(&encoded[18], profile.sync_word);
+    putU16(&encoded[20], profile.preamble_symbols);
+    encoded[22] = static_cast<std::uint8_t>(profile.region);
+    encoded[23] = profile.preamble_override ? kPreambleOverrideFlag : 0U;
+    putU32(&encoded[kV3ChecksumOffset], settingsCrc32(encoded, kV3ChecksumOffset));
+    std::copy(std::begin(encoded), std::end(encoded), bytes);
     return true;
 }
 

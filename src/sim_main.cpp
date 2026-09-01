@@ -26,7 +26,9 @@
 #include "theme.h"
 #include "lilyshark/core/app_settings.h"
 #include "lilyshark/core/builtin_profiles.h"
+#include "lilyshark/core/channel_keys.h"
 #include "lilyshark/core/diagnostic_tools.h"
+#include "lilyshark/core/profile_tuning.h"
 #include "lilyshark/core/spectrum.h"
 #include "lilyshark/ui/app_shell.h"
 #include "lilyshark/ui/assets/lilyshark_wordmark_a8.h"
@@ -42,7 +44,6 @@
 #include "lilyshark/core/capture_runtime.h"
 #include "lilyshark/device/simulate_source.h"
 #include "lilyshark/core/profile_settings.h"
-#include "lilyshark/core/profile_tuning.h"
 #include "lilyshark/core/rolling_diagnostics.h"
 #include "lilyshark/core/runtime_event_history.h"
 #include "lilyshark/core/survey_accumulator.h"
@@ -165,6 +166,84 @@ std::size_t spectrum_confirmation_selection = 1U;
 SpectrumScanMode spectrum_scan_mode = SpectrumScanMode::FastNarrow;
 char shell_notice[64]{};
 lv_obj_t * root = nullptr;
+
+// Radio tuning screen: one row per editable PHY field.
+enum class RadioTuningField : std::uint8_t {
+    Frequency = 0,
+    Bandwidth,
+    SpreadingFactor,
+    CodingRate,
+    SyncWord,
+    Preamble,
+    Count,
+};
+std::size_t radio_tuning_selection = 0U;
+char radio_tuning_notice[48]{};
+
+// Channel keys. The store lives here in both builds so the screen renders the
+// same either way; only the device persists it. See
+// include/lilyshark/core/channel_keys.h for what that storage protects.
+ChannelKeyStore channel_keys{};
+std::size_t channel_key_selection = 0U;
+char channel_key_notice[48]{};
+
+/// Key entry is a two-stage prompt: a name, then 32 hex digits. The typed key
+/// is never drawn — the screen shows a mask and a digit count — so there is no
+/// path from key material to the framebuffer, and therefore none to a BMP
+/// screenshot.
+enum class ChannelKeyEntryStage : std::uint8_t {
+    Idle = 0,
+    Name,
+    Secret,
+};
+ChannelKeyEntryStage channel_key_entry_stage = ChannelKeyEntryStage::Idle;
+char channel_key_entry_name[kChannelKeyNameCapacity]{};
+char channel_key_entry_digits[(kChannelKeySize * 2U) + 1U]{};
+std::size_t channel_key_entry_digit_count = 0U;
+/// True while renaming rather than adding; the slot being renamed is the
+/// current selection.
+bool channel_key_entry_rename = false;
+
+bool channel_key_entry_active() noexcept
+{
+    return channel_key_entry_stage != ChannelKeyEntryStage::Idle;
+}
+
+/// Abandon key entry, overwriting the typed digits. Volatile so the compiler
+/// cannot drop the wipe of a buffer that is about to be reused.
+void reset_channel_key_entry() noexcept
+{
+    volatile char * digits = channel_key_entry_digits;
+    for(std::size_t index = 0; index < sizeof(channel_key_entry_digits); ++index) {
+        digits[index] = '\0';
+    }
+    channel_key_entry_digit_count = 0U;
+    std::memset(channel_key_entry_name, 0, sizeof(channel_key_entry_name));
+    channel_key_entry_stage = ChannelKeyEntryStage::Idle;
+    channel_key_entry_rename = false;
+}
+
+bool hex_digit_value(char digit, std::uint8_t &value) noexcept
+{
+    if(digit >= '0' && digit <= '9') { value = static_cast<std::uint8_t>(digit - '0'); return true; }
+    if(digit >= 'a' && digit <= 'f') { value = static_cast<std::uint8_t>(digit - 'a' + 10); return true; }
+    if(digit >= 'A' && digit <= 'F') { value = static_cast<std::uint8_t>(digit - 'A' + 10); return true; }
+    return false;
+}
+
+/// Render the typed key as a mask, never as its digits. This is the only thing
+/// the key screen ever draws for a secret, which is what keeps key material
+/// out of the framebuffer and out of every screenshot taken from it.
+void channel_key_entry_mask(char * out, std::size_t capacity) noexcept
+{
+    if(out == nullptr || capacity == 0U) return;
+    const std::size_t digits = kChannelKeySize * 2U;
+    std::size_t written = 0U;
+    for(std::size_t index = 0; index < digits && written + 1U < capacity; ++index) {
+        out[written++] = index < channel_key_entry_digit_count ? '*' : '.';
+    }
+    out[written] = '\0';
+}
 #if defined(LILYSHARK_DEVICE)
 static uint8_t * spectrum_buffer = nullptr;
 CaptureRuntime<64> capture_runtime{};
@@ -4808,11 +4887,60 @@ bool load_app_settings() noexcept
     return true;
 }
 
+// Channel keys live in their own Preferences record, not inside the app
+// settings blob: that blob is rewritten on every brightness nudge and is
+// printed during diagnostics, and key material must not ride along with
+// either. The record is CRC-validated and refused whole, exactly like the
+// others. include/lilyshark/core/channel_keys.h has the full design, including
+// the plain statement that this target stores the keys unencrypted.
+bool write_channel_keys() noexcept
+{
+    if(!ensure_preferences_ready()) return false;
+    std::uint8_t bytes[kChannelKeyStoreRecordSize]{};
+    const bool encoded = channel_keys.encode(bytes, sizeof(bytes));
+    const bool stored = encoded &&
+        profile_preferences.putBytes("keys", bytes, sizeof(bytes)) == sizeof(bytes);
+    // The staging buffer held every key. Wipe it before the frame is reused.
+    volatile std::uint8_t * scrub = bytes;
+    for(std::size_t index = 0; index < sizeof(bytes); ++index) scrub[index] = 0U;
+    return stored;
+}
+
+bool load_channel_keys() noexcept
+{
+    channel_keys.clear();
+    if(!ensure_preferences_ready()) return false;
+    if(profile_preferences.getBytesLength("keys") != kChannelKeyStoreRecordSize) return false;
+    std::uint8_t bytes[kChannelKeyStoreRecordSize]{};
+    const bool read =
+        profile_preferences.getBytes("keys", bytes, sizeof(bytes)) == sizeof(bytes);
+    const bool loaded = read &&
+        channel_keys.decode(bytes, sizeof(bytes)) == ChannelKeyDecodeResult::LoadedV1;
+    volatile std::uint8_t * scrub = bytes;
+    for(std::size_t index = 0; index < sizeof(bytes); ++index) scrub[index] = 0U;
+    if(read && !loaded) {
+        Serial.println("Lilyshark channel keys failed validation; key list cleared");
+    }
+    return loaded;
+}
+
+/// Setup reset. The in-memory store is cleared first and stays cleared even if
+/// the erase fails: rolling a secret back because a write failed would be the
+/// wrong way round. False means a copy may still be in flash, and the caller
+/// says so out loud.
+bool erase_channel_keys() noexcept
+{
+    channel_keys.clear();
+    if(!ensure_preferences_ready()) return false;
+    if(profile_preferences.getBytesLength("keys") == 0U) return true;
+    return profile_preferences.remove("keys");
+}
+
 bool write_saved_profile(const RadioProfile &profile) noexcept
 {
     if(!ensure_preferences_ready()) return false;
-    std::uint8_t bytes[kSavedProfileV2Size]{};
-    return encodeSavedProfileV2(profile, bytes, sizeof(bytes)) &&
+    std::uint8_t bytes[kSavedProfileV3Size]{};
+    return encodeSavedProfileV3(profile, bytes, sizeof(bytes)) &&
            profile_preferences.putBytes("profile", bytes, sizeof(bytes)) == sizeof(bytes);
 }
 
@@ -4821,17 +4949,18 @@ bool load_saved_profile(RadioProfile &profile) noexcept
     if(!ensure_preferences_ready()) return false;
 
     const std::size_t stored_size = profile_preferences.getBytesLength("profile");
-    if(stored_size != kSavedProfileV1Size && stored_size != kSavedProfileV2Size) {
+    if(stored_size != kSavedProfileV1Size && stored_size != kSavedProfileV2Size &&
+       stored_size != kSavedProfileV3Size) {
         return false;
     }
 
-    std::uint8_t bytes[kSavedProfileV2Size]{};
+    std::uint8_t bytes[kSavedProfileV3Size]{};
     if(profile_preferences.getBytes("profile", bytes, stored_size) != stored_size) return false;
     RadioProfile candidate{};
     const SavedProfileDecodeResult result = decodeSavedProfile(bytes, stored_size, candidate);
     if(result == SavedProfileDecodeResult::Invalid) return false;
-    if(result == SavedProfileDecodeResult::MigratedV1 && !write_saved_profile(candidate)) {
-        Serial.println("Lilyshark saved profile loaded but v2 migration was not saved");
+    if(result != SavedProfileDecodeResult::LoadedV3 && !write_saved_profile(candidate)) {
+        Serial.println("Lilyshark saved profile loaded but v3 migration was not saved");
     }
 
     for(std::size_t index = 0; index < builtinProfileCount(); ++index) {

@@ -107,6 +107,23 @@ const char *decodeStateLabel(DecodeState state) noexcept
     }
 }
 
+const char *packetKeyStateLabel(const DecodedPacket &packet) noexcept
+{
+    if (packet.hasAttribute(AttributeDefaultKeyReadable)) {
+        return "DEFAULT KEY";
+    }
+    if (packet.hasAttribute(AttributeStoredKeyReadable)) {
+        return "STORED KEY";
+    }
+    if (packet.kind == PacketKind::EncryptedPayload ||
+        packet.kind == PacketKind::OpaquePayload) {
+        return "NO KEY MATCH";
+    }
+    // Everything else was never a ciphertext question: a malformed frame, a
+    // header-only decode, or a protocol whose payload is not encrypted here.
+    return "N/A";
+}
+
 bool contributesToNodeSummary(const FrameRecord &record) noexcept
 {
     return record.raw.rf.crc != CrcStatus::Invalid &&

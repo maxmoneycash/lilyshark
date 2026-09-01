@@ -1,6 +1,7 @@
 #pragma once
 
-// Reading a Meshtastic payload that was sent under the public default key.
+// Reading a Meshtastic payload under the public default key, then under the
+// keys the operator entered on the device.
 //
 // Meshtastic ships every radio with the same well-known channel key, and the
 // default LongFast channel uses it. Traffic on that channel is therefore
@@ -8,7 +9,16 @@
 // rather than a protection worth defeating. Nothing here attacks a cipher: it
 // applies a published key, and gives up the moment the result fails to parse.
 //
-// A channel with a real PSK stays opaque, exactly as it should.
+// After the default key, each stored channel key is tried in the order the
+// operator listed them, mirroring webapp/src/lib/dissect/meshtastic.ts. The
+// distinction matters and is preserved all the way to the screen: success
+// under the default key proves the traffic was never private, while success
+// under a stored key proves only that the operator knew the channel's secret.
+//
+// A channel with a real PSK that the operator has not entered stays opaque,
+// exactly as it should.
+
+#include "lilyshark/core/channel_key_provider.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -56,11 +66,30 @@ struct MeshtasticPayload {
     char short_name[8]{};
 };
 
+/// Which key read a payload. Never the key itself: `slot` is an index into the
+/// operator's key list, so nothing downstream — a capture record, a screen, a
+/// log line — can learn key material from a decode result.
+enum class MeshtasticKeySource : std::uint8_t {
+    /// Nothing read it. The payload stays opaque.
+    None = 0,
+    /// The published default channel key. The traffic was never private.
+    DefaultKey,
+    /// A key the operator stored on the device, identified by `slot`.
+    StoredKey,
+};
+
+struct MeshtasticKeyState {
+    MeshtasticKeySource source = MeshtasticKeySource::None;
+    /// Provider index of the key that worked. Meaningful only when `source`
+    /// is StoredKey.
+    std::uint8_t slot = 0;
+};
+
 /// Short label for a port number, or "PORT n" when this build has no name.
 const char *meshtasticPortLabel(std::uint16_t portnum) noexcept;
 
 /// Try to read `length` ciphertext bytes taken from immediately after the
-/// 16-byte outer header.
+/// 16-byte outer header, under the published default key only.
 ///
 /// The nonce is rebuilt the way the firmware does — packet id as a 64-bit
 /// little-endian value, then the sender's node number — so the caller passes
@@ -72,5 +101,21 @@ bool readMeshtasticPayload(const std::uint8_t *ciphertext,
                            std::uint32_t from_node,
                            std::uint32_t packet_id,
                            MeshtasticPayload &out) noexcept;
+
+/// The same read, extended with the operator's stored channel keys.
+///
+/// The published default key is tried first — so passing a null or empty
+/// provider is byte-for-byte the keyless behaviour above — and then each
+/// stored key in the provider's order. The first plaintext that parses as a
+/// Data message wins and `key_state` names the key that produced it. Failure
+/// leaves both outputs untouched and the payload opaque: failing closed to
+/// ciphertext is the honest result for a key nobody has.
+bool readMeshtasticPayloadWithKeys(const std::uint8_t *ciphertext,
+                                   std::size_t length,
+                                   std::uint32_t from_node,
+                                   std::uint32_t packet_id,
+                                   const ChannelKeyProvider *keys,
+                                   MeshtasticPayload &out,
+                                   MeshtasticKeyState &key_state) noexcept;
 
 } // namespace lilyshark

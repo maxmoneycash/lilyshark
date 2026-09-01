@@ -88,14 +88,25 @@ DecodeResult MeshtasticDecoder::decode(const RawFrame &frame, const RadioProfile
     }
 
     // Default-channel traffic is readable with a key every radio ships with,
-    // so try it. Success means the payload was never private; failure leaves
-    // the packet opaque, which is the honest outcome for a real PSK.
+    // so try it first, then any channel key the operator stored on the device.
+    // Success under the default key means the payload was never private;
+    // success under a stored key means only that the operator knew the
+    // channel's secret. Failure under all of them leaves the packet opaque,
+    // which is the honest outcome for a PSK nobody here has.
     if (output.payload_length > 0) {
         MeshtasticPayload payload{};
-        if (readMeshtasticPayload(&frame.bytes[output.payload_offset], output.payload_length,
-                                  output.source, output.packet_id, payload)) {
+        MeshtasticKeyState key_state{};
+        if (readMeshtasticPayloadWithKeys(&frame.bytes[output.payload_offset],
+                                          output.payload_length, output.source,
+                                          output.packet_id, channel_keys_, payload,
+                                          key_state)) {
             output.application_port = payload.portnum;
-            output.attributes |= AttributeDefaultKeyReadable;
+            output.attributes |= key_state.source == MeshtasticKeySource::StoredKey
+                                     ? AttributeStoredKeyReadable
+                                     : AttributeDefaultKeyReadable;
+            output.channel_key_slot = key_state.source == MeshtasticKeySource::StoredKey
+                                          ? key_state.slot
+                                          : 0U;
             output.kind = PacketKind::Data;
             output.state = DecodeState::PayloadDecoded;
         }

@@ -56,6 +56,11 @@ enum PacketAttribute : std::uint16_t {
     // because it is the difference between traffic that merely looks
     // protected and traffic that is.
     AttributeDefaultKeyReadable = 1U << 6,
+    // The payload was readable under a channel key the operator stored on the
+    // device, named by `channel_key_slot`. Mutually exclusive with
+    // AttributeDefaultKeyReadable, which is always tried first: this one
+    // claims only that whoever runs the analyzer knew the channel's secret.
+    AttributeStoredKeyReadable = 1U << 7,
 };
 
 struct DecodedPacket {
@@ -76,6 +81,11 @@ struct DecodedPacket {
     // kept here — it is read back from the stored frame on demand, so a
     // 64-frame buffer does not carry 64 message bodies.
     std::uint16_t application_port = 0;
+    // Index of the stored channel key that read this payload, meaningful only
+    // with AttributeStoredKeyReadable. An index, never key material: this
+    // struct is copied into the frame store and shown on screen, so nothing
+    // that could reconstruct a key is allowed to live here.
+    std::uint8_t channel_key_slot = 0;
     std::uint8_t hop_limit = 0;
     std::uint8_t hop_start = 0;
     std::uint8_t next_hop = 0;
