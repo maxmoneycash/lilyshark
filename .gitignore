@@ -20,3 +20,6 @@ contracts/capture-registry/build/
 # Move build artifacts
 contracts/*/build/
 .wave-notes/
+
+# Move Prover intermediate artifacts
+*.bpl
