@@ -30,6 +30,8 @@
  * a different thing (see `WitnessState` and lib/fieldPointsChain.ts).
  */
 
+import type { WitnessIneligibleReason } from "./witnessKey.ts";
+
 /** The chain this build reads points from, and its honest label. */
 export interface FieldPointsDeployment {
 	/** Machine name, for keys and query params. */
@@ -338,9 +340,7 @@ function keyOf(value: unknown, where: string): string {
 export function sortEvents(events: FieldPointsEvent[]): FieldPointsEvent[] {
 	return events
 		.slice()
-		.sort(
-			(a, b) => a.txVersion - b.txVersion || a.eventIndex - b.eventIndex,
-		);
+		.sort((a, b) => a.txVersion - b.txVersion || a.eventIndex - b.eventIndex);
 }
 
 /**
@@ -539,7 +539,8 @@ export function indexWitnesses(
 		}
 		// attest_witness aborts on a repeat attester, so a duplicate in the
 		// log is data the module could not have produced. Keep the first.
-		if (record.attestations.some((a) => a.attester === event.attester)) continue;
+		if (record.attestations.some((a) => a.attester === event.attester))
+			continue;
 		const position = record.attestations.length + 1;
 		record.attestations.push({
 			attester: event.attester,
@@ -567,7 +568,7 @@ export function indexWitnesses(
  * clock anchor) and carries no chain claim at all.
  */
 export type WitnessState =
-	| { kind: "ineligible"; reason: string }
+	| { kind: "ineligible"; reason: WitnessIneligibleReason }
 	| { kind: "unknown" }
 	| { kind: "not-attested" }
 	| { kind: "attested"; count: 1; byYou: boolean }
@@ -835,10 +836,7 @@ export function reduceStandings(
 		txVersionRange:
 			ordered.length === 0
 				? null
-				: [
-						ordered[0].txVersion,
-						ordered[ordered.length - 1].txVersion,
-					],
+				: [ordered[0].txVersion, ordered[ordered.length - 1].txVersion],
 		timeRangeUnix:
 			ordered.length === 0
 				? null
@@ -883,7 +881,9 @@ export function classifyChainFailure(
 	const message =
 		isObject(body) && typeof body.message === "string" ? body.message : "";
 	const code =
-		isObject(body) && typeof body.error_code === "string" ? body.error_code : "";
+		isObject(body) && typeof body.error_code === "string"
+			? body.error_code
+			: "";
 	const missing =
 		code === "module_not_found" ||
 		/module.*(can't be found|not found)/i.test(message);

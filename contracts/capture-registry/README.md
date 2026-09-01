@@ -33,6 +33,19 @@ whole loop was exercised: anchor
 `claim_anchor_points` and a witness pair paying both accounts. Devnet is also
 wiped periodically — this is dated evidence, not a home.
 
+**And it is already gone.** Re-checked later the same week, that deployment
+returns `404 module_not_found`; the account still exists with
+`sequence_number: 0`. The wipe warning above is not a hypothetical, and it
+is the whole argument for putting the durable score on testnet or mainnet
+rather than leaving it on a prototype chain. The analyzer's POINTS screen
+reads this exact state and says so, rather than showing a zero score.
+
+One related finding worth recording: the Aptos **indexer `events` GraphQL
+table is deprecated** on devnet, testnet, and mainnet, and serves no
+CORS header, so a browser cannot use it. Event history therefore has to be
+read per account from submitted transactions until a supported indexer
+route exists.
+
 **Aptos testnet (the durable target, task CO-003/CO-002).** Anchors and the
 points ledger belong on Aptos, with Shelby holding the blobs: the pointer
 format is backend-agnostic and unchanged either way. The testnet faucet is

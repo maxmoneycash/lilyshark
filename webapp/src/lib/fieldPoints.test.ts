@@ -27,8 +27,8 @@ import {
 	attestCommands,
 	classifyChainFailure,
 	creditForPosition,
-	eventsFromTransactions,
 	EVENT_NAMES,
+	eventsFromTransactions,
 	eventTypeTag,
 	FIELD_POINTS_DEPLOYMENT,
 	FieldPointsInputError,
@@ -38,8 +38,8 @@ import {
 	networkFailure,
 	normalizeAddress,
 	normalizeWitnessKey,
-	parseEventsDocument,
 	POINTS,
+	parseEventsDocument,
 	reduceStandings,
 	registryEventTypeTag,
 	witnessStateLabel,
@@ -182,7 +182,13 @@ test("a malformed event names the field that broke", () => {
 		() =>
 			parseEventsDocument({
 				events: [
-					{ type: "Nope", tx_version: 1, event_index: 0, timestamp_unix: 1, data: {} },
+					{
+						type: "Nope",
+						tx_version: 1,
+						event_index: 0,
+						timestamp_unix: 1,
+						data: {},
+					},
 				],
 			}),
 		/events\[0\]\.type/,
@@ -257,7 +263,12 @@ test("garbage in, nothing out — never a throw that loses the whole read", () =
 				events: [
 					{
 						type: eventTypeTag(EVENT_NAMES.witness),
-						data: { key: "nonsense", attester: "0xa1fa", position: 1, credited: 0 },
+						data: {
+							key: "nonsense",
+							attester: "0xa1fa",
+							position: 1,
+							credited: 0,
+						},
 					},
 				],
 			},
@@ -273,13 +284,21 @@ test("the reduction reproduces the scorer's on-chain standings exactly", () => {
 	const standings = reduceStandings(
 		parseEventsDocument(EXAMPLE_EVENTS_DOCUMENT),
 	);
-	assert.deepEqual(standings.discrepancies, [], "the example is self-consistent");
+	assert.deepEqual(
+		standings.discrepancies,
+		[],
+		"the example is self-consistent",
+	);
 	assert.equal(standings.rows.length, 4);
 	for (const [short, expected] of Object.entries(EXAMPLE_SCORER_ONCHAIN)) {
 		const row = standings.rows.find((r) => r.account === long(short));
 		assert.ok(row, `${short} has a standings row`);
 		assert.equal(row.anchorPoints, expected.anchor, `${short} anchor points`);
-		assert.equal(row.witnessPoints, expected.witness, `${short} witness points`);
+		assert.equal(
+			row.witnessPoints,
+			expected.witness,
+			`${short} witness points`,
+		);
 		assert.equal(row.total, expected.total, `${short} total`);
 	}
 });
@@ -405,7 +424,12 @@ test("a chain that lies about `credited` is contradicted, not believed", () => {
 });
 
 test("a repeat attester in the log is a discrepancy, and credits nothing twice", () => {
-	const witness = (tx: number, attester: string, position: number, credited: number) => ({
+	const witness = (
+		tx: number,
+		attester: string,
+		position: number,
+		credited: number,
+	) => ({
 		type: "WitnessAttested",
 		tx_version: tx,
 		event_index: 0,
@@ -454,7 +478,10 @@ test("an attestation outside the seven-day window is recorded and unpaid", () =>
 			],
 		}),
 	);
-	assert.equal(standings.rows.every((r) => r.total === 0), true);
+	assert.equal(
+		standings.rows.every((r) => r.total === 0),
+		true,
+	);
 	assert.equal(
 		standings.rows.find((r) => r.account === long("0xb4a0"))?.attestations,
 		1,

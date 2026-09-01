@@ -91,6 +91,18 @@ import {
 } from "../lib/dissect/tree";
 import type { ChannelKey, NodeTone } from "../lib/dissect/types";
 import { buildCsv, buildJson, buildLoraTapPcap } from "../lib/export";
+import {
+	attestCommands,
+	CHAIN_CAVEAT,
+	type ChainFailure,
+	fieldPointsFunction,
+	hexOfBytes,
+	normalizeAddress,
+	type WitnessState,
+	witnessStateLabel,
+	witnessStateOfAttesters,
+} from "../lib/fieldPoints";
+import { fetchWitnessAttesters, probeModule } from "../lib/fieldPointsChain";
 import { type FramePredicate, parseFrameFilter } from "../lib/frameFilter";
 import {
 	findShelbyPointer,
@@ -145,6 +157,12 @@ import {
 	tableKeyNav,
 	visibleSpan,
 } from "../lib/virtualRows";
+import {
+	type FrameWitnessKeyResult,
+	frameWitnessKey,
+	type WitnessIneligibleReason,
+	witnessEligibility,
+} from "../lib/witnessKey";
 import { demoNextFrame, isDemo } from "../mesh/demo";
 import { fg, useThemeTick } from "../mesh/theme";
 import { startTrafficDemoInterval } from "./trafficDemo";
@@ -179,6 +197,57 @@ const crcClass = (c: LscapFrame["crc"]) =>
 
 /** Canvas height of the IO graph strip, in CSS pixels. */
 const IO_GRAPH_HEIGHT = 140;
+
+/**
+ * Why a frame yields no witness key, in the operator's words. The reason
+ * tokens come from lib/witnessKey, which shares them byte for byte with
+ * scripts/field_receipts.py and the firmware — so a refusal here reads the
+ * same as a refusal there. Synthetic is first because it is the one that
+ * must never be worked around.
+ */
+const WITNESS_REFUSAL: Record<WitnessIneligibleReason, string> = {
+	synthetic:
+		"SYNTHETIC — never eligible. A simulated frame is not a transmission and can corroborate nothing; the library refuses it, so no key exists to attest.",
+	crc_not_valid:
+		"CRC NOT VALID — a payload that cannot be checked cannot corroborate one.",
+	empty_payload: "EMPTY PAYLOAD — there are no bytes to hash.",
+	truncated:
+		"TRUNCATED AT CAPTURE — not the transmitted frame, so its key could never match a witness's.",
+	required_fields_absent:
+		"NO TIMESTAMP OR FREQUENCY FIELD — the derivation needs both, and neither is guessed.",
+	no_wall_clock:
+		"NO WALL-CLOCK ANCHOR — a version 1 .lscap stores boot-relative ticks only. Set the unix time of tick 0 above.",
+};
+
+/** The table cell and the detail badge agree, and both are colour-coded. */
+const witnessCellClass = (state: WitnessState): string => {
+	switch (state.kind) {
+		case "corroborated":
+			return "ok";
+		case "attested":
+			return state.byYou ? "ok" : "";
+		case "ineligible":
+			return state.reason === "synthetic" ? "warn" : "dim";
+		default:
+			return "dim";
+	}
+};
+
+/** Compact glyph for the table's WIT column; the title carries the words. */
+const witnessGlyph = (state: WitnessState): string => {
+	switch (state.kind) {
+		case "ineligible":
+			return state.reason === "synthetic" ? "SIM" : "—";
+		case "unknown":
+			return "?";
+		case "not-attested":
+			return "○";
+		case "attested":
+			return state.byYou ? "◐ YOU" : "◐";
+		case "corroborated":
+			return `◉ ×${state.count}${state.byYou ? " YOU" : ""}`;
+	}
+};
 
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -1426,6 +1495,21 @@ interface CaptureView {
 	 * uploadable beside the capture.
 	 */
 	annotations: AnnotationSidecar;
+	/**
+	 * The wall-clock anchor witness keys are derived against (UI-014): the
+	 * unix time of capture tick 0. A version 1 `.lscap` record carries only
+	 * a boot-relative tick count, so the derivation frozen in
+	 * docs/protocol/field-receipts.md has no wall time of its own and a
+	 * frame without an anchor is ineligible — never given a placeholder key.
+	 * It belongs to the capture, so it travels with the slot.
+	 */
+	witnessEpochUnix: number | null;
+	/**
+	 * Frame indices queued for attestation. Only frames the witness-key
+	 * library accepted ever reach it: a synthetic frame cannot be queued,
+	 * because it cannot produce a key to queue.
+	 */
+	attestBasket: readonly number[];
 }
 
 const BLANK_VIEW: CaptureView = {
@@ -1442,6 +1526,8 @@ const BLANK_VIEW: CaptureView = {
 	liveSeq: 1000,
 	containsSynthetic: false,
 	annotations: emptySidecar(),
+	witnessEpochUnix: null,
+	attestBasket: [],
 };
 
 /** The one slot the capture session records into; reused every recording. */
@@ -2919,6 +3005,270 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	const f = frames[selected];
 	const ptr = f ? pointers[selected] : null;
 
+	/* ── witness corroboration (UI-014) ─────────────────────────────────
+	 * Each frame's witness state, keyed by the witness key derived from its
+	 * own bytes (lib/witnessKey, golden-vectored against the Python and C++
+	 * implementations), read from `field_points` on the chain named in
+	 * lib/fieldPoints.
+	 *
+	 * Three refusals are load-bearing here and all three are shown rather
+	 * than hidden:
+	 *
+	 *  - A **synthetic** frame never yields a key. The library refuses it,
+	 *    this pane refuses it again, and it can never enter the attest
+	 *    basket — a simulated frame corroborating a real transmission would
+	 *    be the exact fabrication the protocol exists to price out.
+	 *  - A frame with **no wall-clock anchor** yields no key either. The
+	 *    v1 capture format stores boot-relative ticks, so the operator has
+	 *    to supply the unix time of tick 0; without it the honest answer is
+	 *    "no key", not a key derived from a guess.
+	 *  - A chain that **could not be read** leaves the state UNKNOWN. It
+	 *    never collapses into "not attested": an unread chain has not told
+	 *    us nobody attested.
+	 */
+	const witnessEpoch = view.witnessEpochUnix;
+	const attestBasket = view.attestBasket;
+	const [epochDraft, setEpochDraft] = useState("");
+	const [epochError, setEpochError] = useState<string | null>(null);
+	const [selfAccount, setSelfAccount] = useState("");
+	const [attestProfile, setAttestProfile] = useState("");
+	const [witnessOpen, setWitnessOpen] = useState(false);
+	const [showAttestCommands, setShowAttestCommands] = useState(false);
+	/** Derived keys, tagged with the capture+anchor they belong to. */
+	const [witness, setWitness] = useState<{
+		gen: string;
+		keys: ReadonlyMap<number, FrameWitnessKeyResult>;
+	}>({ gen: "", keys: new Map() });
+	const witnessRef = useRef(witness);
+	witnessRef.current = witness;
+	/** `witness_attesters(key)` answers, by bare-hex key. */
+	const [attesters, setAttesters] = useState<ReadonlyMap<string, string[]>>(
+		new Map(),
+	);
+	const attesterAsked = useRef(new Set<string>());
+	const [chainState, setChainState] = useState<"reading" | "ok" | ChainFailure>(
+		"reading",
+	);
+
+	// Is the module even there? One probe decides how every witness cell in
+	// the table reads, and on a periodically wiped devnet the answer is
+	// routinely "no" — which is a state, not a failure.
+	useEffect(() => {
+		let alive = true;
+		void probeModule().then((read) => {
+			if (!alive) return;
+			setChainState(read.ok ? "ok" : { kind: read.kind, reason: read.reason });
+		});
+		return () => {
+			alive = false;
+		};
+	}, []);
+
+	const selfAddress = useMemo(
+		() => normalizeAddress(selfAccount.trim()),
+		[selfAccount],
+	);
+
+	/**
+	 * Eligibility is cheap and synchronous, so it is computed over every
+	 * shown frame — that is what the counts and the refusal list report.
+	 * Deriving the key itself needs SHA-256, so it is done only for frames
+	 * that are actually on screen, selected, or queued.
+	 */
+	const witnessCensus = useMemo(() => {
+		const byReason = new Map<WitnessIneligibleReason, number>();
+		let eligible = 0;
+		for (const i of shown) {
+			const state = witnessEligibility(frames[i], witnessEpoch != null);
+			if (state === "eligible") eligible++;
+			else byReason.set(state, (byReason.get(state) ?? 0) + 1);
+		}
+		return { eligible, byReason };
+	}, [shown, frames, witnessEpoch]);
+
+	const keyTargets = useMemo(() => {
+		const want = new Set<number>(attestBasket);
+		for (const i of shown.slice(rowWindow.start, rowWindow.end)) want.add(i);
+		if (frames[selected]) want.add(selected);
+		return [...want];
+	}, [shown, rowWindow.start, rowWindow.end, selected, frames, attestBasket]);
+
+	/** Capture identity + anchor: change either and every key is stale. */
+	const witnessGen = `${slot?.id ?? ""}·${witnessEpoch ?? "none"}·${frames.length}`;
+
+	useEffect(() => {
+		let alive = true;
+		void (async () => {
+			const ticks = capture?.header.ticksPerSecond ?? 1_000_000;
+			const current = witnessRef.current;
+			const next = new Map(current.gen === witnessGen ? current.keys : []);
+			let added = false;
+			for (const i of keyTargets) {
+				if (next.has(i)) continue;
+				const frame = frames[i];
+				if (!frame) continue;
+				next.set(i, await frameWitnessKey(frame, witnessEpoch, ticks));
+				added = true;
+			}
+			if (!alive) return;
+			if (added || current.gen !== witnessGen) {
+				setWitness({ gen: witnessGen, keys: next });
+			}
+		})();
+		return () => {
+			alive = false;
+		};
+	}, [witnessGen, keyTargets, frames, witnessEpoch, capture]);
+
+	// Ask the chain about every key that has been derived and not yet asked
+	// about. One view call per distinct key, once — scrolling back over a
+	// frame does not re-ask.
+	useEffect(() => {
+		if (chainState !== "ok") return;
+		const pending: string[] = [];
+		for (const result of witness.keys.values()) {
+			if (result.key === null) continue;
+			const hex = hexOfBytes(result.key);
+			if (attesterAsked.current.has(hex)) continue;
+			attesterAsked.current.add(hex);
+			pending.push(hex);
+		}
+		if (pending.length === 0) return;
+		let alive = true;
+		void (async () => {
+			for (const hex of pending) {
+				const read = await fetchWitnessAttesters(hex);
+				if (!alive) return;
+				if (read.ok) {
+					setAttesters((prev) => new Map(prev).set(hex, read.value));
+				} else {
+					// Leave it unasked so a later read can still answer; the cell
+					// stays UNKNOWN in the meantime rather than reading as zero.
+					attesterAsked.current.delete(hex);
+					setChainState({ kind: read.kind, reason: read.reason });
+					return;
+				}
+			}
+		})();
+		return () => {
+			alive = false;
+		};
+	}, [witness, chainState]);
+
+	/** One frame's witness state, exactly as the table cell prints it. */
+	const witnessStateAt = useCallback(
+		(index: number): WitnessState => {
+			const result = witness.keys.get(index);
+			if (!result) {
+				// Not derived yet — but eligibility is known without crypto, so
+				// a refusal can be reported before the digest is computed.
+				const frame = frames[index];
+				if (!frame) return { kind: "unknown" };
+				const eligibility = witnessEligibility(frame, witnessEpoch != null);
+				return eligibility === "eligible"
+					? { kind: "unknown" }
+					: { kind: "ineligible", reason: eligibility };
+			}
+			if (result.key === null) {
+				return { kind: "ineligible", reason: result.reason };
+			}
+			if (chainState !== "ok") return { kind: "unknown" };
+			return witnessStateOfAttesters(
+				attesters.get(hexOfBytes(result.key)),
+				selfAddress,
+			);
+		},
+		[witness, frames, witnessEpoch, chainState, attesters, selfAddress],
+	);
+
+	/** The derived key of a frame, or null when the library refused it. */
+	const witnessKeyHexAt = useCallback(
+		(index: number): string | null => {
+			const result = witness.keys.get(index);
+			return result?.key ? hexOfBytes(result.key) : null;
+		},
+		[witness],
+	);
+
+	const setWitnessEpoch = (next: number | null) =>
+		patch({ witnessEpochUnix: next, attestBasket: [] });
+
+	/** Accepts unix seconds or anything `Date` parses (an ISO timestamp). */
+	const applyEpochDraft = () => {
+		const text = epochDraft.trim();
+		if (text === "") {
+			setEpochError(null);
+			setWitnessEpoch(null);
+			return;
+		}
+		const asNumber = Number(text);
+		const seconds = Number.isSafeInteger(asNumber)
+			? asNumber
+			: Math.floor(Date.parse(text) / 1000);
+		if (!Number.isSafeInteger(seconds) || seconds < 0) {
+			setEpochError(
+				`${text} is neither unix seconds nor a timestamp Date can parse`,
+			);
+			return;
+		}
+		setEpochError(null);
+		setWitnessEpoch(seconds);
+	};
+
+	const inBasket = (index: number) => attestBasket.includes(index);
+
+	/** A frame with no key can never be queued — the refusal is structural. */
+	const toggleBasket = (index: number) => {
+		if (witnessKeyHexAt(index) === null) return;
+		patch({
+			attestBasket: inBasket(index)
+				? attestBasket.filter((x) => x !== index)
+				: [...attestBasket, index],
+		});
+		setShowAttestCommands(false);
+	};
+
+	const addVisibleEligible = () => {
+		const next = new Set(attestBasket);
+		for (const i of shown.slice(rowWindow.start, rowWindow.end)) {
+			if (witnessKeyHexAt(i) !== null) next.add(i);
+		}
+		patch({ attestBasket: [...next] });
+		setShowAttestCommands(false);
+	};
+
+	/** Keys behind the basket, in frame order. Refused frames contribute none. */
+	const basketKeys = useMemo(
+		() =>
+			[...attestBasket]
+				.sort((a, b) => a - b)
+				.map((i) => ({ index: i, hex: witnessKeyHexAt(i) }))
+				.filter(
+					(row): row is { index: number; hex: string } => row.hex !== null,
+				),
+		[attestBasket, witnessKeyHexAt],
+	);
+
+	const attestScript = useMemo(
+		() =>
+			basketKeys.length === 0
+				? ""
+				: attestCommands(
+						basketKeys.map((row) => row.hex),
+						attestProfile.trim() || undefined,
+					),
+		[basketKeys, attestProfile],
+	);
+
+	const chainBadge =
+		chainState === "reading"
+			? { text: "READING CHAIN…", cls: "dim" }
+			: chainState === "ok"
+				? { text: "MODULE LIVE", cls: "ok" }
+				: chainState.kind === "module-not-found"
+					? { text: "MODULE NOT FOUND", cls: "warn" }
+					: { text: "CHAIN UNREACHABLE", cls: "err" };
+
 	// ── user channel keys (UI-011) ─────────────────────────────────────
 	// React state only — never persisted, never in the URL, never uploaded;
 	// a reload clears them. A change re-dissects the selected frame via the
@@ -3731,6 +4081,387 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							onToggleDestination={toggleDestinationFilter}
 						/>
 
+						{/* WITNESS: each frame's corroboration state on the chain, and
+						    the attestation the operator can submit for the frames they
+						    picked (UI-014). Everything here is refusable, and every
+						    refusal is printed. */}
+						<div
+							style={{
+								borderBottom: "1px solid var(--border)",
+								flexShrink: 0,
+							}}
+						>
+							<div
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: 10,
+									padding: "4px 12px",
+									flexWrap: "wrap",
+								}}
+							>
+								<span
+									className="dim"
+									style={{ fontSize: 10, letterSpacing: 1 }}
+								>
+									WITNESS
+								</span>
+								<span className="dim" style={{ fontSize: 10 }}>
+									{witnessCensus.eligible} of {shown.length} shown frame(s)
+									yield a key
+									{witnessCensus.byReason.get("synthetic") ? (
+										<span className="warn">
+											{" · "}
+											{witnessCensus.byReason.get("synthetic")} SYNTHETIC ·
+											NEVER ATTESTABLE
+										</span>
+									) : null}
+									{witnessEpoch === null && " · no wall-clock anchor set"}
+								</span>
+								<span className={chainBadge.cls} style={{ fontSize: 10 }}>
+									{chainBadge.text}
+								</span>
+								<span className="spacer" />
+								{attestBasket.length > 0 && (
+									<span className="ok" style={{ fontSize: 10 }}>
+										{basketKeys.length} QUEUED
+									</span>
+								)}
+								<button
+									type="button"
+									onClick={() => setWitnessOpen((v) => !v)}
+									title={
+										witnessOpen
+											? "Collapse the witness panel"
+											: "Show witness keys, corroboration state and the attest action"
+									}
+								>
+									{witnessOpen ? "▾ HIDE" : "▸ WITNESS"}
+								</button>
+							</div>
+
+							{witnessOpen && (
+								<div style={{ padding: "0 12px 10px" }}>
+									<div className="kv" style={{ padding: 0 }}>
+										<span className="k warn">CHAIN</span>
+										<span className="v warn">{CHAIN_CAVEAT}</span>
+										<span className="k">MODULE</span>
+										<span className="v" style={{ wordBreak: "break-all" }}>
+											{fieldPointsFunction("attest_witness")}
+										</span>
+										<span className="k">STATE</span>
+										<span className={`v ${chainBadge.cls}`}>
+											{chainState === "reading"
+												? "asking the fullnode whether the module is published…"
+												: chainState === "ok"
+													? "witness_attesters is answering; every derived key below was asked about"
+													: chainState.reason}
+										</span>
+									</div>
+
+									<div
+										style={{
+											display: "flex",
+											gap: 8,
+											alignItems: "center",
+											flexWrap: "wrap",
+											padding: "8px 0 0",
+										}}
+									>
+										<label
+											htmlFor="witness-epoch"
+											style={{
+												fontSize: 10,
+												letterSpacing: 1,
+												color: "var(--fg-dim)",
+											}}
+										>
+											TICK-0 WALL CLOCK
+										</label>
+										<input
+											id="witness-epoch"
+											placeholder="unix seconds, or 2026-09-01T12:00:00Z"
+											value={epochDraft}
+											spellCheck={false}
+											onChange={(e) => setEpochDraft(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") applyEpochDraft();
+											}}
+											style={{ flex: 1, minWidth: 180, fontSize: 11 }}
+										/>
+										<button type="button" onClick={applyEpochDraft}>
+											{epochDraft.trim() === "" ? "CLEAR" : "SET"}
+										</button>
+										{witnessEpoch !== null && (
+											<span className="ok" style={{ fontSize: 10 }}>
+												tick 0 = {new Date(witnessEpoch * 1000).toISOString()}
+											</span>
+										)}
+									</div>
+									{epochError && (
+										<div className="err" style={{ fontSize: 11 }}>
+											{epochError}
+										</div>
+									)}
+									<div className="dim" style={{ fontSize: 11, paddingTop: 4 }}>
+										The witness key hashes the payload with the receive time
+										bucketed to 60 s, and a version 1 capture stores only
+										boot-relative ticks — so the anchor is the operator's claim
+										about when tick 0 happened, and a wrong anchor produces a
+										key nothing will ever match. Without one, no key is derived
+										at all.
+									</div>
+
+									<div
+										style={{
+											display: "flex",
+											gap: 8,
+											alignItems: "center",
+											flexWrap: "wrap",
+											padding: "8px 0 0",
+										}}
+									>
+										<label
+											htmlFor="witness-self"
+											style={{
+												fontSize: 10,
+												letterSpacing: 1,
+												color: "var(--fg-dim)",
+											}}
+										>
+											YOUR ACCOUNT
+										</label>
+										<input
+											id="witness-self"
+											placeholder="0x… (optional — only to mark your own attestations)"
+											value={selfAccount}
+											spellCheck={false}
+											onChange={(e) => setSelfAccount(e.target.value)}
+											style={{ flex: 1, minWidth: 200, fontSize: 11 }}
+										/>
+										{selfAccount.trim() !== "" && selfAddress === null && (
+											<span className="err" style={{ fontSize: 10 }}>
+												not an account address
+											</span>
+										)}
+									</div>
+									<div className="dim" style={{ fontSize: 11, paddingTop: 4 }}>
+										Nothing is signed here and nothing is uploaded. Without an
+										address the panel will not claim "attested by you" — it has
+										no way to know.
+									</div>
+
+									{witnessCensus.byReason.size > 0 && (
+										<>
+											<div
+												className="dim"
+												style={{
+													fontSize: 10,
+													letterSpacing: 1,
+													padding: "10px 0 2px",
+												}}
+											>
+												REFUSED — NO KEY DERIVED
+											</div>
+											<div className="scroll-x">
+												<table className="grid">
+													<tbody>
+														{[...witnessCensus.byReason.entries()].map(
+															([reason, count]) => (
+																<tr key={reason}>
+																	<td
+																		className={
+																			reason === "synthetic" ? "warn" : "dim"
+																		}
+																		style={{ whiteSpace: "nowrap" }}
+																	>
+																		{count} frame(s)
+																	</td>
+																	<td
+																		className={
+																			reason === "synthetic" ? "warn" : "dim"
+																		}
+																	>
+																		{WITNESS_REFUSAL[reason]}
+																	</td>
+																</tr>
+															),
+														)}
+													</tbody>
+												</table>
+											</div>
+										</>
+									)}
+
+									<div
+										style={{
+											display: "flex",
+											gap: 8,
+											alignItems: "center",
+											flexWrap: "wrap",
+											padding: "10px 0 0",
+										}}
+									>
+										<button
+											type="button"
+											onClick={addVisibleEligible}
+											disabled={witnessCensus.eligible === 0}
+											title="Queue every frame on screen whose key the library actually derived"
+										>
+											+ QUEUE ELIGIBLE IN VIEW
+										</button>
+										{attestBasket.length > 0 && (
+											<button
+												type="button"
+												onClick={() => {
+													patch({ attestBasket: [] });
+													setShowAttestCommands(false);
+												}}
+											>
+												CLEAR QUEUE
+											</button>
+										)}
+										<button
+											type="button"
+											className={basketKeys.length > 0 ? "primary" : undefined}
+											disabled={basketKeys.length === 0}
+											onClick={() => setShowAttestCommands((v) => !v)}
+										>
+											{showAttestCommands
+												? "▾ HIDE ATTEST COMMANDS"
+												: `⇧ ATTEST ${basketKeys.length} KEY(S)`}
+										</button>
+										{basketKeys.length > 0 && (
+											<>
+												<label
+													htmlFor="witness-profile"
+													style={{
+														fontSize: 10,
+														letterSpacing: 1,
+														color: "var(--fg-dim)",
+													}}
+												>
+													PROFILE
+												</label>
+												<input
+													id="witness-profile"
+													placeholder="aptos CLI profile"
+													value={attestProfile}
+													spellCheck={false}
+													onChange={(e) => setAttestProfile(e.target.value)}
+													style={{ width: 160, fontSize: 11 }}
+												/>
+											</>
+										)}
+									</div>
+
+									{basketKeys.length > 0 && (
+										<div className="scroll-x" style={{ paddingTop: 6 }}>
+											<table className="grid">
+												<thead>
+													<tr>
+														<th>FRAME</th>
+														<th>WITNESS KEY</th>
+														<th>STATE</th>
+														<th />
+													</tr>
+												</thead>
+												<tbody>
+													{basketKeys.map((row) => {
+														const state = witnessStateAt(row.index);
+														return (
+															<tr key={row.index}>
+																<td>{Number(frames[row.index].sequence)}</td>
+																<td
+																	style={{ wordBreak: "break-all" }}
+																	title={row.hex}
+																>
+																	{row.hex.slice(0, 24)}…
+																</td>
+																<td className={witnessCellClass(state)}>
+																	{witnessStateLabel(state)}
+																</td>
+																<td>
+																	<button
+																		type="button"
+																		onClick={() => toggleBasket(row.index)}
+																	>
+																		REMOVE
+																	</button>
+																</td>
+															</tr>
+														);
+													})}
+												</tbody>
+											</table>
+										</div>
+									)}
+
+									{showAttestCommands && attestScript !== "" && (
+										<>
+											<div
+												className="dim"
+												style={{
+													fontSize: 10,
+													letterSpacing: 1,
+													padding: "10px 0 2px",
+												}}
+											>
+												RUN THESE — ONE TRANSACTION PER KEY
+											</div>
+											<pre
+												style={{
+													margin: 0,
+													fontSize: 11,
+													whiteSpace: "pre",
+													overflowX: "auto",
+													border: "1px solid var(--border)",
+													padding: 8,
+												}}
+											>
+												{attestScript}
+											</pre>
+											<div
+												className="dim"
+												style={{ fontSize: 11, paddingTop: 6 }}
+											>
+												This browser holds no Aptos key and this build ships no
+												wallet adapter — there is no{" "}
+												<code>@aptos-labs/wallet-adapter</code> in the webapp's
+												dependencies, and adding wallet infrastructure is a
+												bigger decision than a table column. So the analyzer
+												does the part it can do honestly: derive the key from
+												the frame's own bytes and hand over the exact call.
+											</div>
+											<div
+												className="dim"
+												style={{ fontSize: 11, paddingTop: 6 }}
+											>
+												Nor does this go through the share service. That service
+												signs Shelby uploads and registry anchors with{" "}
+												<em>one</em> key of its own, so every attestation routed
+												through it would credit the same account and
+												"corroborate" every key with the same attester — which
+												is precisely the independence the witness primitive is
+												made of. The account that runs the command is the
+												account credited, and that is the only arrangement under
+												which a corroborated key means anything.
+											</div>
+											<div
+												className="warn"
+												style={{ fontSize: 11, paddingTop: 6 }}
+											>
+												Only attest transmissions your own receiver actually
+												heard. An attestation is a claim about physical reality,
+												and the whole value of a corroborated key is that two
+												independently operated receivers made it separately.
+											</div>
+										</>
+									)}
+								</div>
+							)}
+						</div>
+
 						{/* DIFF: this capture against another open one, matched by
 						    payload and an estimated clock offset (UI-009). */}
 						{diffSlot && diff && diffViewRows && (
@@ -3771,6 +4502,9 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 											<th>SNR</th>
 											<th>ORIGIN</th>
 											<th>CRC</th>
+											<th title="Witness corroboration state for this frame's witness key. ○ no attestation · ◐ one attester · ◉ corroborated · ? chain not read · SIM synthetic, never attestable">
+												WIT
+											</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -3780,7 +4514,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 												style={{ ...SPACER_ROW, height: rowWindow.topPadPx }}
 											>
 												<td
-													colSpan={10}
+													colSpan={11}
 													style={{
 														...SPACER_CELL,
 														height: rowWindow.topPadPx,
@@ -3881,6 +4615,21 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 														{fr.synthetic ? "SIM" : "UNMARKED"}
 													</td>
 													<td className={crcClass(fr.crc)}>{fr.crc}</td>
+													{/* Witness corroboration (UI-014). The glyph is
+													    short enough for the row; the words are in the
+													    title, and the same words are in the detail
+													    pane. An unread chain shows "?" — never "○". */}
+													{(() => {
+														const state = witnessStateAt(i);
+														return (
+															<td
+																className={witnessCellClass(state)}
+																title={witnessStateLabel(state)}
+															>
+																{witnessGlyph(state)}
+															</td>
+														);
+													})()}
 												</tr>
 											);
 										})}
@@ -3890,7 +4639,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 												style={{ ...SPACER_ROW, height: rowWindow.bottomPadPx }}
 											>
 												<td
-													colSpan={10}
+													colSpan={11}
 													style={{
 														...SPACER_CELL,
 														height: rowWindow.bottomPadPx,
@@ -3900,7 +4649,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 										)}
 										{(applied || brush) && shown.length === 0 && (
 											<tr>
-												<td colSpan={10} className="dim">
+												<td colSpan={11} className="dim">
 													no frames match the{" "}
 													{applied && brush
 														? "filter and time range"
@@ -4012,6 +4761,64 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							<span className="k">ORIGIN</span>
 							<span className={`v ${f.synthetic ? "warn" : "dim"}`}>
 								{f.synthetic ? "SYNTHETIC · NOT OTA" : "UNMARKED"}
+							</span>
+							{/* Witness corroboration for this frame (UI-014): the key it
+							    derives (or the reason it derives none), what the chain
+							    says about that key, and the one action available from a
+							    browser that holds no keys. */}
+							<span className="k">WITNESS KEY</span>
+							<span className="v" style={{ wordBreak: "break-all" }}>
+								{(() => {
+									const hex = witnessKeyHexAt(selected);
+									if (hex) return hex;
+									const state = witnessStateAt(selected);
+									return state.kind === "ineligible" ? (
+										<span
+											className={state.reason === "synthetic" ? "warn" : "dim"}
+										>
+											{WITNESS_REFUSAL[state.reason]}
+										</span>
+									) : (
+										<span className="dim">deriving…</span>
+									);
+								})()}
+							</span>
+							<span className="k">WITNESS STATE</span>
+							<span
+								className={`v ${witnessCellClass(witnessStateAt(selected))}`}
+							>
+								{witnessStateLabel(witnessStateAt(selected))}
+								{witnessStateAt(selected).kind === "unknown" &&
+									chainState !== "ok" &&
+									chainState !== "reading" && (
+										<span className="dim"> · {chainState.reason}</span>
+									)}
+							</span>
+							<span className="k">ATTEST</span>
+							<span className="v">
+								{witnessKeyHexAt(selected) ? (
+									<button
+										type="button"
+										onClick={() => toggleBasket(selected)}
+										title={
+											inBasket(selected)
+												? "Take this frame out of the attest queue"
+												: `Queue this frame's witness key for ${fieldPointsFunction("attest_witness")}`
+										}
+									>
+										{inBasket(selected)
+											? "✕ REMOVE FROM QUEUE"
+											: "+ QUEUE FOR ATTEST"}
+									</button>
+								) : f.synthetic ? (
+									<span className="warn">
+										REFUSED — a synthetic frame can never be attested
+									</span>
+								) : (
+									<span className="dim">
+										no key to attest — see WITNESS KEY above
+									</span>
+								)}
 							</span>
 							{/* Follow conversation (UI-008): one action, filtering the
 							    table to this frame's src/dst pair — where the protocol

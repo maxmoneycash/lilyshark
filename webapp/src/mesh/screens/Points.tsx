@@ -1,25 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-	type ChainFailure,
+	FIELD_POINTS_DEPLOYMENT as CHAIN,
 	CHAIN_CAVEAT,
+	type ChainFailure,
 	explorerAccount,
 	explorerTxn,
 	type FieldPointsEvent,
-	FIELD_POINTS_DEPLOYMENT as CHAIN,
 	FieldPointsInputError,
 	fieldPointsModule,
 	moduleUrl,
 	normalizeAddress,
-	parseEventsDocument,
 	POINTS,
+	parseEventsDocument,
 	reduceStandings,
 	SEASON,
-	shortAddress,
 	type Standings,
+	shortAddress,
 } from "../../lib/fieldPoints.ts";
 import {
 	fetchEventsForAccounts,
 	fetchEventsFromIndexer,
+	fetchPointsBreakdown,
+	type PointsBreakdown,
 	probeModule,
 } from "../../lib/fieldPointsChain.ts";
 import {
@@ -92,7 +94,8 @@ const SCHEDULE: [string, string, string][] = [
 	],
 ];
 
-const utcDay = (unix: number) => new Date(unix * 1000).toISOString().slice(0, 10);
+const utcDay = (unix: number) =>
+	new Date(unix * 1000).toISOString().slice(0, 10);
 
 /** One failure, rendered the way SHELBY renders an unreachable fullnode. */
 function FailureNote({ failure }: { failure: ChainFailure }) {
@@ -123,6 +126,8 @@ export default function Points() {
 	);
 	const [reading, setReading] = useState(false);
 	const [err, setErr] = useState("");
+	/** `points_breakdown` per roster account: chain state, not event replay. */
+	const [breakdowns, setBreakdowns] = useState<PointsBreakdown[]>([]);
 	const alive = useRef(true);
 
 	useEffect(() => {
@@ -148,14 +153,26 @@ export default function Points() {
 				setProbe({ kind: found.kind, reason: found.reason });
 				setReadFailures([]);
 				setIndexerFailure(null);
+				setBreakdowns([]);
 				setLoaded((prev) => (prev?.kind === "chain" ? null : prev));
 				return;
 			}
 			setProbe("ok");
+			// The module's own view of each roster account, read straight from
+			// chain state. It answers a different question from the replay —
+			// "what does this account hold right now", all-time and unwindowed —
+			// so the two are shown side by side rather than merged.
+			const views = await Promise.all(
+				roster.map((account) => fetchPointsBreakdown(account)),
+			);
+			if (!alive.current) return;
+			setBreakdowns(views.flatMap((v) => (v.ok ? [v.value] : [])));
 			const viaIndexer = await fetchEventsFromIndexer();
 			if (!alive.current) return;
 			setIndexerFailure(
-				viaIndexer.ok ? null : { kind: viaIndexer.kind, reason: viaIndexer.reason },
+				viaIndexer.ok
+					? null
+					: { kind: viaIndexer.kind, reason: viaIndexer.reason },
 			);
 			const viaAccounts = await fetchEventsForAccounts(roster);
 			if (!alive.current) return;
@@ -240,7 +257,7 @@ export default function Points() {
 		<main>
 			<div className="panel" style={{ flex: 1 }}>
 				<div className="panel-title">
-					PANEL // {SEASON.name.toUpperCase()} LEADERBOARD
+					{`PANEL // ${SEASON.name.toUpperCase()} LEADERBOARD`}
 					<span className="spacer" />
 					{isExample && <span className="sim-badge">{EXAMPLE_LABEL}</span>}
 					<span className={status.className}>{status.text}</span>
@@ -393,8 +410,8 @@ export default function Points() {
 					{standings && standings.rows.length > 0 && (
 						<div className="panel-foot">
 							<span className="dim">
-								{standings.eventCount} event(s) ·{" "}
-								{standings.witnessKeyCount} witness key(s)
+								{standings.eventCount} event(s) · {standings.witnessKeyCount}{" "}
+								witness key(s)
 								{standings.txVersionRange
 									? ` · tx ${standings.txVersionRange[0]}–${standings.txVersionRange[1]}`
 									: ""}
@@ -437,6 +454,55 @@ export default function Points() {
 						</>
 					)}
 
+					{breakdowns.length > 0 && (
+						<>
+							<div className="panel-title">
+								LIVE CHAIN STATE · points_breakdown
+							</div>
+							<div className="panel-foot dim">
+								What the module itself says each roster account holds, read from
+								the view function rather than replayed from events. It is
+								all-time and unwindowed, so it will not match the season table
+								above whenever the event read is incomplete — which is the
+								honest reason to show both.
+							</div>
+							<div className="scroll-x">
+								<table className="grid">
+									<thead>
+										<tr>
+											<th>ACCOUNT</th>
+											<th style={{ textAlign: "right" }}>TOTAL</th>
+											<th style={{ textAlign: "right" }}>ANCHOR</th>
+											<th style={{ textAlign: "right" }}>WITNESS</th>
+											<th style={{ textAlign: "right" }}>ANCHORS CLAIMED</th>
+										</tr>
+									</thead>
+									<tbody>
+										{breakdowns.map((row) => (
+											<tr key={row.account}>
+												<td title={row.account}>
+													<a
+														href={explorerAccount(row.account)}
+														target="_blank"
+														rel="noreferrer"
+													>
+														{shortAddress(row.account)}
+													</a>
+												</td>
+												<td style={{ textAlign: "right" }}>{row.total}</td>
+												<td style={{ textAlign: "right" }}>{row.anchor}</td>
+												<td style={{ textAlign: "right" }}>{row.witness}</td>
+												<td style={{ textAlign: "right" }} className="dim">
+													{row.anchorsClaimed}
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						</>
+					)}
+
 					{readFailures.length > 0 && (
 						<>
 							<div className="panel-title">ROSTER READS THAT FAILED</div>
@@ -452,7 +518,11 @@ export default function Points() {
 				<div className="panel-title">
 					<span>SOURCE</span>
 					<span className="spacer" />
-					<button type="button" disabled={reading} onClick={() => void readChain()}>
+					<button
+						type="button"
+						disabled={reading}
+						onClick={() => void readChain()}
+					>
 						{reading ? "READING…" : "↻ RE-READ"}
 					</button>
 				</div>
@@ -518,7 +588,11 @@ export default function Points() {
 					</div>
 					<div className="kv">
 						{roster.map((address) => (
-							<span key={address} className="k" style={{ gridColumn: "1 / -1" }}>
+							<span
+								key={address}
+								className="k"
+								style={{ gridColumn: "1 / -1" }}
+							>
 								<span
 									className="v"
 									style={{ wordBreak: "break-all", display: "inline" }}
@@ -559,8 +633,8 @@ export default function Points() {
 					<div className="panel-title">EVENT EXTRACT</div>
 					<div style={{ padding: "8px 12px", display: "grid", gap: 8 }}>
 						<span className="dim" style={{ fontSize: 11 }}>
-							A published event extract in the season scorer's schema
-							(<code>score --events</code>). Read in this browser; nothing is
+							A published event extract in the season scorer's schema (
+							<code>score --events</code>). Read in this browser; nothing is
 							uploaded.
 						</span>
 						<input
@@ -603,8 +677,8 @@ export default function Points() {
 						</p>
 						<p>
 							The cell bonuses and the closed-witness-clique discount in{" "}
-							<code>{SEASON.rulesDoc}</code> are <em>not</em> applied here.
-							They need capture blobs and season policy, so they belong to the
+							<code>{SEASON.rulesDoc}</code> are <em>not</em> applied here. They
+							need capture blobs and season policy, so they belong to the
 							published scorer; this table is the on-chain half only, which is
 							why it is labelled STANDINGS and not FINAL.
 						</p>

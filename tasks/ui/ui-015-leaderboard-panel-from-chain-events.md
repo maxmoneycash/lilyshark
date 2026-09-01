@@ -4,7 +4,7 @@ title: Leaderboard panel from chain events
 area: ui
 size: M
 priority: P1
-status: todo
+status: done
 depends_on:
 - CO-002
 eval:

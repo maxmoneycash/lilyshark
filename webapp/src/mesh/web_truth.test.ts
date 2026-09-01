@@ -84,4 +84,27 @@ assert.match(mapView, /useDeviceLink/);
 assert.match(mapView, /THIS DEVICE/);
 assert.match(traffic, /sim-badge/);
 
+// Field Receipts (UI-014, UI-015). Two claims the screens must never make:
+// that a synthetic frame could be attested, and that a devnet score is a
+// durable one. Both are enforced in the libraries and tested there; these
+// assertions keep the *screens* from quietly dropping the labels.
+const points = readFileSync(new URL("./screens/Points.tsx", import.meta.url), "utf8");
+const fieldPoints = readFileSync(new URL("../lib/fieldPoints.ts", import.meta.url), "utf8");
+
+assert.match(fieldPoints, /periodically wiped; not a durable record/);
+assert.match(points, /CHAIN_CAVEAT/);
+assert.match(traffic, /CHAIN_CAVEAT/);
+assert.match(points, /MODULE NOT FOUND ON THIS NETWORK/);
+assert.match(points, /EXAMPLE_LABEL/);
+assert.match(
+  traffic,
+  /SYNTHETIC — never eligible/,
+  "TRAFFIC must state the refusal, not merely skip synthetic frames",
+);
+assert.match(
+  traffic,
+  /a synthetic frame can never be attested/,
+  "the attest action must name its refusal where the operator would press it",
+);
+
 console.log("web_truth.test.ts OK");

@@ -33,9 +33,9 @@ import {
 	EVENT_NAMES,
 	eventsFromTransactions,
 	eventTypeTag,
+	FIELD_POINTS_DEPLOYMENT,
 	type FieldPointsDeployment,
 	type FieldPointsEvent,
-	FIELD_POINTS_DEPLOYMENT,
 	fieldPointsFunction,
 	moduleUrl,
 	networkFailure,
@@ -81,7 +81,10 @@ export async function probeModule(
 		typeof body === "object" && body !== null && "bytecode" in body
 			? String((body as { bytecode: unknown }).bytecode ?? "")
 			: "";
-	return { ok: true, value: { bytecodeBytes: Math.max(0, bytecode.length - 2) / 2 } };
+	return {
+		ok: true,
+		value: { bytecodeBytes: Math.max(0, bytecode.length - 2) / 2 },
+	};
 }
 
 /** POST one `#[view]` call to the fullnode. */
@@ -152,7 +155,13 @@ export async function fetchPointsBreakdown(
 	}
 	return {
 		ok: true,
-		value: { account: address, total, anchor, witness, anchorsClaimed: claimed },
+		value: {
+			account: address,
+			total,
+			anchor,
+			witness,
+			anchorsClaimed: claimed,
+		},
 	};
 }
 
@@ -193,6 +202,13 @@ export async function fetchWitnessAttesters(
  * difference between "the indexer said there are no events" and "the
  * indexer will not answer this question any more", and only asking tells
  * them apart.
+ *
+ * Observed against the devnet endpoint: the query comes back HTTP 400 with
+ * "Request for Deprecated Resource: events", and the GraphQL endpoint
+ * answers without an `access-control-allow-origin` header, so from a
+ * browser the fetch is refused by CORS before the body is seen. Both paths
+ * end in a named degradation on the screen; neither ends in an empty
+ * leaderboard.
  */
 export async function fetchEventsFromIndexer(
 	d: FieldPointsDeployment = FIELD_POINTS_DEPLOYMENT,
@@ -214,7 +230,13 @@ export async function fetchEventsFromIndexer(
 			}),
 		});
 	} catch (error) {
-		return fail(networkFailure(error, d));
+		// networkFailure names the fullnode; this read is the indexer's, and
+		// a reader chasing the failure needs the endpoint that actually
+		// refused — CORS on this host is the usual reason.
+		return fail({
+			kind: "unreachable",
+			reason: `${d.indexer} unreachable — ${error instanceof Error ? error.message : String(error)} (the GraphQL endpoint sends no access-control-allow-origin header, so a browser is refused before it sees a body)`,
+		});
 	}
 	const body = (await bodyOf(res)) as
 		| { errors?: { message?: string }[]; data?: { events?: unknown[] } }

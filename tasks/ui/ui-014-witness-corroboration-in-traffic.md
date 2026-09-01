@@ -4,7 +4,7 @@ title: Witness corroboration in TRAFFIC
 area: ui
 size: M
 priority: P1
-status: todo
+status: done
 depends_on:
 - PR-003
 - CO-002
