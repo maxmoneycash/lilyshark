@@ -16,11 +16,19 @@
  * writes them. Enum fields (proto, dir, crc) have no ordering and take
  * only == and !=.
  *
+ * One hash field: `dest` is the 16-byte Reticulum destination hash a frame's
+ * clear RNS header names, written as its full 32-character hex. It takes ==
+ * and != only, and matches the whole hash — never a prefix, so a match is
+ * always the destination the operator actually named. Frames that carry no
+ * readable destination hash (every non-Reticulum frame, and any split,
+ * IFAC-masked or too-short RNS header) equal no hash at all.
+ *
  * Errors never throw to the UI: parseFrameFilter returns a structured
  * error carrying the offending token's [start, end) offsets in the input,
  * so the caller can point at the exact token.
  */
 
+import { reticulumDestinationHashHex } from "./dissect/rnode";
 import { findShelbyPointer } from "./lscap";
 
 /** The subset of an LscapFrame a filter can see. Structural, so tests can
@@ -44,11 +52,15 @@ export interface FilterFrame {
 /**
  * A compiled filter. `hasPointer` lets the caller pass a precomputed
  * Shelby-pointer flag (TrafficTab already scans every payload once);
- * without it the predicate scans the frame's bytes itself.
+ * without it the predicate scans the frame's bytes itself. `destHashHex`
+ * does the same for the Reticulum destination hash — pass the frame's
+ * already-read hash (or null when it has none) and `dest ==` costs nothing
+ * per keystroke; omit it and the predicate reads the header itself.
  */
 export type FramePredicate = (
 	frame: FilterFrame,
 	hasPointer?: boolean,
+	destHashHex?: string | null,
 ) => boolean;
 
 export interface FilterError {
@@ -135,9 +147,33 @@ const ENUM_FIELDS: Record<string, EnumField> = {
 	},
 };
 
+/* ── hash fields ────────────────────────────────────────────────────── */
+
+/** A destination hash is 16 bytes — 32 hex characters, nothing shorter. */
+export const DEST_HASH_HEX_LENGTH = 32;
+
+/**
+ * Fields compared against a hash written as hex. `dest` reads the Reticulum
+ * destination hash straight out of a frame's clear RNS header — the same
+ * arithmetic dissect/rnode.ts uses, pinned to it by dissect.test.ts. The
+ * read is gated on the frame's capture profile naming RNode, so no other
+ * protocol's bytes are ever reinterpreted as an RNS header.
+ */
+const HASH_FIELDS: Record<
+	string,
+	(f: FilterFrame, precomputed?: string | null) => string | null
+> = {
+	dest: (f, precomputed) => {
+		if (precomputed !== undefined) return precomputed;
+		if (protoOfProfile(f.profileId) !== "rnode") return null;
+		return reticulumDestinationHashHex(f.bytes);
+	},
+};
+
 export const FILTER_FIELDS = [
 	...Object.keys(NUMERIC_FIELDS),
 	...Object.keys(ENUM_FIELDS),
+	...Object.keys(HASH_FIELDS),
 	"has:pointer",
 	"has:synthetic",
 ] as const;
@@ -276,7 +312,7 @@ class Parser {
 		while (this.takeOp("||")) {
 			const l = left;
 			const r = this.parseAnd();
-			left = (f, hp) => l(f, hp) || r(f, hp);
+			left = (f, hp, dh) => l(f, hp, dh) || r(f, hp, dh);
 		}
 		return left;
 	}
@@ -286,7 +322,7 @@ class Parser {
 		while (this.takeOp("&&")) {
 			const l = left;
 			const r = this.parseUnary();
-			left = (f, hp) => l(f, hp) && r(f, hp);
+			left = (f, hp, dh) => l(f, hp, dh) && r(f, hp, dh);
 		}
 		return left;
 	}
@@ -294,7 +330,7 @@ class Parser {
 	private parseUnary(): FramePredicate {
 		if (this.takeOp("!")) {
 			const inner = this.parseUnary();
-			return (f, hp) => !inner(f, hp);
+			return (f, hp, dh) => !inner(f, hp, dh);
 		}
 		return this.parsePrimary();
 	}
@@ -339,11 +375,45 @@ class Parser {
 		fail(`expected a field, got "${t.text}"`, t.start, t.end);
 	}
 
+	/**
+	 * A hash literal, read straight from the source text. The tokenizer splits
+	 * `0a1b…` into a number and an identifier — a hash is not a quantity, so
+	 * the adjacent tokens are stitched back together by their source offsets
+	 * and the result is validated as hex. Hex digits never spell `and`, `or`,
+	 * `not` or `has` (n, o, r, s and t are not hex), so no operator keyword can
+	 * be swallowed by this.
+	 */
+	private readHashLiteral(field: Token): { text: string; token: Token } {
+		const first = this.peek();
+		if (first.kind !== "number" && first.kind !== "ident") {
+			fail(
+				`"${field.text}" compares against a ${DEST_HASH_HEX_LENGTH}-character hash in hex`,
+				first.start,
+				first.end,
+			);
+		}
+		let text = "";
+		let end = first.start;
+		while (
+			(this.peek().kind === "number" || this.peek().kind === "ident") &&
+			this.peek().start === end
+		) {
+			const t = this.next();
+			text += t.text;
+			end = t.end;
+		}
+		return {
+			text: text.toLowerCase(),
+			token: { ...first, text, end },
+		};
+	}
+
 	private parseComparison(): FramePredicate {
 		const field = this.next();
 		const numeric = NUMERIC_FIELDS[field.text];
 		const enumField = ENUM_FIELDS[field.text];
-		if (!numeric && !enumField) {
+		const hashField = HASH_FIELDS[field.text];
+		if (!numeric && !enumField && !hashField) {
 			fail(
 				`unknown field "${field.text}" — one of ${FILTER_FIELDS.join(", ")}`,
 				field.start,
@@ -358,6 +428,31 @@ class Parser {
 			fail(`expected a comparison after "${field.text}"`, op.start, op.end);
 		}
 		this.next();
+
+		if (hashField) {
+			if (ordered) {
+				fail(
+					`"${field.text}" has no ordering — use == or !=`,
+					op.start,
+					op.end,
+				);
+			}
+			const literal = this.readHashLiteral(field);
+			if (
+				literal.text.length !== DEST_HASH_HEX_LENGTH ||
+				!/^[0-9a-f]+$/.test(literal.text)
+			) {
+				fail(
+					`"${field.text}" is a ${DEST_HASH_HEX_LENGTH}-character hex hash (16 bytes), matched whole — not a prefix`,
+					literal.token.start,
+					literal.token.end,
+				);
+			}
+			const want = literal.text;
+			return op.text === "=="
+				? (f, _hp, dh) => hashField(f, dh) === want
+				: (f, _hp, dh) => hashField(f, dh) !== want;
+		}
 
 		const value = this.next();
 		if (numeric) {

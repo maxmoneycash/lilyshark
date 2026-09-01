@@ -290,3 +290,104 @@ test("errors are returned, never thrown", () => {
 		);
 	}
 });
+
+/* ── dest: the Reticulum destination hash (UI-013) ───────────────────── */
+
+/**
+ * A clear RNode/Reticulum HEADER_1 frame naming one destination hash:
+ * shim, RNS flags, hops, the 16-byte hash, the context byte. Profile 4 is
+ * the firmware's RNODE EXAMPLE profile, so the filter is allowed to read
+ * the header at all.
+ */
+function rnodeFrame(hashHex: string, overrides: Partial<FilterFrame> = {}) {
+	const hash = Uint8Array.from(
+		hashHex.match(/../g) ?? [],
+		(b) => Number.parseInt(b, 16),
+	);
+	assert.equal(hash.length, 16, "a destination hash is 16 bytes");
+	const bytes = new Uint8Array(20);
+	bytes[0] = 0x00; // RNode shim, complete frame
+	bytes[1] = 0x01; // HEADER_1, SINGLE destination, ANNOUNCE
+	bytes[2] = 1; // hops
+	bytes.set(hash, 3);
+	return frame({ profileId: 4, bytes, ...overrides });
+}
+
+const HASH_A = "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf";
+const HASH_B = "0a1b2c3d4e5f60718293a4b5c6d7e8f9";
+const HASH_DIGITS = "01234567890123456789012345678901";
+
+test("dest matches a frame's whole destination hash", () => {
+	const f = rnodeFrame(HASH_A);
+	assert.equal(compile(`dest == ${HASH_A}`)(f), true);
+	assert.equal(compile(`dest != ${HASH_A}`)(f), false);
+	assert.equal(compile(`dest == ${HASH_B}`)(f), false);
+	assert.equal(compile(`dest != ${HASH_B}`)(f), true);
+});
+
+test("dest reads hashes the tokenizer would otherwise split into pieces", () => {
+	// "0a1b…" lexes as a number then an identifier; a hash is not a quantity.
+	assert.equal(compile(`dest == ${HASH_B}`)(rnodeFrame(HASH_B)), true);
+	assert.equal(compile(`dest == ${HASH_DIGITS}`)(rnodeFrame(HASH_DIGITS)), true);
+	// Case is not part of a hash.
+	assert.equal(
+		compile(`dest == ${HASH_A.toUpperCase()}`)(rnodeFrame(HASH_A)),
+		true,
+	);
+});
+
+test("dest reads no hash out of a frame that carries none", () => {
+	const nonReticulum = rnodeFrame(HASH_A, { profileId: 1 }); // Meshtastic
+	assert.equal(compile(`dest == ${HASH_A}`)(nonReticulum), false);
+	assert.equal(compile(`dest != ${HASH_A}`)(nonReticulum), true);
+
+	const split = rnodeFrame(HASH_A);
+	split.bytes[0] = 0x01; // RNode split frame: no clear RNS header
+	assert.equal(compile(`dest == ${HASH_A}`)(split), false);
+
+	const ifac = rnodeFrame(HASH_A);
+	ifac.bytes[1] |= 0x80; // IFAC masks the header
+	assert.equal(compile(`dest == ${HASH_A}`)(ifac), false);
+
+	const short = frame({ profileId: 4, bytes: new Uint8Array([0x00, 0x01]) });
+	assert.equal(compile(`dest == ${HASH_A}`)(short), false);
+});
+
+test("a precomputed dest hash is used instead of re-reading the header", () => {
+	// The caller's read wins: TrafficTab reads every frame's hash once.
+	const f = rnodeFrame(HASH_A);
+	assert.equal(compile(`dest == ${HASH_B}`)(f, undefined, HASH_B), true);
+	assert.equal(compile(`dest == ${HASH_A}`)(f, undefined, null), false);
+	// …and it reaches predicates nested under every combinator.
+	assert.equal(
+		compile(`!(dest == ${HASH_A}) && (dest == ${HASH_B} || sf == 11)`)(
+			f,
+			undefined,
+			HASH_B,
+		),
+		true,
+	);
+});
+
+test("dest composes with the rest of the language", () => {
+	const f = rnodeFrame(HASH_A, { snrDb: 9 });
+	assert.equal(compile(`dest == ${HASH_A} && snr > 5`)(f), true);
+	assert.equal(compile(`dest == ${HASH_A} && snr > 20`)(f), false);
+	assert.equal(compile(`proto == rnode and dest == ${HASH_A}`)(f), true);
+});
+
+test("dest refuses a prefix, an ordering, and a non-hash value", () => {
+	const short = `dest == ${HASH_A.slice(0, 8)}`;
+	let e = reject(short);
+	assert.equal(short.slice(e.start, e.end), HASH_A.slice(0, 8));
+	assert.match(e.message, /not a prefix/);
+
+	e = reject(`dest < ${HASH_A}`);
+	assert.match(e.message, /no ordering/);
+
+	e = reject("dest == zzzz");
+	assert.match(e.message, /hex hash/);
+
+	assert.equal(parseFrameFilter("dest ==").ok, false);
+	assert.doesNotThrow(() => parseFrameFilter("dest == ("));
+});
