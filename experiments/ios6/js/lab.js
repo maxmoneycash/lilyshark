@@ -130,6 +130,10 @@
             const track = Ios6.state.unlockTrack;
             if (track && point.y >= track.y && point.y <= track.y + track.h &&
                 point.x >= track.x && point.x <= track.x + track.w) {
+                if (point.x > track.x + track.w * 0.72) {
+                    Ios6.open("home");
+                    return;
+                }
                 Ios6.state.dragging = true;
                 canvas().setPointerCapture(event.pointerId);
                 return;
@@ -241,12 +245,56 @@
         });
     }
 
+    Ios6.selftest = function () {
+        const report = { screens: {}, send: false };
+        Ios6.SCREEN_ORDER.forEach(function (id) {
+            Ios6.state.screen = id;
+            Ios6.state.unlockSlide = 0;
+            Ios6.redraw();
+            const frame = canvas().getContext("2d").getImageData(0, 0, W, H);
+            let ink = 0;
+            for (let index = 0; index < frame.data.length; index += 4) {
+                if (frame.data[index] | frame.data[index + 1] | frame.data[index + 2]) ink += 1;
+            }
+            report.screens[id] = {
+                colors: Ios6.state.colorCount,
+                painted: ink,
+                blank: ink < 200,
+            };
+        });
+        const before = Ios6.threads.everyone.messages.length;
+        Ios6.state.peer = "everyone";
+        Ios6.state.draft = "hello ridge";
+        Ios6.sendDraft();
+        const last = Ios6.threads.everyone.messages[Ios6.threads.everyone.messages.length - 1];
+        report.send = Ios6.threads.everyone.messages.length === before + 1 &&
+            last.text === "hello ridge" && last.mine === true;
+        Ios6.state.screen = "home";
+        Ios6.state.rgb565 = false;
+        Ios6.redraw();
+        report.homeFull = Ios6.state.colorCount;
+        Ios6.state.rgb565 = true;
+        Ios6.redraw();
+        report.home565 = Ios6.state.colorCount;
+        report.ok = !Ios6.SCREEN_ORDER.some(function (id) {
+            return report.screens[id].blank;
+        }) && report.send && report.home565 > 200 && report.homeFull >= report.home565;
+        return report;
+    };
+
     Ios6.start = async function () {
         bind();
         applyScale();
         await loadFaces();
         const initial = location.hash.replace("#", "");
         Ios6.open(Ios6.screens[initial] ? initial : "home");
+        if (/\bselftest=1\b/.test(location.search)) {
+            const report = Ios6.selftest();
+            const pre = document.createElement("pre");
+            pre.id = "selftest";
+            pre.textContent = JSON.stringify(report, null, 2);
+            document.body.appendChild(pre);
+        }
         requestAnimationFrame(tick);
     };
 

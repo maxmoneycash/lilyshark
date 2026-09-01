@@ -410,11 +410,11 @@
                 },
             };
         });
-        K().tableGroup(ctx, 10, 48, 300, group, { rowH: 32 });
+        K().tableGroup(ctx, 10, 48, 300, group, { rowH: 32, labelX: 30 });
         for (let index = 0; index < rows.length; index += 1) {
             ctx.fillStyle = K().hex24(rows[index].tone);
             ctx.beginPath();
-            ctx.arc(24, 48 + 16 + index * 32, 4, 0, Math.PI * 2);
+            ctx.arc(22, 48 + 16 + index * 32, 4, 0, Math.PI * 2);
             ctx.fill();
         }
         K().text(ctx, "Green inside 5 minutes. Amber to 30. Red beyond.", 16, 186, C.Meta, { size: 10 });

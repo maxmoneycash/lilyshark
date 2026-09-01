@@ -230,9 +230,11 @@
         const words = value.split(" ");
         const lines = [];
         let current = "";
+        const columns = Math.max(8, Math.floor(maxWidth / 6.5));
         for (let index = 0; index < words.length; index += 1) {
             const next = current ? current + " " + words[index] : words[index];
-            if (ctx.measureText(next).width > maxWidth && current) {
+            const measured = ctx.measureText(next).width;
+            if ((measured > maxWidth || next.length > columns) && current) {
                 lines.push(current);
                 current = words[index];
             } else {
@@ -246,7 +248,7 @@
 
     function lineHeight(spec) {
         if (Ios6.state.font === "pixel") return 8 * pixelScale((spec && spec.size) || 12);
-        return Math.round(((spec && spec.size) || 12) * 1.15);
+        return (spec && spec.size) || 12;
     }
 
     function hit(x, y, width, height, action) {
@@ -427,6 +429,7 @@
     function tableGroup(ctx, x, y, width, rows, options) {
         const spec = options || {};
         const rowH = spec.rowH || 28;
+        const labelX = spec.labelX || 12;
         const height = rows.length * rowH;
         panel(ctx, x, y, width, height, C.White, 0xf3f3f3, C.GrayEdge, 8);
         for (let index = 0; index < rows.length; index += 1) {
@@ -440,7 +443,7 @@
                 ctx.fillStyle = "rgba(49,83,124,0.12)";
                 ctx.fillRect(x + 1, top + (index === 0 ? 1 : 0), width - 2, rowH);
             }
-            text(ctx, row.label, x + 12, top + 8, C.Ink, { size: 12, weight: "600" });
+            text(ctx, row.label, x + labelX, top + 8, C.Ink, { size: 12, weight: "600" });
             if (row.value) {
                 text(ctx, row.value, x + width - (row.disclosure ? 22 : 12), top + 8, C.Meta, {
                     size: 12,
