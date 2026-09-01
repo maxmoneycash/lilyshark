@@ -8515,71 +8515,74 @@ void build_chat(lv_obj_t * parent)
         put_label(parent, "TYPE, THEN PRESS ENTER TO SEND.", 52, 126,
                   lv_color_hex(kIos6Meta), &font_pixel_6x8);
     } else {
-        // A short conversation settles on the bottom of the log, against the
-        // box you type in, the way that system placed it.
-        const lv_coord_t settle =
-            visible < kChatVisible
-                ? static_cast<lv_coord_t>((kChatVisible - visible) *
-                                          static_cast<std::size_t>(kChatRowH))
-                : 0;
-        for (std::size_t index = 0; index < visible; ++index) {
+        // Bubbles are packed upward from the bottom, because a conversation is
+        // read from its newest end and no two bubbles are the same height.
+        lv_coord_t cursor = static_cast<lv_coord_t>(kChatMetaY - 6);
+        for (std::size_t back = 0; back < visible; ++back) {
+            const std::size_t index = visible - 1U - back;
             const ChatLine &line = chat_log[match_slots[first + index]];
-            const lv_coord_t y = kChatMsgY + settle +
-                                 static_cast<lv_coord_t>(index) * kChatRowH;
-            // Consecutive messages from one speaker are a single turn, so the
-            // name belongs on the first of them only.
             const ChatLine *previous =
                 index > 0U ? &chat_log[match_slots[first + index - 1U]] : nullptr;
             const bool same_speaker =
                 previous != nullptr && previous->mine == line.mine &&
                 (line.mine || std::strcmp(previous->from, line.from) == 0);
-            const lv_coord_t bubble_y =
-                static_cast<lv_coord_t>(y + (same_speaker ? 4 : 9));
-            // A bubble is only as wide as what it holds, which is what makes a
-            // thread read as an exchange rather than as a table.
-            const std::size_t length = std::strlen(line.text);
-            lv_coord_t width = static_cast<lv_coord_t>(length * 7U + 18U);
-            if (width > 270) width = 270;
-            if (width < 44) width = 44;
-            const lv_coord_t bx =
-                line.mine ? static_cast<lv_coord_t>(310 - width) : 10;
-            if (!same_speaker) {
-                char who[28]{};
-                if (line.when[0] != '\0') {
-                    std::snprintf(who, sizeof(who), "%s  %s", line.when,
-                                  line.mine ? "YOU" : line.from);
-                } else {
-                    std::snprintf(who, sizeof(who), "%s", line.mine ? "YOU" : line.from);
-                }
-                const lv_coord_t who_w = static_cast<lv_coord_t>(std::strlen(who) * 6);
-                put_label(parent, who,
-                          line.mine ? static_cast<lv_coord_t>(310 - who_w) : 12, y,
-                          lv_color_hex(kIos6Meta), &font_pixel_6x8);
+            const bool named = !same_speaker && !line.mine && broadcast;
+
+            // Let the label wrap itself and then measure it. A bubble being
+            // exactly the size of what it holds is the whole reason the
+            // original reads as speech instead of as a table of rows -- and a
+            // sentence that runs past one line has to grow downward, not be
+            // cut off at the edge of a strip.
+            lv_obj_t *text = theme::label(parent, line.text, lv_color_hex(kIos6Ink),
+                                          &font_condensed_12);
+            lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
+            lv_obj_set_width(text, LV_SIZE_CONTENT);
+            lv_obj_set_style_max_width(text, 216, 0);
+            lv_obj_update_layout(text);
+            const lv_coord_t text_w = lv_obj_get_width(text);
+            const lv_coord_t text_h = lv_obj_get_height(text);
+            const lv_coord_t bubble_w = static_cast<lv_coord_t>(text_w + 20);
+            const lv_coord_t bubble_h = static_cast<lv_coord_t>(text_h + 13);
+            const lv_coord_t header = named ? 11 : 0;
+            const lv_coord_t delivered = (line.mine && line.acked) ? 10 : 0;
+            if (cursor - bubble_h - header - delivered < kChatMsgY) {
+                lv_obj_delete(text);
+                break;
             }
-            // Amber for a message that reached us over the internet rather than
-            // over the air: it is real traffic, but it never crossed this radio
-            // and the eye has to be told where it already is.
+            cursor = static_cast<lv_coord_t>(cursor - delivered);
+            const lv_coord_t bubble_y = static_cast<lv_coord_t>(cursor - bubble_h);
+            const lv_coord_t bubble_x =
+                line.mine ? static_cast<lv_coord_t>(310 - bubble_w) : 10;
+            // Amber for a message that reached us over the internet: real
+            // traffic somebody heard, but it never crossed this radio.
             const std::uint32_t top = line.mine ? kIos6BlueTop
                                                 : (line.via_net ? 0xffe6b0 : kIos6GrayTop);
             const std::uint32_t bottom = line.mine ? kIos6BlueBottom
                                                    : (line.via_net ? 0xf0c060 : kIos6GrayBottom);
             const std::uint32_t edge = line.mine ? kIos6BlueEdge
                                                  : (line.via_net ? 0xc79b3a : kIos6GrayEdge);
-            ios6_panel(parent, bx, bubble_y, width, kChatBubbleH, top, bottom, edge, 8);
+            ios6_panel(parent, bubble_x, bubble_y, bubble_w, bubble_h, top, bottom, edge, 11);
             ios6_bubble_tail(parent,
-                             line.mine ? static_cast<lv_coord_t>(bx + width - 3)
-                                       : static_cast<lv_coord_t>(bx - 2),
-                             static_cast<lv_coord_t>(bubble_y + kChatBubbleH - 4),
+                             line.mine ? static_cast<lv_coord_t>(bubble_x + bubble_w - 3)
+                                       : static_cast<lv_coord_t>(bubble_x - 2),
+                             static_cast<lv_coord_t>(bubble_y + bubble_h - 5),
                              line.mine);
-            put_clipped_label(parent, line.text, static_cast<lv_coord_t>(bx + 9),
-                              static_cast<lv_coord_t>(bubble_y + 4),
-                              static_cast<lv_coord_t>(width - 18),
-                              lv_color_hex(kIos6Ink), &font_mono_semibold_12);
-            if (line.mine && line.acked) {
+            lv_obj_set_pos(text, static_cast<lv_coord_t>(bubble_x + 10),
+                           static_cast<lv_coord_t>(bubble_y + 6));
+            lv_obj_move_foreground(text);
+            if (delivered > 0) {
                 put_label(parent, "DELIVERED", static_cast<lv_coord_t>(310 - 54),
-                          static_cast<lv_coord_t>(bubble_y + kChatBubbleH),
+                          static_cast<lv_coord_t>(bubble_y + bubble_h + 1),
                           lv_color_hex(kIos6Meta), &font_pixel_6x8);
             }
+            if (named) {
+                // Only a channel with several voices on it needs to say which
+                // one spoke; a direct conversation is already named in the bar.
+                put_label(parent, line.from, 12,
+                          static_cast<lv_coord_t>(bubble_y - 10),
+                          lv_color_hex(kIos6Meta), &font_pixel_6x8);
+            }
+            cursor = static_cast<lv_coord_t>(bubble_y - header - 4);
         }
     }
     if (chat_tx_failed || std::strstr(shell_notice, "TX FAILED") != nullptr) {
@@ -12702,7 +12705,7 @@ bool run_simulator_render_test() noexcept
         if (render_directory != nullptr) {
             (void)write_simulator_frame(render_directory, "chat", 0);
         }
-        constexpr std::uint64_t kChatHash = 0xd1157a108526fc98ULL;
+        constexpr std::uint64_t kChatHash = 0xd543fada5eb1f941ULL;
         const std::uint64_t chat_hash = hash_simulator_frame();
         std::size_t chat_ink = 0U;
         for(const std::uint16_t pixel : simulator_frame_buffer) {
