@@ -168,7 +168,11 @@ export function summarizeAnnounces(
 	const { observations, reticulumFrameCount } = collectAnnounces(frames, t0Us);
 	if (reticulumFrameCount === 0) return EMPTY;
 	if (observations.length === 0) {
-		return { ...EMPTY, reticulumFrameCount, structuralOnlyCount: reticulumFrameCount };
+		return {
+			...EMPTY,
+			reticulumFrameCount,
+			structuralOnlyCount: reticulumFrameCount,
+		};
 	}
 
 	// Airtime shares are only offered when every announce frame reports one;

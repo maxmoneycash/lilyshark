@@ -512,9 +512,15 @@ export function dissectRNode(
 		isAnnounce &&
 		destinationType === RETICULUM_DESTINATION_TYPE.single &&
 		fields.payloadLength >= announceFixedLength;
-	const state: DecodeState = announceArithmeticHolds
-		? "payload-decoded"
-		: "header-only";
+	// The state follows the announce that is actually read, not the flags that
+	// promised one. The C++ decode() sets PayloadDecoded from
+	// announceArithmeticHolds alone, but on-device that can never disagree
+	// with the reader: a RawFrame is capped at kMaxFrameBytes, so app_data can
+	// never exceed kReticulumAnnounceMaxAppDataBytes there. A .lscap record
+	// carries a 16-bit captured length and CAN, and calling such a frame
+	// payload-decoded while reporting no announce would be a claim about
+	// bytes nothing read.
+	let state: DecodeState = "header-only";
 
 	const clear = reticulumPayloadIsClear(packetType, destinationType, context);
 	if (!clear) {
@@ -550,6 +556,7 @@ export function dissectRNode(
 			transportOffset,
 			destinationOffset,
 		);
+		state = "payload-decoded";
 	} else {
 		// The generic clear-payload node, with the firmware reader's refusal
 		// reasons said out loud where the flags looked like an announce.

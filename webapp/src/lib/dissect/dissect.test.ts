@@ -426,6 +426,7 @@ test("announce exclusions stay structural, exactly as the C++ reader refuses the
 		"announce-ifac-protected-rejected", // IFAC-masked header
 		"announce-one-byte-short-of-fixed-layout", // payload too short
 		"announce-payload-too-short",
+		"announce-app-data-past-the-frame-arithmetic", // app_data past the cap
 	];
 	for (const name of excluded) {
 		const { primary, fields } = announceOf(name);
@@ -455,6 +456,10 @@ test("a structural announce says which arithmetic refused it", () => {
 		["announce-group-destination-structural", /GROUP destination/],
 		["announce-ratchet-promised-but-missing", /promises a ratchet/],
 		["announce-payload-too-short", /shorter than the 148-byte/],
+		[
+			"announce-app-data-past-the-frame-arithmetic",
+			/app_data exceeds the 87-byte frame arithmetic/,
+		],
 	] as const) {
 		const { primary } = announceOf(name);
 		const payload = findNode(primary.root, "Payload");
@@ -466,7 +471,9 @@ test("a structural announce says which arithmetic refused it", () => {
 test("reticulumDestinationHashHex never disagrees with the dissector", () => {
 	const check = (bytes: Uint8Array, context: string) => {
 		const { primary } = dissectFrame(bytes, "reticulum");
-		const fields = primary.fields as { destinationHashHex: string | null } | null;
+		const fields = primary.fields as {
+			destinationHashHex: string | null;
+		} | null;
 		assert.equal(
 			reticulumDestinationHashHex(bytes),
 			fields?.destinationHashHex ?? null,

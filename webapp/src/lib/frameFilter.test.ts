@@ -300,9 +300,8 @@ test("errors are returned, never thrown", () => {
  * the header at all.
  */
 function rnodeFrame(hashHex: string, overrides: Partial<FilterFrame> = {}) {
-	const hash = Uint8Array.from(
-		hashHex.match(/../g) ?? [],
-		(b) => Number.parseInt(b, 16),
+	const hash = Uint8Array.from(hashHex.match(/../g) ?? [], (b) =>
+		Number.parseInt(b, 16),
 	);
 	assert.equal(hash.length, 16, "a destination hash is 16 bytes");
 	const bytes = new Uint8Array(20);
@@ -328,7 +327,10 @@ test("dest matches a frame's whole destination hash", () => {
 test("dest reads hashes the tokenizer would otherwise split into pieces", () => {
 	// "0a1b…" lexes as a number then an identifier; a hash is not a quantity.
 	assert.equal(compile(`dest == ${HASH_B}`)(rnodeFrame(HASH_B)), true);
-	assert.equal(compile(`dest == ${HASH_DIGITS}`)(rnodeFrame(HASH_DIGITS)), true);
+	assert.equal(
+		compile(`dest == ${HASH_DIGITS}`)(rnodeFrame(HASH_DIGITS)),
+		true,
+	);
 	// Case is not part of a hash.
 	assert.equal(
 		compile(`dest == ${HASH_A.toUpperCase()}`)(rnodeFrame(HASH_A)),

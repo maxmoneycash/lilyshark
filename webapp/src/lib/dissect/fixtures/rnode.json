@@ -1,466 +1,481 @@
 {
- "comment": "Byte fixtures for the Reticulum-over-RNode dissector, extracted from the firmware C++ tests. Entries marked 'constructed' were built from the flag layout in src/core/reticulum_decoder.cpp because no C++ test pins those exact bytes. 'expect' keys compare against ReticulumDissection fields and 'expectAnnounce' keys against fields.announce (the semantic announce tier, readReticulumAnnounce in src/core/reticulum_decoder.cpp); hex strings compare as numbers. The announce-* entries follow buildAnnounceFrame in test/reticulum_announce/test_reticulum_announce.cpp byte for byte, including its region ramps: transport id 0x70+, destination hash 0xd0+, public key 0x11+, name hash 0x21+, random hash 0x31+, ratchet 0x41+, signature 0x51+, app_data 0x61+ — so a copy from the wrong offset cannot pass.",
- "fixtures": [
-  {
-   "name": "header-one-plain-data",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumRNodeHeaderOneAndTwo (header_one_bytes)",
-   "hex": "a00802000102030405060708090a0b0c0d0e0f006869",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "data",
-   "expect": {
-    "rnodeShim": "0xa0",
-    "splitFrame": false,
-    "ifacProtected": false,
-    "headerType": 1,
-    "destinationType": 2,
-    "packetType": 0,
-    "hops": 2,
-    "transportIdPrefix": null,
-    "destinationHashPrefix": "0x00010203",
-    "context": 0,
-    "payloadOffset": 20,
-    "payloadLength": 2,
-    "encrypted": false
-   }
-  },
-  {
-   "name": "header-two-transport-single-data",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumRNodeHeaderOneAndTwo (header_two_bytes)",
-   "hex": "b05003101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f09010203",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "encrypted-payload",
-   "expect": {
-    "rnodeShim": "0xb0",
-    "headerType": 2,
-    "transportPacket": true,
-    "destinationType": 0,
-    "packetType": 0,
-    "hops": 3,
-    "transportIdPrefix": "0x10111213",
-    "destinationHashPrefix": "0x20212223",
-    "context": "0x09",
-    "payloadOffset": 36,
-    "payloadLength": 3,
-    "encrypted": true
-   }
-  },
-  {
-   "name": "ifac-protected",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (ifac_bytes)",
-   "hex": "c08000000000000000000000000000000000000000",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "encrypted-payload",
-   "expect": {
-    "rnodeShim": "0xc0",
-    "splitFrame": false,
-    "ifacProtected": true,
-    "headerType": null,
-    "packetType": null,
-    "payloadOffset": 1,
-    "payloadLength": 20,
-    "encrypted": true
-   }
-  },
-  {
-   "name": "split-frame",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (split_bytes)",
-   "hex": "d10802",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "data",
-   "expect": {
-    "rnodeShim": "0xd1",
-    "splitFrame": true,
-    "rnsFlags": null,
-    "headerType": null,
-    "payloadOffset": 1,
-    "payloadLength": 2,
-    "encrypted": false
-   }
-  },
-  {
-   "name": "shim-only",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (shim_only_bytes)",
-   "hex": "a0",
-   "result": "malformed",
-   "state": "malformed"
-  },
-  {
-   "name": "short-header-one",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_header_one_bytes)",
-   "hex": "a00802",
-   "result": "malformed",
-   "state": "malformed"
-  },
-  {
-   "name": "short-header-two",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_header_two_bytes)",
-   "hex": "a04002",
-   "result": "malformed",
-   "state": "malformed"
-  },
-  {
-   "name": "excessive-hops",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (excessive_hops_bytes)",
-   "hex": "a008800000000000000000000000000000000000",
-   "result": "malformed",
-   "state": "malformed"
-  },
-  {
-   "name": "short-ifac",
-   "source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_ifac_bytes)",
-   "hex": "a08000",
-   "result": "malformed",
-   "state": "malformed"
-  },
-  {
-   "name": "announce-payload-too-short",
-   "source": "constructed — HEADER_1 SINGLE/ANNOUNCE flags (0x01) per the masks in src/core/reticulum_decoder.cpp; announces are cleartext by protocol rule (payloadIsClear), but a 4-byte payload cannot hold the 148-byte fixed announce layout, so announceArithmeticHolds fails and the frame stays structural (header-only, no announce)",
-   "hex": "a00101303132333435363738393a3b3c3d3e3f00deadbeef",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "advertisement",
-   "expect": {
-    "headerType": 1,
-    "destinationType": 0,
-    "packetType": 1,
-    "hops": 1,
-    "destinationHashPrefix": "0x30313233",
-    "payloadOffset": 20,
-    "payloadLength": 4,
-    "encrypted": false,
-    "announce": null
-   }
-  },
-  {
-   "name": "link-request",
-   "source": "constructed — HEADER_1 SINGLE/LINK REQUEST flags (0x02); link requests are cleartext by protocol rule (payloadIsClear in src/core/reticulum_decoder.cpp)",
-   "hex": "a00200404142434445464748494a4b4c4d4e4f00aabb",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "control",
-   "expect": {
-    "packetType": 2,
-    "destinationType": 0,
-    "hops": 0,
-    "payloadOffset": 20,
-    "payloadLength": 2,
-    "encrypted": false
-   }
-  },
-  {
-   "name": "proof-resource-proof-context",
-   "source": "constructed — HEADER_1 SINGLE/PROOF flags (0x03) with context 0x05 (RESOURCE PROOF), which payloadIsClear in src/core/reticulum_decoder.cpp treats as cleartext",
-   "hex": "a00301505152535455565758595a5b5c5d5e5f05cc",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "control",
-   "expect": {
-    "packetType": 3,
-    "context": "0x05",
-    "payloadOffset": 20,
-    "payloadLength": 1,
-    "encrypted": false
-   }
-  },
-  {
-   "name": "shelby-pointer-payload",
-   "source": "test/shelby_registry/test_shelby_registry.cpp makeReticulumFrameWithPointer / nestedPointerEnrichesMeshCoreAndReticulum",
-   "hex": "a00802000102030405060708090a0b0c0d0e0f0053484c420105202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f0010000000b33f7100000100",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "data",
-   "expect": {
-    "headerType": 1,
-    "destinationType": 2,
-    "packetType": 0,
-    "payloadOffset": 20,
-    "payloadLength": 82,
-    "encrypted": false
-   },
-   "expectShelby": {
-    "offset": 20,
-    "sizeBytes": 4096,
-    "chunkCount": 1
-   }
-  },
-  {
-   "name": "announce-header-one-minimal",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testMinimalHeaderOneAnnounce — buildAnnounceFrame(header_two=false, with_ratchet=false, app_data=0, hops=3); 1 shim + 19 HEADER_1 + 148 payload = 168 bytes",
-   "hex": "000103d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
-   "result": "matched",
-   "state": "payload-decoded",
-   "kind": "advertisement",
-   "expect": {
-    "headerType": 1,
-    "destinationType": 0,
-    "packetType": 1,
-    "contextFlag": false,
-    "hops": 3,
-    "destinationHashHex": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
-    "destinationHashPrefix": "0xd0d1d2d3",
-    "payloadOffset": 20,
-    "payloadLength": 148,
-    "encrypted": false
-   },
-   "expectAnnounce": {
-    "headerType": 1,
-    "hops": 3,
-    "destinationHashHex": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
-    "destinationHashRange": {
-     "offset": 3,
-     "length": 16
-    },
-    "transportIdHex": null,
-    "transportIdRange": null,
-    "publicKeyRange": {
-     "offset": 20,
-     "length": 64
-    },
-    "nameHashHex": "2122232425262728292a",
-    "nameHashRange": {
-     "offset": 84,
-     "length": 10
-    },
-    "randomHashHex": "3132333435363738393a",
-    "randomHashRange": {
-     "offset": 94,
-     "length": 10
-    },
-    "ratchetRange": null,
-    "signatureRange": {
-     "offset": 104,
-     "length": 64
-    },
-    "appDataLength": 0,
-    "appDataRange": null,
-    "appDataHex": null,
-    "appDataPreview": null
-   }
-  },
-  {
-   "name": "announce-ratchet-and-app-data",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testRatchetAndAppDataAnnounce — buildAnnounceFrame(false, with_ratchet=true, app_data=5, hops=0); 1 + 19 + 64 + 10 + 10 + 32 + 64 + 5 = 205 bytes",
-   "hex": "002100d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f605152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f906162636465",
-   "result": "matched",
-   "state": "payload-decoded",
-   "kind": "advertisement",
-   "expect": {
-    "headerType": 1,
-    "contextFlag": true,
-    "packetType": 1,
-    "hops": 0,
-    "payloadOffset": 20,
-    "payloadLength": 185,
-    "encrypted": false
-   },
-   "expectAnnounce": {
-    "headerType": 1,
-    "hops": 0,
-    "publicKeyRange": {
-     "offset": 20,
-     "length": 64
-    },
-    "nameHashRange": {
-     "offset": 84,
-     "length": 10
-    },
-    "randomHashRange": {
-     "offset": 94,
-     "length": 10
-    },
-    "ratchetRange": {
-     "offset": 104,
-     "length": 32
-    },
-    "signatureRange": {
-     "offset": 136,
-     "length": 64
-    },
-    "appDataLength": 5,
-    "appDataRange": {
-     "offset": 200,
-     "length": 5
-    },
-    "appDataHex": "6162636465",
-    "appDataPreview": "abcde"
-   }
-  },
-  {
-   "name": "announce-header-two-transported",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testHeaderTwoAnnounce — buildAnnounceFrame(header_two=true, false, 0, hops=7); 1 + 35 + 148 = 184 bytes",
-   "hex": "005107707172737475767778797a7b7c7d7e7fd0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
-   "result": "matched",
-   "state": "payload-decoded",
-   "kind": "advertisement",
-   "expect": {
-    "headerType": 2,
-    "transportPacket": true,
-    "packetType": 1,
-    "hops": 7,
-    "transportIdPrefix": "0x70717273",
-    "destinationHashHex": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
-    "payloadOffset": 36,
-    "payloadLength": 148
-   },
-   "expectAnnounce": {
-    "headerType": 2,
-    "hops": 7,
-    "transportIdHex": "707172737475767778797a7b7c7d7e7f",
-    "transportIdRange": {
-     "offset": 3,
-     "length": 16
-    },
-    "destinationHashRange": {
-     "offset": 19,
-     "length": 16
-    },
-    "publicKeyRange": {
-     "offset": 36,
-     "length": 64
-    },
-    "nameHashRange": {
-     "offset": 100,
-     "length": 10
-    },
-    "randomHashRange": {
-     "offset": 110,
-     "length": 10
-    },
-    "ratchetRange": null,
-    "signatureRange": {
-     "offset": 120,
-     "length": 64
-    },
-    "appDataLength": 0,
-    "appDataRange": null
-   }
-  },
-  {
-   "name": "announce-maximum-app-data",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testMaximumAppData — buildAnnounceFrame(false, false, kReticulumAnnounceMaxAppDataBytes=87, hops=1); fills kMaxFrameBytes exactly",
-   "hex": "000101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f906162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
-   "result": "matched",
-   "state": "payload-decoded",
-   "kind": "advertisement",
-   "expect": {
-    "payloadOffset": 20,
-    "payloadLength": 235
-   },
-   "expectAnnounce": {
-    "hops": 1,
-    "appDataLength": 87,
-    "appDataRange": {
-     "offset": 168,
-     "length": 87
-    },
-    "appDataHex": "6162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
-    "appDataPreview": null
-   }
-  },
-  {
-   "name": "announce-printable-app-data-preview",
-   "source": "constructed — buildAnnounceFrame(false, false, app_data=\"nomadnet.node\", hops=2) construction rules from test/reticulum_announce/test_reticulum_announce.cpp, with the app_data ramp replaced by printable ASCII. The C++ never inspects app_data bytes; the browser offers a printable-ASCII preview only, labelled as a preview, because RNS app_data is usually msgpack",
-   "hex": "000102d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f906e6f6d61646e65742e6e6f6465",
-   "result": "matched",
-   "state": "payload-decoded",
-   "kind": "advertisement",
-   "expectAnnounce": {
-    "hops": 2,
-    "appDataLength": 13,
-    "appDataRange": {
-     "offset": 168,
-     "length": 13
-    },
-    "appDataHex": "6e6f6d61646e65742e6e6f6465",
-    "appDataPreview": "nomadnet.node"
-   }
-  },
-  {
-   "name": "announce-group-destination-structural",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testFlagInconsistenciesStayStructural (group_bytes) — buildAnnounceFrame(..., destination_type=1). Announces are only issued by SINGLE destinations, so this stays HeaderOnly with no announce, while the kind is still Advertisement",
-   "hex": "000501d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "advertisement",
-   "expect": {
-    "packetType": 1,
-    "destinationType": 1,
-    "announce": null,
-    "encrypted": false
-   }
-  },
-  {
-   "name": "announce-ratchet-promised-but-missing",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testFlagInconsistenciesStayStructural (promise_bytes) — a ratchet-less 148-byte announce payload with the context flag set afterwards, so the flags promise a 32-byte ratchet the payload cannot hold",
-   "hex": "002101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "advertisement",
-   "expect": {
-    "packetType": 1,
-    "destinationType": 0,
-    "contextFlag": true,
-    "payloadLength": 148,
-    "announce": null
-   }
-  },
-  {
-   "name": "announce-split-frame-rejected",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testSplitAndIfacRejected (split_bytes) — a complete announce whose RNode shim marks a split frame; this stateless decoder never claims split reassembly",
-   "hex": "010101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "data",
-   "expect": {
-    "splitFrame": true,
-    "rnsFlags": null,
-    "announce": null
-   }
-  },
-  {
-   "name": "announce-ifac-protected-rejected",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testSplitAndIfacRejected (ifac_bytes) — the same announce with the IFAC marker set; IFAC masks header and payload, so only the marker bit is interpreted",
-   "hex": "008101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "encrypted-payload",
-   "expect": {
-    "ifacProtected": true,
-    "headerType": null,
-    "packetType": null,
-    "encrypted": true,
-    "announce": null
-   }
-  },
-  {
-   "name": "announce-hops-127",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testHopCounts — hops pass through unchanged up to 127; 128 and above stays malformed at the structural tier (the excessive-hops fixture above)",
-   "hex": "00017fd0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
-   "result": "matched",
-   "state": "payload-decoded",
-   "kind": "advertisement",
-   "expect": {
-    "hops": 127
-   },
-   "expectAnnounce": {
-    "hops": 127
-   }
-  },
-  {
-   "name": "announce-one-byte-short-of-fixed-layout",
-   "source": "test/reticulum_announce/test_reticulum_announce.cpp testTruncationAtEveryBoundary — the cut one byte below `header_length + fixed_payload`: structurally fine, semantically unproven, so HeaderOnly with no announce",
-   "hex": "000102d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f",
-   "result": "matched",
-   "state": "header-only",
-   "kind": "advertisement",
-   "expect": {
-    "payloadLength": 147,
-    "announce": null
-   }
-  }
- ]
+	"comment": "Byte fixtures for the Reticulum-over-RNode dissector, extracted from the firmware C++ tests. Entries marked 'constructed' were built from the flag layout in src/core/reticulum_decoder.cpp because no C++ test pins those exact bytes. 'expect' keys compare against ReticulumDissection fields and 'expectAnnounce' keys against fields.announce (the semantic announce tier, readReticulumAnnounce in src/core/reticulum_decoder.cpp); hex strings compare as numbers. The announce-* entries follow buildAnnounceFrame in test/reticulum_announce/test_reticulum_announce.cpp byte for byte, including its region ramps: transport id 0x70+, destination hash 0xd0+, public key 0x11+, name hash 0x21+, random hash 0x31+, ratchet 0x41+, signature 0x51+, app_data 0x61+ — so a copy from the wrong offset cannot pass.",
+	"fixtures": [
+		{
+			"name": "header-one-plain-data",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumRNodeHeaderOneAndTwo (header_one_bytes)",
+			"hex": "a00802000102030405060708090a0b0c0d0e0f006869",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"rnodeShim": "0xa0",
+				"splitFrame": false,
+				"ifacProtected": false,
+				"headerType": 1,
+				"destinationType": 2,
+				"packetType": 0,
+				"hops": 2,
+				"transportIdPrefix": null,
+				"destinationHashPrefix": "0x00010203",
+				"context": 0,
+				"payloadOffset": 20,
+				"payloadLength": 2,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "header-two-transport-single-data",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumRNodeHeaderOneAndTwo (header_two_bytes)",
+			"hex": "b05003101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f09010203",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "encrypted-payload",
+			"expect": {
+				"rnodeShim": "0xb0",
+				"headerType": 2,
+				"transportPacket": true,
+				"destinationType": 0,
+				"packetType": 0,
+				"hops": 3,
+				"transportIdPrefix": "0x10111213",
+				"destinationHashPrefix": "0x20212223",
+				"context": "0x09",
+				"payloadOffset": 36,
+				"payloadLength": 3,
+				"encrypted": true
+			}
+		},
+		{
+			"name": "ifac-protected",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (ifac_bytes)",
+			"hex": "c08000000000000000000000000000000000000000",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "encrypted-payload",
+			"expect": {
+				"rnodeShim": "0xc0",
+				"splitFrame": false,
+				"ifacProtected": true,
+				"headerType": null,
+				"packetType": null,
+				"payloadOffset": 1,
+				"payloadLength": 20,
+				"encrypted": true
+			}
+		},
+		{
+			"name": "split-frame",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (split_bytes)",
+			"hex": "d10802",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"rnodeShim": "0xd1",
+				"splitFrame": true,
+				"rnsFlags": null,
+				"headerType": null,
+				"payloadOffset": 1,
+				"payloadLength": 2,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "shim-only",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (shim_only_bytes)",
+			"hex": "a0",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "short-header-one",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_header_one_bytes)",
+			"hex": "a00802",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "short-header-two",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_header_two_bytes)",
+			"hex": "a04002",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "excessive-hops",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (excessive_hops_bytes)",
+			"hex": "a008800000000000000000000000000000000000",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "short-ifac",
+			"source": "test/core_runtime/test_core_runtime.cpp testReticulumProtectedSplitAndMalformedFrames (short_ifac_bytes)",
+			"hex": "a08000",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "announce-payload-too-short",
+			"source": "constructed — HEADER_1 SINGLE/ANNOUNCE flags (0x01) per the masks in src/core/reticulum_decoder.cpp; announces are cleartext by protocol rule (payloadIsClear), but a 4-byte payload cannot hold the 148-byte fixed announce layout, so announceArithmeticHolds fails and the frame stays structural (header-only, no announce)",
+			"hex": "a00101303132333435363738393a3b3c3d3e3f00deadbeef",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "advertisement",
+			"expect": {
+				"headerType": 1,
+				"destinationType": 0,
+				"packetType": 1,
+				"hops": 1,
+				"destinationHashPrefix": "0x30313233",
+				"payloadOffset": 20,
+				"payloadLength": 4,
+				"encrypted": false,
+				"announce": null
+			}
+		},
+		{
+			"name": "link-request",
+			"source": "constructed — HEADER_1 SINGLE/LINK REQUEST flags (0x02); link requests are cleartext by protocol rule (payloadIsClear in src/core/reticulum_decoder.cpp)",
+			"hex": "a00200404142434445464748494a4b4c4d4e4f00aabb",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "control",
+			"expect": {
+				"packetType": 2,
+				"destinationType": 0,
+				"hops": 0,
+				"payloadOffset": 20,
+				"payloadLength": 2,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "proof-resource-proof-context",
+			"source": "constructed — HEADER_1 SINGLE/PROOF flags (0x03) with context 0x05 (RESOURCE PROOF), which payloadIsClear in src/core/reticulum_decoder.cpp treats as cleartext",
+			"hex": "a00301505152535455565758595a5b5c5d5e5f05cc",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "control",
+			"expect": {
+				"packetType": 3,
+				"context": "0x05",
+				"payloadOffset": 20,
+				"payloadLength": 1,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "shelby-pointer-payload",
+			"source": "test/shelby_registry/test_shelby_registry.cpp makeReticulumFrameWithPointer / nestedPointerEnrichesMeshCoreAndReticulum",
+			"hex": "a00802000102030405060708090a0b0c0d0e0f0053484c420105202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f0010000000b33f7100000100",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"headerType": 1,
+				"destinationType": 2,
+				"packetType": 0,
+				"payloadOffset": 20,
+				"payloadLength": 82,
+				"encrypted": false
+			},
+			"expectShelby": {
+				"offset": 20,
+				"sizeBytes": 4096,
+				"chunkCount": 1
+			}
+		},
+		{
+			"name": "announce-header-one-minimal",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testMinimalHeaderOneAnnounce — buildAnnounceFrame(header_two=false, with_ratchet=false, app_data=0, hops=3); 1 shim + 19 HEADER_1 + 148 payload = 168 bytes",
+			"hex": "000103d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "advertisement",
+			"expect": {
+				"headerType": 1,
+				"destinationType": 0,
+				"packetType": 1,
+				"contextFlag": false,
+				"hops": 3,
+				"destinationHashHex": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+				"destinationHashPrefix": "0xd0d1d2d3",
+				"payloadOffset": 20,
+				"payloadLength": 148,
+				"encrypted": false
+			},
+			"expectAnnounce": {
+				"headerType": 1,
+				"hops": 3,
+				"destinationHashHex": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+				"destinationHashRange": {
+					"offset": 3,
+					"length": 16
+				},
+				"transportIdHex": null,
+				"transportIdRange": null,
+				"publicKeyRange": {
+					"offset": 20,
+					"length": 64
+				},
+				"nameHashHex": "2122232425262728292a",
+				"nameHashRange": {
+					"offset": 84,
+					"length": 10
+				},
+				"randomHashHex": "3132333435363738393a",
+				"randomHashRange": {
+					"offset": 94,
+					"length": 10
+				},
+				"ratchetRange": null,
+				"signatureRange": {
+					"offset": 104,
+					"length": 64
+				},
+				"appDataLength": 0,
+				"appDataRange": null,
+				"appDataHex": null,
+				"appDataPreview": null
+			}
+		},
+		{
+			"name": "announce-ratchet-and-app-data",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testRatchetAndAppDataAnnounce — buildAnnounceFrame(false, with_ratchet=true, app_data=5, hops=0); 1 + 19 + 64 + 10 + 10 + 32 + 64 + 5 = 205 bytes",
+			"hex": "002100d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f605152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f906162636465",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "advertisement",
+			"expect": {
+				"headerType": 1,
+				"contextFlag": true,
+				"packetType": 1,
+				"hops": 0,
+				"payloadOffset": 20,
+				"payloadLength": 185,
+				"encrypted": false
+			},
+			"expectAnnounce": {
+				"headerType": 1,
+				"hops": 0,
+				"publicKeyRange": {
+					"offset": 20,
+					"length": 64
+				},
+				"nameHashRange": {
+					"offset": 84,
+					"length": 10
+				},
+				"randomHashRange": {
+					"offset": 94,
+					"length": 10
+				},
+				"ratchetRange": {
+					"offset": 104,
+					"length": 32
+				},
+				"signatureRange": {
+					"offset": 136,
+					"length": 64
+				},
+				"appDataLength": 5,
+				"appDataRange": {
+					"offset": 200,
+					"length": 5
+				},
+				"appDataHex": "6162636465",
+				"appDataPreview": "abcde"
+			}
+		},
+		{
+			"name": "announce-header-two-transported",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testHeaderTwoAnnounce — buildAnnounceFrame(header_two=true, false, 0, hops=7); 1 + 35 + 148 = 184 bytes",
+			"hex": "005107707172737475767778797a7b7c7d7e7fd0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "advertisement",
+			"expect": {
+				"headerType": 2,
+				"transportPacket": true,
+				"packetType": 1,
+				"hops": 7,
+				"transportIdPrefix": "0x70717273",
+				"destinationHashHex": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+				"payloadOffset": 36,
+				"payloadLength": 148
+			},
+			"expectAnnounce": {
+				"headerType": 2,
+				"hops": 7,
+				"transportIdHex": "707172737475767778797a7b7c7d7e7f",
+				"transportIdRange": {
+					"offset": 3,
+					"length": 16
+				},
+				"destinationHashRange": {
+					"offset": 19,
+					"length": 16
+				},
+				"publicKeyRange": {
+					"offset": 36,
+					"length": 64
+				},
+				"nameHashRange": {
+					"offset": 100,
+					"length": 10
+				},
+				"randomHashRange": {
+					"offset": 110,
+					"length": 10
+				},
+				"ratchetRange": null,
+				"signatureRange": {
+					"offset": 120,
+					"length": 64
+				},
+				"appDataLength": 0,
+				"appDataRange": null
+			}
+		},
+		{
+			"name": "announce-maximum-app-data",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testMaximumAppData — buildAnnounceFrame(false, false, kReticulumAnnounceMaxAppDataBytes=87, hops=1); fills kMaxFrameBytes exactly",
+			"hex": "000101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f906162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "advertisement",
+			"expect": {
+				"payloadOffset": 20,
+				"payloadLength": 235
+			},
+			"expectAnnounce": {
+				"hops": 1,
+				"appDataLength": 87,
+				"appDataRange": {
+					"offset": 168,
+					"length": 87
+				},
+				"appDataHex": "6162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+				"appDataPreview": null
+			}
+		},
+		{
+			"name": "announce-printable-app-data-preview",
+			"source": "constructed — buildAnnounceFrame(false, false, app_data=\"nomadnet.node\", hops=2) construction rules from test/reticulum_announce/test_reticulum_announce.cpp, with the app_data ramp replaced by printable ASCII. The C++ never inspects app_data bytes; the browser offers a printable-ASCII preview only, labelled as a preview, because RNS app_data is usually msgpack",
+			"hex": "000102d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f906e6f6d61646e65742e6e6f6465",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "advertisement",
+			"expectAnnounce": {
+				"hops": 2,
+				"appDataLength": 13,
+				"appDataRange": {
+					"offset": 168,
+					"length": 13
+				},
+				"appDataHex": "6e6f6d61646e65742e6e6f6465",
+				"appDataPreview": "nomadnet.node"
+			}
+		},
+		{
+			"name": "announce-group-destination-structural",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testFlagInconsistenciesStayStructural (group_bytes) — buildAnnounceFrame(..., destination_type=1). Announces are only issued by SINGLE destinations, so this stays HeaderOnly with no announce, while the kind is still Advertisement",
+			"hex": "000501d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "advertisement",
+			"expect": {
+				"packetType": 1,
+				"destinationType": 1,
+				"announce": null,
+				"encrypted": false
+			}
+		},
+		{
+			"name": "announce-ratchet-promised-but-missing",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testFlagInconsistenciesStayStructural (promise_bytes) — a ratchet-less 148-byte announce payload with the context flag set afterwards, so the flags promise a 32-byte ratchet the payload cannot hold",
+			"hex": "002101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "advertisement",
+			"expect": {
+				"packetType": 1,
+				"destinationType": 0,
+				"contextFlag": true,
+				"payloadLength": 148,
+				"announce": null
+			}
+		},
+		{
+			"name": "announce-split-frame-rejected",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testSplitAndIfacRejected (split_bytes) — a complete announce whose RNode shim marks a split frame; this stateless decoder never claims split reassembly",
+			"hex": "010101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"splitFrame": true,
+				"rnsFlags": null,
+				"announce": null
+			}
+		},
+		{
+			"name": "announce-ifac-protected-rejected",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testSplitAndIfacRejected (ifac_bytes) — the same announce with the IFAC marker set; IFAC masks header and payload, so only the marker bit is interpreted",
+			"hex": "008101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "encrypted-payload",
+			"expect": {
+				"ifacProtected": true,
+				"headerType": null,
+				"packetType": null,
+				"encrypted": true,
+				"announce": null
+			}
+		},
+		{
+			"name": "announce-hops-127",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testHopCounts — hops pass through unchanged up to 127; 128 and above stays malformed at the structural tier (the excessive-hops fixture above)",
+			"hex": "00017fd0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "advertisement",
+			"expect": {
+				"hops": 127
+			},
+			"expectAnnounce": {
+				"hops": 127
+			}
+		},
+		{
+			"name": "announce-one-byte-short-of-fixed-layout",
+			"source": "test/reticulum_announce/test_reticulum_announce.cpp testTruncationAtEveryBoundary — the cut one byte below `header_length + fixed_payload`: structurally fine, semantically unproven, so HeaderOnly with no announce",
+			"hex": "000102d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "advertisement",
+			"expect": {
+				"payloadLength": 147,
+				"announce": null
+			}
+		},
+		{
+			"name": "announce-app-data-past-the-frame-arithmetic",
+			"source": "constructed from the buildAnnounceFrame rules in test/reticulum_announce/test_reticulum_announce.cpp with one byte more app_data than kReticulumAnnounceMaxAppDataBytes (88), making a 256-byte frame. The firmware can never see this — a RawFrame is capped at kMaxFrameBytes — but a .lscap record carries a 16-bit captured length, so the browser can. readReticulumAnnounce refuses app_data past that cap, so the frame stays structural and the state follows the announce actually read rather than the flags that promised one",
+			"hex": "000101d0d1d2d3d4d5d6d7d8d9dadbdcdddedf001112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f502122232425262728292a3132333435363738393a5152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f906162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "advertisement",
+			"expect": {
+				"packetType": 1,
+				"destinationType": 0,
+				"payloadOffset": 20,
+				"payloadLength": 236,
+				"announce": null
+			}
+		}
+	]
 }

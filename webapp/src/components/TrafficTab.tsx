@@ -3,6 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import {
+	type AnnounceDestination,
+	type AnnounceOverview,
+	announceTicks,
+	destinationFilterExpression,
+	hopRangeLabel,
+	summarizeAnnounces,
+} from "../lib/announceView";
+import {
 	captureByteLength,
 	captureElapsedMs,
 	captureFileName,
@@ -19,6 +27,7 @@ import {
 } from "../lib/deviceLink";
 import type { FrameDissection } from "../lib/dissect/registry";
 import { dissectFrame } from "../lib/dissect/registry";
+import { reticulumDestinationHashHex } from "../lib/dissect/rnode";
 import {
 	deepestRowAt,
 	flattenTree,
@@ -101,6 +110,14 @@ const crcClass = (c: LscapFrame["crc"]) =>
 const IO_GRAPH_HEIGHT = 140;
 
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/**
+ * The capture profile a frame actually reported, or null when it reported
+ * none. The dissector never guesses a protocol the radio did not name, and
+ * neither does the announce panel or the `dest` display filter.
+ */
+const profileOf = (fr: LscapFrame): number | null =>
+	hasField(fr, RF_FIELD.profile) ? fr.profileId : null;
 
 /**
  * The on-chain anchor outcome of a publish, one honest line per state
@@ -639,6 +656,243 @@ function DissectPane({
 				/>
 			</div>
 		</>
+	);
+}
+
+/* ── ANNOUNCES panel (UI-013) ──────────────────────────────────────────
+ * The first Reticulum announce view: one row per destination hash the
+ * capture heard announce, over the same capture clock the table and the IO
+ * graph read. Every figure comes from the semantic announce tier in
+ * dissect/rnode.ts — a port of readReticulumAnnounce — which reads only
+ * what length and flag arithmetic prove about a cleartext announce. No key
+ * is held here, no signature is checked, and no announce payload byte is
+ * interpreted, so nothing on this panel may say otherwise: app_data is a
+ * length, the ratchet and public key are presence, and SHARE is a share of
+ * this capture's ANNOUNCES, never of its total traffic.
+ *
+ * Clicking a row writes `dest == <hash>` into the ordinary display filter,
+ * so it composes with everything else the operator has typed and lands in
+ * the permalink like any other filter. */
+
+const TIMELINE_WIDTH = 160;
+const TIMELINE_HEIGHT = 14;
+
+/** One destination's announces drawn on the capture's announce span. */
+function AnnounceTimeline({
+	destination,
+	overview,
+}: {
+	destination: AnnounceDestination;
+	overview: AnnounceOverview;
+}) {
+	const ticks = announceTicks(destination, overview);
+	const inset = 2;
+	const usable = TIMELINE_WIDTH - inset * 2;
+	return (
+		<svg
+			width={TIMELINE_WIDTH}
+			height={TIMELINE_HEIGHT}
+			viewBox={`0 0 ${TIMELINE_WIDTH} ${TIMELINE_HEIGHT}`}
+			role="img"
+			aria-label={`${destination.count} announce(s) between ${destination.firstSeenS.toFixed(3)} and ${destination.lastSeenS.toFixed(3)} seconds, ${destination.pathChanges} observed path change(s)`}
+			style={{ display: "block" }}
+		>
+			<title>
+				{`${destination.count} announce(s) on the capture clock · ${destination.pathChanges} observed path change(s)`}
+			</title>
+			<line
+				x1={inset}
+				y1={TIMELINE_HEIGHT / 2}
+				x2={TIMELINE_WIDTH - inset}
+				y2={TIMELINE_HEIGHT / 2}
+				stroke="currentColor"
+				strokeOpacity={0.22}
+			/>
+			{ticks.map((tick) => (
+				<line
+					key={tick.frameIndex}
+					x1={inset + tick.x * usable}
+					x2={inset + tick.x * usable}
+					y1={tick.pathChange ? 0 : 3}
+					y2={tick.pathChange ? TIMELINE_HEIGHT : TIMELINE_HEIGHT - 3}
+					// Shape, not colour: a path change is the taller, heavier mark,
+					// so it survives the inverted palette of a selected row and
+					// reads without colour vision.
+					stroke="currentColor"
+					strokeWidth={tick.pathChange ? 2 : 1}
+					strokeOpacity={tick.pathChange ? 1 : 0.6}
+				/>
+			))}
+		</svg>
+	);
+}
+
+function AnnouncesPanel({
+	overview,
+	activeDestination,
+	onToggleDestination,
+}: {
+	overview: AnnounceOverview;
+	/** The destination hash the applied filter currently isolates, if any. */
+	activeDestination: string | null;
+	onToggleDestination: (destinationHashHex: string) => void;
+}) {
+	const [open, setOpen] = useState(true);
+	// Nothing to say about a capture that carries no Reticulum traffic at
+	// all — an empty panel would be a claim of its own.
+	if (overview.reticulumFrameCount === 0) return null;
+
+	const shareLabel = overview.shareIsAirtime
+		? "ANNOUNCE AIRTIME SHARE"
+		: "ANNOUNCE SHARE";
+	const shareTitle = overview.shareIsAirtime
+		? "Share of this capture's ANNOUNCE airtime — not of total traffic, and not a duty cycle."
+		: "Share of this capture's announces, by count — not of total traffic. This capture reports no per-frame airtime.";
+
+	return (
+		<div style={{ borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					gap: 10,
+					padding: "4px 12px",
+				}}
+			>
+				<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+					ANNOUNCES
+				</span>
+				<span className="dim" style={{ fontSize: 10 }}>
+					{overview.announceCount > 0 ? (
+						<>
+							{overview.announceCount} from {overview.destinations.length}{" "}
+							destination(s) · structure only, no keys held
+						</>
+					) : (
+						"no announces in this capture"
+					)}
+				</span>
+				<span className="spacer" />
+				{overview.announceCount > 0 && (
+					<button
+						type="button"
+						onClick={() => setOpen((v) => !v)}
+						title={
+							open ? "Collapse the announce table" : "Show the announce table"
+						}
+					>
+						{open ? "▾ HIDE" : "▸ ANNOUNCES"}
+					</button>
+				)}
+			</div>
+			{overview.announceCount === 0 ? (
+				<div className="dim" style={{ padding: "0 12px 8px", fontSize: 11 }}>
+					{overview.reticulumFrameCount} Reticulum frame(s) present; none
+					carried a payload that provably held the fixed announce fields.
+				</div>
+			) : (
+				open && (
+					<div className="scroll-x" style={{ padding: "0 8px 8px" }}>
+						<table className="grid">
+							<thead>
+								<tr>
+									<th>DESTINATION</th>
+									<th>ANNOUNCES</th>
+									<th>FIRST</th>
+									<th>LAST</th>
+									<th>CADENCE</th>
+									<th>HOPS</th>
+									<th>MARKERS</th>
+									<th title={shareTitle}>{shareLabel}</th>
+									<th>TIMELINE · ▮ PATH CHANGE</th>
+								</tr>
+							</thead>
+							<tbody>
+								{overview.destinations.map((d) => {
+									const active = d.destinationHashHex === activeDestination;
+									const share = overview.shareIsAirtime
+										? (d.airtimeSharePercent ?? d.countSharePercent)
+										: d.countSharePercent;
+									return (
+										<tr
+											key={d.destinationHashHex}
+											className={active ? "sel" : undefined}
+											tabIndex={0}
+											aria-selected={active}
+											style={{ cursor: "pointer" }}
+											title={
+												active
+													? "Showing only this destination — click to clear the filter"
+													: `Filter the table to ${d.destinationHashHex}`
+											}
+											onClick={() => onToggleDestination(d.destinationHashHex)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter" || e.key === " ") {
+													e.preventDefault();
+													onToggleDestination(d.destinationHashHex);
+												}
+											}}
+										>
+											<td title={d.destinationHashHex}>
+												{d.prefix}
+												<span className="dim">…</span>
+											</td>
+											<td>{d.count}</td>
+											<td>{d.firstSeenS.toFixed(3)}</td>
+											<td>{d.lastSeenS.toFixed(3)}</td>
+											<td className={d.meanIntervalS === null ? "dim" : ""}>
+												{d.meanIntervalS === null
+													? "—"
+													: `${d.meanIntervalS.toFixed(1)} s`}
+											</td>
+											<td>{hopRangeLabel(d)}</td>
+											<td>
+												{d.ratchetCount > 0 && (
+													<span
+														className="ok"
+														title={`${d.ratchetCount} announce(s) carried the 32 ratchet bytes the context flag promised — presence only, never validated`}
+													>
+														RATCHET {d.ratchetCount}
+													</span>
+												)}
+												{d.ratchetCount > 0 && d.appDataCount > 0 && " · "}
+												{d.appDataCount > 0 && (
+													<span
+														title={`${d.appDataCount} announce(s) carried an application-defined tail — a length only; the bytes are never interpreted`}
+													>
+														APP DATA {d.appDataCount}
+													</span>
+												)}
+												{(d.ratchetCount > 0 || d.appDataCount > 0) &&
+													d.transportedCount > 0 &&
+													" · "}
+												{d.transportedCount > 0 && (
+													<span
+														className="dim"
+														title={`${d.transportedCount} announce(s) arrived through a transport instance (HEADER_2)`}
+													>
+														VIA {d.transportedCount}
+													</span>
+												)}
+												{d.ratchetCount === 0 &&
+													d.appDataCount === 0 &&
+													d.transportedCount === 0 && (
+														<span className="dim">—</span>
+													)}
+											</td>
+											<td title={shareTitle}>{share.toFixed(1)}%</td>
+											<td>
+												<AnnounceTimeline destination={d} overview={overview} />
+											</td>
+										</tr>
+									);
+								})}
+							</tbody>
+						</table>
+					</div>
+				)
+			)}
+		</div>
 	);
 }
 
@@ -1238,6 +1492,18 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		() => frames.map((f) => findShelbyPointer(f.bytes)),
 		[frames],
 	);
+	// Every frame's Reticulum destination hash, read once from its clear RNS
+	// header. The `dest ==` filter would otherwise re-read every header on
+	// every keystroke; frames that carry no readable hash are null.
+	const destHashes = useMemo(
+		() =>
+			frames.map((fr) =>
+				profileProtocolHint(profileOf(fr)) === "reticulum"
+					? reticulumDestinationHashHex(fr.bytes)
+					: null,
+			),
+		[frames],
+	);
 
 	// ── display filter ─────────────────────────────────────────────────
 	// The text is parsed on every keystroke; only a parse that succeeds is
@@ -1269,10 +1535,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		if (!applied) return frames.map((_, i) => i);
 		const idx: number[] = [];
 		for (let i = 0; i < frames.length; i++) {
-			if (applied.predicate(frames[i], pointers[i] !== null)) idx.push(i);
+			if (applied.predicate(frames[i], pointers[i] !== null, destHashes[i]))
+				idx.push(i);
 		}
 		return idx;
-	}, [frames, pointers, applied]);
+	}, [frames, pointers, destHashes, applied]);
 
 	// ── time brush ─────────────────────────────────────────────────────
 	// A range brushed on the IO graph is one more predicate over the text
@@ -1298,6 +1565,42 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		() => shown.filter((i) => pointers[i]).length,
 		[shown, pointers],
 	);
+
+	// ── Reticulum announces (UI-013) ───────────────────────────────────
+	// Read over the WHOLE capture, never the filtered set: the panel is how
+	// an operator finds a destination worth filtering to, so filtering to one
+	// row must not erase the rows beside it.
+	const announceOverview = useMemo(
+		() =>
+			summarizeAnnounces(
+				frames.map((fr) => ({
+					timestampUs: fr.timestampUs,
+					bytes: fr.bytes,
+					truncated: fr.truncated,
+					profileId: profileOf(fr),
+					airtimeUs: hasField(fr, RF_FIELD.airtime) ? fr.airtimeUs : null,
+				})),
+				t0,
+			),
+		[frames, t0],
+	);
+	/** The destination a row-click filter is currently isolating, if any. */
+	const activeDestination = useMemo(() => {
+		const text = applied?.text.trim();
+		if (!text) return null;
+		const match = announceOverview.destinations.find(
+			(d) => destinationFilterExpression(d.destinationHashHex) === text,
+		);
+		return match?.destinationHashHex ?? null;
+	}, [announceOverview, applied]);
+	// Clicking a row writes an ordinary display filter — the same box, the
+	// same grammar, the same permalink. Clicking the isolated row clears it.
+	const toggleDestinationFilter = (destinationHashHex: string) => {
+		const expression = destinationFilterExpression(destinationHashHex);
+		setFilterText((current) =>
+			current.trim() === expression ? "" : expression,
+		);
+	};
 
 	// A filter change may hide the selected row; selection snaps to the first
 	// visible frame so the detail pane always describes a row that is on
@@ -2180,6 +2483,15 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 									</div>
 								))}
 						</div>
+
+						{/* ANNOUNCES: the Reticulum destinations this capture heard,
+						    over the same clock. Absent entirely when no Reticulum
+						    frame is present — there is nothing honest to say. */}
+						<AnnouncesPanel
+							overview={announceOverview}
+							activeDestination={activeDestination}
+							onToggleDestination={toggleDestinationFilter}
+						/>
 
 						<div className="scroll-y" ref={tableRef}>
 							<div className="scroll-x">

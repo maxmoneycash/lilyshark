@@ -4,7 +4,7 @@ title: Reticulum announce and path view
 area: ui
 size: L
 priority: P1
-status: todo
+status: done
 depends_on:
 - UI-004
 eval:
