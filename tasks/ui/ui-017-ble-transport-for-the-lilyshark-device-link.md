@@ -4,7 +4,7 @@ title: BLE transport for the Lilyshark device link
 area: ui
 size: M
 priority: P2
-status: todo
+status: done
 eval:
   rubric:
   - LSK handshake, telemetry, and frame streaming work over Web Bluetooth to a T-Deck without a cable;

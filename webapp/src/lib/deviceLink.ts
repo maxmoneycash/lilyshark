@@ -1,6 +1,6 @@
 /**
  * The Lilyshark analyzer link: lilyshark.com talking to a T-Deck running
- * Lilyshark firmware over Web Serial.
+ * Lilyshark firmware.
  *
  * This is not the MeshCore companion protocol — Lilyshark is the instrument,
  * not the messenger, so its link is the instrument's: a "LSK HELLO"
@@ -14,18 +14,29 @@
  * happily and then says nothing — which reads as a hang, not a wrong choice.
  * So candidates are filtered to USB serial vendors, each one is asked to
  * identify itself, and only a port that answers becomes the link.
+ *
+ * How the browser reaches the radio lives behind DeviceTransport
+ * (deviceTransport.ts): Web Serial today, Web Bluetooth the day the firmware
+ * advertises the service in docs/lsk-ble-contract.md. The handshake, reboot
+ * tolerance and retry budget below are shared by both, so a second transport
+ * cannot quietly grow its own connect behaviour.
  */
 
 import { useSyncExternalStore } from 'react';
+import {
+  bleLinkAvailability,
+  createBleTransport,
+  grantedLskBleDevices,
+  requestLskBleDevice,
+} from './bleTransport';
 import { recordFrame } from './captureSession';
-
-/** USB vendors that put a serial device on a dev board: Espressif's native
- *  USB (the T-Deck), then the CH34x / CP210x / FTDI bridges other boards use.
- *  Bluetooth and console ports report no USB vendor at all, so this alone
- *  clears the noise off the picker. */
-const ESPRESSIF_USB_VENDOR = 0x303a;
-const KNOWN_USB_VENDORS = [ESPRESSIF_USB_VENDOR, 0x1a86, 0x10c4, 0x0403];
-const PORT_FILTERS = KNOWN_USB_VENDORS.map((usbVendorId) => ({ usbVendorId }));
+import type { DeviceTransport } from './deviceTransport';
+import {
+  createSerialTransport,
+  grantedSerialPorts,
+  isWebSerialAvailable,
+  requestSerialPort,
+} from './serialTransport';
 
 /** How long a single open port gets to answer LSK HELLO. Opening ESP32-S3
  *  native USB almost always resets the board, and Lilyshark only reads the
@@ -357,12 +368,7 @@ export function getDeviceLinkState(): DeviceLinkState {
 }
 const listeners = new Set<() => void>();
 
-let port: SerialPort | undefined;
-let writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
-let activeReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-let pumpDone: Promise<void> | undefined;
-/** False means a disconnect was asked for, so a read ending is not a fault. */
-let reading = false;
+let activeTransport: DeviceTransport | undefined;
 let identified: (() => void) | undefined;
 let streamEnded: (() => void) | undefined;
 let pendingTx:
@@ -411,7 +417,7 @@ export function useDeviceLink(): DeviceLinkState {
 }
 
 async function send(line: string): Promise<void> {
-  await writer?.write(new TextEncoder().encode(line + '\n'));
+  await activeTransport?.write(line);
 }
 
 function markLinked(firmware?: string): void {
@@ -458,134 +464,31 @@ function handleLine(line: string): void {
 }
 
 async function teardown(): Promise<void> {
-  reading = false;
+  const closing = activeTransport;
+  activeTransport = undefined;
   try {
-    await activeReader?.cancel();
+    await closing?.close();
   } catch {
     /* already gone */
-  }
-  try {
-    await pumpDone;
-  } catch {
-    /* already gone */
-  }
-  try {
-    writer?.releaseLock();
-  } catch {
-    /* already gone */
-  }
-  try {
-    await port?.close();
-  } catch {
-    /* already gone */
-  }
-  activeReader = undefined;
-  writer = undefined;
-  port = undefined;
-  pumpDone = undefined;
-}
-
-async function readAvailable(candidate: SerialPort): Promise<void> {
-  const decoder = new TextDecoder();
-  let pending = '';
-  while (reading) {
-    // Local alias: teardown() clears the module-level activeReader from
-    // another task, so TypeScript cannot keep it narrowed across the awaits.
-    let reader = activeReader;
-    if (!reader) {
-      const readable = candidate.readable;
-      if (!readable) return;
-      try {
-        reader = readable.getReader();
-      } catch {
-        return;
-      }
-      activeReader = reader;
-    }
-    try {
-      const { value, done } = await reader.read();
-      if (done) {
-        try {
-          reader.releaseLock();
-        } catch {
-          /* already released */
-        }
-        activeReader = undefined;
-        await new Promise((r) => setTimeout(r, 200));
-        continue;
-      }
-      pending += decoder.decode(value, { stream: true });
-      let nl = pending.indexOf('\n');
-      while (nl >= 0) {
-        handleLine(pending.slice(0, nl).trim());
-        pending = pending.slice(nl + 1);
-        nl = pending.indexOf('\n');
-      }
-    } catch {
-      try {
-        reader.releaseLock();
-      } catch {
-        /* already released */
-      }
-      activeReader = undefined;
-      await new Promise((r) => setTimeout(r, 200));
-    }
-  }
-}
-
-/** Stream lines until the port ends. A drop during handshake is a reboot, not
- *  a failed identity check — the opener decides whether to retry. */
-async function pump(candidate: SerialPort): Promise<void> {
-  try {
-    await readAvailable(candidate);
-  } catch {
-    /* unplugged or rebooted mid-read */
-  }
-  if (!reading) return;
-  streamEnded?.();
-}
-
-async function openCandidate(candidate: SerialPort): Promise<boolean> {
-  try {
-    await candidate.open({ baudRate: 115200 });
-    return true;
-  } catch {
-    /* already open in this origin, or held by another tab */
-  }
-  try {
-    await candidate.close();
-  } catch {
-    /* was not ours */
-  }
-  try {
-    await candidate.open({ baudRate: 115200 });
-    return true;
-  } catch {
-    return false;
   }
 }
 
 type HandshakeResult = 'linked' | 'drop' | 'timeout' | 'busy';
 
-async function openAndWait(candidate: SerialPort): Promise<HandshakeResult> {
-  if (!(await openCandidate(candidate))) return 'busy';
-  try {
-    // Release reset/boot after the host has opened. Too late to prevent the
-    // first CDC reset, but it keeps the board out of the bootloader.
-    await candidate.setSignals({ dataTerminalReady: false, requestToSend: false });
-  } catch {
-    /* not every platform exposes setSignals */
-  }
-
-  port = candidate;
-  writer = candidate.writable?.getWriter();
-  activeReader = candidate.readable?.getReader();
-  if (!writer || !activeReader) {
+/** Open one transport and wait for it to identify. A drop here is a reboot,
+ *  not a failed identity check — attemptTransport decides whether to retry. */
+async function openAndWait(transport: DeviceTransport): Promise<HandshakeResult> {
+  // Set before opening: a disconnect racing the open must still find
+  // something to close.
+  activeTransport = transport;
+  const opened = await transport.open({
+    onLine: handleLine,
+    onDrop: () => streamEnded?.(),
+  });
+  if (opened !== 'opened') {
     await teardown();
     return 'busy';
   }
-  reading = true;
-  pumpDone = pump(candidate);
 
   return await new Promise<HandshakeResult>((resolve) => {
     const hello = setInterval(() => void send('LSK HELLO'), 1200);
@@ -612,12 +515,14 @@ function linkTurnedOff(): boolean {
   return state.status === 'off';
 }
 
-/** Open one port and ask it to identify. Survives the ESP32-S3 USB reboot
- *  that almost always happens on the first open. */
-async function attemptPort(candidate: SerialPort): Promise<boolean> {
+/** Open one transport and ask it to identify, retrying across the ESP32-S3
+ *  USB reboot that almost always happens on the first open. Transport-blind
+ *  on purpose: Bluetooth gets the same retry budget and the same tolerance
+ *  for a link that drops mid-handshake. */
+async function attemptTransport(transport: DeviceTransport): Promise<boolean> {
   for (let attempt = 0; attempt < HANDSHAKE_MAX_ATTEMPTS; attempt++) {
     if (linkTurnedOff()) return false;
-    const result = await openAndWait(candidate);
+    const result = await openAndWait(transport);
     if (result === 'linked') return true;
     await teardown();
     if (linkTurnedOff()) return false;
@@ -633,12 +538,13 @@ async function attemptPort(candidate: SerialPort): Promise<boolean> {
   return false;
 }
 
-async function grantedCandidates(vendors: number[] = KNOWN_USB_VENDORS): Promise<SerialPort[]> {
-  const ports = await navigator.serial.getPorts();
-  return ports.filter((p) => {
-    const vendor = p.getInfo().usbVendorId;
-    return vendor !== undefined && vendors.includes(vendor);
-  });
+export type DeviceLinkTransport = 'serial' | 'ble';
+
+export interface ConnectDeviceLinkOptions {
+  /** Skip the already-granted devices and go straight to the picker. */
+  picker?: boolean;
+  /** Defaults to 'serial', the only transport a shipped T-Deck speaks. */
+  transport?: DeviceLinkTransport;
 }
 
 /**
@@ -646,8 +552,13 @@ async function grantedCandidates(vendors: number[] = KNOWN_USB_VENDORS): Promise
  * first that identifies as Lilyshark; opens the picker (filtered to real USB
  * serial devices) when none does.
  */
-export async function connectDeviceLink(options: { picker?: boolean } = {}): Promise<void> {
-  if (!('serial' in navigator)) {
+export async function connectDeviceLink(options: ConnectDeviceLinkOptions = {}): Promise<void> {
+  if ((options.transport ?? 'serial') === 'ble') return connectOverBluetooth(options);
+  return connectOverSerial(options);
+}
+
+async function connectOverSerial(options: ConnectDeviceLinkOptions): Promise<void> {
+  if (!isWebSerialAvailable()) {
     set({ status: 'error', error: 'this browser has no Web Serial — use Chrome, Edge or Arc' });
     return;
   }
@@ -658,14 +569,14 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
 
   try {
     if (!options.picker) {
-      for (const candidate of await grantedCandidates()) {
-        if (await attemptPort(candidate)) return;
+      for (const candidate of await grantedSerialPorts()) {
+        if (await attemptTransport(createSerialTransport(candidate))) return;
       }
     }
     // Nothing answered: ask the user which device, listing only USB serial
     // hardware so a headset or Bluetooth port cannot be chosen by mistake.
-    const chosen = await navigator.serial.requestPort({ filters: PORT_FILTERS });
-    if (await attemptPort(chosen)) return;
+    const chosen = await requestSerialPort();
+    if (await attemptTransport(createSerialTransport(chosen))) return;
     set({
       status: 'error',
       error:
@@ -682,6 +593,50 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
         : /Failed to open/i.test(message)
           ? 'port is busy — close other lilyshark.com tabs or serial monitors, then retry'
           : message,
+    });
+  }
+}
+
+/**
+ * The same handshake over Web Bluetooth. Refuses before touching the radio
+ * when either half of the link is missing — a browser without Web Bluetooth,
+ * or (today) firmware that does not advertise the LSK GATT service at all.
+ * Saying so is the whole point: a Bluetooth button that always times out
+ * would be indistinguishable from a broken radio.
+ */
+async function connectOverBluetooth(options: ConnectDeviceLinkOptions): Promise<void> {
+  const availability = bleLinkAvailability();
+  if (!availability.usable) {
+    set({ status: 'error', error: availability.detail, canPick: false });
+    return;
+  }
+  if (state.status === 'connecting' || state.status === 'linked') {
+    await disconnectDeviceLink();
+  }
+  set({ status: 'connecting', error: undefined, canPick: undefined, lastRx: undefined });
+
+  try {
+    if (!options.picker) {
+      for (const granted of await grantedLskBleDevices()) {
+        if (await attemptTransport(createBleTransport(granted))) return;
+      }
+    }
+    const chosen = await requestLskBleDevice();
+    if (await attemptTransport(createBleTransport(chosen))) return;
+    set({
+      status: 'error',
+      error:
+        'that radio never answered over Bluetooth — keep it in range and awake, then retry. If it links over USB but not here, its firmware predates the LSK Bluetooth service.',
+      canPick: true,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'connection failed';
+    set({
+      status: 'error',
+      canPick: true,
+      error: /User cancelled|chooser|No device selected/i.test(message)
+        ? 'no device chosen'
+        : message,
     });
   }
 }

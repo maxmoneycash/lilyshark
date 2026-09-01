@@ -30,11 +30,13 @@ import { ShelbyScreen } from "./screens/Shelby";
 // pre-rendered images its code is a few kilobytes.
 const MapView = lazy(() => import("./screens/MapView"));
 const Coverage = lazy(() => import("./screens/Coverage"));
+const Points = lazy(() => import("./screens/Points"));
 const Telemetry = lazy(() => import("./screens/Telemetry"));
 const Docs = lazy(() => import("./screens/Docs"));
 import { fmtFreq, useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
+import { bleLinkAvailability } from "../lib/bleTransport";
 import {
   connectDeviceLink,
   disconnectDeviceLink,
@@ -55,6 +57,7 @@ const TABS = [
   "NODES",
   "MAP",
   "COVERAGE",
+  "POINTS",
   "MESH",
   "TELEMETRY",
   "CONFIG",
@@ -224,6 +227,11 @@ function App() {
   const [connectOpen, setConnectOpen] = useState(false);
   const hasSerial = typeof navigator !== "undefined" && "serial" in navigator;
   const hasBle = typeof navigator !== "undefined" && "bluetooth" in navigator;
+  // Two halves have to be true before Bluetooth to a Lilyshark T-Deck can be
+  // offered: this browser, and firmware that advertises the LSK GATT service
+  // (docs/lsk-ble-contract.md). Today the second is false, so the button is
+  // disabled and says why rather than failing on every tap.
+  const lskBle = bleLinkAvailability();
   const [chatConvo, setChatConvo] = useState("ch:0");
   // node to preselect when jumping MAP → NODES with [+INFO]
   const [nodeFocus, setNodeFocus] = useState<number | undefined>();
@@ -714,6 +722,22 @@ function App() {
               LILYSHARK T-DECK · USB
             </button>
             <button
+              type="button"
+              disabled={!lskBle.usable}
+              title={
+                lskBle.usable
+                  ? "The same Lilyshark link over Bluetooth: no cable, one hand"
+                  : lskBle.detail
+              }
+              onClick={() => {
+                landOnLilyRef.current = true;
+                setConnectOpen(false);
+                void connectDeviceLink({ transport: "ble" });
+              }}
+            >
+              LILYSHARK T-DECK · BLUETOOTH
+            </button>
+            <button
               disabled={!hasSerial}
               onClick={() => {
                 setMode("serie");
@@ -741,6 +765,11 @@ function App() {
             companion protocol and will sit at ESTABLISHING LINK forever
             against a Lilyshark radio.
           </p>
+          {!lskBle.usable && (
+            <p className="sheet-note">
+              LILYSHARK T-DECK · BLUETOOTH is off because {lskBle.detail}
+            </p>
+          )}
           {!hasSerial && !hasBle && (
             <p className="sheet-note">
               This browser exposes neither Web Serial nor Web Bluetooth — open
@@ -817,6 +846,7 @@ function App() {
         />
       )}
       {tab === "COVERAGE" && <Coverage />}
+      {tab === "POINTS" && <Points />}
       {tab === "MESH" && <Mesh />}
       {tab === "CONFIG" && <Config />}
       {tab === "TELEMETRY" && <Telemetry />}
