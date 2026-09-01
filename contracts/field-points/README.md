@@ -58,9 +58,51 @@ testnet faucet is web-gated. To complete CO-002:
 5. Exercise one anchor + claim + witness pair as above; record the
    addresses and txs here.
 
+## Verification
+
+Two different gates cover this module, and they cover different things.
+
+**Machine-proven** (Move Prover, `sources/field_points.spec.move`). These hold
+for *every* reachable state and input, not just the ones a test picks:
+
+| Property | Where it is stated |
+| --- | --- |
+| Points never decrease: `total`, `anchor`, `witness`, and `anchors_claimed` are monotonically non-decreasing, and a `Points` resource is never destroyed | `invariant update` in `spec module` |
+| `anchors_claimed` never exceeds the account's `capture_registry` count | global `invariant` in `spec module`, plus `ensures ... anchors_claimed == anchored` on `claim_anchor_points` and a frame condition on `attest_witness` |
+| An attester appears at most once per witness key | data invariant on `spec Witness`, re-checked wherever a `Witness` is built or its `attesters` vector is mutated |
+| Credited amounts match the constant schedule — `POINTS_WITNESS` to the opener and the corroborator at position 2, `POINTS_LATE_WITNESS` to positions 3..=`MAX_CREDITED_ATTESTERS`, nothing outside `WITNESS_WINDOW_SECS` or past the cap, `POINTS_ANCHOR` per newly claimed anchor, and no other amount to anyone | `ensures` on `attest_witness`, `claim_anchor_points`, and `credit` |
+
+Two honest caveats about what "proven" means here:
+
+- The specs are written with `pragma aborts_if_is_partial = true`. The listed
+  `aborts_if` conditions are proven to abort (short key, uninitialized book,
+  repeat attester, empty claim), but the list is not exhaustive: the `u64`
+  overflow aborts that `credit` and `delta * POINTS_ANCHOR` can raise are not
+  enumerated. Every `ensures` above is therefore a guarantee about calls that
+  succeed.
+- The anchor-watermark invariant names `capture_registry::count`, but the prover
+  run verifies `field_points` only. It proves `field_points` never breaks the
+  bound at any state transition of its own; that `capture_registry` cannot break
+  it from the other side rests on `register` being push-only, which is checked by
+  reading it, not by the prover.
+
+**Unit-tested only** (`tests/field_points_tests.move`, 7/7): the concrete
+end-to-end paths and the event stream — that the opener really is unpaid until
+corroboration, that a claim after a second `register` pays exactly the delta,
+that a week-plus-one-second gap zeroes the credit while still recording the
+attester, and the specific abort codes. Event emission itself is not specified.
+
 ## Reproduce
 
 ```sh
 cd contracts/field-points
 aptos move test --named-addresses lilyshark=0xA11CE
+
+# The prover needs boogie + z3 on PATH via BOOGIE_EXE / Z3_EXE:
+aptos update prover-dependencies
+aptos move prove --named-addresses lilyshark=0xA11CE
 ```
+
+CI runs both on any change under `contracts/**`
+(`.github/workflows/contracts.yml`), so a change that breaks an invariant
+fails the build rather than shipping.

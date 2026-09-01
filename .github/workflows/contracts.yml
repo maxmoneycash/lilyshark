@@ -1,0 +1,83 @@
+name: Move contracts
+
+# The scoreboard is the one part of the protocol anyone has an incentive to
+# attack, so the four invariants in contracts/field-points/sources/field_points.spec.move
+# are a gate, not documentation: a change to contracts/** that breaks points
+# monotonicity, the anchor watermark, attester uniqueness, or the constant point
+# schedule fails this job (CO-005).
+#
+# NOTE: this job has not yet run on GitHub Actions. It was authored and its
+# commands were exercised in a sandbox whose egress policy blocks the
+# `aptos update prover-dependencies` download, so the backend install step below
+# is the documented upstream path rather than one observed green in CI. The
+# prover itself has been run locally against these specs and reports Success.
+
+on:
+  push:
+    branches: [main]
+    paths: ['contracts/**', '.github/workflows/contracts.yml']
+  pull_request:
+    paths: ['contracts/**', '.github/workflows/contracts.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  APTOS_CLI_VERSION: 9.0.0
+  # Matches the rev pinned in every contracts/*/Move.toml.
+  LILYSHARK_ADDR: "0xA11CE"
+
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pinned Aptos CLI
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin"
+          curl -fsSL -o /tmp/aptos-cli.zip \
+            "https://github.com/aptos-labs/aptos-core/releases/download/aptos-cli-v${APTOS_CLI_VERSION}/aptos-cli-${APTOS_CLI_VERSION}-Linux-x86_64.zip"
+          unzip -q -o /tmp/aptos-cli.zip -d "$HOME/bin"
+          chmod +x "$HOME/bin/aptos"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Report CLI version
+        run: aptos --version
+
+      - name: Install Move prover backends (boogie, z3, cvc5)
+        run: |
+          set -euo pipefail
+          aptos update prover-dependencies | tee /tmp/prover-deps.log
+          # The installer prints the environment it wants exported. Honour what
+          # it printed; fall back to its documented default install location.
+          if grep -qE '(BOOGIE_EXE|Z3_EXE|CVC5_EXE)=' /tmp/prover-deps.log; then
+            grep -oE '(BOOGIE_EXE|Z3_EXE|CVC5_EXE)=[^"'"'"' ]+' /tmp/prover-deps.log >> "$GITHUB_ENV"
+          else
+            for tool in boogie z3 cvc5; do
+              path="$(command -v "$tool" || echo "$HOME/.local/bin/$tool")"
+              echo "$(echo "$tool" | tr '[:lower:]' '[:upper:]')_EXE=$path" >> "$GITHUB_ENV"
+            done
+          fi
+
+      - name: Show backend versions
+        run: |
+          "$BOOGIE_EXE" /version
+          "$Z3_EXE" --version
+
+      - name: Compile capture_registry
+        working-directory: contracts/capture-registry
+        run: aptos move compile --named-addresses "lilyshark=${LILYSHARK_ADDR}"
+
+      - name: Unit-test field_points
+        working-directory: contracts/field-points
+        run: aptos move test --named-addresses "lilyshark=${LILYSHARK_ADDR}"
+
+      - name: Prove field_points invariants
+        working-directory: contracts/field-points
+        run: aptos move prove --named-addresses "lilyshark=${LILYSHARK_ADDR}"

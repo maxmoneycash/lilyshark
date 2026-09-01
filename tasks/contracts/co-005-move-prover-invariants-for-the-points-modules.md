@@ -4,7 +4,7 @@ title: Move Prover invariants for the points modules
 area: contracts
 size: M
 priority: P2
-status: todo
+status: done
 depends_on:
 - CO-001
 eval:
