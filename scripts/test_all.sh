@@ -254,6 +254,9 @@ python3 -m unittest discover -s test/logo_asset -p 'test_*.py'
 echo "Testing tdeck_preflight"
 python3 -m unittest discover -s test/tdeck_preflight -p 'test_*.py'
 
+echo "Testing ios6_lab"
+python3 -m unittest discover -s test/ios6_lab -p 'test_*.py'
+
 if [[ "${host_only}" == true ]]; then
   echo "All host tests passed"
   exit 0

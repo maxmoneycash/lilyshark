@@ -781,6 +781,7 @@ assets/brand/                 Pink transparent SVG wordmark and monochrome varia
 assets/device/                Embedded-wordmark generation notes and placement contract
 design/previews/              Captures from the working simulator
 design/references/            Ten target hardware mockups and their screen map
+experiments/ios6/             Isolated 320×240 iOS 6 UI lab (not firmware)
 docs/                         Quickstart, architecture, off-grid design, format specs, guides
 .github/workflows/            Reproducible test and firmware artifact build
 ```

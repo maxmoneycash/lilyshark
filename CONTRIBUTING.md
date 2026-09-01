@@ -11,6 +11,7 @@
 | `docs/` | Format specifications and architecture notes |
 | `samples/` | Deterministic demo captures |
 | `webapp/` | Vite + React analyzer and Shelby network explorer (see `webapp/README.md`) |
+| `experiments/ios6/` | Isolated 320×240 iOS 6 UI lab (not firmware) |
 | `boards/`, `platformio.ini` | PlatformIO targets: `t-deck` (device) and `simulator` (host) |
 
 ## Ground rules
