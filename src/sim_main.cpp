@@ -476,14 +476,14 @@ bool chat_open = false;
 std::uint8_t chat_unread = 0;
 std::size_t chat_scroll_offset = 0;
 bool chat_tx_failed = false;
-constexpr std::size_t kChatVisible = 4;
+constexpr std::size_t kChatVisible = 5;
 constexpr std::size_t kChatTabVisible = 4;
-constexpr lv_coord_t kChatSendX = 262;
+constexpr lv_coord_t kChatSendX = 256;
 // SEND shares the compose box's top edge and height. It used to be 20 tall
 // against a 26 tall box, two pixels lower, so the pair read as misaligned.
-constexpr lv_coord_t kChatSendY = 186;
-constexpr lv_coord_t kChatSendW = 52;
-constexpr lv_coord_t kChatSendH = 30;
+constexpr lv_coord_t kChatSendY = 196;
+constexpr lv_coord_t kChatSendW = 56;
+constexpr lv_coord_t kChatSendH = 26;
 
 enum class FieldTab : std::uint8_t {
     Lily = 0,
@@ -656,20 +656,15 @@ constexpr lv_coord_t kTlChipX0 = 8;
 constexpr lv_coord_t kChatTabY = 26;
 constexpr lv_coord_t kChatTabH = 16;
 constexpr lv_coord_t kChatRuleY = 44;
-// OLDER and NEWER live in the navigation bar, which is where iOS 6 put the
-// buttons that move you through a conversation. The drawing and the touch
-// test both read these, so they travel together.
-constexpr lv_coord_t kChatOlderY = 3;
-constexpr lv_coord_t kChatOlderH = 18;
-constexpr lv_coord_t kChatOlderBtnX = 4;
+constexpr lv_coord_t kChatOlderY = 44;
+constexpr lv_coord_t kChatOlderH = 16;
+constexpr lv_coord_t kChatOlderBtnX = 158;
 constexpr lv_coord_t kChatOlderBtnW = 50;
-constexpr lv_coord_t kChatNewerBtnX = 266;
+constexpr lv_coord_t kChatNewerBtnX = 212;
 constexpr lv_coord_t kChatNewerBtnW = 50;
-constexpr lv_coord_t kChatMsgY = 46;
-// A 21 px bubble, plus a 9 px speaker line on the first of a run.
-constexpr lv_coord_t kChatRowH = 30;
-constexpr lv_coord_t kChatBubbleH = 21;
-constexpr lv_coord_t kChatMetaY = 168;
+constexpr lv_coord_t kChatMsgY = 62;
+// A 12px message face plus its 8px sender line needs more than 24.
+constexpr lv_coord_t kChatRowH = 26;
 constexpr lv_coord_t kNodeChatX = 8;
 constexpr lv_coord_t kNodeMapX = 72;
 constexpr lv_coord_t kNodeActionY = 62;
@@ -8310,126 +8305,49 @@ void build_shell_screen(lv_obj_t * parent)
 
 void build_current_screen();
 
-// iOS 6 Messages, taken from the kit rather than remembered. That system was
-// 320 points wide, exactly as this panel is, so the widths and corner radii
-// carry across untouched; only the height is halved, which costs rows and
-// nothing else.
-constexpr std::uint32_t kIos6Backdrop = 0xdbe4f1;
-constexpr std::uint32_t kIos6NavTop = 0x8ba7c7;
-constexpr std::uint32_t kIos6NavBottom = 0x31537c;
-constexpr std::uint32_t kIos6NavEdge = 0x2b486b;
-constexpr std::uint32_t kIos6BlueTop = 0xb9e3ff;
-constexpr std::uint32_t kIos6BlueBottom = 0x68b4f6;
-constexpr std::uint32_t kIos6BlueEdge = 0x5e95c9;
-constexpr std::uint32_t kIos6GrayTop = 0xffffff;
-constexpr std::uint32_t kIos6GrayBottom = 0xd9d9d9;
-constexpr std::uint32_t kIos6GrayEdge = 0xb7b7b7;
-constexpr std::uint32_t kIos6BarTop = 0xcbd3dd;
-constexpr std::uint32_t kIos6BarBottom = 0x81909e;
-constexpr std::uint32_t kIos6BarEdge = 0x69717b;
-constexpr std::uint32_t kIos6InputTop = 0xe1e1e1;
-constexpr std::uint32_t kIos6InputBottom = 0xffffff;
-constexpr std::uint32_t kIos6SendTop = 0x8fc2ff;
-constexpr std::uint32_t kIos6SendBottom = 0x1d58c4;
-constexpr std::uint32_t kIos6SendEdge = 0x3568ba;
-constexpr std::uint32_t kIos6ButtonTop = 0xffffff;
-constexpr std::uint32_t kIos6ButtonBottom = 0xd9e0e8;
-constexpr std::uint32_t kIos6ButtonEdge = 0xa9b2bc;
-constexpr std::uint32_t kIos6ButtonInk = 0x506994;
-constexpr std::uint32_t kIos6Meta = 0x8c97a5;
-constexpr std::uint32_t kIos6Ink = 0x000000;
-constexpr std::uint32_t kIos6White = 0xffffff;
-
-/// One skeuomorphic surface: a vertical gloss inside a hairline border with
-/// softly rounded corners. Every control in that release was built from this
-/// shape, so matching it matters more than matching any single colour.
-lv_obj_t *ios6_panel(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t width,
-                     lv_coord_t height, std::uint32_t top, std::uint32_t bottom,
-                     std::uint32_t edge, lv_coord_t corner) noexcept
-{
-    lv_obj_t *object = theme::rect(parent, x, y, width, height, lv_color_hex(top));
-    lv_obj_set_style_bg_grad_color(object, lv_color_hex(bottom), 0);
-    lv_obj_set_style_bg_grad_dir(object, LV_GRAD_DIR_VER, 0);
-    lv_obj_set_style_radius(object, corner, 0);
-    lv_obj_set_style_border_color(object, lv_color_hex(edge), 0);
-    lv_obj_set_style_border_width(object, 1, 0);
-    lv_obj_set_style_border_opa(object, LV_OPA_COVER, 0);
-    return object;
-}
-
-/// The tail that turns a rounded rectangle into a speech bubble. Drawn as a
-/// short stack of narrowing rows because the original is a rotated square, and
-/// a rotation this small costs more than it is worth at this size.
-void ios6_bubble_tail(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, bool mine) noexcept
-{
-    const lv_color_t body = lv_color_hex(mine ? kIos6BlueBottom : kIos6GrayBottom);
-    for (lv_coord_t step = 0; step < 5; ++step) {
-        const lv_coord_t width = static_cast<lv_coord_t>(5 - step);
-        const lv_coord_t left = mine ? x : static_cast<lv_coord_t>(x + step);
-        theme::rect(parent, left, static_cast<lv_coord_t>(y + step), width, 1, body);
-    }
-}
-
 void build_chat(lv_obj_t * parent)
 {
     const std::uint32_t dest = chat_active_dest();
     chat_clear_peer_unread(dest);
     const bool broadcast = dest == 0xffffffffU;
-    theme::rect(parent, 0, 0, 320, 240, lv_color_hex(kIos6Backdrop));
-    ios6_panel(parent, -1, -2, 322, 26, kIos6NavTop, kIos6NavBottom, kIos6NavEdge, 0);
-    {
-        // The conversation names itself in the title bar, the way it did on
-        // that system, which is also what frees every message row below from
-        // having to repeat it.
-        const char *title = chat_peers[chat_peer_index].name;
-        const lv_coord_t width = static_cast<lv_coord_t>(std::strlen(title) * 7);
-        put_label(parent, title, static_cast<lv_coord_t>((320 - width) / 2), 5,
-                  lv_color_hex(kIos6White), &font_mono_semibold_12);
-    }
+#if defined(LILYSHARK_DEVICE)
+    add_status_bar(parent, "CHAT");
+#else
+    add_simulator_live_status_bar(parent, "CHAT");
+#endif
     const std::size_t tab0 = chat_tab_first();
     const std::size_t shown = chat_tab_shown();
     const lv_coord_t tab_w = static_cast<lv_coord_t>(320 / shown);
-    // With a single conversation the title bar already names it, and a row of
-    // one button underneath just says EVERYONE twice.
-    const std::size_t tabs_drawn = chat_peer_count > 1U ? shown : 0U;
-    for (std::size_t index = 0; index < tabs_drawn; ++index) {
+    for (std::size_t index = 0; index < shown; ++index) {
         const std::size_t peer = tab0 + index;
         const lv_coord_t x = static_cast<lv_coord_t>(index) * tab_w;
         const bool selected = peer == chat_peer_index;
         const bool all = chat_peers[peer].node == 0xffffffffU;
         const std::uint8_t unread = chat_peers[peer].unread;
-        // The row of buttons that sat under the title bar, earning its keep
-        // here by choosing whose conversation you are in.
-        ios6_panel(parent, x + 2, kChatTabY, tab_w - 4, kChatTabH,
-                   selected ? kIos6SendTop : kIos6ButtonTop,
-                   selected ? kIos6SendBottom : kIos6ButtonBottom,
-                   selected ? kIos6SendEdge : kIos6ButtonEdge, 5);
+        if (selected) {
+            draw_outline_rect(parent, x + 2, kChatTabY, tab_w - 4, kChatTabH, theme::pink());
+        }
         const lv_coord_t name_w = (all && unread == 0U) ? tab_w - 12 : tab_w - 28;
         put_clipped_label(parent, chat_peers[peer].name, x + 6, kChatTabY + 4,
                           name_w > 24 ? name_w : 24,
-                          lv_color_hex(selected ? kIos6White : kIos6ButtonInk),
-                          &font_pixel_6x8);
+                          selected ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
         if (unread > 0U && !selected) {
             const lv_coord_t badge_x = x + tab_w - 16;
-            ios6_panel(parent, badge_x, kChatTabY + 3, 12, 10, 0xf66576, 0xaf0017,
-                       0xe9e9e9, 5);
+            theme::rect(parent, badge_x, kChatTabY + 3, 12, 10, theme::pink());
             char badge[4]{};
             if (unread < 10U) {
                 std::snprintf(badge, sizeof(badge), "%u", static_cast<unsigned>(unread));
             } else {
                 std::snprintf(badge, sizeof(badge), "+");
             }
-            put_label(parent, badge, badge_x + 3, kChatTabY + 4,
-                      lv_color_hex(kIos6White), &font_pixel_6x8);
+            put_label(parent, badge, badge_x + 3, kChatTabY + 4, theme::on_accent(),
+                      &font_pixel_6x8);
         } else if (!all) {
             put_label(parent, "DM", x + tab_w - 20, kChatTabY + 4,
-                      lv_color_hex(selected ? kIos6White : kIos6ButtonInk),
-                      &font_pixel_6x8);
+                      selected ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
         }
     }
-    if (tabs_drawn > 0U) {
-        theme::rule_line(parent, 0, kChatRuleY, 320, 1, lv_color_hex(0xb8c0cb));
-    }
+    theme::rule_line(parent, 0, kChatRuleY, 320, 1, theme::pink());
 
     std::size_t match_slots[kChatLogCapacity]{};
     std::size_t match_count = 0;
@@ -8443,18 +8361,29 @@ void build_chat(lv_obj_t * parent)
     if (chat_scroll_offset > max_off) chat_scroll_offset = max_off;
     const std::size_t first = match_count == 0U ? 0U :
         match_count - visible - chat_scroll_offset;
+    theme::rect(parent, 0, kChatOlderY + 1, 320, kChatOlderH - 1, lv_color_hex(0x050808));
     if (match_count > visible) {
-        // Glossy blue nav buttons, the pair that walked you back and forward
-        // through a thread. They say where they take you rather than which key
-        // does it.
-        ios6_panel(parent, kChatOlderBtnX, kChatOlderY, kChatOlderBtnW, kChatOlderH,
-                   0x92b8fb, 0x1a51b7, 0x24406f, 5);
-        put_label(parent, "OLDER", kChatOlderBtnX + 8, kChatOlderY + 5,
-                  lv_color_hex(kIos6White), &font_pixel_6x8);
-        ios6_panel(parent, kChatNewerBtnX, kChatOlderY, kChatNewerBtnW, kChatOlderH,
-                   0x92b8fb, 0x1a51b7, 0x24406f, 5);
-        put_label(parent, "NEWER", kChatNewerBtnX + 8, kChatOlderY + 5,
-                  lv_color_hex(kIos6White), &font_pixel_6x8);
+        char older[20]{};
+        std::snprintf(older, sizeof(older), "%u OLDER",
+                      static_cast<unsigned>(first));
+        put_label(parent, first > 0U ? older : "NEWEST", 8, kChatOlderY + 4,
+                  theme::text_muted(), &font_pixel_6x8);
+        // "UP"/"DOWN" described the key, not the result. These say where they
+        // take you, and the boxes are the actual tap targets.
+        draw_outline_rect(parent, kChatOlderBtnX, kChatOlderY + 1, kChatOlderBtnW,
+                          kChatOlderH - 2, theme::pink());
+        put_label(parent, "OLDER", kChatOlderBtnX + 7, kChatOlderY + 4, theme::pink(),
+                  &font_pixel_6x8);
+        draw_outline_rect(parent, kChatNewerBtnX, kChatOlderY + 1, kChatNewerBtnW,
+                          kChatOlderH - 2, theme::pink());
+        put_label(parent, "NEWER", kChatNewerBtnX + 7, kChatOlderY + 4, theme::pink(),
+                  &font_pixel_6x8);
+    }
+    if (chat_peer_count > shown) {
+        char extra[8]{};
+        std::snprintf(extra, sizeof(extra), "+%u",
+                      static_cast<unsigned>(chat_peer_count - shown));
+        put_label(parent, extra, 148, kChatOlderY + 4, theme::pink(), &font_pixel_6x8);
     }
     // "TO ALL" said what the selected tab already says -- EVERYONE means
     // broadcast, a node name means direct. This row now carries the one thing
@@ -8491,112 +8420,96 @@ void build_chat(lv_obj_t * parent)
     std::snprintf(link, sizeof(link), "SNR %s", broadcast ? "-8.6" : "-12.7");
 #endif
     {
-        // iOS 6 put DELIVERED here, small and grey under the last bubble. The
-        // equivalent truth on a radio is how well the last thing from this
-        // peer actually arrived, so that is what sits in its place.
         const lv_coord_t link_w = static_cast<lv_coord_t>(std::strlen(link) * 6);
-        put_label(parent, link, static_cast<lv_coord_t>(312 - link_w), kChatMetaY,
-                  lv_color_hex(kIos6Meta), &font_pixel_6x8);
-        if (chat_peer_count > shown) {
-            char extra[8]{};
-            std::snprintf(extra, sizeof(extra), "+%u MORE",
-                          static_cast<unsigned>(chat_peer_count - shown));
-            put_label(parent, extra, 8, kChatMetaY, lv_color_hex(kIos6Meta),
-                      &font_pixel_6x8);
-        }
+        put_label(parent, link, 314 - link_w, kChatOlderY + 4,
+                  std::strcmp(link, "NO SIGNAL") == 0 ? theme::text_muted() : theme::lime(),
+                  &font_pixel_6x8);
     }
+    theme::rule_line(parent, 0, kChatOlderY + kChatOlderH, 320, 1, theme::pink());
 
     if (visible == 0U) {
-        put_label(parent, "NO MESSAGES YET", 92, 92, lv_color_hex(kIos6Meta),
+        draw_outline_rect(parent, 16, 78, 288, 86, theme::pink());
+        put_label(parent, "NO MESSAGES YET", 28, 94, theme::pink(),
                   &font_pixel_6x8);
-        put_label(parent, broadcast ? "EVERYONE ON THIS CHANNEL WILL SEE THIS."
-                                    : "ONLY THIS NODE WILL SEE THIS.",
-                  28, 112, lv_color_hex(kIos6Meta), &font_pixel_6x8);
-        put_label(parent, "TYPE, THEN PRESS ENTER TO SEND.", 52, 126,
-                  lv_color_hex(kIos6Meta), &font_pixel_6x8);
+        put_label(parent, broadcast ? "EVERYONE ON THIS CHANNEL WILL SEE THIS." :
+                                      "ONLY THIS NODE WILL SEE THIS.",
+                  28, 116, theme::text_muted(), &font_pixel_6x8);
+        put_label(parent, "TYPE, THEN PRESS ENTER TO SEND.", 28, 132,
+                  theme::text_muted(), &font_pixel_6x8);
     } else {
-        // Bubbles are packed upward from the bottom, because a conversation is
-        // read from its newest end and no two bubbles are the same height.
-        lv_coord_t cursor = static_cast<lv_coord_t>(kChatMetaY - 6);
-        for (std::size_t back = 0; back < visible; ++back) {
-            const std::size_t index = visible - 1U - back;
+        // A short conversation settles on the bottom of the log, against the
+        // box you type in, the way every messaging app puts it. Top-aligning
+        // left a band of dead space between the newest message and the cursor
+        // and made a live channel look abandoned.
+        const lv_coord_t settle =
+            visible < kChatVisible
+                ? static_cast<lv_coord_t>((kChatVisible - visible) *
+                                          static_cast<std::size_t>(kChatRowH))
+                : 0;
+        for (std::size_t index = 0; index < visible; ++index) {
             const ChatLine &line = chat_log[match_slots[first + index]];
+            const lv_coord_t y = kChatMsgY + settle +
+                                 static_cast<lv_coord_t>(index) * kChatRowH;
+            // Your own lines are indented and edged in pink, theirs are flush
+            // left and edged in cyan. The only mark before was an 8 px bar at
+            // the far right, which reads as a scrollbar, so a conversation
+            // looked like one voice talking to itself.
+            const lv_coord_t text_x = line.mine ? 58 : 14;
+            const lv_coord_t text_w = line.mine ? 248 : 292;
+            // Both markers hug their own text now. The pink one sat at x=310,
+            // hard against the right edge -- exactly where a scrollbar lives --
+            // so a run of your own messages read as a scrollbar rather than as
+            // you speaking.
+            theme::rect(parent, line.mine ? 46 : 4, y, 6, 24,
+                        line.mine ? theme::pink()
+                                  : (line.via_net ? theme::amber() : theme::cyan()));
+            // The destination is already stated once above the log; repeating
+            // ALL or PRIVATE on every line was noise, and the operator's own
+            // call sign told them nothing they did not know.
+            // DELIVERED appears once the peer's radio confirms the exact
+            // packet; a pending direct message shows nothing extra, because
+            // absence of confirmation is not an error worth shouting about.
+            const char *delivery = line.mine && line.acked ? "  DELIVERED" : "";
+            // A message relayed over the internet is real traffic somebody
+            // else heard -- but it never crossed this radio, and the line has
+            // to say so where the eye already is.
+            const char *route = line.via_net ? "  VIA NET" : "";
+            // Consecutive messages from one speaker are a single turn, so the
+            // name belongs on the first of them only. Five rows each captioned
+            // YOU said nothing, five times over, and cost half the log's
+            // height to say it.
             const ChatLine *previous =
                 index > 0U ? &chat_log[match_slots[first + index - 1U]] : nullptr;
             const bool same_speaker =
                 previous != nullptr && previous->mine == line.mine &&
                 (line.mine || std::strcmp(previous->from, line.from) == 0);
-            const bool named = !same_speaker && !line.mine && broadcast;
-
-            // Let the label wrap itself and then measure it. A bubble being
-            // exactly the size of what it holds is the whole reason the
-            // original reads as speech instead of as a table of rows -- and a
-            // sentence that runs past one line has to grow downward, not be
-            // cut off at the edge of a strip.
-            lv_obj_t *text = theme::label(parent, line.text, lv_color_hex(kIos6Ink),
-                                          &font_condensed_12);
-            lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
-            lv_obj_set_width(text, LV_SIZE_CONTENT);
-            lv_obj_set_style_max_width(text, 216, 0);
-            lv_obj_update_layout(text);
-            const lv_coord_t text_w = lv_obj_get_width(text);
-            const lv_coord_t text_h = lv_obj_get_height(text);
-            const lv_coord_t bubble_w = static_cast<lv_coord_t>(text_w + 20);
-            const lv_coord_t bubble_h = static_cast<lv_coord_t>(text_h + 13);
-            const lv_coord_t header = named ? 11 : 0;
-            const lv_coord_t delivered = (line.mine && line.acked) ? 10 : 0;
-            if (cursor - bubble_h - header - delivered < kChatMsgY) {
-                lv_obj_delete(text);
-                break;
+            const bool header = !same_speaker || delivery[0] != '\0' || route[0] != '\0';
+            if (header) {
+                char who[28]{};
+                if (line.when[0] != '\0') {
+                    std::snprintf(who, sizeof(who), "%s  %s%s%s", line.when,
+                                  line.mine ? "YOU" : line.from, delivery, route);
+                } else {
+                    std::snprintf(who, sizeof(who), "%s%s%s",
+                                  line.mine ? "YOU" : line.from, delivery, route);
+                }
+                put_label(parent, who, text_x, y,
+                          line.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
             }
-            cursor = static_cast<lv_coord_t>(cursor - delivered);
-            const lv_coord_t bubble_y = static_cast<lv_coord_t>(cursor - bubble_h);
-            const lv_coord_t bubble_x =
-                line.mine ? static_cast<lv_coord_t>(310 - bubble_w) : 10;
-            // Amber for a message that reached us over the internet: real
-            // traffic somebody heard, but it never crossed this radio.
-            const std::uint32_t top = line.mine ? kIos6BlueTop
-                                                : (line.via_net ? 0xffe6b0 : kIos6GrayTop);
-            const std::uint32_t bottom = line.mine ? kIos6BlueBottom
-                                                   : (line.via_net ? 0xf0c060 : kIos6GrayBottom);
-            const std::uint32_t edge = line.mine ? kIos6BlueEdge
-                                                 : (line.via_net ? 0xc79b3a : kIos6GrayEdge);
-            ios6_panel(parent, bubble_x, bubble_y, bubble_w, bubble_h, top, bottom, edge, 11);
-            ios6_bubble_tail(parent,
-                             line.mine ? static_cast<lv_coord_t>(bubble_x + bubble_w - 3)
-                                       : static_cast<lv_coord_t>(bubble_x - 2),
-                             static_cast<lv_coord_t>(bubble_y + bubble_h - 5),
-                             line.mine);
-            lv_obj_set_pos(text, static_cast<lv_coord_t>(bubble_x + 10),
-                           static_cast<lv_coord_t>(bubble_y + 6));
-            lv_obj_move_foreground(text);
-            if (delivered > 0) {
-                put_label(parent, "DELIVERED", static_cast<lv_coord_t>(310 - 54),
-                          static_cast<lv_coord_t>(bubble_y + bubble_h + 1),
-                          lv_color_hex(kIos6Meta), &font_pixel_6x8);
-            }
-            if (named) {
-                // Only a channel with several voices on it needs to say which
-                // one spoke; a direct conversation is already named in the bar.
-                put_label(parent, line.from, 12,
-                          static_cast<lv_coord_t>(bubble_y - 10),
-                          lv_color_hex(kIos6Meta), &font_pixel_6x8);
-            }
-            cursor = static_cast<lv_coord_t>(bubble_y - header - 4);
+            put_clipped_label(parent, line.text, text_x, header ? y + 11 : y + 5, text_w,
+                              theme::text(), &font_mono_semibold_12);
         }
     }
     if (chat_tx_failed || std::strstr(shell_notice, "TX FAILED") != nullptr) {
-        put_label(parent, "TX FAILED", 10, kChatMetaY, lv_color_hex(0xaf0017),
-                  &font_pixel_6x8);
+        theme::rect(parent, 4, 184, 312, 12, lv_color_hex(0x180808));
+        put_label(parent, "TX FAILED", 10, 185, theme::fault(), &font_pixel_6x8);
     }
-    // The composer: a brushed bar, a recessed pill to type into, and the one
-    // blue button on the screen.
-    ios6_panel(parent, -1, 180, 322, 44, kIos6BarTop, kIos6BarBottom, kIos6BarEdge, 0);
-    ios6_panel(parent, 6, 186, 250, 30, kIos6InputTop, kIos6InputBottom, 0x777777, 15);
+    draw_outline_rect(parent, 4, 196, 248, 26, theme::pink());
+    put_label(parent, ">", 10, 203, theme::pink(), &font_pixel_6x8);
     put_clipped_label(parent,
                       chat_draft[0] == '\0' ? "TYPE A MESSAGE" : chat_draft,
-                      18, 194, 228,
-                      lv_color_hex(chat_draft[0] == '\0' ? 0xaaaaaa : kIos6Ink),
+                      22, 203, 200,
+                      chat_draft[0] == '\0' ? theme::text_muted() : theme::text(),
                       chat_draft[0] == '\0' ? &font_pixel_6x8 : &font_mono_semibold_12);
     if (chat_draft_len > 0U) {
         const unsigned left = static_cast<unsigned>(
@@ -8604,13 +8517,12 @@ void build_chat(lv_obj_t * parent)
         char remain[4]{};
         std::snprintf(remain, sizeof(remain), "%u", left);
         const lv_coord_t remain_w = static_cast<lv_coord_t>(std::strlen(remain) * 6);
-        put_label(parent, remain, static_cast<lv_coord_t>(248 - remain_w), 196,
-                  lv_color_hex(left < 10U ? 0xaf0017 : 0x8a8a8a), &font_pixel_6x8);
+        put_label(parent, remain, 244 - remain_w, 204,
+                  left < 10U ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
     }
-    ios6_panel(parent, kChatSendX, kChatSendY, kChatSendW, kChatSendH,
-               kIos6SendTop, kIos6SendBottom, kIos6SendEdge, 15);
-    put_label(parent, "SEND", kChatSendX + 14, kChatSendY + 11,
-              lv_color_hex(kIos6White), &font_pixel_6x8);
+    draw_outline_rect(parent, kChatSendX, kChatSendY, kChatSendW, kChatSendH, theme::pink());
+    put_label(parent, "SEND", kChatSendX + 16, kChatSendY + 9, theme::pink(),
+              &font_pixel_6x8);
 }
 
 void send_chat_draft() noexcept
@@ -12705,7 +12617,7 @@ bool run_simulator_render_test() noexcept
         if (render_directory != nullptr) {
             (void)write_simulator_frame(render_directory, "chat", 0);
         }
-        constexpr std::uint64_t kChatHash = 0xd543fada5eb1f941ULL;
+        constexpr std::uint64_t kChatHash = 0xce68cfe6c5188638ULL;
         const std::uint64_t chat_hash = hash_simulator_frame();
         std::size_t chat_ink = 0U;
         for(const std::uint16_t pixel : simulator_frame_buffer) {
