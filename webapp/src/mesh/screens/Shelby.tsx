@@ -247,6 +247,13 @@ export function ShelbyScreen() {
               read live in this browser straight from the fullnode — it records
               who vouched for each capture, and when.
             </p>
+            <p>
+              Shelbynet is a prototype network that is wiped roughly weekly, so
+              this deployment and the anchors in it are a live demonstration,
+              not a durable record. The durable home for anchors and season
+              points is Aptos itself — see{" "}
+              <code>contracts/capture-registry/README.md</code>.
+            </p>
           </div>
           {regErr ? (
             <div className="panel-foot">

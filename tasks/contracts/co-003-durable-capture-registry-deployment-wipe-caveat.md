@@ -4,7 +4,7 @@ title: Durable capture_registry deployment + wipe caveat
 area: contracts
 size: S
 priority: P1
-status: todo
+status: doing
 depends_on:
 - CO-001
 eval:
