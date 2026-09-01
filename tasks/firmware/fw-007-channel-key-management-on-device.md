@@ -4,7 +4,7 @@ title: Channel key management on device
 area: firmware
 size: M
 priority: P2
-status: todo
+status: done
 eval:
   rubric:
   - Channel keys can be entered, named, and deleted on device; stored keys never leave the device and

@@ -905,10 +905,10 @@ bool onboardingProfileSaveFailureScenario()
                     !hasLabel(lv_screen_active(), "ENTER  RETRY"),
                 "successful profile retry did not advance to field controls")) return false;
     if(!require(state().profile_put_calls == 2U &&
-                    state().saved_profile.size() == lilyshark::kSavedProfileV2Size &&
+                    state().saved_profile.size() == lilyshark::kSavedProfileV3Size &&
                     lilyshark::decodeSavedProfile(state().saved_profile.data(),
                                                   state().saved_profile.size(), saved_profile) ==
-                        lilyshark::SavedProfileDecodeResult::LoadedV2,
+                        lilyshark::SavedProfileDecodeResult::LoadedV3,
                 "successful onboarding profile retry did not persist a valid profile")) {
         return false;
     }

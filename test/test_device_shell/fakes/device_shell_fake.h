@@ -28,6 +28,7 @@ struct State {
     bool preferences_available = true;
     bool fail_app_settings_put = false;
     bool fail_profile_put = false;
+    bool fail_channel_keys_put = false;
     bool fail_file_open = false;
     bool fail_file_write = false;
     bool fail_file_flush = false;
@@ -42,8 +43,12 @@ struct State {
     std::set<std::string> directories{};
     std::vector<std::uint8_t> saved_profile{};
     std::vector<std::uint8_t> saved_app_settings{};
+    std::vector<std::uint8_t> saved_channel_keys{};
     std::size_t app_settings_put_calls = 0;
     std::size_t profile_put_calls = 0;
+    std::size_t channel_keys_put_calls = 0;
+    std::size_t channel_keys_remove_calls = 0;
+    bool fail_channel_keys_remove = false;
     std::size_t sd_end_calls = 0;
 
     std::array<std::uint16_t, 320U * 240U> framebuffer{};

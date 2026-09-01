@@ -34,6 +34,7 @@ counterfactual failure models (card survival, gateway resolution), and
 | --- | --- |
 | [FLASHING.md](FLASHING.md) | Flash a T-Deck with the release or a local build |
 | [RECORDING_UI.md](RECORDING_UI.md) | Record the simulator UI for demos and screenshots |
+| [channel-key-security.md](channel-key-security.md) | What the device does with stored channel keys — and, plainly, what it does not |
 
 ## Sample data
 

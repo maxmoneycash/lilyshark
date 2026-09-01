@@ -2279,21 +2279,37 @@ void build_packet_detail(lv_obj_t * parent)
         put_label(parent, line, 49, 112,
                   record->decoded.state == DecodeState::Malformed ? theme::fault() : theme::lime(),
                   &font_mono_semibold_12);
-        std::snprintf(line, sizeof(line), "KIND   %s", packetKindLabel(record->decoded));
+        std::snprintf(line, sizeof(line), "KIND   %s   KEY %s",
+                      packetKindLabel(record->decoded),
+                      packetKeyStateLabel(record->decoded));
         put_label(parent, line, 49, 134, theme::text(), &font_mono_10);
-        // A message sent under the published default key gives its rows to the
-        // message: the port it was addressed to, and the text itself. The key
-        // is stated on screen so nobody mistakes this for broken encryption.
+        // A message this device could read gives its rows to the message: the
+        // port it was addressed to, and the text itself. Which key read it is
+        // stated on screen — the published default key means the traffic was
+        // never private, a stored key means only that the operator knew the
+        // channel's secret — so nobody mistakes either for broken encryption.
+        // The key's name is shown; the key never is.
+        const bool by_stored_key = record->decoded.hasAttribute(AttributeStoredKeyReadable);
         MeshtasticPayload readable{};
+        MeshtasticKeyState key_state{};
         const bool has_readable =
-            record->decoded.hasAttribute(AttributeDefaultKeyReadable) &&
-            readMeshtasticPayload(&record->raw.bytes[record->decoded.payload_offset],
-                                  record->decoded.payload_length, record->decoded.source,
-                                  record->decoded.packet_id, readable);
+            (record->decoded.hasAttribute(AttributeDefaultKeyReadable) || by_stored_key) &&
+            readMeshtasticPayloadWithKeys(&record->raw.bytes[record->decoded.payload_offset],
+                                          record->decoded.payload_length, record->decoded.source,
+                                          record->decoded.packet_id, &channel_keys, readable,
+                                          key_state);
         if(has_readable) {
-            std::snprintf(line, sizeof(line), "PORT   %s  ·  DEFAULT KEY",
-                          meshtasticPortLabel(readable.portnum));
-            put_label(parent, line, 49, 153, theme::lime(), &font_mono_semibold_12);
+            const char *key_name = key_state.source == MeshtasticKeySource::StoredKey
+                ? channel_keys.name(key_state.slot) : nullptr;
+            std::snprintf(line, sizeof(line), "PORT   %s  ·  %s%s",
+                          meshtasticPortLabel(readable.portnum),
+                          key_state.source == MeshtasticKeySource::StoredKey ? "KEY "
+                                                                             : "DEFAULT KEY",
+                          key_name == nullptr ? "" : key_name);
+            put_label(parent, line, 49, 153,
+                      key_state.source == MeshtasticKeySource::StoredKey ? theme::amber()
+                                                                         : theme::lime(),
+                      &font_mono_semibold_12);
             if(readable.has_text) {
                 put_label(parent, "MESSAGE", 49, 174, theme::text_muted(), &font_mono_10);
                 lv_obj_t *message = put_label(parent, readable.text, 49, 190, theme::cyan(),
@@ -2544,8 +2560,9 @@ void build_packet_detail(lv_obj_t * parent)
         put_label(parent, detail_line, 49, 112,
                   simulated_decoded.state == DecodeState::Malformed
                       ? theme::fault() : theme::lime(), &font_mono_semibold_12);
-        std::snprintf(detail_line, sizeof(detail_line), "KIND   %s",
-                      packetKindLabel(simulated_decoded));
+        std::snprintf(detail_line, sizeof(detail_line), "KIND   %s   KEY %s",
+                      packetKindLabel(simulated_decoded),
+                      packetKeyStateLabel(simulated_decoded));
         put_label(parent, detail_line, 49, 134, theme::text(), &font_mono_10);
         std::snprintf(detail_line, sizeof(detail_line), "FIELDS 0x%08lX   ATTR 0x%04X",
                       static_cast<unsigned long>(simulated_decoded.present_fields),
@@ -4064,26 +4081,49 @@ void build_home(lv_obj_t * parent)
     }
 }
 
+/// Rows the radio profile list shows at once. The preset table is longer than
+/// the screen now that it carries regional band plans, so the list scrolls to
+/// follow the selection instead of running off the bottom.
+constexpr std::size_t radio_profile_visible_rows = 5U;
+
+std::size_t radio_profile_window_start() noexcept
+{
+    const std::size_t count = builtinProfileCount();
+    if(count <= radio_profile_visible_rows) return 0U;
+    const std::size_t selected = app_shell.profileSelection() % count;
+    const std::size_t last_start = count - radio_profile_visible_rows;
+    if(selected < radio_profile_visible_rows) return 0U;
+    const std::size_t start = selected - radio_profile_visible_rows + 1U;
+    return start > last_start ? last_start : start;
+}
+
 void build_radio_profiles(lv_obj_t * parent)
 {
     add_shell_header(parent, "RADIO PROFILE");
     const std::size_t selected = app_shell.profileSelection();
     const std::size_t count = builtinProfileCount();
+    const std::size_t start = radio_profile_window_start();
+    const std::size_t visible = count - start < radio_profile_visible_rows
+        ? count - start : radio_profile_visible_rows;
     const RadioProfile &active = shell_active_profile();
-    for(std::size_t index = 0; index < count; ++index) {
+    for(std::size_t row = 0; row < visible; ++row) {
+        const std::size_t index = start + row;
         const RadioProfile &profile = builtinProfiles()[index];
         char value[42]{};
-        std::snprintf(value, sizeof(value), "%.3f / %.1fk / SF%u",
+        std::snprintf(value, sizeof(value), "%s %.3f / %.1fk", regionLabel(profile.region),
                       static_cast<double>(profile.center_frequency_hz) / 1000000.0,
-                      static_cast<double>(profile.bandwidth_hz) / 1000.0,
-                      profile.spreading_factor);
+                      static_cast<double>(profile.bandwidth_hz) / 1000.0);
         const bool is_active = profile.id == active.id;
         char label[32]{};
         std::snprintf(label, sizeof(label), "%c %s", is_active ? '*' : ' ', profile.name);
-        add_shell_list_row(parent, 24 + static_cast<lv_coord_t>(index) * 34, 34,
+        add_shell_list_row(parent, 24 + static_cast<lv_coord_t>(row) * 34, 34,
                            label, value, index == selected,
                            is_active ? theme::lime() : theme::text_muted());
     }
+    char footer[32]{};
+    std::snprintf(footer, sizeof(footer), "%u/%u   T  TUNE",
+                  static_cast<unsigned>(selected + 1U), static_cast<unsigned>(count));
+    put_label(parent, footer, 8, 196, theme::text_muted(), &font_mono_10);
     const bool profile_failed = std::strstr(shell_notice, "FAILED") != nullptr;
     add_action_strip(parent, "BACK",
                      shell_notice[0] != '\0' ? shell_notice : "ENTER  APPLY PROFILE",
@@ -4091,17 +4131,171 @@ void build_radio_profiles(lv_obj_t * parent)
                      (shell_notice[0] != '\0' ? theme::lime() : theme::cyan()));
 }
 
+/// Format the sync word the way the SX1262 takes it: a bare byte for the
+/// one-byte logical form, or the full two-byte register pair.
+void format_sync_word(const RadioProfile &profile, char * out, std::size_t capacity) noexcept
+{
+    if(profile.sync_word <= 0xffU) {
+        std::snprintf(out, capacity, "0x%02X", static_cast<unsigned>(profile.sync_word));
+    } else {
+        std::snprintf(out, capacity, "0x%04X", static_cast<unsigned>(profile.sync_word));
+    }
+}
+
+void build_radio_tuning(lv_obj_t * parent)
+{
+    add_shell_header(parent, "RADIO TUNING");
+    const RadioProfile &profile = shell_active_profile();
+
+    char frequency[24]{};
+    std::snprintf(frequency, sizeof(frequency), "%.3f MHz",
+                  static_cast<double>(profile.center_frequency_hz) / 1000000.0);
+    char bandwidth[20]{};
+    std::snprintf(bandwidth, sizeof(bandwidth), "%.1f kHz",
+                  static_cast<double>(profile.bandwidth_hz) / 1000.0);
+    char spreading[12]{};
+    std::snprintf(spreading, sizeof(spreading), "SF%u", profile.spreading_factor);
+    char coding[12]{};
+    std::snprintf(coding, sizeof(coding), "4/%u", profile.coding_rate_denominator);
+    char sync[16]{};
+    format_sync_word(profile, sync, sizeof(sync));
+    char preamble[28]{};
+    std::snprintf(preamble, sizeof(preamble), "%u SYM %s",
+                  static_cast<unsigned>(profile.preamble_symbols),
+                  profile.preamble_override ? "SET" : "AUTO");
+
+    struct TuningRow { const char *label; const char *value; };
+    const std::array<TuningRow, static_cast<std::size_t>(RadioTuningField::Count)> rows = {{
+        {"FREQUENCY", frequency},
+        {"BANDWIDTH", bandwidth},
+        {"SPREADING", spreading},
+        {"CODING RATE", coding},
+        {"SYNC WORD", sync},
+        {"PREAMBLE", preamble},
+    }};
+    for(std::size_t index = 0; index < rows.size(); ++index) {
+        const bool pinned = index == static_cast<std::size_t>(RadioTuningField::Preamble) &&
+                            profile.preamble_override;
+        add_shell_list_row(parent, 24 + static_cast<lv_coord_t>(index) * 27, 27,
+                           rows[index].label, rows[index].value,
+                           index == radio_tuning_selection,
+                           pinned ? theme::amber() : theme::text_muted());
+    }
+
+    char band[48]{};
+    std::uint32_t lower_hz = 0;
+    std::uint32_t upper_hz = 0;
+    if(regionBandLimits(profile.region, lower_hz, upper_hz)) {
+        std::snprintf(band, sizeof(band), "%s  %.3f - %.3f MHz", regionLabel(profile.region),
+                      static_cast<double>(lower_hz) / 1000000.0,
+                      static_cast<double>(upper_hz) / 1000000.0);
+    } else {
+        std::snprintf(band, sizeof(band), "BAND PLAN INFERRED FROM PROFILE");
+    }
+    put_label(parent, band, 8, 190, theme::text_muted(), &font_mono_10);
+
+    const bool rejected = std::strstr(radio_tuning_notice, "RANGE") != nullptr ||
+                          std::strstr(radio_tuning_notice, "REJECTED") != nullptr;
+    add_action_strip(parent, "BACK",
+                     radio_tuning_notice[0] != '\0' ? radio_tuning_notice
+                                                    : "LEFT/RIGHT  EDIT FIELD",
+                     rejected ? theme::fault() : theme::cyan());
+}
+
+void build_channel_keys(lv_obj_t * parent)
+{
+    add_shell_header(parent, "CHANNEL KEYS");
+
+    if(channel_key_entry_active()) {
+        const bool naming = channel_key_entry_stage == ChannelKeyEntryStage::Name;
+        put_label(parent, channel_key_entry_rename ? "RENAME KEY" : "NEW KEY", 8, 30,
+                  theme::pink(), &font_mono_semibold_12);
+        put_label(parent, "NAME", 8, 56, theme::text_muted(), &font_mono_10);
+        put_label(parent, channel_key_entry_name[0] != '\0' ? channel_key_entry_name : "_",
+                  90, 54, naming ? theme::cyan() : theme::text(), &font_mono_semibold_12);
+
+        if(!channel_key_entry_rename) {
+            // The typed key is drawn as a mask and a digit count, never as its
+            // digits. Nothing that could reconstruct a key reaches the
+            // framebuffer, so nothing reaches a BMP screenshot of it either.
+            char mask[(kChannelKeySize * 2U) + 1U]{};
+            channel_key_entry_mask(mask, sizeof(mask));
+            put_label(parent, "KEY", 8, 80, theme::text_muted(), &font_mono_10);
+            put_label(parent, mask, 90, 78, naming ? theme::text_muted() : theme::cyan(),
+                      &font_mono_semibold_12);
+            char progress[32]{};
+            std::snprintf(progress, sizeof(progress), "%u/32 HEX DIGITS",
+                          static_cast<unsigned>(channel_key_entry_digit_count));
+            put_label(parent, progress, 90, 98, theme::text_muted(), &font_mono_10);
+        }
+
+        put_label(parent,
+                  naming ? "Type a name, then ENTER."
+                         : "Type 32 hex digits, then ENTER.",
+                  8, 128, theme::text(), &font_mono_10);
+        put_label(parent, "Keys are stored unencrypted in flash.", 8, 146, theme::amber(),
+                  &font_mono_10);
+        put_label(parent, "A lost device is a disclosed key list.", 8, 162,
+                  theme::text_muted(), &font_mono_10);
+        add_action_strip(parent, "ESC  CANCEL",
+                         channel_key_notice[0] != '\0' ? channel_key_notice : "ENTER  CONFIRM",
+                         channel_key_notice[0] != '\0' ? theme::fault() : theme::cyan());
+        return;
+    }
+
+    const std::size_t count = channel_keys.size();
+    if(count == 0U) {
+        put_label(parent, "No channel keys stored.", 8, 36, theme::text(),
+                  &font_mono_semibold_12);
+        put_label(parent, "Meshtastic default-key traffic still decodes;", 8, 60,
+                  theme::text_muted(), &font_mono_10);
+        put_label(parent, "a stored key adds the channels you know.", 8, 76,
+                  theme::text_muted(), &font_mono_10);
+    }
+    for(std::size_t index = 0; index < count; ++index) {
+        char fingerprint[kChannelKeyFingerprintDigits + 1]{};
+        const bool printed = channel_keys.fingerprint(index, fingerprint, sizeof(fingerprint));
+        // A one-way digest of the key, never the key. Safe on screen, and
+        // therefore safe in a screenshot.
+        char value[24]{};
+        std::snprintf(value, sizeof(value), "FP %s", printed ? fingerprint : "??????");
+        char label[24]{};
+        std::snprintf(label, sizeof(label), "%u %s", static_cast<unsigned>(index + 1U),
+                      channel_keys.name(index));
+        add_shell_list_row(parent, 24 + static_cast<lv_coord_t>(index) * 21, 21, label, value,
+                           index == channel_key_selection, theme::text_muted());
+    }
+
+    char summary[48]{};
+    std::snprintf(summary, sizeof(summary), "%u/%u STORED   N NEW   D DELETE",
+                  static_cast<unsigned>(count),
+                  static_cast<unsigned>(channel_keys.capacity()));
+    put_label(parent, summary, 8, 194, theme::text_muted(), &font_mono_10);
+    add_action_strip(parent, "BACK",
+                     channel_key_notice[0] != '\0' ? channel_key_notice : "ENTER  RENAME KEY",
+                     channel_key_notice[0] != '\0' ? theme::amber() : theme::cyan());
+}
+
 void build_settings(lv_obj_t * parent)
 {
     add_shell_header(parent, "SETTINGS");
-    constexpr std::array<const char *, 7> labels = {{
+    // Order matches SettingsItem, including the two entries appended after
+    // RUN SETUP AGAIN so the earlier indices keep their meaning.
+    constexpr std::array<const char *, 9> labels = {{
         "RADIO PROFILE", "CAPTURE & STORAGE", "DEVICE STATUS", "DISPLAY & INPUT",
-        "HELP", "ABOUT LILYSHARK", "RUN SETUP AGAIN",
+        "HELP", "ABOUT LILYSHARK", "RUN SETUP AGAIN", "RADIO TUNING", "CHANNEL KEYS",
     }};
     const std::size_t selected = static_cast<std::size_t>(app_shell.settingsSelection());
+    char tuning_value[20]{};
+    format_sync_word(shell_active_profile(), tuning_value, sizeof(tuning_value));
+    char keys_value[16]{};
+    std::snprintf(keys_value, sizeof(keys_value), "%u STORED",
+                  static_cast<unsigned>(channel_keys.size()));
     for(std::size_t index = 0; index < labels.size(); ++index) {
         const char *value = "ENTER";
         if(index == 0) value = shell_active_profile().name;
+        else if(index == 7) value = tuning_value;
+        else if(index == 8) value = keys_value;
 #if defined(LILYSHARK_DEVICE)
         else if(index == 1) value = capture_summary_value();
         else if(index == 2) value = app_settings.simulate_mode ? "SIM" :
@@ -4110,7 +4304,7 @@ void build_settings(lv_obj_t * parent)
         else if(index == 1) value = capture_summary_value();
         else if(index == 2) value = "READY";
 #endif
-        add_shell_list_row(parent, 23 + static_cast<lv_coord_t>(index) * 25, 25,
+        add_shell_list_row(parent, 23 + static_cast<lv_coord_t>(index) * 21, 21,
                            labels[index], value, index == selected,
                            index == 6 ? theme::amber() : theme::text_muted());
     }
@@ -4426,6 +4620,8 @@ void build_shell_screen(lv_obj_t * parent)
         case ShellRoute::OnboardingReadiness: build_onboarding_readiness(parent); break;
         case ShellRoute::Home: build_home(parent); break;
         case ShellRoute::RadioProfiles: build_radio_profiles(parent); break;
+        case ShellRoute::RadioTuning: build_radio_tuning(parent); break;
+        case ShellRoute::ChannelKeys: build_channel_keys(parent); break;
         case ShellRoute::Settings: build_settings(parent); break;
         case ShellRoute::Storage: build_storage(parent); break;
         case ShellRoute::DeviceStatus: build_device_status(parent); break;
@@ -4561,6 +4757,10 @@ void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
     bool have_pos = false;
     double lat = 0.0;
     double lon = 0.0;
+    // Deliberately default-key only. Content read with the published key was
+    // never private and streaming it costs nobody anything; content read with
+    // an operator's stored key is theirs, and pushing it to a linked analyzer
+    // by default would take a decision that is not this firmware's to take.
     if (packet.protocol == ProtocolId::Meshtastic &&
         packet.hasAttribute(AttributeDefaultKeyReadable) && packet.payload_length > 0U &&
         record.raw.captured_length >=
@@ -5229,6 +5429,353 @@ void finish_first_run() noexcept
     build_current_screen();
 }
 
+void set_channel_key_notice(const char * text) noexcept
+{
+    std::snprintf(channel_key_notice, sizeof(channel_key_notice), "%s",
+                  text == nullptr ? "" : text);
+}
+
+/// Persist the key list, rolling back to `previous` if the write fails — the
+/// same discipline every other preference uses, so the list in RAM never
+/// drifts from the list in flash. `previous` holds key material, so it is
+/// wiped before returning.
+bool persist_channel_keys(ChannelKeyStore &previous, const char * success,
+                          const char * failure) noexcept
+{
+#if defined(LILYSHARK_DEVICE)
+    const bool stored = write_channel_keys();
+    if(!stored) {
+        channel_keys = previous;
+        record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::System, failure);
+    } else {
+        record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System, success);
+    }
+    previous.clear();
+    return stored;
+#else
+    (void)success;
+    (void)failure;
+    previous.clear();
+    return true;
+#endif
+}
+
+void clamp_channel_key_selection() noexcept
+{
+    if(channel_keys.empty()) {
+        channel_key_selection = 0U;
+    } else if(channel_key_selection >= channel_keys.size()) {
+        channel_key_selection = channel_keys.size() - 1U;
+    }
+}
+
+void begin_channel_key_entry(bool rename) noexcept
+{
+    if(rename && channel_keys.empty()) {
+        set_channel_key_notice("NO KEYS TO RENAME");
+        return;
+    }
+    if(!rename && channel_keys.full()) {
+        set_channel_key_notice(channelKeyResultLabel(ChannelKeyResult::StoreFull));
+        return;
+    }
+    reset_channel_key_entry();
+    channel_key_entry_rename = rename;
+    channel_key_entry_stage = ChannelKeyEntryStage::Name;
+    channel_key_notice[0] = '\0';
+}
+
+void commit_channel_key_name() noexcept
+{
+    if(!isValidChannelKeyName(channel_key_entry_name)) {
+        set_channel_key_notice(channelKeyResultLabel(ChannelKeyResult::InvalidName));
+        return;
+    }
+    if(!channel_key_entry_rename) {
+        channel_key_entry_stage = ChannelKeyEntryStage::Secret;
+        channel_key_notice[0] = '\0';
+        return;
+    }
+
+    ChannelKeyStore previous = channel_keys;
+    const ChannelKeyResult result =
+        channel_keys.rename(channel_key_selection, channel_key_entry_name);
+    if(result != ChannelKeyResult::Ok) {
+        previous.clear();
+        set_channel_key_notice(channelKeyResultLabel(result));
+        return;
+    }
+    set_channel_key_notice(persist_channel_keys(previous, "Channel key renamed",
+                                                "Channel key rename was not saved")
+                               ? "" : "RENAME NOT SAVED");
+    reset_channel_key_entry();
+}
+
+void commit_channel_key_secret() noexcept
+{
+    if(channel_key_entry_digit_count != kChannelKeySize * 2U) {
+        set_channel_key_notice(channelKeyResultLabel(ChannelKeyResult::InvalidKey));
+        return;
+    }
+
+    std::uint8_t key[kChannelKeySize]{};
+    bool parsed = true;
+    for(std::size_t index = 0; index < kChannelKeySize && parsed; ++index) {
+        std::uint8_t high = 0U;
+        std::uint8_t low = 0U;
+        parsed = hex_digit_value(channel_key_entry_digits[index * 2U], high) &&
+                 hex_digit_value(channel_key_entry_digits[(index * 2U) + 1U], low);
+        key[index] = static_cast<std::uint8_t>((high << 4U) | low);
+    }
+
+    ChannelKeyStore previous = channel_keys;
+    std::size_t slot = 0U;
+    const ChannelKeyResult result =
+        parsed ? channel_keys.add(channel_key_entry_name, key, sizeof(key), slot)
+               : ChannelKeyResult::InvalidKey;
+    // The staged key has been copied into the store; wipe the scratch copy
+    // rather than leaving it on the stack for the next screen to reuse.
+    volatile std::uint8_t * scrub = key;
+    for(std::size_t index = 0; index < sizeof(key); ++index) scrub[index] = 0U;
+
+    if(result != ChannelKeyResult::Ok) {
+        previous.clear();
+        set_channel_key_notice(channelKeyResultLabel(result));
+        return;
+    }
+    channel_key_selection = slot;
+    const bool stored = persist_channel_keys(previous, "Channel key stored",
+                                             "Channel key was not saved");
+    clamp_channel_key_selection();
+    set_channel_key_notice(stored ? "" : "KEY NOT SAVED");
+    reset_channel_key_entry();
+}
+
+void delete_selected_channel_key() noexcept
+{
+    if(channel_keys.empty()) {
+        set_channel_key_notice("NO KEYS TO DELETE");
+        return;
+    }
+    ChannelKeyStore previous = channel_keys;
+    const ChannelKeyResult result = channel_keys.remove(channel_key_selection);
+    if(result != ChannelKeyResult::Ok) {
+        previous.clear();
+        set_channel_key_notice(channelKeyResultLabel(result));
+        return;
+    }
+    clamp_channel_key_selection();
+    const bool stored = persist_channel_keys(previous, "Channel key deleted",
+                                             "Channel key delete was not saved");
+    clamp_channel_key_selection();
+    set_channel_key_notice(stored ? "" : "DELETE NOT SAVED");
+}
+
+/// Swallow every key while a key is being typed, so a stray letter cannot fall
+/// through to a global shortcut and navigate away mid-entry.
+bool handle_channel_key_entry_key(std::uint32_t key) noexcept
+{
+    if(!channel_key_entry_active()) return false;
+
+    if(key == LV_KEY_ESC) {
+        reset_channel_key_entry();
+        set_channel_key_notice("ENTRY CANCELLED");
+        build_current_screen();
+        return true;
+    }
+    if(key == LV_KEY_ENTER || key == '\r') {
+        if(channel_key_entry_stage == ChannelKeyEntryStage::Name) {
+            commit_channel_key_name();
+        } else {
+            commit_channel_key_secret();
+        }
+        build_current_screen();
+        return true;
+    }
+    if(key == 0x08U || key == 0x7fU) {
+        if(channel_key_entry_stage == ChannelKeyEntryStage::Name) {
+            const std::size_t length = std::strlen(channel_key_entry_name);
+            if(length != 0U) channel_key_entry_name[length - 1U] = '\0';
+        } else if(channel_key_entry_digit_count != 0U) {
+            --channel_key_entry_digit_count;
+            channel_key_entry_digits[channel_key_entry_digit_count] = '\0';
+        }
+        channel_key_notice[0] = '\0';
+        build_current_screen();
+        return true;
+    }
+    if(key < 0x20U || key >= 0x7fU) return true;
+
+    const char typed = static_cast<char>(key);
+    if(channel_key_entry_stage == ChannelKeyEntryStage::Name) {
+        const std::size_t length = std::strlen(channel_key_entry_name);
+        if(length + 1U < kChannelKeyNameCapacity) {
+            channel_key_entry_name[length] = typed;
+            channel_key_entry_name[length + 1U] = '\0';
+            channel_key_notice[0] = '\0';
+        } else {
+            set_channel_key_notice("NAME IS FULL");
+        }
+    } else {
+        std::uint8_t value = 0U;
+        if(!hex_digit_value(typed, value)) {
+            set_channel_key_notice("HEX DIGITS ONLY");
+        } else if(channel_key_entry_digit_count < kChannelKeySize * 2U) {
+            channel_key_entry_digits[channel_key_entry_digit_count++] = typed;
+            channel_key_entry_digits[channel_key_entry_digit_count] = '\0';
+            channel_key_notice[0] = '\0';
+        } else {
+            set_channel_key_notice("32 DIGITS ENTERED");
+        }
+    }
+    build_current_screen();
+    return true;
+}
+
+bool handle_channel_keys_key(std::uint32_t key) noexcept
+{
+    if(key == 'n' || key == 'N') {
+        begin_channel_key_entry(false);
+        build_current_screen();
+        return true;
+    }
+    if(key == 'd' || key == 'D') {
+        delete_selected_channel_key();
+        build_current_screen();
+        return true;
+    }
+    return false;
+}
+
+/// The sync word has one logical byte; 0x1424 and 0x12 are two spellings of
+/// it. Stepping moves that byte and keeps whichever spelling the profile
+/// already uses, so a profile written in register form stays in register form.
+std::uint16_t stepped_sync_word(std::uint16_t current, int direction) noexcept
+{
+    const bool register_form = current > 0xffU;
+    const std::uint8_t logical = register_form
+        ? static_cast<std::uint8_t>(((current >> 8U) & 0xf0U) | ((current & 0xf0U) >> 4U))
+        : static_cast<std::uint8_t>(current);
+    const std::uint8_t next =
+        static_cast<std::uint8_t>(logical + (direction > 0 ? 1 : -1));
+    if(!register_form) return next;
+    return static_cast<std::uint16_t>(((next & 0xf0U) << 8U) | 0x0400U |
+                                      ((next & 0x0fU) << 4U) | 0x04U);
+}
+
+#if defined(LILYSHARK_DEVICE)
+/// Turn an explicit field edit into a radio change or a stated refusal. Every
+/// rejection names its reason on screen; nothing is quietly clamped into
+/// range, because an analyzer that retunes itself to a value nobody asked for
+/// is worse than one that says no.
+void report_profile_edit(ProfileEditResult result, const RadioProfile &candidate,
+                         const char * field) noexcept
+{
+    switch(result) {
+        case ProfileEditResult::Applied:
+            apply_tuned_profile(candidate, field);
+            break;
+        case ProfileEditResult::Unchanged:
+            std::snprintf(radio_tuning_notice, sizeof(radio_tuning_notice),
+                          "%s UNCHANGED", field);
+            break;
+        case ProfileEditResult::OutOfRange: {
+            std::snprintf(radio_tuning_notice, sizeof(radio_tuning_notice),
+                          "%s OUT OF RANGE", field);
+            char message[80]{};
+            std::snprintf(message, sizeof(message),
+                          "%s refused: outside the SX1262 limits", field);
+            record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Profile,
+                                 message);
+            break;
+        }
+        case ProfileEditResult::UnsupportedModulation:
+            std::snprintf(radio_tuning_notice, sizeof(radio_tuning_notice),
+                          "%s NEEDS LORA", field);
+            break;
+    }
+}
+#endif
+
+void step_radio_tuning_field(int direction) noexcept
+{
+#if defined(LILYSHARK_DEVICE)
+    const RadioProfile current = radio_service.activeProfile();
+    RadioProfile candidate{};
+    radio_tuning_notice[0] = '\0';
+    switch(static_cast<RadioTuningField>(radio_tuning_selection)) {
+        case RadioTuningField::Frequency:
+            apply_tuned_profile(stepProfileFrequency(current, direction),
+                                direction > 0 ? "frequency up" : "frequency down");
+            break;
+        // The bandwidth, spreading-factor and coding-rate helpers walk a fixed
+        // list forward and wrap, so both directions advance them.
+        case RadioTuningField::Bandwidth:
+            apply_tuned_profile(cycleProfileBandwidth(current), "bandwidth");
+            break;
+        case RadioTuningField::SpreadingFactor:
+            apply_tuned_profile(cycleProfileSpreadingFactor(current), "spreading factor");
+            break;
+        case RadioTuningField::CodingRate:
+            apply_tuned_profile(cycleProfileCodingRate(current), "coding rate");
+            break;
+        case RadioTuningField::SyncWord: {
+            const ProfileEditResult result = setProfileSyncWord(
+                current, stepped_sync_word(current.sync_word, direction), candidate);
+            report_profile_edit(result, candidate, "SYNC WORD");
+            break;
+        }
+        case RadioTuningField::Preamble: {
+            const std::int32_t next =
+                static_cast<std::int32_t>(current.preamble_symbols) + direction;
+            const ProfileEditResult result =
+                next < 0 || next > static_cast<std::int32_t>(kMaximumPreambleSymbols)
+                    ? ProfileEditResult::OutOfRange
+                    : setProfilePreambleSymbols(
+                          current, static_cast<std::uint16_t>(next), candidate);
+            report_profile_edit(result, candidate, "PREAMBLE");
+            break;
+        }
+        case RadioTuningField::Count:
+            break;
+    }
+#else
+    (void)direction;
+    std::snprintf(radio_tuning_notice, sizeof(radio_tuning_notice),
+                  "SIMULATOR TUNING IS READ-ONLY");
+#endif
+}
+
+void reset_radio_tuning_preamble() noexcept
+{
+#if defined(LILYSHARK_DEVICE)
+    if(static_cast<RadioTuningField>(radio_tuning_selection) != RadioTuningField::Preamble) {
+        std::snprintf(radio_tuning_notice, sizeof(radio_tuning_notice),
+                      "LEFT/RIGHT  EDIT FIELD");
+        return;
+    }
+    const RadioProfile current = radio_service.activeProfile();
+    RadioProfile candidate{};
+    const ProfileEditResult result = clearProfilePreambleOverride(current, candidate);
+    radio_tuning_notice[0] = '\0';
+    report_profile_edit(result, candidate, "PREAMBLE");
+    if(result == ProfileEditResult::Applied || result == ProfileEditResult::Unchanged) {
+        std::snprintf(radio_tuning_notice, sizeof(radio_tuning_notice), "PREAMBLE FOLLOWS AUTO");
+    }
+#else
+    std::snprintf(radio_tuning_notice, sizeof(radio_tuning_notice),
+                  "SIMULATOR TUNING IS READ-ONLY");
+#endif
+}
+
+void open_radio_tuning() noexcept
+{
+    radio_tuning_selection = 0U;
+    radio_tuning_notice[0] = '\0';
+    (void)app_shell.open(ShellRoute::RadioTuning);
+    build_current_screen();
+}
+
 bool handle_shell_navigation_key(std::uint32_t key)
 {
     const ShellRoute route = app_shell.route();
@@ -5246,6 +5793,11 @@ bool handle_shell_navigation_key(std::uint32_t key)
         }
         if(route == ShellRoute::DisplayInput) display_settings_save_failed = false;
         if(route == ShellRoute::Storage) capture_settings_save_failed = false;
+        if(route == ShellRoute::RadioTuning) radio_tuning_notice[0] = '\0';
+        if(route == ShellRoute::ChannelKeys) {
+            reset_channel_key_entry();
+            channel_key_notice[0] = '\0';
+        }
         if(app_shell.goBack()) {
             build_current_screen();
         } else if(route != ShellRoute::Splash) {
@@ -5302,6 +5854,14 @@ bool handle_shell_navigation_key(std::uint32_t key)
                 apply_shell_profile(app_shell.profileSelection());
                 build_current_screen();
                 break;
+            case ShellRoute::RadioTuning:
+                reset_radio_tuning_preamble();
+                build_current_screen();
+                break;
+            case ShellRoute::ChannelKeys:
+                begin_channel_key_entry(true);
+                build_current_screen();
+                break;
             case ShellRoute::Settings:
             {
                 const ShellRoute destination = routeForSettingsItem(app_shell.settingsSelection());
@@ -5320,6 +5880,13 @@ bool handle_shell_navigation_key(std::uint32_t key)
                     display_settings_save_failed = false;
                 } else if(destination == ShellRoute::Storage) {
                     capture_settings_save_failed = false;
+                } else if(destination == ShellRoute::RadioTuning) {
+                    radio_tuning_selection = 0U;
+                    radio_tuning_notice[0] = '\0';
+                } else if(destination == ShellRoute::ChannelKeys) {
+                    reset_channel_key_entry();
+                    channel_key_notice[0] = '\0';
+                    clamp_channel_key_selection();
                 }
                 (void)app_shell.open(destination);
                 build_current_screen();
@@ -5391,6 +5958,8 @@ bool handle_shell_navigation_key(std::uint32_t key)
             case ShellRoute::ResetConfirmation:
                 if(reset_confirmation_yes) {
                     const AppSettings previous = app_settings;
+                    const std::size_t previous_key_count = channel_keys.size();
+                    (void)previous_key_count;
                     app_settings = defaultAppSettings();
 #if defined(LILYSHARK_DEVICE)
                     if(!write_app_settings()) {
@@ -5405,6 +5974,28 @@ bool handle_shell_navigation_key(std::uint32_t key)
                     onboarding_complete = false;
                     onboarding_save_failed = false;
                     reset_save_failed = false;
+                    // Setup reset takes the stored channel keys with it. This
+                    // is the one preference whose erase is never rolled back:
+                    // the in-memory list is cleared regardless, and a failed
+                    // erase is reported as the disclosure risk it is.
+#if defined(LILYSHARK_DEVICE)
+                    if(!erase_channel_keys()) {
+                        record_runtime_event(
+                            RuntimeEventSeverity::Error, RuntimeEventType::System,
+                            "Channel keys cleared in memory but may remain in flash");
+                    } else if(previous_key_count != 0U) {
+                        record_runtime_event(RuntimeEventSeverity::Success,
+                                             RuntimeEventType::System,
+                                             "Stored channel keys erased by setup reset");
+                    }
+#else
+                    channel_keys.clear();
+#endif
+                    reset_channel_key_entry();
+                    channel_key_selection = 0U;
+                    channel_key_notice[0] = '\0';
+                    radio_tuning_selection = 0U;
+                    radio_tuning_notice[0] = '\0';
 #if defined(LILYSHARK_DEVICE)
                     set_backlight(app_settings.display_brightness);
                     keyboard_ready = set_keyboard_brightness(app_settings.keyboard_brightness);
@@ -5519,6 +6110,26 @@ bool handle_shell_navigation_key(std::uint32_t key)
                                                builtinProfileCount());
                 shell_notice[0] = '\0';
                 break;
+            case ShellRoute::RadioTuning: {
+                const std::size_t count = static_cast<std::size_t>(RadioTuningField::Count);
+                radio_tuning_selection = next
+                    ? (radio_tuning_selection + 1U) % count
+                    : (radio_tuning_selection + count - 1U) % count;
+                radio_tuning_notice[0] = '\0';
+                break;
+            }
+            case ShellRoute::ChannelKeys: {
+                const std::size_t count = channel_keys.size();
+                if(count == 0U) {
+                    channel_key_selection = 0U;
+                } else {
+                    channel_key_selection = next
+                        ? (channel_key_selection + 1U) % count
+                        : (channel_key_selection + count - 1U) % count;
+                }
+                channel_key_notice[0] = '\0';
+                break;
+            }
             case ShellRoute::Settings:
                 app_shell.moveSettingsSelection(next ? SelectionMove::Next : SelectionMove::Previous);
                 break;
@@ -5546,6 +6157,10 @@ bool handle_shell_navigation_key(std::uint32_t key)
         const bool next = key == LV_KEY_RIGHT || key == LV_KEY_NEXT;
         if(route == ShellRoute::Home) {
             app_shell.moveHomeSelection(next ? SelectionMove::Next : SelectionMove::Previous);
+        } else if(route == ShellRoute::RadioTuning) {
+            step_radio_tuning_field(next ? 1 : -1);
+            build_current_screen();
+            return true;
         } else if(route == ShellRoute::OnboardingProfile) {
             const std::size_t count = onboarding_profile_count();
             onboarding_profile_selection = next
@@ -5686,9 +6301,23 @@ void handle_touch_tap(std::uint16_t x, std::uint16_t y)
         app_shell.setProfileSelection((y - 24U) / 34U, builtinProfileCount());
         handle_navigation_key(LV_KEY_ENTER);
         return;
-    } else if(route == ShellRoute::Settings && y >= 23U && y < 198U) {
-        app_shell.setSettingsSelection((y - 23U) / 25U);
+    } else if(route == ShellRoute::Settings && y >= 23U && y < 212U) {
+        app_shell.setSettingsSelection((y - 23U) / 21U);
         handle_navigation_key(LV_KEY_ENTER);
+        return;
+    } else if(route == ShellRoute::RadioTuning && y >= 24U && y < 186U) {
+        radio_tuning_selection = (y - 24U) / 27U;
+        radio_tuning_notice[0] = '\0';
+        build_current_screen();
+        return;
+    } else if(route == ShellRoute::ChannelKeys && !channel_key_entry_active() &&
+              y >= 24U && y < 192U) {
+        const std::size_t row = (y - 24U) / 21U;
+        if(row < channel_keys.size()) {
+            channel_key_selection = row;
+            channel_key_notice[0] = '\0';
+            build_current_screen();
+        }
         return;
     } else if(route == ShellRoute::DisplayInput && y >= 31U && y < 167U) {
         display_input_selection = (y - 31U) / 34U;
@@ -5823,6 +6452,14 @@ void handle_navigation_key(uint32_t key)
     if(starting_route == ShellRoute::SpectrumConfirmation ||
        starting_route == ShellRoute::ResetConfirmation) {
         (void)handle_shell_navigation_key(key);
+        return;
+    }
+    // Key entry owns the keyboard while it is open, so a typed letter cannot
+    // fall through to a global shortcut and navigate away mid-entry.
+    if(handle_channel_key_entry_key(key)) return;
+    if(starting_route == ShellRoute::ChannelKeys && handle_channel_keys_key(key)) return;
+    if(starting_route == ShellRoute::RadioProfiles && (key == 't' || key == 'T')) {
+        open_radio_tuning();
         return;
     }
     if(key >= '1' && key <= '8' && onboarding_complete &&
@@ -6444,7 +7081,90 @@ bool run_simulator_interaction_test() noexcept
     if(!expect_simulator_state(app_shell.route() == ShellRoute::RadioProfiles &&
                                app_shell.profileSelection() == simulator_active_profile_index,
                                "Settings must open Radio Profiles on the active preset")) return false;
+
+    // The preset list is longer than the screen now that it carries regional
+    // band plans, so the window must follow the selection rather than draw
+    // rows nobody can see.
+    app_shell.setProfileSelection(builtinProfileCount() - 1U, builtinProfileCount());
+    if(!expect_simulator_state(builtinProfileCount() > radio_profile_visible_rows &&
+                               radio_profile_window_start() ==
+                                   builtinProfileCount() - radio_profile_visible_rows,
+                               "the profile list must scroll to keep the selection visible")) {
+        return false;
+    }
+    app_shell.setProfileSelection(0U, builtinProfileCount());
+    if(!expect_simulator_state(radio_profile_window_start() == 0U,
+                               "the profile list must return to the top for early rows")) {
+        return false;
+    }
+
+    handle_navigation_key('T');
+    if(!expect_simulator_state(app_shell.route() == ShellRoute::RadioTuning &&
+                               radio_tuning_selection == 0U,
+                               "T must open Radio Tuning from the profile list")) return false;
+    for(std::size_t index = 0; index + 1U < static_cast<std::size_t>(RadioTuningField::Count);
+        ++index) {
+        handle_navigation_key(LV_KEY_DOWN);
+    }
+    if(!expect_simulator_state(
+           app_shell.route() == ShellRoute::RadioTuning &&
+               radio_tuning_selection ==
+                   static_cast<std::size_t>(RadioTuningField::Preamble),
+           "Radio Tuning must reach the preamble row")) return false;
+    handle_navigation_key(LV_KEY_UP);
+    if(!expect_simulator_state(radio_tuning_selection ==
+                                   static_cast<std::size_t>(RadioTuningField::SyncWord),
+                               "Radio Tuning must expose a sync word row")) return false;
     handle_navigation_key(0x08U);
+    if(!expect_simulator_state(app_shell.route() == ShellRoute::RadioProfiles,
+                               "Radio Tuning Back must restore its caller")) return false;
+    handle_navigation_key(0x08U);
+
+    app_shell.setSettingsSelection(static_cast<std::size_t>(SettingsItem::ChannelKeys));
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(app_shell.route() == ShellRoute::ChannelKeys &&
+                               !channel_key_entry_active() && channel_keys.empty(),
+                               "Settings must open an empty Channel Keys list")) return false;
+    handle_navigation_key('N');
+    if(!expect_simulator_state(channel_key_entry_active() &&
+                               channel_key_entry_stage == ChannelKeyEntryStage::Name,
+                               "N must start key entry at the name prompt")) return false;
+    for(const char *typed = "FIELD TEAM"; *typed != '\0'; ++typed) {
+        handle_navigation_key(static_cast<std::uint32_t>(*typed));
+    }
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_entry_stage == ChannelKeyEntryStage::Secret &&
+                               std::strcmp(channel_key_entry_name, "FIELD TEAM") == 0,
+                               "a valid name must advance key entry to the secret")) return false;
+    // A short key is refused outright rather than padded into something the
+    // cipher would accept.
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_entry_stage == ChannelKeyEntryStage::Secret &&
+                               channel_keys.empty() && channel_key_notice[0] != '\0',
+                               "an incomplete key must be refused with a stated reason")) {
+        return false;
+    }
+    for(std::size_t index = 0; index < kChannelKeySize * 2U; ++index) {
+        handle_navigation_key(static_cast<std::uint32_t>("0123456789ABCDEF"[index % 16U]));
+    }
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(!channel_key_entry_active() && channel_keys.size() == 1U &&
+                               std::strcmp(channel_keys.name(0U), "FIELD TEAM") == 0,
+                               "a complete key must be stored under its name")) return false;
+    char stored_fingerprint[kChannelKeyFingerprintDigits + 1]{};
+    if(!expect_simulator_state(channel_keys.fingerprint(0U, stored_fingerprint,
+                                                        sizeof(stored_fingerprint)) &&
+                               std::strlen(stored_fingerprint) ==
+                                   kChannelKeyFingerprintDigits,
+                               "a stored key must render a fingerprint, never its bytes")) {
+        return false;
+    }
+    handle_navigation_key('D');
+    if(!expect_simulator_state(channel_keys.empty() && channel_key_selection == 0U,
+                               "D must delete the selected key")) return false;
+    handle_navigation_key(0x08U);
+    if(!expect_simulator_state(app_shell.route() == ShellRoute::Settings,
+                               "Channel Keys Back must restore Settings")) return false;
 
     handle_navigation_key('?');
     if(!expect_simulator_state(app_shell.route() == ShellRoute::Help,
@@ -6936,7 +7656,7 @@ bool run_simulator_render_test() noexcept
         0x2be5c3b77b22c471ULL, 0xcfaaaf3663d2576bULL, 0x10ea4452a28290ecULL,
         0x6bc33cc2d6da9b3dULL,
     }};
-    constexpr std::array<ShellRoute, 17> shell_routes = {{
+    constexpr std::array<ShellRoute, 19> shell_routes = {{
         ShellRoute::Splash,
         ShellRoute::OnboardingWelcome,
         ShellRoute::OnboardingCapabilities,
@@ -6946,6 +7666,8 @@ bool run_simulator_render_test() noexcept
         ShellRoute::OnboardingReadiness,
         ShellRoute::Home,
         ShellRoute::RadioProfiles,
+        ShellRoute::RadioTuning,
+        ShellRoute::ChannelKeys,
         ShellRoute::Settings,
         ShellRoute::Storage,
         ShellRoute::DeviceStatus,
@@ -6958,16 +7680,18 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<const char *, shell_routes.size()> shell_names = {{
         "SPLASH", "SETUP WELCOME", "SETUP CAPABILITIES", "SETUP NETWORK", "SETUP PROFILE",
         "SETUP CONTROLS", "SETUP READY",
-        "HOME", "RADIO PROFILE", "SETTINGS", "STORAGE", "DEVICE STATUS",
-        "DISPLAY & INPUT", "HELP", "ABOUT", "SPECTRUM WARNING", "RESET SETUP",
+        "HOME", "RADIO PROFILE", "RADIO TUNING", "CHANNEL KEYS", "SETTINGS", "STORAGE",
+        "DEVICE STATUS", "DISPLAY & INPUT", "HELP", "ABOUT", "SPECTRUM WARNING",
+        "RESET SETUP",
     }};
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xc6a4407c26a02f13ULL, 0xb88919d01605e06eULL, 0xc2a85a4e18f789d3ULL,
         0xa5666f12ca08abf9ULL, 0x4e993a3aa6388940ULL, 0xe6c9d863553be97aULL,
-        0xa5f0734975306c69ULL, 0xc8a60ee25e4a75bbULL, 0xb001f37939e2809aULL,
-        0x58f4a35f10689fcfULL, 0x88d179e2188e4626ULL, 0xb7a95ab1033f7e3bULL,
-        0xc36df0bfc6ae6cceULL, 0x410f758bfa6d57f7ULL, 0x56624c3700a45905ULL,
-        0x5374881a952f5232ULL, 0x447e77256eefa3f2ULL,
+        0xa5f0734975306c69ULL, 0xc8a60ee25e4a75bbULL, 0xa035cb16fbe93bfeULL,
+        0x47fb524d547574c4ULL, 0x31bc99e4b7823685ULL, 0x2a3c80d5cb90a687ULL,
+        0x88d179e2188e4626ULL, 0xb7a95ab1033f7e3bULL, 0xc36df0bfc6ae6cceULL,
+        0x410f758bfa6d57f7ULL, 0x56624c3700a45905ULL, 0x5374881a952f5232ULL,
+        0x447e77256eefa3f2ULL,
     }};
 
     lv_display_t *display = lv_display_create(theme::screen_width, theme::screen_height);
@@ -7077,7 +7801,7 @@ bool run_simulator_render_test() noexcept
         "PACKET RAW", "PACKET HEX PAGE 2", "PACKET HEX PAGE 3", "EVENT DETAIL",
     }};
     constexpr std::array<std::uint64_t, interaction_names.size()> interaction_expected_hashes = {{
-        0xcbd54598d8668ab2ULL, 0xfdd5b84e4188f778ULL, 0x4dac0cbbcdf016f0ULL,
+        0xcbd54598d8668ab2ULL, 0xfdd5b84e4188f778ULL, 0xf5765e6a2bdf233eULL,
         0x2915b2b73668d214ULL, 0xf011cb3671063a53ULL, 0xc0473a755aff6445ULL,
         0xc88079704daf69a8ULL, 0x8bc456d3a7d88c94ULL,
     }};
@@ -7717,7 +8441,7 @@ int main(int argc, char ** argv)
     }
 
     constexpr std::uint64_t soak_screen_interval_ms = 300;
-    constexpr std::array<ShellRoute, 17> soak_shell_routes = {{
+    constexpr std::array<ShellRoute, 19> soak_shell_routes = {{
         ShellRoute::Splash,
         ShellRoute::OnboardingWelcome,
         ShellRoute::OnboardingCapabilities,
@@ -7727,6 +8451,8 @@ int main(int argc, char ** argv)
         ShellRoute::OnboardingReadiness,
         ShellRoute::Home,
         ShellRoute::RadioProfiles,
+        ShellRoute::RadioTuning,
+        ShellRoute::ChannelKeys,
         ShellRoute::Settings,
         ShellRoute::Storage,
         ShellRoute::DeviceStatus,
@@ -8386,6 +9112,15 @@ void setup()
         record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::Capture,
                              "Capture disabled in Settings; analysis remains in memory");
     }
+
+    // Stored channel keys are consulted after Meshtastic's published default
+    // key. A missing or invalid key record simply leaves the decoder with the
+    // default key, which is exactly the behaviour before keys existed.
+    if(!load_channel_keys() && channel_keys.size() == 0U) {
+        record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::System,
+                             "No stored channel keys; default-key decoding only");
+    }
+    meshtastic_decoder.setChannelKeys(&channel_keys);
 
     capture_runtime.addDecoder(meshtastic_decoder);
     capture_runtime.addDecoder(meshcore_decoder);

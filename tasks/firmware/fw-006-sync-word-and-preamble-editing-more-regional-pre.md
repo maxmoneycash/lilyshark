@@ -4,7 +4,7 @@ title: Sync-word and preamble editing, more regional presets
 area: firmware
 size: M
 priority: P2
-status: todo
+status: done
 eval:
   rubric:
   - Sync word and preamble are editable within SX1262 limits from the profile screens, persisted with
