@@ -8,13 +8,17 @@ status: todo
 depends_on: [UI-017]
 eval:
   auto:
-  - grep -q "6c736b00" docs/lsk-ble-contract.md
+  - grep -rq "6c736b00" src/ include/
   rubric:
   - The firmware advertises the service, RX, and TX UUIDs exactly as docs/lsk-ble-contract.md specifies, with the Lilyshark name prefix.
   - LSK lines framed on \n in both directions, chunked to the 20-byte ATT floor, with analyzer_link_active cleared on disconnect.
   - The analyzer connects over Bluetooth with the same handshake, telemetry, and frame streaming it gets over USB — verified on hardware, with the session recorded like the other field reports.
   - Power cost of advertising is measured and stated; if it materially shortens a field session, advertising is opt-in from Settings.
 ---
+
+The auto check greps the firmware sources for the service UUID, not the
+contract doc: the doc exists already, so checking it reported this task
+green while no firmware had been written. Same trap as PA-006.
 
 Why: UI-017 built the browser half of the Bluetooth link — the transport
 interface, the BLE transport, the framing, and the tests — but the
