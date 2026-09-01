@@ -15,6 +15,8 @@ import test from "node:test";
 
 import type { AnyDissection, ProtocolHint } from "./registry";
 import { dissectFrame } from "./registry";
+import type { ReticulumFields } from "./rnode";
+import { reticulumDestinationHashHex } from "./rnode";
 import type { DissectNode } from "./types";
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -30,6 +32,8 @@ interface Fixture {
 	kind?: string;
 	expect?: Record<string, unknown>;
 	expectPayload?: Record<string, unknown>;
+	/** Reticulum semantic announce tier (UI-013) — fields.announce. */
+	expectAnnounce?: Record<string, unknown>;
 	expectShelby?: Record<string, unknown>;
 }
 
@@ -208,6 +212,24 @@ for (const { file, hint, protocol } of CORPUS) {
 				}
 			}
 
+			if (fixture.expectAnnounce) {
+				assert.equal(primary.protocol, "Reticulum");
+				const fields = primary.fields as unknown as {
+					announce: Record<string, unknown> | null;
+				} | null;
+				assert.ok(
+					fields?.announce,
+					`${fixture.name}: expected a decoded announce`,
+				);
+				for (const [key, value] of Object.entries(fixture.expectAnnounce)) {
+					assert.deepEqual(
+						fields.announce[key],
+						expected(value),
+						`${fixture.name}: announce ${key}`,
+					);
+				}
+			}
+
 			if (fixture.expectShelby) {
 				assert.ok(
 					shelby,
@@ -288,6 +310,182 @@ test("a bare Shelby pointer with no outer protocol decodes as Custom", () => {
 	assert.ok(shelby);
 	assert.equal(shelby.offset, 0);
 	assertTreeInvariants(primary.root, pointer.length, "bare pointer");
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Reticulum announce, semantic tier (UI-013). The port must agree with
+ * readReticulumAnnounce in src/core/reticulum_decoder.cpp field for field,
+ * and must never claim more than length-and-flag arithmetic proves.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const RNODE_FIXTURES = loadFixtures("rnode.json");
+
+function rnodeFixture(name: string): Fixture {
+	const found = RNODE_FIXTURES.find((f) => f.name === name);
+	assert.ok(found, `missing rnode fixture: ${name}`);
+	return found;
+}
+
+function announceOf(name: string, truncated = false) {
+	const bytes = bytesFromHex(rnodeFixture(name).hex);
+	const { primary } = dissectFrame(bytes, "reticulum", { truncated });
+	assert.equal(primary.protocol, "Reticulum");
+	return {
+		bytes,
+		primary,
+		fields: primary.fields as ReticulumFields | null,
+	};
+}
+
+test("announce fields land in the tree at the C++ byte ranges", () => {
+	const { primary } = announceOf("announce-header-one-minimal");
+	const announce = findNode(primary.root, "Announce");
+	assert.ok(announce, "the announce gets its own subtree");
+	// The subtree spans exactly the payload the C++ reader walks.
+	assert.equal(announce.byteOffset, 20);
+	assert.equal(announce.byteLength, 148);
+
+	const ranges: Array<[string, number, number]> = [
+		["Public key", 20, 64],
+		["Name hash", 84, 10],
+		["Random hash", 94, 10],
+		["Signature", 104, 64],
+	];
+	for (const [label, offset, length] of ranges) {
+		const n = findNode(announce, label);
+		assert.ok(n, `${label} node present`);
+		assert.equal(n.byteOffset, offset, `${label} offset`);
+		assert.equal(n.byteLength, length, `${label} length`);
+	}
+	// Neither optional tail is invented when the flags do not promise it.
+	assert.equal(findNode(announce, "Ratchet key"), null);
+	assert.equal(findNode(announce, "App data"), null);
+});
+
+test("announce key, ratchet and signature bytes are reported present, never verified", () => {
+	const { primary } = announceOf("announce-ratchet-and-app-data");
+	const announce = findNode(primary.root, "Announce");
+	assert.ok(announce);
+	for (const label of ["Public key", "Ratchet key", "Signature"]) {
+		const n = findNode(announce, label);
+		assert.ok(n, `${label} present`);
+		assert.match(n.value ?? "", /present/, `${label} says present`);
+		assert.match(
+			n.value ?? "",
+			/not validated|not verified/,
+			`${label} refuses to claim the bytes are good`,
+		);
+	}
+	// No cryptographic claim anywhere in the subtree.
+	const said = JSON.stringify(announce);
+	assert.doesNotMatch(said, /\bvalid signature|decrypt|verified ok/i);
+});
+
+test("an announce's ratchet is placed only when the context flag promises one", () => {
+	const withRatchet = announceOf("announce-ratchet-and-app-data").fields;
+	assert.ok(withRatchet?.announce);
+	assert.deepEqual(withRatchet.announce.ratchetRange, {
+		offset: 104,
+		length: 32,
+	});
+	assert.equal(withRatchet.contextFlag, true);
+
+	const without = announceOf("announce-header-one-minimal").fields;
+	assert.ok(without?.announce);
+	assert.equal(without.announce.ratchetRange, null);
+	assert.equal(without.contextFlag, false);
+});
+
+test("announce app_data stays raw bytes, with a preview only when clearly printable", () => {
+	const printable = announceOf("announce-printable-app-data-preview");
+	assert.ok(printable.fields?.announce);
+	assert.equal(printable.fields.announce.appDataPreview, "nomadnet.node");
+	const appData = findNode(printable.primary.root, "App data");
+	assert.ok(appData);
+	assert.equal(appData.tone, "raw", "app_data is undecoded raw bytes");
+	assert.match(appData.value ?? "", /never interpreted/);
+	assert.match(appData.value ?? "", /msgpack/);
+	assert.match(appData.value ?? "", /printable-ASCII preview only/);
+
+	// The maximal ramp runs past 0x7e, so no preview is offered at all.
+	const ramp = announceOf("announce-maximum-app-data");
+	assert.ok(ramp.fields?.announce);
+	assert.equal(ramp.fields.announce.appDataLength, 87);
+	assert.equal(ramp.fields.announce.appDataPreview, null);
+	const rampNode = findNode(ramp.primary.root, "App data");
+	assert.ok(rampNode);
+	assert.doesNotMatch(rampNode.value ?? "", /preview/);
+});
+
+test("announce exclusions stay structural, exactly as the C++ reader refuses them", () => {
+	// Each of these is a C++ refusal path in readReticulumAnnounce.
+	const excluded = [
+		"announce-group-destination-structural", // non-SINGLE destination
+		"announce-ratchet-promised-but-missing", // context flag with no room
+		"announce-split-frame-rejected", // RNode split frame
+		"announce-ifac-protected-rejected", // IFAC-masked header
+		"announce-one-byte-short-of-fixed-layout", // payload too short
+		"announce-payload-too-short",
+	];
+	for (const name of excluded) {
+		const { primary, fields } = announceOf(name);
+		assert.equal(fields?.announce ?? null, null, `${name}: no announce`);
+		assert.equal(
+			findNode(primary.root, "Announce"),
+			null,
+			`${name}: no announce subtree`,
+		);
+		assert.notEqual(
+			primary.state,
+			"payload-decoded",
+			`${name}: stays structural`,
+		);
+	}
+
+	// A truncated capture of a perfectly-shaped announce is refused too: the
+	// C++ reader rejects any packet whose state is Malformed.
+	const cut = announceOf("announce-header-one-minimal", true);
+	assert.equal(cut.primary.result, "malformed");
+	assert.equal(cut.fields?.announce ?? null, null);
+	assert.equal(findNode(cut.primary.root, "Announce"), null);
+});
+
+test("a structural announce says which arithmetic refused it", () => {
+	for (const [name, pattern] of [
+		["announce-group-destination-structural", /GROUP destination/],
+		["announce-ratchet-promised-but-missing", /promises a ratchet/],
+		["announce-payload-too-short", /shorter than the 148-byte/],
+	] as const) {
+		const { primary } = announceOf(name);
+		const payload = findNode(primary.root, "Payload");
+		assert.ok(payload, `${name}: payload node`);
+		assert.match(payload.value ?? "", pattern, `${name}: refusal reason`);
+	}
+});
+
+test("reticulumDestinationHashHex never disagrees with the dissector", () => {
+	const check = (bytes: Uint8Array, context: string) => {
+		const { primary } = dissectFrame(bytes, "reticulum");
+		const fields = primary.fields as { destinationHashHex: string | null } | null;
+		assert.equal(
+			reticulumDestinationHashHex(bytes),
+			fields?.destinationHashHex ?? null,
+			context,
+		);
+	};
+	for (const fixture of RNODE_FIXTURES) {
+		const bytes = bytesFromHex(fixture.hex);
+		for (let length = 0; length <= bytes.length; length++) {
+			check(bytes.subarray(0, length), `${fixture.name} prefix ${length}`);
+		}
+	}
+	const random = mulberry32(0x524e4453); // "RNDS"
+	for (let round = 0; round < 400; round++) {
+		const length = Math.floor(random() * 64);
+		const bytes = new Uint8Array(length);
+		for (let i = 0; i < length; i++) bytes[i] = Math.floor(random() * 256);
+		check(bytes, `garbage round ${round}`);
+	}
 });
 
 /* ────────────────────────────────────────────────────────────────────────────

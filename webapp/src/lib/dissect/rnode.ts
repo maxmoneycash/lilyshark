@@ -33,6 +33,51 @@ export const RETICULUM_HEADER_TWO_LENGTH = 35;
 export const RETICULUM_MINIMUM_IFAC_BYTES = 1;
 export const RETICULUM_MAXIMUM_HOPS_EXCLUSIVE = 128;
 
+/* ── announce semantic tier — include/lilyshark/protocols/reticulum_decoder.h
+ *
+ * An RNS announce payload has a fixed layout apart from two optional tails:
+ *
+ *   public key   64 bytes (32B X25519 + 32B Ed25519)
+ *   name hash    10 bytes
+ *   random hash  10 bytes
+ *   [ratchet     32 bytes — present only when the header's context flag is set]
+ *   signature    64 bytes
+ *   [app_data    everything remaining — application-defined]
+ *
+ * Every field is placed by length and flag arithmetic alone; no cryptography
+ * runs here. Key, ratchet, and signature bytes cannot be validated without
+ * crypto, so they are reported as *present* with byte ranges rather than as
+ * verified values. app_data is application-defined and stays undecoded raw
+ * bytes — it is never interpreted. */
+
+export const RETICULUM_HASH_BYTES = 16;
+export const RETICULUM_ANNOUNCE_PUBLIC_KEY_BYTES = 64;
+export const RETICULUM_ANNOUNCE_NAME_HASH_BYTES = 10;
+export const RETICULUM_ANNOUNCE_RANDOM_HASH_BYTES = 10;
+export const RETICULUM_ANNOUNCE_RATCHET_BYTES = 32;
+export const RETICULUM_ANNOUNCE_SIGNATURE_BYTES = 64;
+
+/** Announce payload length with neither ratchet nor app_data: 64+10+10+64. */
+export const RETICULUM_ANNOUNCE_MINIMUM_BYTES =
+	RETICULUM_ANNOUNCE_PUBLIC_KEY_BYTES +
+	RETICULUM_ANNOUNCE_NAME_HASH_BYTES +
+	RETICULUM_ANNOUNCE_RANDOM_HASH_BYTES +
+	RETICULUM_ANNOUNCE_SIGNATURE_BYTES;
+
+/** kMaxFrameBytes in include/lilyshark/core/raw_frame.h. */
+export const RETICULUM_MAX_FRAME_BYTES = 255;
+
+/**
+ * Largest app_data that fits a captured frame: the shortest possible clear
+ * announce framing is RNode shim + HEADER_1 + the fixed announce fields
+ * (kReticulumAnnounceMaxAppDataBytes in the firmware).
+ */
+export const RETICULUM_ANNOUNCE_MAX_APP_DATA_BYTES =
+	RETICULUM_MAX_FRAME_BYTES -
+	RNODE_SHIM_LENGTH -
+	RETICULUM_HEADER_ONE_LENGTH -
+	RETICULUM_ANNOUNCE_MINIMUM_BYTES;
+
 /** ReticulumPacketType in include/lilyshark/protocols/reticulum_decoder.h. */
 export const RETICULUM_PACKET_TYPE = {
 	data: 0,
@@ -99,6 +144,78 @@ export function reticulumPayloadIsClear(
 	);
 }
 
+/**
+ * The full 16-byte destination hash of a clear RNode/Reticulum header, as
+ * lowercase hex — or null when the frame carries no readable one: shorter
+ * than the shim plus flags, a split continuation, IFAC-masked, an
+ * out-of-range hop count, or a header cut short. This is the same header
+ * arithmetic `dissectRNode` performs, without building a tree: the display
+ * filter's `dest ==` runs it over every frame of a capture on every
+ * keystroke. dissect.test.ts pins it against `dissectRNode`'s own
+ * `destinationHashHex` for every fixture, every prefix of every fixture and
+ * random bytes, so the two can never drift apart.
+ */
+export function reticulumDestinationHashHex(bytes: Uint8Array): string | null {
+	const n = bytes.length;
+	if (n < RNODE_SHIM_LENGTH + 1) return null;
+	if ((bytes[0] & 0x01) !== 0) return null; // split continuation
+	const flags = bytes[1];
+	if ((flags & 0x80) !== 0) return null; // IFAC masks the whole header
+	const headerTwo = (flags & 0x40) !== 0;
+	const physicalHeaderLength =
+		RNODE_SHIM_LENGTH +
+		(headerTwo ? RETICULUM_HEADER_TWO_LENGTH : RETICULUM_HEADER_ONE_LENGTH);
+	if (n < physicalHeaderLength) return null;
+	if (bytes[2] >= RETICULUM_MAXIMUM_HOPS_EXCLUSIVE) return null;
+	const destinationOffset = headerTwo ? 3 + RETICULUM_HASH_BYTES : 3;
+	return hexBytes(bytes, destinationOffset, RETICULUM_HASH_BYTES);
+}
+
+/** Absolute byte range inside the captured frame (ReticulumByteRange). */
+export interface ReticulumByteRange {
+	offset: number;
+	length: number;
+}
+
+/**
+ * One decoded announce — the TypeScript form of ReticulumAnnounce filled by
+ * readReticulumAnnounce in src/core/reticulum_decoder.cpp. Present only when
+ * the frame proves, by length and flag arithmetic, that every fixed field
+ * fits: ANNOUNCE packet type, SINGLE destination, no split, no IFAC, no
+ * truncation, and a payload long enough for every promised field (including
+ * the ratchet when the context flag promises one). All ranges are absolute
+ * offsets into the captured frame bytes.
+ */
+export interface ReticulumAnnounceFields {
+	headerType: 1 | 2;
+	hops: number;
+	/** Full 16-byte truncated destination hash, lowercase hex. */
+	destinationHashHex: string;
+	destinationHashRange: ReticulumByteRange;
+	/** HEADER_2 only: the transport instance the announce travelled through. */
+	transportIdHex: string | null;
+	transportIdRange: ReticulumByteRange | null;
+	/** Presence + range only — arithmetic cannot validate key bytes. */
+	publicKeyRange: ReticulumByteRange;
+	nameHashHex: string;
+	nameHashRange: ReticulumByteRange;
+	randomHashHex: string;
+	randomHashRange: ReticulumByteRange;
+	/** Ratchet presence is signalled by the header's context flag. */
+	ratchetRange: ReticulumByteRange | null;
+	/** Presence + range only — the signature is never verified here. */
+	signatureRange: ReticulumByteRange;
+	/** Application-defined tail, kept as raw bytes; 0 when absent. */
+	appDataLength: number;
+	appDataRange: ReticulumByteRange | null;
+	appDataHex: string | null;
+	/**
+	 * Set only when EVERY app_data byte is printable ASCII — a preview, not a
+	 * decode: Reticulum app_data is often msgpack and is never interpreted.
+	 */
+	appDataPreview: string | null;
+}
+
 export interface ReticulumFields {
 	rnodeShim: number;
 	splitFrame: boolean;
@@ -114,10 +231,14 @@ export interface ReticulumFields {
 	/** First four network-order bytes of the 16-byte hashes — prefixes only. */
 	transportIdPrefix: number | null;
 	destinationHashPrefix: number | null;
+	/** Full 16-byte destination hash, lowercase hex — clear headers only. */
+	destinationHashHex: string | null;
 	context: number | null;
 	payloadOffset: number;
 	payloadLength: number;
 	encrypted: boolean;
+	/** Semantic announce tier (UI-013); null unless provably an announce. */
+	announce: ReticulumAnnounceFields | null;
 }
 
 export interface ReticulumDissection extends Dissection {
@@ -189,10 +310,12 @@ export function dissectRNode(
 		hops: null,
 		transportIdPrefix: null,
 		destinationHashPrefix: null,
+		destinationHashHex: null,
 		context: null,
 		payloadOffset: RNODE_SHIM_LENGTH,
 		payloadLength: n - RNODE_SHIM_LENGTH,
 		encrypted: false,
+		announce: null,
 	};
 
 	root.children.push(
@@ -341,12 +464,13 @@ export function dissectRNode(
 		);
 	}
 	fields.destinationHashPrefix = readBe32(bytes, destinationOffset);
+	fields.destinationHashHex = hexBytes(bytes, destinationOffset, 16);
 	root.children.push(
 		node(
 			"Destination hash",
 			destinationOffset,
 			16,
-			`${hexBytes(bytes, destinationOffset, 16)} (prefix ${hex(fields.destinationHashPrefix, 4)})`,
+			`${fields.destinationHashHex} (prefix ${hex(fields.destinationHashPrefix, 4)})`,
 		),
 	);
 
@@ -376,6 +500,22 @@ export function dissectRNode(
 		kind = "control";
 	}
 
+	// Semantic announce tier — announceArithmeticHolds in the firmware:
+	// announces are only issued by SINGLE destinations, and the payload must
+	// provably hold every fixed field the flags promise. Anything else stays
+	// structural (header-only), exactly as in the C++ decoder.
+	const isAnnounce = packetType === RETICULUM_PACKET_TYPE.announce;
+	const announceFixedLength =
+		RETICULUM_ANNOUNCE_MINIMUM_BYTES +
+		(contextFlag ? RETICULUM_ANNOUNCE_RATCHET_BYTES : 0);
+	const announceArithmeticHolds =
+		isAnnounce &&
+		destinationType === RETICULUM_DESTINATION_TYPE.single &&
+		fields.payloadLength >= announceFixedLength;
+	const state: DecodeState = announceArithmeticHolds
+		? "payload-decoded"
+		: "header-only";
+
 	const clear = reticulumPayloadIsClear(packetType, destinationType, context);
 	if (!clear) {
 		fields.encrypted = true;
@@ -390,13 +530,44 @@ export function dissectRNode(
 				"encrypted",
 			),
 		);
+	} else if (
+		announceArithmeticHolds &&
+		!opts.truncated &&
+		fields.payloadLength - announceFixedLength <=
+			RETICULUM_ANNOUNCE_MAX_APP_DATA_BYTES
+	) {
+		// readReticulumAnnounce: the fields are placed by arithmetic alone. A
+		// truncated capture never reaches this branch (the C++ reader refuses a
+		// malformed packet), and app_data beyond the frame arithmetic's maximum
+		// stays structural exactly as the firmware's reader refuses it.
+		fields.announce = fillAnnounce(
+			root,
+			bytes,
+			fields,
+			headerTwo,
+			contextFlag,
+			hops,
+			transportOffset,
+			destinationOffset,
+		);
 	} else {
+		// The generic clear-payload node, with the firmware reader's refusal
+		// reasons said out loud where the flags looked like an announce.
+		const reason = !isAnnounce
+			? "contents not parsed"
+			: destinationType !== RETICULUM_DESTINATION_TYPE.single
+				? `ANNOUNCE from a ${DESTINATION_TYPE_LABEL[destinationType]} destination is a flag inconsistency — stays structural`
+				: fields.payloadLength < announceFixedLength
+					? `announce payload shorter than the ${announceFixedLength}-byte fixed field layout${contextFlag ? " (context flag promises a ratchet)" : ""} — stays structural`
+					: opts.truncated
+						? "truncated capture — announce fields cannot be trusted"
+						: `announce app_data exceeds the ${RETICULUM_ANNOUNCE_MAX_APP_DATA_BYTES}-byte frame arithmetic — stays structural`;
 		root.children.push(
 			node(
 				"Payload",
 				physicalHeaderLength,
 				fields.payloadLength,
-				`undecoded — ${fields.payloadLength} raw bytes (cleartext by protocol rule; contents not parsed)`,
+				`undecoded — ${fields.payloadLength} raw bytes (cleartext by protocol rule; ${reason})`,
 				[],
 				"raw",
 			),
@@ -407,5 +578,177 @@ export function dissectRNode(
 		errorNode(root, n, 0, "the radio cut this frame short");
 		return malformed(root, fields);
 	}
-	return result(root, fields, "matched", "header-only", kind);
+	return result(root, fields, "matched", state, kind);
+}
+
+/** True when every byte of the range is printable ASCII (0x20–0x7e). */
+function isPrintableAscii(
+	bytes: Uint8Array,
+	offset: number,
+	length: number,
+): boolean {
+	for (let i = 0; i < length; i++) {
+		const b = bytes[offset + i];
+		if (b < 0x20 || b > 0x7e) return false;
+	}
+	return length > 0;
+}
+
+/** Preview cap so a maximal app_data tail cannot flood a tree row. */
+const APP_DATA_PREVIEW_LIMIT = 48;
+/** Hex shown in the tree caps at this many bytes; fields keep the full hex. */
+const APP_DATA_HEX_NODE_LIMIT = 32;
+
+/**
+ * Fill the announce fields and attach the announce subtree — the TypeScript
+ * body of readReticulumAnnounce, byte range for byte range. Only called once
+ * the caller has proven the arithmetic holds.
+ */
+function fillAnnounce(
+	root: DissectNode,
+	bytes: Uint8Array,
+	fields: ReticulumFields,
+	headerTwo: boolean,
+	contextFlag: boolean,
+	hops: number,
+	transportOffset: number,
+	destinationOffset: number,
+): ReticulumAnnounceFields {
+	const range = (offset: number, length: number): ReticulumByteRange => ({
+		offset,
+		length,
+	});
+
+	let cursor = fields.payloadOffset;
+	const publicKeyRange = range(cursor, RETICULUM_ANNOUNCE_PUBLIC_KEY_BYTES);
+	cursor += RETICULUM_ANNOUNCE_PUBLIC_KEY_BYTES;
+	const nameHashRange = range(cursor, RETICULUM_ANNOUNCE_NAME_HASH_BYTES);
+	cursor += RETICULUM_ANNOUNCE_NAME_HASH_BYTES;
+	const randomHashRange = range(cursor, RETICULUM_ANNOUNCE_RANDOM_HASH_BYTES);
+	cursor += RETICULUM_ANNOUNCE_RANDOM_HASH_BYTES;
+	let ratchetRange: ReticulumByteRange | null = null;
+	if (contextFlag) {
+		ratchetRange = range(cursor, RETICULUM_ANNOUNCE_RATCHET_BYTES);
+		cursor += RETICULUM_ANNOUNCE_RATCHET_BYTES;
+	}
+	const signatureRange = range(cursor, RETICULUM_ANNOUNCE_SIGNATURE_BYTES);
+	cursor += RETICULUM_ANNOUNCE_SIGNATURE_BYTES;
+	const appDataLength = fields.payloadOffset + fields.payloadLength - cursor;
+	const appDataRange = appDataLength > 0 ? range(cursor, appDataLength) : null;
+
+	const printable =
+		appDataRange !== null &&
+		isPrintableAscii(bytes, appDataRange.offset, appDataRange.length);
+	const previewText = printable
+		? String.fromCharCode(
+				...bytes.subarray(
+					// appDataRange is non-null whenever printable is true.
+					(appDataRange as ReticulumByteRange).offset,
+					(appDataRange as ReticulumByteRange).offset +
+						Math.min(appDataLength, APP_DATA_PREVIEW_LIMIT),
+				),
+			) + (appDataLength > APP_DATA_PREVIEW_LIMIT ? "…" : "")
+		: null;
+
+	const announce: ReticulumAnnounceFields = {
+		headerType: headerTwo ? 2 : 1,
+		hops,
+		// destinationHashHex is set for every clear header before this runs.
+		destinationHashHex: fields.destinationHashHex ?? "",
+		destinationHashRange: range(destinationOffset, RETICULUM_HASH_BYTES),
+		transportIdHex: headerTwo
+			? hexBytes(bytes, transportOffset, RETICULUM_HASH_BYTES)
+			: null,
+		transportIdRange: headerTwo
+			? range(transportOffset, RETICULUM_HASH_BYTES)
+			: null,
+		publicKeyRange,
+		nameHashHex: hexBytes(bytes, nameHashRange.offset, nameHashRange.length),
+		nameHashRange,
+		randomHashHex: hexBytes(
+			bytes,
+			randomHashRange.offset,
+			randomHashRange.length,
+		),
+		randomHashRange,
+		ratchetRange,
+		signatureRange,
+		appDataLength,
+		appDataRange,
+		appDataHex: appDataRange
+			? hexBytes(bytes, appDataRange.offset, appDataRange.length)
+			: null,
+		appDataPreview: previewText,
+	};
+
+	const children: DissectNode[] = [
+		node(
+			"Public key",
+			publicKeyRange.offset,
+			publicKeyRange.length,
+			"present — 64 bytes (32B X25519 + 32B Ed25519); presence proven by arithmetic, bytes not validated (no crypto runs here)",
+		),
+		node(
+			"Name hash",
+			nameHashRange.offset,
+			nameHashRange.length,
+			announce.nameHashHex,
+		),
+		node(
+			"Random hash",
+			randomHashRange.offset,
+			randomHashRange.length,
+			announce.randomHashHex,
+		),
+	];
+	if (ratchetRange) {
+		children.push(
+			node(
+				"Ratchet key",
+				ratchetRange.offset,
+				ratchetRange.length,
+				"present — 32 bytes, promised by the context flag; bytes not validated",
+			),
+		);
+	}
+	children.push(
+		node(
+			"Signature",
+			signatureRange.offset,
+			signatureRange.length,
+			"present — 64 bytes Ed25519; not verified (no crypto runs here)",
+		),
+	);
+	if (appDataRange) {
+		const hexShown =
+			hexBytes(
+				bytes,
+				appDataRange.offset,
+				Math.min(appDataLength, APP_DATA_HEX_NODE_LIMIT),
+			) + (appDataLength > APP_DATA_HEX_NODE_LIMIT ? "…" : "");
+		children.push(
+			node(
+				"App data",
+				appDataRange.offset,
+				appDataRange.length,
+				`undecoded — ${appDataLength} raw application-defined byte(s) (often msgpack, never interpreted): ${hexShown}` +
+					(previewText !== null
+						? ` · printable-ASCII preview only: ${JSON.stringify(previewText)}`
+						: ""),
+				[],
+				"raw",
+			),
+		);
+	}
+
+	root.children.push(
+		node(
+			"Announce",
+			fields.payloadOffset,
+			fields.payloadLength,
+			`destination ${announce.destinationHashHex} · ${hops} hop(s) — cleartext by protocol rule; field layout proven by length arithmetic`,
+			children,
+		),
+	);
+	return announce;
 }
