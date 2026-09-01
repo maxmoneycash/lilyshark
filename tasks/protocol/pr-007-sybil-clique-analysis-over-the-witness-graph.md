@@ -4,7 +4,7 @@ title: Sybil-clique analysis over the witness graph
 area: protocol
 size: M
 priority: P2
-status: todo
+status: done
 depends_on:
 - PR-005
 eval:

@@ -253,6 +253,15 @@ python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
 echo "Testing shelby_pointer_py"
 python3 -m unittest discover -s test/shelby_pointer_py -p 'test_*.py'
 
+echo "Testing field_receipts_py"
+python3 -m unittest discover -s test/field_receipts_py -p 'test_*.py'
+
+echo "Testing field_receipts_score"
+python3 -m unittest discover -s test/field_receipts_score -p 'test_*.py'
+
+echo "Testing witness_graph"
+python3 -m unittest discover -s test/witness_graph -p 'test_*.py'
+
 echo "Testing analysis_sim"
 python3 -m unittest discover -s test/analysis_sim -p 'test_*.py'
 
