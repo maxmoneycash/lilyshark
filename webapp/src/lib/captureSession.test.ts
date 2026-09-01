@@ -16,6 +16,7 @@ import {
 	clearCapture,
 	getCaptureSession,
 	recordFrame,
+	sessionCapture,
 	startCapture,
 	stopCapture,
 } from "./captureSession.ts";
@@ -118,6 +119,52 @@ test("a runaway session stops itself at the frame limit", () => {
 	const s = getCaptureSession();
 	assert.equal(s.recording, false, "it stops rather than growing without bound");
 	assert.equal(s.frames.length, CAPTURE_FRAME_LIMIT);
+});
+
+test("the running session reads as an ordinary capture (UI-012 live slot)", () => {
+	clearCapture();
+	startCapture();
+	for (let i = 0; i < 3; i++) {
+		recordFrame(frameFrom(lskFrame({ seq: i, hex: "aabb", olen: 7 })));
+	}
+	const cache: ReturnType<typeof sessionCapture>["frames"] = [];
+	const live = sessionCapture(getCaptureSession(), cache);
+	assert.equal(live.frames.length, 3);
+	assert.equal(live.trailingBytes, 0);
+
+	// Field for field what the analyzer reads back off the .lscap the same
+	// session writes on STOP — or the live table would describe frames that the
+	// saved capture does not.
+	const done = stopCapture();
+	const file = parseLscap(captureToLscap(done).slice().buffer as ArrayBuffer);
+	const strip = (f: (typeof file.frames)[number]) => ({ ...f, bytes: [...f.bytes] });
+	assert.deepEqual(sessionCapture(done, []).frames.map(strip), file.frames.map(strip));
+	assert.equal(file.frames[0].truncated, true, "olen 7 > 2 captured bytes");
+
+	// Only the new records are converted; the cache is what makes a growing
+	// recording cost O(new frames) rather than O(session).
+	assert.equal(cache.length, 3);
+	const again = sessionCapture(getCaptureSession(), cache);
+	assert.equal(cache.length, 3);
+	assert.notEqual(again.frames, cache, "a fresh array signals the change");
+
+	// A restarted session must not inherit the old recording's frames.
+	startCapture();
+	assert.equal(sessionCapture(getCaptureSession(), cache).frames.length, 0);
+});
+
+test("recording a long session does not copy the whole array per frame", () => {
+	clearCapture();
+	startCapture();
+	const line = lskFrame({ hex: "aabb", olen: 2 });
+	const started = performance.now();
+	for (let i = 0; i < 20_000; i++) recordFrame(frameFrom(line));
+	const elapsedMs = performance.now() - started;
+	assert.equal(getCaptureSession().frames.length, 20_000);
+	assert.equal(getCaptureSession().framesVersion, 20_000);
+	// Copying the array on every arrival is 200M element copies at this length;
+	// the generous ceiling here only has to catch a return to that.
+	assert.ok(elapsedMs < 5000, `20,000 frames recorded in ${elapsedMs}ms`);
 });
 
 test("the file name is stamped from the session start", () => {

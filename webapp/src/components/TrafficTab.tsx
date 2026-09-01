@@ -1,5 +1,16 @@
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+	CSSProperties,
+	KeyboardEvent as ReactKeyboardEvent,
+	ReactNode,
+} from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useReducer,
+	useRef,
+	useState,
+} from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import {
@@ -16,10 +27,24 @@ import {
 	captureFileName,
 	captureToLscap,
 	clearCapture,
+	getCaptureSession,
+	sessionCapture,
 	startCapture,
 	stopCapture,
 	useCaptureSession,
 } from "../lib/captureSession";
+import {
+	activeSlot,
+	type CaptureSlot,
+	emptySlots,
+	MAX_OPEN_CAPTURES,
+	type SlotAction,
+	type SlotOrigin,
+	type SlotState,
+	slotBadges,
+	slotsReducer,
+	slotTitle,
+} from "../lib/captureSlots";
 import {
 	connectDeviceLink,
 	disconnectDeviceLink,
@@ -81,12 +106,28 @@ import {
 	normalizeBrush,
 	pcapExclusionNote,
 } from "../lib/trafficView";
+import {
+	computeRowWindow,
+	DEFAULT_ROW_HEIGHT_PX,
+	rowInWindow,
+	rowsPerPage,
+	scrollTopForRow,
+	tableKeyNav,
+	visibleSpan,
+} from "../lib/virtualRows";
 import { demoNextFrame, isDemo } from "../mesh/demo";
 import { fg, useThemeTick } from "../mesh/theme";
 import { startTrafficDemoInterval } from "./trafficDemo";
 
-/** The live table stops growing here; old frames age out on the left. */
-const LIVE_CAP = 250;
+/**
+ * The synthetic SIM stream stops growing here; old frames age out on the left.
+ *
+ * It was 250 because the table rendered every row it held. The table is
+ * windowed now (lib/virtualRows), so the bound is memory, not the DOM:
+ * 50,000 × ~594 B for a 40 B-payload frame ≈ 29 MB, well inside the per-slot
+ * budget whose arithmetic lives in lib/captureSlots.
+ */
+const LIVE_CAP = 50_000;
 
 /**
  * TRAFFIC — the analyzer. Opens a .lscap capture written by the T-Deck
@@ -927,23 +968,131 @@ interface AppliedFilter {
 	predicate: FramePredicate;
 }
 
+/**
+ * One step of the resolve trace — the walk from Shelby coordinates to an
+ * opened capture, narrated on screen while it happens.
+ */
+interface TraceStep {
+	label: string;
+	detail: string;
+	state: "run" | "ok" | "err";
+}
+
+/* ── capture slots (UI-012) ────────────────────────────────────────────
+ * Everything below belongs to ONE open capture. The tab holds several, and
+ * switching slots swaps the whole lot at once — table, stats, IO strip,
+ * announces, dissection, resolve trace, publish result — because every one
+ * of them is derived from these fields and nothing else. lib/captureSlots
+ * owns the identity, ordering, capacity and labels; this is the payload it
+ * carries around. */
+
+interface CaptureView {
+	capture: LscapCapture | null;
+	/** Where this capture lives on Shelby — null for a local, unpublished one. */
+	ref: CaptureRef | null;
+	/** Index into `capture.frames` of the frame the detail pane describes. */
+	selected: number;
+	filterText: string;
+	applied: AppliedFilter | null;
+	brush: BrushRange | null;
+	/** A note about this capture (trailing bytes), not an open failure. */
+	note: string | null;
+	exportNote: { text: string; warn: boolean } | null;
+	published: {
+		publish: PublishResult;
+		/** 'pending' while the read-back runs; 'ok' or the mismatch reason after. */
+		verified: "pending" | "ok" | string;
+	} | null;
+	publishError: string | null;
+	/** Next sequence number the synthetic SIM stream will use here. */
+	liveSeq: number;
+	/** True when any frame in it was generated rather than heard. */
+	containsSynthetic: boolean;
+}
+
+const BLANK_VIEW: CaptureView = {
+	capture: null,
+	ref: null,
+	selected: 0,
+	filterText: "",
+	applied: null,
+	brush: null,
+	note: null,
+	exportNote: null,
+	published: null,
+	publishError: null,
+	liveSeq: 1000,
+	containsSynthetic: false,
+};
+
+/** The one slot the capture session records into; reused every recording. */
+const LIVE_SLOT_KEY = "live-capture-session";
+
+/** A stable empty frame list, so "no capture" does not churn every memo. */
+const NO_FRAMES: LscapFrame[] = [];
+
+/**
+ * The two spacer rows that stand in for the frames outside the window. They
+ * are structure, not content: the grid's hover ink, its pointer cursor and
+ * the row-landing animation it plays on the last row all belong to real
+ * frames, so they are switched off here rather than flashing over a gap.
+ */
+const SPACER_ROW: CSSProperties = {
+	background: "transparent",
+	cursor: "default",
+	animation: "none",
+};
+const SPACER_CELL: CSSProperties = {
+	padding: 0,
+	border: 0,
+};
+
+/** slotsReducer bound to this tab's view payload (useReducer wants a value). */
+function reduceSlots(
+	state: SlotState<CaptureView>,
+	action: SlotAction<CaptureView>,
+): SlotState<CaptureView> {
+	return slotsReducer(state, action);
+}
+
 interface TrafficTabProps {
 	/** True only while TerminalApp is showing its synthetic demo state. */
 	demoActive: boolean;
 }
 
 export function TrafficTab({ demoActive }: TrafficTabProps) {
-	const [capture, setCapture] = useState<LscapCapture | null>(null);
-	const [name, setName] = useState("");
-	const [selected, setSelected] = useState(0);
-	const [error, setError] = useState<string | null>(null);
+	// ── open captures (UI-012) ────────────────────────────────────────────
+	// Several captures are open at once; `view` is whichever one the slot bar
+	// has active, and every derived value below reads from it and nothing else,
+	// so switching slots swaps the whole dependent view in one render.
+	const [slotState, dispatch] = useReducer(
+		reduceSlots,
+		emptySlots<CaptureView>(),
+	);
+	const slot = activeSlot(slotState);
+	const view = slot?.view ?? BLANK_VIEW;
+	const capture = view.capture;
+	const name = slot?.name ?? "";
+	const selected = view.selected;
+	/** Merge into the active capture's view state; no other slot sees it. */
+	const patch = useCallback(
+		(next: Partial<CaptureView>) => dispatch({ type: "patch", view: next }),
+		[],
+	);
+	// The synthetic ticker and the capture-session effect fire outside render
+	// and must reach whatever slot is active when they fire.
+	const slotRef = useRef<CaptureSlot<CaptureView> | null>(slot);
+	slotRef.current = slot;
+
+	/** A failed open. It never clears the capture already on screen. */
+	const [openError, setOpenError] = useState<string | null>(null);
+	const error = openError ?? view.note;
 	const [blob, setBlob] = useState("");
 	const [busy, setBusy] = useState(false);
 	// Live demo mode adds synthetic frames at a configured cadence. It is
 	// available only while TerminalApp is showing the demo mesh. Opening a file
 	// pauses it.
 	const [live, setLive] = useState(() => demoActive && isDemo());
-	const liveSeq = useRef(1000);
 	const fileRef = useRef<HTMLInputElement>(null);
 	const tableRef = useRef<HTMLDivElement>(null);
 	const demoActiveRef = useRef(demoActive);
@@ -962,27 +1111,26 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		readPermalink(window.location.hash, DEMO_BLOB.owner),
 	);
 	const pendingFrame = useRef<number | null>(bootPermalink.current.frame);
+	/** `filter=` from the URL, handed to the first capture that opens. */
+	const bootFilter = useRef(readHashFilter());
 	const scrollToSelected = useRef(false);
-	/** Where the open capture lives on Shelby — null for a local, unpublished
+	/** Where the active capture lives on Shelby — null for a local, unpublished
 	 *  capture, which therefore has no permalink until it is published. */
-	const [captureRef, setCaptureRef] = useState<CaptureRef | null>(
-		bootPermalink.current.ref,
-	);
+	const captureRef = view.ref;
 
+	/**
+	 * Open a parsed capture into a slot: the same source (blob, commitment,
+	 * file name, the sample) reuses its slot rather than stacking duplicates,
+	 * anything else takes a new one.
+	 */
 	const load = (
 		buf: ArrayBuffer,
 		from: string,
-		ref: CaptureRef | null = null,
+		opts: { ref?: CaptureRef | null; origin?: SlotOrigin; key?: string } = {},
 	) => {
 		try {
 			const c = parseLscap(buf);
-			setCapture(c);
-			setName(from);
-			setCaptureRef(ref);
-			// A new capture is a new clock: a brush or export note from the old
-			// one would describe frames that are no longer on screen.
-			setBrush(null);
-			setExportNote(null);
+			const ref = opts.ref ?? null;
 			// A permalink names its frame by sequence number; otherwise land on
 			// the most interesting frame — the first one carrying a Shelby
 			// pointer, so the decoded pointer detail is on screen from the start.
@@ -992,37 +1140,56 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 				want !== null
 					? c.frames.findIndex((fr) => Number(fr.sequence) === want)
 					: -1;
-			if (wantIdx >= 0) {
-				setSelected(wantIdx);
-				scrollToSelected.current = true;
-			} else {
-				const ptrIdx = c.frames.findIndex((fr) => findShelbyPointer(fr.bytes));
-				setSelected(ptrIdx >= 0 ? ptrIdx : 0);
-			}
+			if (wantIdx >= 0) scrollToSelected.current = true;
+			const ptrIdx =
+				wantIdx >= 0
+					? -1
+					: c.frames.findIndex((fr) => findShelbyPointer(fr.bytes));
+			// The boot permalink's filter belongs to the capture the link named,
+			// and to that one only — a later open starts with a clean filter
+			// rather than inheriting a predicate written for other frames.
+			const filterText = bootFilter.current;
+			bootFilter.current = "";
+			const parsed = parseFrameFilter(filterText);
+			dispatch({
+				type: "open",
+				key: opts.key ?? `file:${from}`,
+				origin: opts.origin ?? "file",
+				name: from,
+				view: {
+					...BLANK_VIEW,
+					capture: c,
+					ref,
+					selected: wantIdx >= 0 ? wantIdx : ptrIdx >= 0 ? ptrIdx : 0,
+					filterText,
+					applied:
+						parsed.ok && !parsed.empty
+							? { text: filterText, predicate: parsed.predicate }
+							: null,
+					// Live frames continue the capture's own numbering; a jump from
+					// 23 to 1000 read as a glitch, not a stream.
+					liveSeq: Number(c.frames[c.frames.length - 1]?.sequence ?? -1n) + 1,
+					containsSynthetic: c.frames.some((fr) => fr.synthetic),
+					note:
+						c.trailingBytes > 0
+							? `${c.trailingBytes} trailing byte(s) were not a complete record`
+							: null,
+				},
+			});
 			// The frame param survives only when this load honored it; any other
 			// load would leave a stale frame= describing the previous capture.
 			writeHashParams({ frame: wantIdx >= 0 ? String(want) : null });
-			// Live frames continue the capture's own numbering; a jump from 23 to
-			// 1000 read as a glitch, not a stream.
-			liveSeq.current =
-				Number(c.frames[c.frames.length - 1]?.sequence ?? -1n) + 1;
-			setError(
-				c.trailingBytes > 0
-					? `${c.trailingBytes} trailing byte(s) were not a complete record`
-					: null,
-			);
+			setOpenError(null);
 		} catch (e) {
-			setCapture(null);
-			setCaptureRef(null);
-			setError(
+			setOpenError(
 				e instanceof LscapParseError ? e.message : "not a .lscap capture",
 			);
 		}
 	};
 
-	// The address bar itself carries the capture reference, so the URL of a
-	// resolved or published capture IS its permalink; a local capture clears
-	// the ref rather than leaving a stale link in the bar. The owner is
+	// The address bar itself carries the ACTIVE capture's reference, so the URL
+	// of a resolved or published capture IS its permalink; a local capture
+	// clears the ref rather than leaving a stale link in the bar. The owner is
 	// omitted when it is the demo account — readPermalink fills it back in.
 	useEffect(() => {
 		if (!captureRef) {
@@ -1052,16 +1219,49 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		setBusy(true);
 		setLive(false); // the user's own capture is a document, not a stream
 		try {
-			load(await f.arrayBuffer(), f.name);
+			load(await f.arrayBuffer(), f.name, { origin: "file" });
 		} finally {
 			setBusy(false);
 		}
 	};
 
+	/**
+	 * Switch the whole view to another open capture. The address bar follows:
+	 * the filter and capture reference through their own effects below, the
+	 * frame only where the URL already named one — a switch is not a reason to
+	 * start pinning a frame that was never linked.
+	 */
+	const activateSlot = (id: string) => {
+		const target = slotState.slots.find((s) => s.id === id);
+		if (!target || id === slotState.activeId) return;
+		dispatch({ type: "activate", id });
+		// A failed open belonged to the attempt, not to this capture.
+		setOpenError(null);
+		// The table is one scrolling element shared by every slot, so a switch
+		// starts it at the top and then reveals that capture's selected frame —
+		// rather than keeping an offset measured against other frames.
+		const el = tableRef.current;
+		if (el) el.scrollTop = 0;
+		setScrollport((prev) =>
+			prev.scrollTopPx === 0 ? prev : { ...prev, scrollTopPx: 0 },
+		);
+		scrollToSelected.current = true;
+		if (!splitHash(window.location.hash).params.has("frame")) return;
+		const fr = target.view.capture?.frames[target.view.selected];
+		writeHashParams({ frame: fr ? String(Number(fr.sequence)) : null });
+	};
+
+	const closeSlot = (id: string) => {
+		dispatch({ type: "close", id });
+		setOpenError(null);
+	};
+
 	// ── capture session ───────────────────────────────────────────────────
-	// Recording keeps the full record of every frame the device streams; on
-	// stop the session becomes a real .lscap and opens in this same viewer,
-	// so the capture is analyzed where it was made.
+	// Recording keeps the full record of every frame the device streams. The
+	// session is one of the open captures while it runs (UI-012), so the
+	// frames land in a slot of their own and whatever else is open stays open
+	// — starting or stopping a recording no longer throws away the capture
+	// being read. On stop the same slot becomes the finished .lscap.
 	const session = useCaptureSession();
 	const [, setTick] = useState(0);
 	useEffect(() => {
@@ -1070,19 +1270,90 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		return () => clearInterval(id);
 	}, [session.recording]);
 
+	/** Frames already converted for the live slot — see sessionCapture. */
+	const liveCache = useRef<LscapFrame[]>([]);
+	const livePatchedVersion = useRef(-1);
+	const liveSlot = slotState.slots.find((s) => s.key === LIVE_SLOT_KEY) ?? null;
+	const liveSlotId = liveSlot?.id ?? null;
+
+	const onStartCapture = () => {
+		clearCapture();
+		startCapture();
+		setLive(false);
+		setOpenError(null);
+		liveCache.current = [];
+		livePatchedVersion.current = -1;
+		dispatch({
+			type: "open",
+			key: LIVE_SLOT_KEY,
+			origin: "live",
+			name: "recording…",
+			view: {
+				...BLANK_VIEW,
+				capture: sessionCapture(getCaptureSession(), liveCache.current),
+			},
+		});
+	};
+
+	// Every frame the device streams lands in the live slot as it arrives, so
+	// the recording is readable — filtered, dissected, plotted — while it runs.
+	// Only the new records are converted (sessionCapture appends into the
+	// cache), which is what keeps a long recording linear rather than square.
+	useEffect(() => {
+		if (!liveSlotId) return;
+		if (livePatchedVersion.current === session.framesVersion) return;
+		livePatchedVersion.current = session.framesVersion;
+		dispatch({
+			type: "patch",
+			id: liveSlotId,
+			view: {
+				capture: sessionCapture(session, liveCache.current),
+				containsSynthetic: session.containsSynthetic,
+			},
+		});
+		// Follow the newest frame while the recording is the capture on screen,
+		// unless the operator has scrolled back to study something — the same
+		// follow rule the synthetic stream uses.
+		const el = tableRef.current;
+		if (
+			el &&
+			slotRef.current?.id === liveSlotId &&
+			el.scrollHeight - el.scrollTop - el.clientHeight < 120
+		)
+			requestAnimationFrame(() => {
+				el.scrollTop = el.scrollHeight;
+			});
+	}, [session, liveSlotId]);
+
 	const onStopCapture = () => {
 		const done = stopCapture();
 		setLive(false);
 		if (done.frames.length === 0) {
-			setError(
+			setOpenError(
 				"capture stopped with no frames — nothing was heard on this channel",
 			);
 			return;
 		}
+		// The slot the frames were recorded into becomes the finished capture,
+		// under the name the .lscap will carry.
+		const fileName = captureFileName(done);
+		if (liveSlotId) {
+			dispatch({ type: "rename", id: liveSlotId, name: fileName });
+			dispatch({
+				type: "patch",
+				id: liveSlotId,
+				view: { capture: sessionCapture(done, liveCache.current) },
+			});
+			dispatch({ type: "activate", id: liveSlotId });
+			return;
+		}
+		// No live slot (a recording started before this tab mounted): open the
+		// finished capture the ordinary way.
 		const bytes = captureToLscap(done);
-		// Copied into a standalone buffer: load() keeps views onto it for the
-		// lifetime of the capture.
-		load(bytes.slice().buffer, captureFileName(done));
+		load(bytes.slice().buffer, fileName, {
+			origin: "live",
+			key: LIVE_SLOT_KEY,
+		});
 	};
 
 	const onDownloadCapture = () => {
@@ -1105,39 +1376,31 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	// PUBLISH is an action or an explanation.
 	const [uploadInfo, setUploadInfo] = useState<UploadServiceInfo | null>(null);
 	const [publishing, setPublishing] = useState(false);
-	const [publishError, setPublishError] = useState<string | null>(null);
-	const [published, setPublished] = useState<{
-		publish: PublishResult;
-		/** 'pending' while the read-back runs; 'ok' or the mismatch reason after. */
-		verified: "pending" | "ok" | string;
-	} | null>(null);
-
-	// A new recording is a new artifact; the previous publish no longer
-	// describes what is on screen.
-	const sessionStart = session.startedAtMs;
-	// biome-ignore lint/correctness/useExhaustiveDependencies: sessionStart is the trigger, not a value the effect reads
-	useEffect(() => {
-		setPublished(null);
-		setPublishError(null);
-	}, [sessionStart]);
+	// The publish belongs to the recorded session, so its result lives in that
+	// session's slot: switching to another capture takes the publish panel with
+	// it, and a new recording opens a slot that has never been published.
+	const published = view.published;
+	const publishError = view.publishError;
 
 	const onPublish = async () => {
+		const target = liveSlotId ?? slotState.activeId;
+		const write = (next: Partial<CaptureView>) =>
+			dispatch({ type: "patch", id: target, view: next });
 		setPublishing(true);
-		setPublishError(null);
+		write({ publishError: null });
 		try {
 			const bytes = captureToLscap(session);
 			const res = await publishCapture(bytes, captureFileName(session));
-			setPublished({ publish: res, verified: "pending" });
-			// The capture opened at STOP now has an address on Shelby — carry it
-			// as the permalink, but only while the viewer still shows this
-			// session's capture (the user may have opened another file since).
-			if (name === captureFileName(session) && res.owner) {
-				setCaptureRef(
-					res.commitment
+			// The capture recorded here now has an address on Shelby — carry it as
+			// that slot's permalink.
+			write({
+				published: { publish: res, verified: "pending" },
+				ref: res.owner
+					? res.commitment
 						? { kind: "commit", owner: res.owner, commitment: res.commitment }
-						: { kind: "blob", owner: res.owner, name: res.blobName },
-				);
-			}
+						: { kind: "blob", owner: res.owner, name: res.blobName }
+					: null,
+			});
 			// Prove the loop instead of asserting it: read the blob back from the
 			// Shelby RPC and compare every byte with what was just sent.
 			try {
@@ -1146,25 +1409,35 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 				);
 				const same =
 					back.length === bytes.length && back.every((b, i) => b === bytes[i]);
-				setPublished({
-					publish: res,
-					verified: same
-						? "ok"
-						: `Shelby served ${back.length} bytes, we sent ${bytes.length}`,
+				write({
+					published: {
+						publish: res,
+						verified: same
+							? "ok"
+							: `Shelby served ${back.length} bytes, we sent ${bytes.length}`,
+					},
 				});
 			} catch (e) {
-				setPublished({
-					publish: res,
-					verified: `read-back failed: ${e instanceof Error ? e.message : e}`,
+				write({
+					published: {
+						publish: res,
+						verified: `read-back failed: ${e instanceof Error ? e.message : e}`,
+					},
 				});
 			}
 		} catch (e) {
-			setPublishError(e instanceof Error ? e.message : String(e));
+			write({ publishError: e instanceof Error ? e.message : String(e) });
 		} finally {
 			setPublishing(false);
 		}
 	};
-	const haveCapture = !session.recording && session.frames.length > 0;
+	// The capture chain-of-custody block describes the recorded session, so it
+	// is shown with that session's slot and not over some other capture.
+	const haveCapture =
+		!session.recording &&
+		session.frames.length > 0 &&
+		liveSlotId !== null &&
+		slotState.activeId === liveSlotId;
 	useEffect(() => {
 		if (!haveCapture || uploadInfo) return;
 		void fetchUploadInfo().then(setUploadInfo);
@@ -1177,17 +1450,16 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	 */
 	const openBlobRef = async (owner: string, name: string) => {
 		setBusy(true);
-		setError(null);
+		setOpenError(null);
 		setLive(false);
 		try {
 			load(await fetchBlobBytes(owner, name), name, {
-				kind: "blob",
-				owner,
-				name,
+				ref: { kind: "blob", owner, name },
+				origin: "shelby",
+				key: `blob:${owner.toLowerCase()}/${name}`,
 			});
 		} catch (e) {
-			setCapture(null);
-			setError(e instanceof Error ? e.message : "fetch failed");
+			setOpenError(e instanceof Error ? e.message : "fetch failed");
 		} finally {
 			setBusy(false);
 		}
@@ -1212,13 +1484,10 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	 * timing: the indexer lookup that turns a commitment into an object name,
 	 * the RPC fetch, the size check against what the pointer promised, the
 	 * on-chain anchor check against the capture registry, and the open. The
-	 * trace stays up afterward so the story can be read back.
+	 * trace stays up afterward so the story can be read back. It narrates an
+	 * operation rather than describing a capture, so it lives here and not in a
+	 * slot — and the effect below drops it the moment the view moves on.
 	 */
-	interface TraceStep {
-		label: string;
-		detail: string;
-		state: "run" | "ok" | "err";
-	}
 	const [trace, setTrace] = useState<TraceStep[] | null>(null);
 	const resolving = trace?.some((t) => t.state === "run") ?? false;
 	const link = useDeviceLink();
@@ -1336,9 +1605,9 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 
 			keepTrace.current = true;
 			load(bytes, found.name, {
-				kind: "commit",
-				owner: p.owner,
-				commitment: p.commitment,
+				ref: { kind: "commit", owner: p.owner, commitment: p.commitment },
+				origin: "shelby",
+				key: `commit:${p.owner.toLowerCase()}/${p.commitment.toLowerCase()}`,
 			});
 			steps.push({ label: "OPENED", detail: `${found.name}`, state: "ok" });
 			show();
@@ -1397,13 +1666,16 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	/** Bundled synthetic capture: 24 frames with a Shelby pointer at sequence 9. */
 	const openSample = async () => {
 		setBusy(true);
-		setError(null);
+		setOpenError(null);
 		try {
 			const res = await fetch("/sample-mesh-traffic.lscap");
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			load(await res.arrayBuffer(), "sample-mesh-traffic.lscap");
+			load(await res.arrayBuffer(), "sample-mesh-traffic.lscap", {
+				origin: "sample",
+				key: "sample",
+			});
 		} catch (e) {
-			setError(e instanceof Error ? e.message : "sample unavailable");
+			setOpenError(e instanceof Error ? e.message : "sample unavailable");
 		} finally {
 			setBusy(false);
 		}
@@ -1422,6 +1694,25 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	useEffect(() => {
 		if (bootRan.current) return;
 		bootRan.current = true;
+		// A recording survives this tab being closed and reopened — the session
+		// store outlives the component — so it gets its slot back before
+		// anything else opens, rather than the frames streaming into nothing.
+		const running = getCaptureSession();
+		if (running.recording || running.frames.length > 0) {
+			liveCache.current = [];
+			livePatchedVersion.current = running.framesVersion;
+			dispatch({
+				type: "open",
+				key: LIVE_SLOT_KEY,
+				origin: "live",
+				name: running.recording ? "recording…" : captureFileName(running),
+				view: {
+					...BLANK_VIEW,
+					capture: sessionCapture(running, liveCache.current),
+					containsSynthetic: running.containsSynthetic,
+				},
+			});
+		}
 		const ref = bootPermalink.current.ref;
 		if (ref) {
 			// The link says exactly what to open; the #resolve token's auto-play
@@ -1463,17 +1754,25 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 			simulatedLive,
 			() => demoActiveRef.current,
 			() => {
-				setCapture((c) => {
-					if (!c) return c;
-					const last = c.frames[c.frames.length - 1];
-					const seq = liveSeq.current++;
-					const f = demoNextFrame(
-						seq,
-						Number(last ? last.timestampUs : 0n) +
-							2_400_000 +
-							(seq % 5) * 640_000,
-					);
-					return { ...c, frames: [...c.frames.slice(-(LIVE_CAP - 1)), f] };
+				// Into whichever capture is on screen, never into the others.
+				const into = slotRef.current;
+				const c = into?.view.capture;
+				if (!into || !c) return;
+				const last = c.frames[c.frames.length - 1];
+				const seq = into.view.liveSeq;
+				const f = demoNextFrame(
+					seq,
+					Number(last ? last.timestampUs : 0n) +
+						2_400_000 +
+						(seq % 5) * 640_000,
+				);
+				dispatch({
+					type: "patch",
+					id: into.id,
+					view: {
+						capture: { ...c, frames: [...c.frames.slice(-(LIVE_CAP - 1)), f] },
+						liveSeq: seq + 1,
+					},
 				});
 				const el = tableRef.current;
 				if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 120) {
@@ -1485,7 +1784,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		);
 	}, [simulatedLive]);
 
-	const frames = capture?.frames ?? [];
+	const frames = capture?.frames ?? NO_FRAMES;
 	// A pointer rides behind whatever protocol header enclosed it, so every
 	// payload is scanned once rather than only at a fixed offset.
 	const pointers = useMemo(
@@ -1510,21 +1809,25 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	// APPLIED. While the text is broken the table keeps the last valid
 	// result and the error is pointed out inline — it never silently shows
 	// wrong rows.
-	const [filterText, setFilterText] = useState<string>(readHashFilter);
+	// Filter text and applied filter belong to the capture they describe, so a
+	// second capture opens with its own (empty) filter rather than inheriting a
+	// predicate written for other frames.
+	const filterText = view.filterText;
+	const applied = view.applied;
+	const setFilterText = (next: string | ((current: string) => string)) =>
+		patch({
+			filterText: typeof next === "function" ? next(view.filterText) : next,
+		});
 	const filterParse = useMemo(() => parseFrameFilter(filterText), [filterText]);
-	const [applied, setApplied] = useState<AppliedFilter | null>(() => {
-		const text = readHashFilter();
-		const r = parseFrameFilter(text);
-		return r.ok && !r.empty ? { text, predicate: r.predicate } : null;
-	});
 	useEffect(() => {
 		if (!filterParse.ok) return; // keep the last valid filter on screen
-		setApplied(
-			filterParse.empty
-				? null
-				: { text: filterText, predicate: filterParse.predicate },
-		);
-	}, [filterParse, filterText]);
+		const next: AppliedFilter | null = filterParse.empty
+			? null
+			: { text: filterText, predicate: filterParse.predicate };
+		// Only when it actually moved: patching on every render would loop.
+		if ((next?.text ?? null) === (applied?.text ?? null)) return;
+		patch({ applied: next });
+	}, [filterParse, filterText, applied, patch]);
 	useEffect(() => {
 		writeHashParams({ filter: filterText || null });
 	}, [filterText]);
@@ -1547,7 +1850,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	// filtered-and-brushed set, and clearing the brush restores the filter's
 	// rows exactly. Times are seconds on the capture clock (first frame = 0),
 	// the same clock the table's TIME column reads.
-	const [brush, setBrush] = useState<BrushRange | null>(null);
+	const brush = view.brush;
+	const setBrush = (next: BrushRange | null) => patch({ brush: next });
 	const t0 = frames.length ? frames[0].timestampUs : 0n;
 
 	/** The table rows: text filter ∘ brush. */
@@ -1565,6 +1869,17 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		() => shown.filter((i) => pointers[i]).length,
 		[shown, pointers],
 	);
+	// The footer's provenance line, counted once per view rather than three
+	// times per render — at six figures of frames that difference is felt.
+	const shownFlags = useMemo(() => {
+		let synthetic = 0;
+		let truncated = false;
+		for (const i of shown) {
+			if (frames[i].synthetic) synthetic++;
+			if (frames[i].truncated) truncated = true;
+		}
+		return { synthetic, truncated };
+	}, [shown, frames]);
 
 	// ── Reticulum announces (UI-013) ───────────────────────────────────
 	// Read over the WHOLE capture, never the filtered set: the panel is how
@@ -1602,43 +1917,202 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		);
 	};
 
+	// ── the virtualized frame table (UI-012) ───────────────────────────
+	// The table renders only the rows the scrollport can show; two spacer
+	// rows stand in for everything above and below, so the scrollbar still
+	// describes the whole capture. Selection, the roving tab stop and the
+	// arrow keys all work on POSITIONS in `shown` — the logical list — so a
+	// 200,000-frame capture navigates exactly like a 24-frame one. All the
+	// arithmetic is in lib/virtualRows.
+	const [scrollport, setScrollport] = useState({
+		scrollTopPx: 0,
+		viewportPx: 0,
+	});
+	const [rowHeightPx, setRowHeightPx] = useState(DEFAULT_ROW_HEIGHT_PX);
+	const [headerPx, setHeaderPx] = useState(0);
+	/** A row waiting to be mounted so it can take the focus. */
+	const pendingFocus = useRef<number | null>(null);
+
+	const measureScrollport = useCallback(() => {
+		const el = tableRef.current;
+		if (!el) return;
+		const rect = el.getBoundingClientRect();
+		const next = visibleSpan({
+			scrollTopPx: el.scrollTop,
+			clientHeightPx: el.clientHeight,
+			scrollHeightPx: el.scrollHeight,
+			rectTopPx: rect.top,
+			rectHeightPx: rect.height,
+			windowHeightPx: window.innerHeight,
+		});
+		setScrollport((prev) =>
+			prev.scrollTopPx === next.scrollTopPx &&
+			prev.viewportPx === next.viewportPx
+				? prev
+				: next,
+		);
+	}, []);
+
+	// The pane scrolls itself on desktop and hands scrolling to the page on a
+	// phone, so both are watched; ResizeObserver catches the panel growing.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: capture is the trigger — the scrolling element mounts with it
+	useEffect(() => {
+		const el = tableRef.current;
+		if (!el) return;
+		measureScrollport();
+		const onMove = () => measureScrollport();
+		el.addEventListener("scroll", onMove, { passive: true });
+		window.addEventListener("scroll", onMove, { passive: true });
+		window.addEventListener("resize", onMove);
+		const ro =
+			typeof ResizeObserver !== "undefined" ? new ResizeObserver(onMove) : null;
+		ro?.observe(el);
+		return () => {
+			el.removeEventListener("scroll", onMove);
+			window.removeEventListener("scroll", onMove);
+			window.removeEventListener("resize", onMove);
+			ro?.disconnect();
+		};
+	}, [measureScrollport, capture]);
+
+	// Row height is measured, not assumed: it moves with the theme's font and
+	// with the phone layout, and the spacers have to match it exactly or the
+	// scrollbar lies. Runs after every render, cheap, and settles immediately.
+	useEffect(() => {
+		const el = tableRef.current;
+		if (!el) return;
+		const head = el.querySelector<HTMLElement>("thead");
+		if (head && Math.abs(head.offsetHeight - headerPx) > 0.5)
+			setHeaderPx(head.offsetHeight);
+		const row = el.querySelector<HTMLElement>("tr[data-row]");
+		if (
+			row &&
+			row.offsetHeight > 0 &&
+			Math.abs(row.offsetHeight - rowHeightPx) > 0.5
+		)
+			setRowHeightPx(row.offsetHeight);
+	});
+
+	const rowWindow = useMemo(
+		() =>
+			computeRowWindow({
+				rowCount: shown.length,
+				rowHeightPx,
+				scrollTopPx: scrollport.scrollTopPx,
+				viewportPx: scrollport.viewportPx,
+			}),
+		[shown.length, rowHeightPx, scrollport],
+	);
+
+	/** Bring a logical row onto the screen, and hand it the focus if asked. */
+	const revealRow = useCallback(
+		(position: number, focus: boolean) => {
+			if (focus) pendingFocus.current = position;
+			const el = tableRef.current;
+			if (!el) return;
+			if (el.scrollHeight - el.clientHeight > 1) {
+				const next = scrollTopForRow({
+					position,
+					rowHeightPx,
+					headerPx,
+					scrollTopPx: el.scrollTop,
+					viewportPx: el.clientHeight,
+				});
+				if (next === el.scrollTop) return;
+				el.scrollTop = next;
+				// Mount the window for the new offset in this same render rather
+				// than waiting for the scroll event, so the focus lands at once.
+				setScrollport((prev) => ({ ...prev, scrollTopPx: next }));
+				return;
+			}
+			// Phone layout: the page is what scrolls.
+			const top =
+				el.getBoundingClientRect().top +
+				window.scrollY +
+				headerPx +
+				position * rowHeightPx;
+			if (
+				top < window.scrollY ||
+				top + rowHeightPx > window.scrollY + window.innerHeight
+			)
+				window.scrollTo({ top: Math.max(0, top - window.innerHeight / 2) });
+		},
+		[rowHeightPx, headerPx],
+	);
+
+	// A row asked for the focus while it was outside the window; take it as
+	// soon as it mounts (the scroll above is what mounts it).
+	useEffect(() => {
+		const position = pendingFocus.current;
+		if (position === null) return;
+		const row = tableRef.current?.querySelector<HTMLElement>(
+			`tr[data-row="${position}"]`,
+		);
+		if (!row) return;
+		pendingFocus.current = null;
+		row.focus({ preventScroll: true });
+	});
+
 	// A filter change may hide the selected row; selection snaps to the first
 	// visible frame so the detail pane always describes a row that is on
 	// screen (or to none when nothing matches), and the roving tabIndex (the
 	// selected row is the table's tab stop) keeps keyboard reach on the table
 	// through selecting, filtering and clearing.
-	const selectedVisible = shown.includes(selected);
+	const selectedPosition = useMemo(
+		() => shown.indexOf(selected),
+		[shown, selected],
+	);
+	const selectedVisible = selectedPosition >= 0;
 	useEffect(() => {
-		if (selectedVisible) return;
+		if (selectedVisible || !capture) return;
 		const next = shown[0] ?? -1;
-		setSelected(next);
+		if (next === selected) return; // nothing to snap to, and no patch to loop on
+		patch({ selected: next });
 		// A URL already naming a frame keeps naming the one on screen; a URL
 		// that never carried frame= is not grown by a passive snap.
 		if (splitHash(window.location.hash).params.has("frame")) {
 			const fr = next >= 0 ? frames[next] : undefined;
 			writeHashParams({ frame: fr ? String(Number(fr.sequence)) : null });
 		}
-	}, [selectedVisible, shown, frames]);
+	}, [selectedVisible, selected, shown, frames, capture, patch]);
 
 	/** User-driven selection: the row and the URL's `frame=` move together. */
 	const selectFrame = (i: number) => {
-		setSelected(i);
+		patch({ selected: i });
 		const fr = frames[i];
 		writeHashParams({ frame: fr ? String(Number(fr.sequence)) : null });
 	};
 
+	/**
+	 * Keyboard navigation over the LOGICAL list: arrows, Page Up/Down, Home
+	 * and End move the selection through `shown` whether or not the next row
+	 * happens to be mounted, scrolling the window to it and carrying the focus
+	 * along (PRODUCT.md: full keyboard reach on the frame table).
+	 */
+	const onRowKeyDown = (e: ReactKeyboardEvent, position: number) => {
+		const nav = tableKeyNav(
+			position,
+			shown.length,
+			e.key,
+			rowsPerPage(scrollport.viewportPx, rowHeightPx),
+		);
+		if (!nav) return;
+		e.preventDefault();
+		const index = shown[nav.position];
+		if (index === undefined) return;
+		selectFrame(index);
+		if (!nav.activate) revealRow(nav.position, true);
+	};
+
 	// A permalink's frame must land on screen, not just be selected: scroll
 	// the row into view once, after the load that consumed `frame=`.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: selected is the trigger; the effect only reads refs
 	useEffect(() => {
 		if (!scrollToSelected.current) return;
+		const position = shown.indexOf(selected);
+		if (position < 0) return;
 		scrollToSelected.current = false;
-		requestAnimationFrame(() => {
-			tableRef.current
-				?.querySelector("tr.sel")
-				?.scrollIntoView({ block: "center" });
-		});
-	}, [selected]);
+		requestAnimationFrame(() => revealRow(position, false));
+	}, [selected, shown, revealRow]);
 
 	// ── IO graph (UI-005) ──────────────────────────────────────────────
 	// One strip over the capture clock: packet rate, mean SNR, CRC-failure
@@ -1797,10 +2271,9 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	// ── export of the current view (UI-006) ────────────────────────────
 	// pcap/CSV/JSON of exactly what the table shows: text filter ∘ brush.
 	// Saved through the same object-URL mechanism as the .lscap download.
-	const [exportNote, setExportNote] = useState<{
-		text: string;
-		warn: boolean;
-	} | null>(null);
+	const exportNote = view.exportNote;
+	const setExportNote = (next: { text: string; warn: boolean } | null) =>
+		patch({ exportNote: next });
 
 	const saveFile = (part: BlobPart, fileName: string, type: string) => {
 		const url = URL.createObjectURL(new Blob([part], { type }));
@@ -1813,14 +2286,14 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 
 	const onExport = (kind: "pcap" | "csv" | "json") => {
 		if (!capture) return;
-		const view = assembleExportView(frames, shown);
+		const exported = assembleExportView(frames, shown);
 		const fileName = exportFileName(
 			name,
 			{ filtered: applied !== null, brushed: brush !== null },
 			kind,
 		);
 		if (kind === "pcap") {
-			const res = buildLoraTapPcap(view);
+			const res = buildLoraTapPcap(exported);
 			saveFile(
 				res.bytes.slice().buffer as ArrayBuffer,
 				fileName,
@@ -1833,14 +2306,14 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 				warn: res.excludedSynthetic + res.excludedUnencodable > 0,
 			});
 		} else {
-			const body = kind === "csv" ? buildCsv(view) : buildJson(view);
+			const body = kind === "csv" ? buildCsv(exported) : buildJson(exported);
 			saveFile(
 				body,
 				fileName,
 				kind === "csv" ? "text/csv" : "application/json",
 			);
 			setExportNote({
-				text: `${fileName} · ${view.frames.length} frame(s) written`,
+				text: `${fileName} · ${exported.frames.length} frame(s) written`,
 				warn: false,
 			});
 		}
@@ -1939,11 +2412,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 					) : (
 						<button
 							type="button"
-							onClick={() => {
-								clearCapture();
-								startCapture();
-								setLive(false);
-							}}
+							onClick={onStartCapture}
 							disabled={!canCapture || busy}
 							title={
 								canCapture
@@ -2035,6 +2504,76 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 						FETCH
 					</button>
 				</div>
+
+				{/* ── capture slots (UI-012) ────────────────────────────────────
+				    One tab per open capture, with the honest word for what each
+				    one is: the recording in progress, a capture that came off the
+				    radio, synthetic frames, published to Shelby. Clicking one
+				    swaps the entire view below; ✕ closes it. */}
+				{slotState.slots.length > 0 && (
+					<div
+						className="scroll-x"
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+							padding: "4px 12px",
+							borderBottom: "1px solid var(--border)",
+							flexShrink: 0,
+						}}
+					>
+						<span
+							className="dim"
+							style={{ fontSize: 10, letterSpacing: 1, flexShrink: 0 }}
+						>
+							CAPTURES {slotState.slots.length}/{MAX_OPEN_CAPTURES}
+						</span>
+						{slotState.slots.map((s) => {
+							const active = s.id === slotState.activeId;
+							const facts = {
+								origin: s.origin,
+								recording: s.key === LIVE_SLOT_KEY && session.recording,
+								synthetic: s.view.containsSynthetic,
+								published: s.view.ref !== null,
+								frameCount: s.view.capture?.frames.length ?? 0,
+							};
+							const badges = slotBadges(facts);
+							return (
+								<span
+									key={s.id}
+									style={{ display: "flex", gap: 2, flexShrink: 0 }}
+								>
+									<button
+										type="button"
+										className={active ? "primary" : ""}
+										aria-pressed={active}
+										title={slotTitle(s.name, facts)}
+										onClick={() => activateSlot(s.id)}
+									>
+										{s.name}
+										<span className="dim">
+											{" "}
+											· {facts.frameCount.toLocaleString()}f
+										</span>
+										{badges.length > 0 && ` · ${badges.join(" · ")}`}
+									</button>
+									<button
+										type="button"
+										title={`Close ${s.name}${
+											facts.recording
+												? " — this stops nothing; the recording keeps running"
+												: ""
+										}`}
+										onClick={() => closeSlot(s.id)}
+										style={{ minWidth: 0 }}
+									>
+										✕
+									</button>
+								</span>
+							);
+						})}
+					</div>
+				)}
 
 				{error && <div className="panel-foot err">{error}</div>}
 
@@ -2495,7 +3034,17 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 
 						<div className="scroll-y" ref={tableRef}>
 							<div className="scroll-x">
-								<table className="grid">
+								{/* Windowed: only the rows in view are in the DOM, and the
+								    two spacer rows hold the height of everything else, so
+								    the scrollbar still measures the whole capture.
+								    aria-rowcount/aria-rowindex tell assistive tech the same
+								    thing the scrollbar does — the row on screen is row
+								    12,000 of 50,000, not row 3 of 400. */}
+								<table
+									className="grid"
+									aria-rowcount={shown.length + 1}
+									aria-label="captured frames"
+								>
 									<thead>
 										<tr>
 											<th>#</th>
@@ -2511,45 +3060,46 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 										</tr>
 									</thead>
 									<tbody>
-										{shown.map((i) => {
+										{rowWindow.topPadPx > 0 && (
+											<tr
+												aria-hidden
+												style={{ ...SPACER_ROW, height: rowWindow.topPadPx }}
+											>
+												<td
+													colSpan={10}
+													style={{
+														...SPACER_CELL,
+														height: rowWindow.topPadPx,
+													}}
+												/>
+											</tr>
+										)}
+										{shown.slice(rowWindow.start, rowWindow.end).map((i, k) => {
 											const fr = frames[i];
+											const position = rowWindow.start + k;
 											return (
 												<tr
 													key={i}
+													data-row={position}
+													aria-rowindex={position + 2}
+													aria-selected={i === selected}
 													className={i === selected ? "sel" : undefined}
 													onClick={() => selectFrame(i)}
-													// Roving tabIndex: the selected row is the table's one
-													// tab stop, arrows walk the *visible* rows. Filtering
-													// or clearing never drops the table out of the tab
-													// order (PRODUCT.md: full keyboard reach).
+													// Roving tabIndex: the selected row is the table's
+													// one tab stop — or, when the selection has scrolled
+													// out of the window (or the filter hid it), the first
+													// row that IS mounted, so the table never drops out
+													// of the tab order (PRODUCT.md: full keyboard reach).
 													tabIndex={
-														i === selected ||
-														(!selectedVisible && i === shown[0])
+														position ===
+														(selectedVisible &&
+														rowInWindow(rowWindow, selectedPosition)
+															? selectedPosition
+															: rowWindow.start)
 															? 0
 															: -1
 													}
-													onKeyDown={(e) => {
-														if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-															e.preventDefault();
-															const sib =
-																e.key === "ArrowDown"
-																	? e.currentTarget.nextElementSibling
-																	: e.currentTarget.previousElementSibling;
-															const pos = shown.indexOf(i);
-															const next =
-																shown[pos + (e.key === "ArrowDown" ? 1 : -1)];
-															if (
-																next !== undefined &&
-																sib instanceof HTMLTableRowElement
-															) {
-																selectFrame(next);
-																sib.focus();
-															}
-														} else if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
-															selectFrame(i);
-														}
-													}}
+													onKeyDown={(e) => onRowKeyDown(e, position)}
 													style={{ cursor: "pointer" }}
 												>
 													<td>
@@ -2597,6 +3147,20 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 												</tr>
 											);
 										})}
+										{rowWindow.bottomPadPx > 0 && (
+											<tr
+												aria-hidden
+												style={{ ...SPACER_ROW, height: rowWindow.bottomPadPx }}
+											>
+												<td
+													colSpan={10}
+													style={{
+														...SPACER_CELL,
+														height: rowWindow.bottomPadPx,
+													}}
+												/>
+											</tr>
+										)}
 										{(applied || brush) && shown.length === 0 && (
 											<tr>
 												<td colSpan={10} className="dim">
@@ -2626,13 +3190,12 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 							)}
 							{" · "}
 							{shownPointerCount} SHELBY POINTER(S)
-							{shownFrames.some((fr) => fr.synthetic) && (
+							{shownFlags.synthetic > 0 && (
 								<span className="warn">
-									{shownFrames.filter((fr) => fr.synthetic).length} SYNTHETIC ·
-									NOT OTA
+									{shownFlags.synthetic} SYNTHETIC · NOT OTA
 								</span>
 							)}
-							{shownFrames.some((fr) => fr.truncated) && (
+							{shownFlags.truncated && (
 								<span className="dim">* = FRAME TRUNCATED AT CAPTURE</span>
 							)}
 							<span className="spacer" />

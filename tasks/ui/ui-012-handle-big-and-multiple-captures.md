@@ -4,7 +4,7 @@ title: Handle big and multiple captures
 area: ui
 size: M
 priority: P1
-status: todo
+status: done
 eval:
   rubric:
   - Frame table is virtualized; a 50k-frame capture scrolls smoothly and the 5,000-frame cap is lifted

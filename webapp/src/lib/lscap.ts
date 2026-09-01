@@ -20,9 +20,16 @@ export type Modulation = 'unknown' | 'lora' | 'fsk';
 export type FrameDirection = 'unknown' | 'rx' | 'tx';
 export type CrcStatus = 'unknown' | 'absent' | 'valid' | 'invalid';
 
-const MODULATION: Modulation[] = ['unknown', 'lora', 'fsk'];
-const DIRECTION: FrameDirection[] = ['unknown', 'rx', 'tx'];
-const CRC: CrcStatus[] = ['unknown', 'absent', 'valid', 'invalid'];
+/** Enum codes as the record header stores them, indexed by the stored byte.
+ *  Exported so a frame assembled in the browser (a live capture session) maps
+ *  its codes exactly the way the file reader does. */
+export const MODULATION_CODES: readonly Modulation[] = ['unknown', 'lora', 'fsk'];
+export const DIRECTION_CODES: readonly FrameDirection[] = ['unknown', 'rx', 'tx'];
+export const CRC_CODES: readonly CrcStatus[] = ['unknown', 'absent', 'valid', 'invalid'];
+
+const MODULATION = MODULATION_CODES;
+const DIRECTION = DIRECTION_CODES;
+const CRC = CRC_CODES;
 
 /** Bit positions of RfField* in the firmware's present_fields mask. */
 export const RF_FIELD = {
@@ -227,18 +234,37 @@ export function summarize(frames: LscapFrame[]) {
       airtimeMs: 0, durationSec: 0, framesPerMinute: 0,
     };
   }
-  const rssi = frames.map((f) => f.rssiDbm).sort((a, b) => a - b);
+  // One pass, and no `Math.max(...array)`: spreading a six-figure frame count
+  // into an argument list overflows the stack outright (UI-012 lifted the cap
+  // to 128,000 frames), and six separate passes over that many frames is work
+  // the summary strip would pay on every filter keystroke.
+  const rssi = new Float64Array(frames.length);
+  let bytes = 0;
+  let crcValid = 0;
+  let crcInvalid = 0;
+  let bestSnrDb = -Infinity;
+  let airtimeUs = 0;
+  for (let i = 0; i < frames.length; i++) {
+    const f = frames[i];
+    rssi[i] = f.rssiDbm;
+    bytes += f.capturedLength;
+    if (f.crc === 'valid') crcValid++;
+    else if (f.crc === 'invalid') crcInvalid++;
+    if (f.snrDb > bestSnrDb) bestSnrDb = f.snrDb;
+    airtimeUs += f.airtimeUs;
+  }
+  rssi.sort();
   const first = frames[0].timestampUs;
   const last = frames[frames.length - 1].timestampUs;
   const durationSec = Number(last - first) / 1_000_000;
   return {
     frames: frames.length,
-    bytes: frames.reduce((n, f) => n + f.capturedLength, 0),
-    crcValid: frames.filter((f) => f.crc === 'valid').length,
-    crcInvalid: frames.filter((f) => f.crc === 'invalid').length,
-    bestSnrDb: Math.max(...frames.map((f) => f.snrDb)),
+    bytes,
+    crcValid,
+    crcInvalid,
+    bestSnrDb,
     medianRssiDbm: rssi[Math.floor(rssi.length / 2)],
-    airtimeMs: frames.reduce((n, f) => n + f.airtimeUs, 0) / 1000,
+    airtimeMs: airtimeUs / 1000,
     durationSec,
     framesPerMinute: durationSec > 0 ? (frames.length / durationSec) * 60 : 0,
   };
