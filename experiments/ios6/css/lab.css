@@ -113,6 +113,20 @@ body {
     color: var(--muted);
 }
 
+.controls input[type="range"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-label {
+    flex-wrap: wrap;
+}
+
+.file-label input[type="file"] {
+    width: 100%;
+    color: var(--ink);
+}
+
 .scale-row {
     display: flex;
     gap: 4px;

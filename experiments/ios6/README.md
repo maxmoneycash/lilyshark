@@ -52,6 +52,23 @@ Font faces:
 - **Barlow** — firmware 4 bpp condensed
 - **Pixel 6×8** — firmware 1 bpp (Adafruit GLCD 5×7 in a 6 px cell)
 
+## How we keep it honest
+
+Guessing from memory is what produced single-line grey strips last time.
+The original is content-sized multi-line bubbles. Compare, do not recall.
+
+1. **Kit numbers** — `js/palette.js` is frozen from `agent/ios6-chat-ui`
+   @ `2ae8e70`. The host test fails if those hex values drift.
+2. **Kit screenshot** — drop `public/reference/chat.png` from
+   `~/Downloads/ios6-pixel-perfect-kit` into
+   `experiments/ios6/reference/chat.png`. The lab onionskins it over the
+   Messages frame and counts RGB565 pixels that still differ. Crop Y
+   walks a taller iPhone 320-wide shot down onto this 240-tall panel.
+3. **Firmware frame** — on `agent/ios6-chat-ui`:
+   `LILYSHARK_RENDER_DIR=<dir> .pio/build/simulator/program --render-test`
+   writes `chat-01.ppm`. That is the device’s own pixels.
+4. **Port** only after the overlay is close. Main stays the terminal chat.
+
 ## Palette
 
 `js/palette.js` holds the kit from `agent/ios6-chat-ui` @ `2ae8e70`.

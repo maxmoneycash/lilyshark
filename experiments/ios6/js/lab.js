@@ -98,11 +98,29 @@
             Ios6.kit.quantizeImageData(frame.data);
             ctx.putImageData(frame, 0, 0);
         }
-        const counted = ctx.getImageData(0, 0, W, H);
-        Ios6.state.colorCount = Ios6.kit.countColors(counted.data, Ios6.state.rgb565);
+        const labFrame = ctx.getImageData(0, 0, W, H);
+        Ios6.state.colorCount = Ios6.kit.countColors(labFrame.data, Ios6.state.rgb565);
         document.getElementById("color-count").textContent =
             Ios6.state.colorCount.toLocaleString("en-US");
+        if (Ios6.compareApi) Ios6.compareApi.apply(ctx, labFrame);
+        Ios6.syncCompareReadout();
         ctx.restore();
+    };
+
+    Ios6.syncCompareReadout = function () {
+        const node = document.getElementById("mismatch");
+        if (!node) return;
+        if (!Ios6.compare.image) {
+            node.textContent = "no reference";
+            return;
+        }
+        if (Ios6.compare.mismatch === null) {
+            node.textContent = Ios6.compare.sourceW + "×" + Ios6.compare.sourceH;
+            return;
+        }
+        const pct = ((Ios6.compare.mismatch / (W * H)) * 100).toFixed(1);
+        node.textContent = Ios6.compare.mismatch.toLocaleString("en-US") +
+            " px (" + pct + "%)";
     };
 
     function eventToPanel(event) {
@@ -233,6 +251,22 @@
                 applyScale();
             });
         });
+        document.getElementById("compare-mode").addEventListener("change", function (event) {
+            Ios6.compare.mode = event.target.value;
+            Ios6.redraw();
+        });
+        document.getElementById("onion").addEventListener("input", function (event) {
+            Ios6.compare.onion = Number(event.target.value) / 100;
+            Ios6.redraw();
+        });
+        document.getElementById("crop-y").addEventListener("input", function (event) {
+            Ios6.compare.cropY = Number(event.target.value);
+            Ios6.redraw();
+        });
+        document.getElementById("ref-file").addEventListener("change", function (event) {
+            const file = event.target.files && event.target.files[0];
+            if (file) Ios6.compareApi.loadFile(file);
+        });
         const node = canvas();
         node.addEventListener("pointerdown", onPointerDown);
         node.addEventListener("pointermove", onPointerMove);
@@ -286,6 +320,7 @@
         bind();
         applyScale();
         await loadFaces();
+        Ios6.compareApi.loadUrl("reference/chat.png");
         const initial = location.hash.replace("#", "");
         Ios6.open(Ios6.screens[initial] ? initial : "home");
         if (/\bselftest=1\b/.test(location.search)) {

@@ -38,6 +38,30 @@
                     Quantize to RGB565
                 </label>
             </div>
+            <h2>Reference</h2>
+            <div class="controls">
+                <label class="file-label">
+                    Drop kit PNG
+                    <input type="file" id="ref-file" accept="image/png,image/jpeg">
+                </label>
+                <label>
+                    Mode
+                    <select id="compare-mode">
+                        <option value="off">Lab only</option>
+                        <option value="onion">Onion skin</option>
+                        <option value="diff">Pixel diff</option>
+                        <option value="ref">Reference only</option>
+                    </select>
+                </label>
+                <label>
+                    Onion
+                    <input type="range" id="onion" min="0" max="100" value="50">
+                </label>
+                <label>
+                    Crop Y
+                    <input type="range" id="crop-y" min="0" max="240" value="0">
+                </label>
+            </div>
         </aside>
         <section class="stage">
             <div class="bezel">
@@ -53,6 +77,7 @@
                     <span>Distinct colors <strong id="color-count">—</strong></span>
                     <span>Scale <strong id="scale-readout">2×</strong></span>
                     <span>Face <strong id="font-readout">Helvetica</strong></span>
+                    <span>Mismatch <strong id="mismatch">—</strong></span>
                 </div>
                 <p class="hint" id="hint"></p>
                 <p class="note">
@@ -66,6 +91,7 @@
     </div>
     <script src="js/palette.js"></script>
     <script src="js/kit.js"></script>
+    <script src="js/compare.js"></script>
     <script src="js/screens.js"></script>
     <script src="js/lab.js"></script>
 </body>

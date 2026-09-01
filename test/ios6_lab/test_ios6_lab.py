@@ -137,11 +137,20 @@ class Ios6LabTests(unittest.TestCase):
         )
 
     def test_index_loads_the_lab_scripts(self):
-        for name in ("palette.js", "kit.js", "screens.js", "lab.js"):
+        for name in ("palette.js", "kit.js", "compare.js", "screens.js", "lab.js"):
             self.assertIn("js/" + name, self.index)
         self.assertIn('id="panel"', self.index)
+        self.assertIn('id="compare-mode"', self.index)
         self.assertIn('width="320"', self.index)
         self.assertIn('height="240"', self.index)
+
+    def test_compare_is_a_pixel_diff_not_a_guess(self):
+        compare = KIT.parent.joinpath("compare.js").read_text(encoding="utf-8")
+        self.assertIn("countMismatch", compare)
+        self.assertIn("onion", compare)
+        readme = README.read_text(encoding="utf-8")
+        self.assertIn("reference/chat.png", readme)
+        self.assertIn("ios6-pixel-perfect-kit", readme)
 
     def test_rgb565_matches_the_kit(self):
         self.assertIn("((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)", self.kit)
