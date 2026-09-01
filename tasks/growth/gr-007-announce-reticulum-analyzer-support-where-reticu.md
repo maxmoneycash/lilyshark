@@ -4,7 +4,7 @@ title: Announce Reticulum analyzer support where Reticulum lives
 area: growth
 size: S
 priority: P2
-status: todo
+status: doing
 depends_on:
 - UI-013
 eval:

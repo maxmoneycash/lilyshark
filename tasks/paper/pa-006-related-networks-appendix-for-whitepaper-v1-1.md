@@ -7,8 +7,6 @@ priority: P2
 status: todo
 depends_on: [PA-001]
 eval:
-  auto:
-  - test -f docs/related-networks.md
   rubric:
   - The appendix answers "why isn't X in the paper" for the overlay networks people actually ask about (Freenet, Hyphanet, I2P, Yggdrasil, Veilid, Nostr), with the scope rule stated once.
   - Each entry names what the network contributes to the paper's argument (prior art, counterexample, candidate layer), not just why it is excluded.
@@ -26,6 +24,12 @@ related-work appendix in a v1.1 revision. The paper's source is not in
 this repo, so this task includes locating/recreating the source pipeline
 and regenerating webapp/public/lilyshark-whitepaper.pdf plus the
 webapp/public/paper/page-*.webp renders as one operation.
+
+The auto check was removed deliberately: it tested only that
+docs/related-networks.md exists, which it does for its own sake, so the
+sweep reported this task as passing while the actual deliverable — a
+regenerated v1.1 PDF — had not been touched. No mechanical check beats a
+false green here; the rubric carries it.
 
 Out of scope: adding overlay networks to the evidence sections — the
 measurements don't apply to them, which is the appendix's whole point.
