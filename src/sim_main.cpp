@@ -14588,10 +14588,21 @@ void loop()
                                       current_screen == Screen::map ||
                                       current_screen == Screen::utilization ||
                                       current_screen == Screen::timeline));
-    // The map is dragged and zoomed directly, so a one-second cadence reads
-    // as lag. Everything else is a readout and does not need it.
-    const std::uint32_t dynamic_interval_ms =
-        scan_active ? 150U : (current_screen == Screen::map ? 200U : 1000U);
+    // This cadence is for AMBIENT change only -- a new position, a node
+    // heard -- because every direct interaction with the map already rebuilds
+    // the screen on the spot: the zoom chips, the layer chip, trackball pan
+    // and click, and touch drag all call build_current_screen() themselves.
+    //
+    // The map was singled out for 200 ms on the theory that being dragged and
+    // zoomed made it need a faster tick. It does not, and the tick was not
+    // free: a rebuild tears down and recreates every LVGL object on the
+    // screen, then re-checks the imagery cache whose key is quantised to
+    // pixels -- so at deep zoom ordinary GPS jitter missed the cache and
+    // repainted 320x204 pixels of layered double-precision noise, five times
+    // a second, on a chip with no hardware doubles. Sitting still on the map
+    // cost more than doing anything else on the device, and it competed with
+    // the input handling, which is what made pressing the buttons feel slow.
+    const std::uint32_t dynamic_interval_ms = scan_active ? 150U : 1000U;
     if((scan_active || time_driven_screen) &&
        now - last_dynamic_ui_refresh_ms >= dynamic_interval_ms) {
         last_dynamic_ui_refresh_ms = now;
