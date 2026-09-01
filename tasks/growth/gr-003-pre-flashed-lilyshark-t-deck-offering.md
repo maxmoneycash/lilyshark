@@ -4,7 +4,7 @@ title: Pre-flashed Lilyshark T-Deck offering
 area: growth
 size: M
 priority: P1
-status: todo
+status: doing
 depends_on:
 - FW-001
 eval:
