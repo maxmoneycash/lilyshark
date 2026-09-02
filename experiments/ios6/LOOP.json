@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 34,
+  "pass": 35,
   "stop_after_pass": 36,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
@@ -60,7 +60,8 @@
     "ios6-fin-tails-and-messages-oval",
     "concave-back-and-chrome-camera",
     "composer-44pt-matched-capsules",
-    "call-facetime-contact-rounded-rects"
+    "call-facetime-contact-rounded-rects",
+    "inbox-compose-pencil-and-search-well"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -95,5 +96,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 34: Call/FaceTime/Contact are iOS 6 rounded rects (radius 5), not capsules, and fill the 26px 1:1 strip. Raised stop_after_pass to 36 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
+  "notes": "Pass 35: Inbox compose is a lined note plus wood-tipped pencil. Search is a darker metal trough with a deeper recessed capsule. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
 }
