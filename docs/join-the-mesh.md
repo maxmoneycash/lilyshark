@@ -41,7 +41,10 @@ expected; imagery comes in step 3.
 ## 2. First boot, and proving it works
 
 On the device: the guided first run asks which network to inspect — choose
-**MESHTASTIC**. The defaults (US LongFast, 906.875 MHz, and the published
+**MESHTASTIC**. To talk to the wider Bay Area community, press `P` afterwards
+and choose **MESHTASTIC BAY MF** — Bay Area Mesh runs Medium Range Fast on
+frequency slot 45 (913.125 MHz), not the stock default, and every deck in this
+group should sit there too. The stock defaults (US LongFast, 906.875 MHz, and the published
 default channel key) match every other Lilyshark deck and stock Meshtastic
 nodes, so no keys or settings need to be exchanged.
 
