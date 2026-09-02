@@ -13,6 +13,8 @@
         messagesVisible: 0,
         messagesStatusChrome: false,
         messagesInbox: false,
+        messagesCompose: false,
+        composeTo: "",
         draft: "",
         composerFocus: false,
         txFailed: false,
@@ -127,6 +129,7 @@
         });
         Ios6.state.chatScroll = 0;
         Ios6.state.draft = "";
+        Ios6.state.messagesCompose = false;
         Ios6.redraw();
     };
 
@@ -427,6 +430,15 @@
         }
         if (/\binbox=1\b/.test(location.search)) {
             Ios6.state.messagesInbox = true;
+        }
+        if (/\bcompose=1\b/.test(location.search)) {
+            Ios6.state.messagesCompose = true;
+            Ios6.state.messagesInbox = false;
+        }
+        const tokenMatch = /(?:\?|&)token=([a-z]+)/.exec(location.search);
+        if (tokenMatch && Ios6.threads && Ios6.threads[tokenMatch[1]]) {
+            Ios6.state.composeTo = tokenMatch[1];
+            Ios6.state.peer = tokenMatch[1];
         }
         const peerMatch = /(?:\?|&)peer=([a-z]+)/.exec(location.search);
         if (peerMatch && Ios6.threads && Ios6.threads[peerMatch[1]]) {

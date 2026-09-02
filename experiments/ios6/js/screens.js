@@ -41,6 +41,7 @@
         return function () {
             Ios6.state.peer = peer;
             Ios6.state.messagesInbox = false;
+            Ios6.state.messagesCompose = false;
             Ios6.state.chatScroll = 0;
             Ios6.open("messages");
         };
@@ -479,8 +480,10 @@
         kit.navBar(ctx, L.StatusH, "Messages");
         kit.navButton(ctx, 6, L.StatusH + 5, 44, 18, "Edit");
         kit.composeButton(ctx, 284, L.StatusH + 5, function () {
-            Ios6.state.peer = "everyone";
+            Ios6.state.messagesCompose = true;
             Ios6.state.messagesInbox = false;
+            Ios6.state.composeTo = "";
+            Ios6.state.draft = "";
             Ios6.state.composerFocus = true;
             Ios6.redraw();
         });
@@ -526,10 +529,124 @@
         }
     }
 
+    function drawMessagesCompose(ctx) {
+        const kit = K();
+        kit.messagePaper(ctx);
+        kit.statusBar(ctx, clockText(true), { light: true, carrier: "LilyGO" });
+        kit.navBar(ctx, L.StatusH, "New Message");
+        kit.navButton(ctx, 252, L.StatusH + 5, 62, 18, "Cancel", function () {
+            Ios6.state.messagesCompose = false;
+            Ios6.state.messagesInbox = true;
+            Ios6.state.composeTo = "";
+            Ios6.redraw();
+        });
+        const toBarY = L.StatusH + L.NavH;
+        const toBarH = 22;
+        ctx.fillStyle = kit.hex24(C.White);
+        ctx.fillRect(0, toBarY, W, toBarH);
+        ctx.fillStyle = kit.hex24(C.Rule);
+        ctx.fillRect(0, toBarY + toBarH - 1, W, 1);
+        kit.text(ctx, "To:", 8, toBarY + 5, C.Meta, { size: 12, weight: "700" });
+        const tokenKey = Ios6.state.composeTo;
+        const token = tokenKey && THREADS[tokenKey];
+        if (token) {
+            const nameSpec = { size: 11, weight: "700" };
+            const chipW = Math.ceil(kit.measureWidth(ctx, token.name, nameSpec) + 16);
+            kit.panel(ctx, 32, toBarY + 3, chipW, 16, C.SendTop, C.SendBottom, C.SendEdge, 8);
+            kit.gloss(ctx, 32, toBarY + 3, chipW, 16, 8, 0.5);
+            kit.text(ctx, token.name, 32 + chipW / 2, toBarY + 5, C.White, {
+                size: 11,
+                weight: "700",
+                align: "center",
+            });
+        } else {
+            ctx.fillStyle = kit.hex24(0x1a6adf);
+            ctx.fillRect(32, toBarY + 5, 1.5, 12);
+        }
+        ctx.beginPath();
+        ctx.arc(304, toBarY + 11, 8, 0, Math.PI * 2);
+        const plusFill = ctx.createLinearGradient(296, toBarY + 3, 296, toBarY + 19);
+        plusFill.addColorStop(0, kit.hex24(C.SendTop));
+        plusFill.addColorStop(1, kit.hex24(C.SendBottom));
+        ctx.fillStyle = plusFill;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.60)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        kit.text(ctx, "+", 304, toBarY + 3, C.White, {
+            size: 14,
+            weight: "700",
+            align: "center",
+        });
+        kit.hit(292, toBarY, 24, toBarH, function () {
+            const keys = ["", "fjell", "hytta", "everyone"];
+            const current = Ios6.state.composeTo || "";
+            const next = keys[(keys.indexOf(current) + 1) % keys.length];
+            Ios6.state.composeTo = next;
+            if (next) Ios6.state.peer = next;
+            Ios6.redraw();
+        });
+
+        const thread = token || THREADS.everyone;
+        const sms = thread.service === "sms";
+        kit.panel(ctx, -1, 180, 322, 62, C.BarTop, C.BarBottom, C.BarEdge, 0);
+        const metal = ctx.createLinearGradient(0, 180, 0, H);
+        metal.addColorStop(0, "rgba(255,255,255,0.28)");
+        metal.addColorStop(0.18, "rgba(255,255,255,0.08)");
+        metal.addColorStop(1, "rgba(0,0,0,0.08)");
+        ctx.fillStyle = metal;
+        ctx.fillRect(0, 180, W, H - 180);
+        ctx.fillStyle = "rgba(255,255,255,0.38)";
+        ctx.fillRect(0, 180, W, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.32)";
+        ctx.fillRect(0, 181, W, 1);
+        kit.cameraWell(ctx, 6, 188, go("settings"));
+        kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
+        const draft = Ios6.state.draft;
+        const placeholder = serviceLabel(thread);
+        kit.text(ctx, draft || placeholder, 54, 194,
+            draft ? C.Ink : C.Placeholder, {
+                size: 12,
+                weight: draft ? "500" : "400",
+            });
+        if (Ios6.state.composerFocus) {
+            const caretX = draft
+                ? 54 + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
+                : 50;
+            ctx.fillStyle = kit.hex24(0x1a6adf);
+            ctx.fillRect(Math.min(caretX, 246), 192, 1.5, 16);
+        }
+        const sendTone = !draft ? {
+            top: 0xa8b0b8,
+            bottom: 0x6a727a,
+            edge: 0x4a525a,
+        } : (sms ? {
+            top: C.SmsTop,
+            bottom: C.SmsBottom,
+            edge: C.SmsEdge,
+        } : {
+            top: C.SendTop,
+            bottom: C.SendBottom,
+            edge: C.SendEdge,
+        });
+        kit.sendButton(ctx, L.ChatSendX, L.ChatSendY, L.ChatSendW, L.ChatSendH, "Send", function () {
+            if (tokenKey) Ios6.state.peer = tokenKey;
+            Ios6.sendDraft();
+        }, sendTone);
+        kit.hit(36, L.ChatSendY, 220, L.ChatSendH, function () {
+            Ios6.state.composerFocus = true;
+        });
+        Ios6.state.messagesVisible = 0;
+    }
+
     function drawMessages(ctx) {
         if (Ios6.state.messagesInbox) {
             drawMessagesInbox(ctx);
             Ios6.state.messagesVisible = 0;
+            return;
+        }
+        if (Ios6.state.messagesCompose) {
+            drawMessagesCompose(ctx);
             return;
         }
 
