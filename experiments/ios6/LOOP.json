@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 23,
+  "pass": 24,
   "stop_after_pass": 30,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
@@ -45,7 +45,9 @@
     "circular-white-camera-glyph",
     "curved-springboard-icon-glass",
     "black-light-status-icons",
-    "convex-balloon-hook-tails"
+    "convex-balloon-hook-tails",
+    "ios6-status-signal-wifi-battery",
+    "inbox-compose-note-and-search"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -80,5 +82,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 23: candy-pill Send with hard equator glass, circular metallic camera with white glyph, curved SpringBoard icon glass, black light-status icons, sharper balloon hooks, Messages icon oval + stripe + internal gloss. Selftest and 16 host tests must stay green. User asked to keep working toward pixel-perfect."
+  "notes": "Pass 24: iOS 6 status icons (sharp rising bars, filled Wi-Fi fans, inset green battery), sharper Messages back point, inbox compose note+pencil and search magnifier, Messages icon stripes BL-to-TR. Selftest and 16 host tests must stay green."
 }

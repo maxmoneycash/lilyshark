@@ -402,14 +402,14 @@
     }
 
     function signalBars(ctx, x, y, filled, color) {
-        // iOS 6 used five rising bars. Dots are iOS 7.
+        // iOS 6 used five rising rectangles. Dots are iOS 7.
         const count = filled === undefined ? 4 : filled;
         const on = color === undefined ? C.White : color;
-        const off = color === undefined ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.18)";
+        const off = color === undefined ? "rgba(255,255,255,0.28)" : "rgba(16,20,24,0.22)";
         for (let bar = 0; bar < 5; bar += 1) {
-            const height = 4 + bar;
-            fillRound(ctx, x + bar * 4, y - height, 3, height, 0.6,
-                bar < count ? hex24(on) : off);
+            const height = 3 + bar * 2;
+            ctx.fillStyle = bar < count ? hex24(on) : off;
+            ctx.fillRect(x + bar * 4, y - height, 3, height);
         }
     }
 
@@ -418,18 +418,24 @@
         const tone = color === undefined ? C.White : color;
         ctx.save();
         ctx.fillStyle = hex24(tone);
-        const cy = y + 8;
-        for (let ring = 2; ring >= 0; ring -= 1) {
-            const outer = 2.3 + ring * 2.55;
-            const inner = Math.max(0.7, outer - 1.55);
+        const cy = y + 7.4;
+        const rings = [
+            { outer: 7.1, inner: 5.45 },
+            { outer: 4.55, inner: 2.95 },
+            { outer: 2.15, inner: 0.8 },
+        ];
+        const start = Math.PI * 1.22;
+        const end = Math.PI * 1.78;
+        for (let index = 0; index < rings.length; index += 1) {
+            const ring = rings[index];
             ctx.beginPath();
-            ctx.arc(x, cy, outer, Math.PI * 1.22, Math.PI * 1.78, false);
-            ctx.arc(x, cy, inner, Math.PI * 1.78, Math.PI * 1.22, true);
+            ctx.arc(x, cy, ring.outer, start, end, false);
+            ctx.arc(x, cy, ring.inner, end, start, true);
             ctx.closePath();
             ctx.fill();
         }
         ctx.beginPath();
-        ctx.arc(x, cy, 1.15, 0, Math.PI * 2);
+        ctx.arc(x, cy, 1.05, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
     }
@@ -439,13 +445,15 @@
         const level = spec.level === undefined ? 0.72 : spec.level;
         const stroke = spec.color === undefined ? C.White : spec.color;
         const fill = spec.fill === undefined ? stroke : spec.fill;
+        ctx.save();
         ctx.strokeStyle = hex24(stroke);
         ctx.lineWidth = 1;
-        roundRectPath(ctx, x + 0.5, y + 0.5, 20, 9, 2);
+        roundRectPath(ctx, x + 0.5, y + 1, 21, 8, 1.4);
         ctx.stroke();
         ctx.fillStyle = hex24(stroke);
-        ctx.fillRect(x + 21, y + 3, 2, 4);
-        fillRound(ctx, x + 2, y + 2, Math.max(2, Math.round(16 * level)), 6, 1, hex24(fill));
+        ctx.fillRect(x + 22, y + 3, 2, 4);
+        fillRound(ctx, x + 2, y + 2.5, Math.max(2, Math.round(17 * level)), 5, 0.8, hex24(fill));
+        ctx.restore();
     }
 
     function padlock(ctx, x, y) {
@@ -479,7 +487,7 @@
             const carrier = options.carrier || "LilyGO";
             signalBars(ctx, 4, 13, filled, ink);
             const carrierW = text(ctx, carrier, 26, 3, ink, { size: 10, weight: "700" });
-            wifi(ctx, 26 + carrierW + 8, 3, ink);
+            wifi(ctx, 26 + carrierW + 7, 2, ink);
             text(ctx, clock, 160, 3, ink, { size: 10, weight: "700", align: "center" });
             text(ctx, "72%", 288, 3, ink, { size: 10, weight: "700", align: "right" });
             battery(ctx, 294, 3, { color: ink, fill: 0x4cb050 });
@@ -545,12 +553,12 @@
         const width = 8 + label.length * (Ios6.state.font === "pixel" ? 6 : 6.2) + 14;
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(x + 7, y);
+        ctx.moveTo(x + 8, y);
         ctx.lineTo(x + width, y);
         ctx.quadraticCurveTo(x + width + 4, y, x + width + 4, y + 4);
         ctx.lineTo(x + width + 4, y + height - 4);
         ctx.quadraticCurveTo(x + width + 4, y + height, x + width, y + height);
-        ctx.lineTo(x + 7, y + height);
+        ctx.lineTo(x + 8, y + height);
         ctx.lineTo(x, y + height / 2);
         ctx.closePath();
         const gradient = ctx.createLinearGradient(x, y, x, y + height);
@@ -859,27 +867,35 @@
 
     function composeButton(ctx, x, y, action) {
         navButton(ctx, x, y, 30, 18, "", action);
-        panel(ctx, x + 7, y + 3, 11, 12, C.White, 0xe8e8e8, 0x2b486b, 1);
-        ctx.strokeStyle = hex24(0x3a5a86);
+        panel(ctx, x + 6, y + 3, 12, 12, C.White, 0xececec, 0x2b486b, 1.5);
+        ctx.strokeStyle = hex24(0x8aa0b8);
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(x + 9, y + 6);
-        ctx.lineTo(x + 16, y + 6);
-        ctx.moveTo(x + 9, y + 9);
-        ctx.lineTo(x + 15, y + 9);
+        ctx.moveTo(x + 8, y + 6.5);
+        ctx.lineTo(x + 15, y + 6.5);
+        ctx.moveTo(x + 8, y + 9);
+        ctx.lineTo(x + 14, y + 9);
+        ctx.moveTo(x + 8, y + 11.5);
+        ctx.lineTo(x + 13, y + 11.5);
         ctx.stroke();
         ctx.strokeStyle = hex24(C.White);
-        ctx.lineWidth = 1.8;
+        ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.moveTo(x + 18, y + 13);
+        ctx.moveTo(x + 17, y + 13);
+        ctx.lineTo(x + 24, y + 5);
+        ctx.stroke();
+        ctx.strokeStyle = hex24(0x3a5a86);
+        ctx.lineWidth = 1.15;
+        ctx.beginPath();
+        ctx.moveTo(x + 17, y + 13);
         ctx.lineTo(x + 24, y + 5);
         ctx.stroke();
         ctx.fillStyle = hex24(0xf2c14a);
         ctx.beginPath();
-        ctx.moveTo(x + 23, y + 4);
-        ctx.lineTo(x + 26, y + 6);
-        ctx.lineTo(x + 24, y + 7);
+        ctx.moveTo(x + 23, y + 3.8);
+        ctx.lineTo(x + 26.2, y + 6.2);
+        ctx.lineTo(x + 24, y + 7.2);
         ctx.closePath();
         ctx.fill();
     }
@@ -887,13 +903,14 @@
     function searchGlyph(ctx, x, y, color) {
         ctx.save();
         ctx.strokeStyle = hex24(color);
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.arc(x, y, 4.2, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(x + 3, y + 3);
-        ctx.lineTo(x + 7, y + 7);
+        ctx.moveTo(x + 3.2, y + 3.2);
+        ctx.lineTo(x + 7.4, y + 7.4);
         ctx.stroke();
         ctx.restore();
     }

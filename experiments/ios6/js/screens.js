@@ -53,7 +53,7 @@
         ctx.clip();
         ctx.save();
         ctx.translate(x + 24, y + 24);
-        ctx.rotate(-Math.PI / 4);
+        ctx.rotate(Math.PI / 4);
         for (let stripe = -56; stripe < 56; stripe += 6) {
             ctx.fillStyle = Math.round(stripe / 6) % 2 === 0
                 ? "rgba(8, 56, 16, 0.22)"
