@@ -665,19 +665,21 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.clip();
-        const equator = y + Math.round(height * 0.48);
+        const equator = y + Math.round(height * 0.46);
         const shine = ctx.createLinearGradient(x, y, x, equator);
-        shine.addColorStop(0, "rgba(255,255,255,0.78)");
-        shine.addColorStop(0.72, "rgba(255,255,255,0.16)");
+        shine.addColorStop(0, "rgba(255,255,255,0.82)");
+        shine.addColorStop(0.62, "rgba(255,255,255,0.22)");
         shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
         ctx.fillRect(x - 8, y, width + 16, equator - y);
-        ctx.fillStyle = "rgba(255,255,255,0.22)";
-        ctx.fillRect(x + 4, equator, width - 8, 1);
-        fillRound(ctx, x + 12, y + 2, width - 24, Math.max(4, Math.round(height * 0.16)), 5,
-            "rgba(255,255,255,0.40)");
-        ctx.fillStyle = "rgba(255,255,255,0.35)";
-        ctx.fillRect(x + 6, y + 1, width - 12, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.08)";
+        ctx.fillRect(x - 8, equator, width + 16, height + 8);
+        ctx.fillStyle = "rgba(255,255,255,0.42)";
+        ctx.fillRect(x + 2, equator, width - 4, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.10)";
+        ctx.fillRect(x + 2, equator + 1, width - 4, 1);
+        ctx.fillStyle = "rgba(255,255,255,0.50)";
+        ctx.fillRect(x + 7, y + 1, width - 14, 1);
         ctx.restore();
     }
 

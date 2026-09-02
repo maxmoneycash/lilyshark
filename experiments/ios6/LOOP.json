@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 14,
+  "pass": 15,
   "stop_after_pass": 16,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
@@ -31,7 +31,8 @@
     "inbox-search-glyph-and-compose",
     "group-imessage-to-bar",
     "one-to-one-call-facetime-contact-bar",
-    "sharp-imessage-balloon-tails"
+    "sharp-imessage-balloon-tails",
+    "convex-balloon-hard-equator"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -66,5 +67,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 14: iMessage/SMS balloons use a short sharp corner hook (out 6px, down 2px) instead of a 7px droop through Delivered. Selftest ok, everyoneBubbles 3."
+  "notes": "Pass 15: balloons use nav-style hard glass (bright top, 1px equator, darker lower half) like iOS 6 wet glass. Selftest ok, everyoneBubbles 3."
 }
