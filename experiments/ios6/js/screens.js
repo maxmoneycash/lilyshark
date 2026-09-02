@@ -608,8 +608,17 @@
 
         kit.panel(ctx, -1, 180, 322, 62, C.BarTop, C.BarBottom, C.BarEdge, 0);
         kit.gloss(ctx, 0, 180, W, 22, 0, 0.40);
-        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        ctx.save();
+        ctx.globalAlpha = 0.04;
+        for (let row = 181; row < H; row += 2) {
+            ctx.fillStyle = row % 4 === 1 ? "#ffffff" : "#1a2028";
+            ctx.fillRect(0, row, W, 1);
+        }
+        ctx.restore();
+        ctx.fillStyle = "rgba(255,255,255,0.32)";
         ctx.fillRect(0, 180, W, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.28)";
+        ctx.fillRect(0, 181, W, 1);
         kit.cameraWell(ctx, 6, 188, go("settings"));
         kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
         const draft = Ios6.state.draft;

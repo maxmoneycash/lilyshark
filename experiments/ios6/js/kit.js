@@ -390,16 +390,16 @@
         const tone = color === undefined ? C.White : color;
         ctx.save();
         ctx.strokeStyle = hex24(tone);
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.5;
         ctx.lineCap = "round";
         for (let ring = 0; ring < 3; ring += 1) {
             ctx.beginPath();
-            ctx.arc(x, y + 7, 2 + ring * 2.3, Math.PI * 1.22, Math.PI * 1.78);
+            ctx.arc(x, y + 7, 2.2 + ring * 2.5, Math.PI * 1.20, Math.PI * 1.80);
             ctx.stroke();
         }
         ctx.fillStyle = hex24(tone);
         ctx.beginPath();
-        ctx.arc(x, y + 7, 0.8, 0, Math.PI * 2);
+        ctx.arc(x, y + 7, 1, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
     }
@@ -530,6 +530,9 @@
         ctx.fillStyle = shine;
         ctx.fillRect(x, y, width + 4, height * 0.5);
         ctx.restore();
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
         ctx.strokeStyle = hex24(C.NavEdge);
         ctx.lineWidth = 1;
         ctx.stroke();
@@ -546,6 +549,10 @@
     function navButton(ctx, x, y, width, height, label, action) {
         panel(ctx, x, y, width, height, 0xa9c4e0, 0x3a5a86, C.NavEdge, 5);
         gloss(ctx, x, y, width, height, 5, 0.5);
+        ctx.strokeStyle = "rgba(255,255,255,0.50)";
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, x + 1.5, y + 1.5, width - 3, height - 3, 4);
+        ctx.stroke();
         text(ctx, label, x + width / 2, y + Math.round((height - 8) / 2), C.White, {
             size: 10,
             weight: "700",
@@ -596,20 +603,35 @@
         text(ctx, String(value), x + 8, y + 3, C.White, { size: 8, weight: "700", align: "center" });
     }
 
-    function bubbleTail(ctx, x, y, mine, fill) {
-        ctx.fillStyle = hex24(fill);
+    function balloonPath(ctx, x, y, width, height, mine, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
         ctx.beginPath();
         if (mine) {
-            ctx.moveTo(x - 5, y);
-            ctx.lineTo(x + 6, y + 7);
-            ctx.lineTo(x, y + 2);
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + width - r, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+            ctx.lineTo(x + width, y + height - r);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - 2, y + height - 1);
+            ctx.quadraticCurveTo(x + width + 7, y + height + 1, x + width + 6, y + height + 7);
+            ctx.quadraticCurveTo(x + width + 1, y + height + 3, x + width - 8, y + height);
+            ctx.lineTo(x + r, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
         } else {
-            ctx.moveTo(x + 5, y);
-            ctx.lineTo(x - 6, y + 7);
-            ctx.lineTo(x, y + 2);
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + width - r, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+            ctx.lineTo(x + width, y + height - r);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+            ctx.lineTo(x + 8, y + height);
+            ctx.quadraticCurveTo(x - 1, y + height + 3, x - 6, y + height + 7);
+            ctx.quadraticCurveTo(x - 7, y + height + 1, x + 2, y + height - 1);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
         }
         ctx.closePath();
-        ctx.fill();
     }
 
     function bubble(ctx, x, y, width, height, mine, viaNet) {
@@ -619,20 +641,34 @@
         const top = mine ? (sms ? C.SmsTop : C.BlueTop) : C.GrayTop;
         const bottom = mine ? (sms ? C.SmsBottom : C.BlueBottom) : C.GrayBottom;
         const edge = mine ? (sms ? C.SmsEdge : C.BlueEdge) : C.GrayEdge;
+        const radius = 13;
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.22)";
+        ctx.shadowColor = "rgba(0,0,0,0.20)";
         ctx.shadowBlur = 2;
         ctx.shadowOffsetY = 1;
-        panel(ctx, x, y, width, height, top, bottom, edge, 13);
+        balloonPath(ctx, x, y, width, height, mine, radius);
+        const fill = ctx.createLinearGradient(x, y, x, y + height);
+        fill.addColorStop(0, hex24(top));
+        fill.addColorStop(0.55, hex24(top));
+        fill.addColorStop(1, hex24(bottom));
+        ctx.fillStyle = fill;
+        ctx.fill();
         ctx.restore();
-        gloss(ctx, x, y, width, height, 13, 0.50);
         ctx.save();
-        roundRectPath(ctx, x, y, width, height, 13);
+        balloonPath(ctx, x, y, width, height, mine, radius);
+        ctx.strokeStyle = hex24(edge);
+        ctx.lineWidth = 1;
+        ctx.stroke();
         ctx.clip();
-        fillRound(ctx, x + 10, y + 2, width - 20, Math.max(5, Math.round(height * 0.20)), 6,
-            "rgba(255,255,255,0.48)");
+        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.52);
+        shine.addColorStop(0, "rgba(255,255,255,0.72)");
+        shine.addColorStop(0.46, "rgba(255,255,255,0.18)");
+        shine.addColorStop(0.50, "rgba(255,255,255,0)");
+        ctx.fillStyle = shine;
+        ctx.fillRect(x - 8, y, width + 16, height * 0.52);
+        fillRound(ctx, x + 12, y + 2, width - 24, Math.max(4, Math.round(height * 0.16)), 5,
+            "rgba(255,255,255,0.40)");
         ctx.restore();
-        bubbleTail(ctx, mine ? x + width : x, y + height - 7, mine, bottom);
     }
 
     function messageStamp(ctx, y, label, when) {
@@ -657,28 +693,32 @@
     }
 
     function cameraWell(ctx, x, y, action) {
+        const cx = x + 13;
+        const cy = y + 15;
         ctx.save();
         ctx.beginPath();
-        ctx.arc(x + 13, y + 15, 13, 0, Math.PI * 2);
-        const rim = ctx.createLinearGradient(x, y, x, y + 30);
-        rim.addColorStop(0, "#1a2028");
-        rim.addColorStop(0.5, "#5a646e");
-        rim.addColorStop(1, "#c4ccd4");
+        ctx.arc(cx, cy, 12.5, 0, Math.PI * 2);
+        const rim = ctx.createLinearGradient(cx, cy - 13, cx, cy + 13);
+        rim.addColorStop(0, "#0c1014");
+        rim.addColorStop(0.45, "#3a424c");
+        rim.addColorStop(1, "#c8d0d8");
         ctx.fillStyle = rim;
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(x + 13, y + 15, 11.2, 0, Math.PI * 2);
-        const well = ctx.createLinearGradient(x, y + 28, x, y + 4);
-        well.addColorStop(0, "#3a424c");
-        well.addColorStop(1, "#0c1014");
+        ctx.arc(cx, cy, 10.6, 0, Math.PI * 2);
+        const well = ctx.createRadialGradient(cx - 2, cy - 3, 1, cx, cy, 11);
+        well.addColorStop(0, "#3a444e");
+        well.addColorStop(0.65, "#161c22");
+        well.addColorStop(1, "#080a0c");
         ctx.fillStyle = well;
         ctx.fill();
         ctx.restore();
-        panel(ctx, x + 6, y + 12, 14, 8, 0xd0d6dc, 0x8a929a, 0x5a626a, 2);
-        fillRound(ctx, x + 10, y + 10, 6, 3, 1, hex24(0xb8bec4));
+        ctx.fillStyle = "rgba(210,216,222,0.88)";
+        fillRound(ctx, cx - 6, cy - 2, 12, 7, 1.6, ctx.fillStyle);
+        fillRound(ctx, cx - 2.5, cy - 5, 5, 3, 1, ctx.fillStyle);
         ctx.beginPath();
-        ctx.arc(x + 13, y + 16, 2.4, 0, Math.PI * 2);
-        ctx.fillStyle = hex24(0x1a2028);
+        ctx.arc(cx, cy + 1.5, 2.1, 0, Math.PI * 2);
+        ctx.fillStyle = "#0a0e12";
         ctx.fill();
         if (action) hit(x, y, 26, 30, action);
     }

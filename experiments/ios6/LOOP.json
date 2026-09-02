@@ -1,9 +1,9 @@
 {
-  "active": false,
-  "pass": 8,
-  "stop_after_pass": 8,
-  "goal": "Make the 320x240 iOS 6 lab match the kit, then port winners to agent/ios6-chat-ui. Main stays the terminal chat.",
-  "done_when": "experiments/ios6/reference/chat.png exists and Messages RGB565 mismatch is under 8%, or the queue is empty.",
+  "active": true,
+  "pass": 9,
+  "stop_after_pass": 16,
+  "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
+  "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
     "lab-folder",
     "kit-pin-from-2ae8e70",
@@ -16,13 +16,26 @@
     "messages-fit-three-bubbles",
     "lock-camera-grip",
     "icon-reflections-in-dock",
-    "messages-full-ios6-status-chrome-toggle"
+    "messages-full-ios6-status-chrome-toggle",
+    "imessage-conversation-chrome",
+    "imessage-inbox",
+    "imessage-placeholder-caret",
+    "organic-balloon-tails-and-gloss",
+    "circular-camera-well",
+    "nav-glass-light-rim",
+    "composer-brushed-metal"
   ],
-  "queue": [],
+  "queue": [
+    "keep-running-until-exact"
+  ],
   "skipped": [
     {
       "id": "firmware-ppm-reference-from-agent-ios6-chat-ui",
       "reason": "PlatformIO is not installed in this VM. Worktree of origin/agent/ios6-chat-ui is at /tmp/ios6-chat-ui @ 2ae8e70. When pio exists: LILYSHARK_RENDER_DIR=<dir> .pio/build/simulator/program --render-test and copy chat-01.ppm into experiments/ios6/reference/."
+    },
+    {
+      "id": "call-facetime-contact-bar",
+      "reason": "240-tall panel cannot hold status + nav + Call/FaceTime/Contact + three content-sized bubbles + composer. Selftest requires everyoneBubbles >= 3."
     }
   ],
   "branch": "cursor/ios6-ui-lab-240f",
@@ -36,12 +49,14 @@
     "Keep kIos6* / kChat* numbers in js/palette.js frozen to agent/ios6-chat-ui @ 2ae8e70.",
     "Commit, push origin cursor/ios6-ui-lab-240f, and update PR 15 before ending a pass.",
     "Re-subscribe timer + GitHub CI + GitHub PR if list_subscriptions is empty or expired.",
-    "Stop only when active is false, pass >= stop_after_pass, or done_when is met."
+    "Stop only when active is false AND the user said stop, or pass >= stop_after_pass after a pass that made no visual progress."
   ],
   "how_to_auto": [
-    "Queue is empty and active is false. Unsubscribe ios6-lab-loop.",
-    "To resume: drop experiments/ios6/reference/chat.png, set active true, queue kit-png-onion-skin, re-subscribe the timer.",
-    "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down."
+    "Read this file. If active is true and pass < stop_after_pass, keep matching Messages to /tmp/ios6-ref iOS 5/6 iMessage shots.",
+    "Do the next visual gap. Snap ?snap=1 panels. Keep selftest ok and 16 host tests green.",
+    "Commit, push, update PR 15, refresh walkthrough artifacts.",
+    "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
+    "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 8 (user: still does not look like iOS 6): HiDPI 2x/3x backing so Helvetica is not a stretched 320 bitmap, Inter Thin lock clock, photographic wallpaper not linen, equator gloss over glyphs, 3D glass dock, metallic slide-to-unlock, status padlock, iOS 6 five bars. Kit hex and Chat* layout unchanged. Queue empty. active false."
+  "notes": "Pass 9: organic balloon path+gloss, circular camera well, nav light rim, brushed composer. User: do everything and continue to run."
 }
