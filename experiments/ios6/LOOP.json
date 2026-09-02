@@ -43,5 +43,5 @@
     "To resume: drop experiments/ios6/reference/chat.png, set active true, queue kit-png-onion-skin, re-subscribe the timer.",
     "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down."
   ],
-  "notes": "Pass 8 (user: still does not look like iOS 6): SpringBoard wallpaper instead of linen, unpixelated 2x/3x type, Liberation Sans Helvetica metric, radial+equator icon gloss over glyphs, 3D glass dock, metallic lock slider + status padlock, iOS 6 five bars (not iOS 7 dots). Kit hex and Chat* layout unchanged. Queue empty. active false."
+  "notes": "Pass 8 (user: still does not look like iOS 6): HiDPI 2x/3x backing so Helvetica is not a stretched 320 bitmap, Inter Thin lock clock, photographic wallpaper not linen, equator gloss over glyphs, 3D glass dock, metallic slide-to-unlock, status padlock, iOS 6 five bars. Kit hex and Chat* layout unchanged. Queue empty. active false."
 }

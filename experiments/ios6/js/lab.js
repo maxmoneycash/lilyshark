@@ -36,17 +36,52 @@
         return document.getElementById("panel");
     }
 
+    function logicalCanvas() {
+        if (!Ios6.logical) {
+            Ios6.logical = document.createElement("canvas");
+            Ios6.logical.width = W;
+            Ios6.logical.height = H;
+        }
+        return Ios6.logical;
+    }
+
+    function displayBacking() {
+        if (Ios6.state.rgb565 || Ios6.state.font === "pixel") return 1;
+        return Ios6.state.scale;
+    }
+
     function applyScale() {
         const node = canvas();
-        node.style.width = (W * Ios6.state.scale) + "px";
-        node.style.height = (H * Ios6.state.scale) + "px";
-        node.classList.toggle("device-pixels", Ios6.state.rgb565);
-        document.getElementById("scale-readout").textContent = Ios6.state.scale + "×";
+        const scale = Ios6.state.scale;
+        const backing = displayBacking();
+        if (node.width !== W * backing || node.height !== H * backing) {
+            node.width = W * backing;
+            node.height = H * backing;
+        }
+        node.style.width = (W * scale) + "px";
+        node.style.height = (H * scale) + "px";
+        node.classList.toggle("device-pixels", Ios6.state.rgb565 || Ios6.state.font === "pixel");
+        document.getElementById("scale-readout").textContent = scale + "×";
         document.querySelectorAll("#scale-row button").forEach(function (button) {
-            button.setAttribute("aria-pressed", button.getAttribute("data-scale") === String(Ios6.state.scale));
+            button.setAttribute("aria-pressed", button.getAttribute("data-scale") === String(scale));
         });
     }
     Ios6.applyScale = applyScale;
+
+    function paintFrame(ctx, width, height, recordHits) {
+        const savedHits = Ios6.hits;
+        if (recordHits) Ios6.hits = [];
+        else Ios6.hits = [];
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        ctx.setTransform(width / W, 0, 0, height / H, 0, 0);
+        ctx.imageSmoothingEnabled = Ios6.state.font !== "pixel";
+        const screen = Ios6.screens[Ios6.state.screen];
+        if (screen) screen.draw(ctx);
+        ctx.restore();
+        if (!recordHits) Ios6.hits = savedHits;
+    }
 
     function syncScreenList() {
         const list = document.getElementById("screen-list");
@@ -89,28 +124,40 @@
     };
 
     Ios6.redraw = function () {
-        const node = canvas();
-        const ctx = node.getContext("2d");
-        Ios6.hits = [];
+        applyScale();
         Ios6.state.now = new Date();
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, W, H);
-        ctx.imageSmoothingEnabled = Ios6.state.font !== "pixel";
-        const screen = Ios6.screens[Ios6.state.screen];
-        if (screen) screen.draw(ctx);
+        const node = canvas();
+        const logical = logicalCanvas();
+        const displayCtx = node.getContext("2d");
+        const logicalCtx = logical.getContext("2d");
+
+        paintFrame(displayCtx, node.width, node.height, true);
         if (Ios6.state.rgb565) {
-            const frame = ctx.getImageData(0, 0, W, H);
+            const frame = displayCtx.getImageData(0, 0, W, H);
             Ios6.kit.quantizeImageData(frame.data);
-            ctx.putImageData(frame, 0, 0);
+            displayCtx.putImageData(frame, 0, 0);
         }
-        const labFrame = ctx.getImageData(0, 0, W, H);
+
+        paintFrame(logicalCtx, W, H, false);
+        if (Ios6.state.rgb565) {
+            const frame = logicalCtx.getImageData(0, 0, W, H);
+            Ios6.kit.quantizeImageData(frame.data);
+            logicalCtx.putImageData(frame, 0, 0);
+        }
+        const labFrame = logicalCtx.getImageData(0, 0, W, H);
         Ios6.state.colorCount = Ios6.kit.countColors(labFrame.data, Ios6.state.rgb565);
         document.getElementById("color-count").textContent =
             Ios6.state.colorCount.toLocaleString("en-US");
-        if (Ios6.compareApi) Ios6.compareApi.apply(ctx, labFrame);
+        if (Ios6.compareApi) Ios6.compareApi.apply(logicalCtx, labFrame);
+        if (Ios6.compare.mode !== "off" && Ios6.compare.image && node.width !== W) {
+            displayCtx.save();
+            displayCtx.setTransform(1, 0, 0, 1, 0, 0);
+            displayCtx.imageSmoothingEnabled = false;
+            displayCtx.clearRect(0, 0, node.width, node.height);
+            displayCtx.drawImage(logical, 0, 0, node.width, node.height);
+            displayCtx.restore();
+        }
         Ios6.syncCompareReadout();
-        ctx.restore();
     };
 
     Ios6.syncCompareReadout = function () {
@@ -229,6 +276,7 @@
             new FontFace("Barlow Condensed", "url(../../assets/fonts/BarlowCondensed-Medium.ttf)", { weight: "500" }),
             new FontFace("Barlow Condensed", "url(../../assets/fonts/BarlowCondensed-Bold.ttf)", { weight: "700" }),
             new FontFace("IBM Plex Mono", "url(../../assets/fonts/IBMPlexMono-SemiBold.ttf)", { weight: "600" }),
+            new FontFace("Inter Thin", "url(fonts/Inter-Thin.woff2)", { weight: "100" }),
         ];
         try {
             await Promise.all(faces.map(function (face) {
@@ -244,6 +292,7 @@
     function bind() {
         document.getElementById("font-face").addEventListener("change", function (event) {
             Ios6.state.font = event.target.value;
+            applyScale();
             Ios6.redraw();
             syncScreenList();
         });
@@ -260,6 +309,7 @@
             button.addEventListener("click", function () {
                 Ios6.state.scale = Number(button.getAttribute("data-scale"));
                 applyScale();
+                Ios6.redraw();
             });
         });
         document.getElementById("compare-mode").addEventListener("change", function (event) {
@@ -296,7 +346,7 @@
             Ios6.state.screen = id;
             Ios6.state.unlockSlide = 0;
             Ios6.redraw();
-            const frame = canvas().getContext("2d").getImageData(0, 0, W, H);
+            const frame = logicalCanvas().getContext("2d").getImageData(0, 0, W, H);
             let ink = 0;
             for (let index = 0; index < frame.data.length; index += 4) {
                 if (frame.data[index] | frame.data[index + 1] | frame.data[index + 2]) ink += 1;

@@ -173,18 +173,18 @@
     function drawLockClock(ctx, value, cx, y) {
         const chars = String(value).split("");
         ctx.save();
-        ctx.font = "300 54px \"Helvetica Neue\", Helvetica, \"Liberation Sans\", Arial, sans-serif";
+        ctx.font = "100 58px \"Inter Thin\", \"Helvetica Neue\", \"Liberation Sans\", sans-serif";
         ctx.textBaseline = "top";
         ctx.textAlign = "left";
         let width = 0;
         const widths = chars.map(function (ch) {
-            const w = ctx.measureText(ch).width + (ch === ":" ? 2 : 3);
+            const w = ctx.measureText(ch).width + (ch === ":" ? 1 : 2);
             width += w;
             return w;
         });
         let left = Math.round(cx - width / 2);
         chars.forEach(function (ch, index) {
-            ctx.fillStyle = "rgba(0,0,0,0.40)";
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
             ctx.fillText(ch, left, y + 2);
             ctx.fillStyle = "#ffffff";
             ctx.fillText(ch, left, y);
@@ -241,8 +241,8 @@
         ctx.fillRect(trackX, trackY, trackW, trackH);
         ctx.restore();
 
-        K().panel(ctx, knobX, trackY + 2, knobW, trackH - 4, 0xf7f9fb, 0xb8c0c8, 0x8a929a, 13);
-        K().gloss(ctx, knobX, trackY + 2, knobW, trackH - 4, 13, 0.52);
+        K().panel(ctx, knobX, trackY + 2, knobW, trackH - 4, 0xffffff, 0xc5ccd4, 0x8a929a, 7);
+        K().gloss(ctx, knobX, trackY + 2, knobW, trackH - 4, 7, 0.55);
         ctx.fillStyle = "#5a626a";
         ctx.beginPath();
         ctx.moveTo(knobX + 18, trackY + 9);

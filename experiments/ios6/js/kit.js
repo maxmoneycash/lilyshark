@@ -703,10 +703,10 @@
         ctx.fillRect(0, y - 4, W, H - y + 4);
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(28, y);
-        ctx.lineTo(292, y);
-        ctx.lineTo(318, frontY);
-        ctx.lineTo(2, frontY);
+        ctx.moveTo(42, y);
+        ctx.lineTo(278, y);
+        ctx.lineTo(320, frontY);
+        ctx.lineTo(0, frontY);
         ctx.closePath();
         ctx.clip();
         const glass = ctx.createLinearGradient(0, y, 0, frontY);
@@ -718,18 +718,18 @@
         ctx.restore();
 
         ctx.beginPath();
-        ctx.moveTo(28, y);
-        ctx.lineTo(292, y);
-        ctx.lineTo(318, frontY);
-        ctx.lineTo(2, frontY);
+        ctx.moveTo(42, y);
+        ctx.lineTo(278, y);
+        ctx.lineTo(320, frontY);
+        ctx.lineTo(0, frontY);
         ctx.closePath();
         ctx.strokeStyle = "rgba(255,255,255,0.55)";
         ctx.lineWidth = 1;
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.moveTo(2, frontY);
-        ctx.lineTo(318, frontY);
+        ctx.moveTo(0, frontY);
+        ctx.lineTo(320, frontY);
         ctx.lineTo(312, frontY + lipH);
         ctx.quadraticCurveTo(160, frontY + lipH + 3, 8, frontY + lipH);
         ctx.closePath();
@@ -749,10 +749,10 @@
             const iconY = y - iconLift;
             ctx.save();
             ctx.beginPath();
-            ctx.moveTo(28, y);
-            ctx.lineTo(292, y);
-            ctx.lineTo(318, frontY);
-            ctx.lineTo(2, frontY);
+            ctx.moveTo(42, y);
+            ctx.lineTo(278, y);
+            ctx.lineTo(320, frontY);
+            ctx.lineTo(0, frontY);
             ctx.closePath();
             ctx.clip();
             ctx.translate(x, iconY + 48);
