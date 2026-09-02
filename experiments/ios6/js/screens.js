@@ -54,11 +54,11 @@
         ctx.save();
         ctx.translate(x + 24, y + 24);
         ctx.rotate(-Math.PI / 4);
-        for (let stripe = -52; stripe < 52; stripe += 4) {
-            ctx.fillStyle = (stripe / 4) % 2 === 0
-                ? "rgba(12, 72, 20, 0.22)"
-                : "rgba(255, 255, 255, 0.08)";
-            ctx.fillRect(-40, stripe, 80, 2.2);
+        for (let stripe = -56; stripe < 56; stripe += 6) {
+            ctx.fillStyle = Math.round(stripe / 6) % 2 === 0
+                ? "rgba(8, 56, 16, 0.22)"
+                : "rgba(230, 255, 190, 0.12)";
+            ctx.fillRect(-50, stripe, 100, 3);
         }
         ctx.restore();
         ctx.restore();
@@ -68,35 +68,47 @@
         ctx.shadowBlur = 2;
         ctx.shadowOffsetY = 1;
         ctx.beginPath();
-        ctx.ellipse(x + 24, y + 21, 15, 10.5, 0, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffffff";
+        ctx.ellipse(x + 24, y + 20.5, 16.2, 11, 0, 0, Math.PI * 2);
+        const body = ctx.createLinearGradient(x, y + 10, x, y + 34);
+        body.addColorStop(0, "#ffffff");
+        body.addColorStop(0.58, "#f4f4f6");
+        body.addColorStop(1, "#d4d6dc");
+        ctx.fillStyle = body;
         ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(x + 14, y + 29);
-        ctx.lineTo(x + 10, y + 38);
-        ctx.lineTo(x + 21, y + 30);
+        ctx.moveTo(x + 14.5, y + 29.2);
+        ctx.lineTo(x + 9.2, y + 38.8);
+        ctx.lineTo(x + 21.8, y + 30.6);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
 
         ctx.save();
         ctx.beginPath();
-        ctx.ellipse(x + 24, y + 21, 15, 10.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24, y + 20.5, 16.2, 11, 0, 0, Math.PI * 2);
         ctx.clip();
-        const bubbleGlass = ctx.createLinearGradient(x, y + 10, x, y + 32);
+        const bubbleGlass = ctx.createLinearGradient(x, y + 9, x, y + 24);
         bubbleGlass.addColorStop(0, "rgba(255,255,255,0.95)");
-        bubbleGlass.addColorStop(0.46, "rgba(255,255,255,0.08)");
-        bubbleGlass.addColorStop(0.50, "rgba(190,200,210,0.22)");
-        bubbleGlass.addColorStop(1, "rgba(190,200,210,0.35)");
+        bubbleGlass.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = bubbleGlass;
-        ctx.fillRect(x + 8, y + 10, 32, 22);
+        ctx.fillRect(x + 8, y + 9, 32, 14);
+        ctx.beginPath();
+        ctx.moveTo(x + 10, y + 16.5);
+        ctx.quadraticCurveTo(x + 24, y + 20.5, x + 38, y + 16.5);
+        ctx.strokeStyle = "rgba(176,184,192,0.55)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
         ctx.restore();
     }
 
     function glyphNodes(ctx, x, y) {
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.22)";
+        ctx.shadowBlur = 1.5;
+        ctx.shadowOffsetY = 1;
         ctx.fillStyle = K().hex24(C.White);
         ctx.beginPath();
-        ctx.arc(x + 18, y + 16, 6, 0, Math.PI * 2);
+        ctx.arc(x + 18, y + 16, 6.2, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
         ctx.ellipse(x + 18, y + 34, 10, 7, 0, Math.PI, 0, true);
@@ -105,11 +117,20 @@
         ctx.arc(x + 31, y + 18, 5, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.ellipse(x + 32, y + 35, 9, 6, 0, Math.PI, 0, true);
+        ctx.ellipse(x + 32, y + 35, 9.2, 6.2, 0, Math.PI, 0, true);
+        ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.beginPath();
+        ctx.ellipse(x + 16.5, y + 14.2, 2.4, 1.6, 0, 0, Math.PI * 2);
         ctx.fill();
     }
 
     function glyphMap(ctx, x, y) {
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.20)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
         ctx.fillStyle = K().hex24(0xd8e8c8);
         ctx.beginPath();
         ctx.moveTo(x + 10, y + 14);
@@ -120,6 +141,13 @@
         ctx.lineTo(x + 10, y + 38);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 22, y + 10);
+        ctx.lineTo(x + 22, y + 34);
+        ctx.stroke();
         ctx.strokeStyle = K().hex24(C.White);
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -134,23 +162,32 @@
         ctx.closePath();
         ctx.fillStyle = K().hex24(C.White);
         ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 24, y + 13, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = K().hex24(0xc01830);
+        ctx.fill();
     }
 
     function glyphTraffic(ctx, x, y) {
-        ctx.fillStyle = K().hex24(C.White);
         const bars = [10, 16, 12, 20, 14];
         for (let index = 0; index < bars.length; index += 1) {
             const bar = bars[index];
-            K().fillRound(ctx, x + 9 + index * 7, y + 36 - bar, 5, bar, 1, K().hex24(C.White));
+            const bx = x + 9 + index * 7;
+            const by = y + 36 - bar;
+            const fill = ctx.createLinearGradient(bx, by, bx, by + bar);
+            fill.addColorStop(0, "#ffffff");
+            fill.addColorStop(1, "#d0d6dc");
+            K().fillRound(ctx, bx, by, 5, bar, 1.2, fill);
         }
     }
 
     function glyphRadio(ctx, x, y) {
+        ctx.save();
         ctx.strokeStyle = K().hex24(C.White);
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.2;
         ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 5, 0, Math.PI * 2);
+        ctx.arc(x + 24, y + 26, 5.2, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(x + 24, y + 26, 11, -Math.PI * 0.75, -Math.PI * 0.25);
@@ -159,59 +196,84 @@
         ctx.arc(x + 24, y + 26, 11, Math.PI * 0.25, Math.PI * 0.75);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 16, -Math.PI * 0.7, -Math.PI * 0.3);
+        ctx.arc(x + 24, y + 26, 16.2, -Math.PI * 0.7, -Math.PI * 0.3);
         ctx.stroke();
         ctx.fillStyle = K().hex24(C.White);
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 2, 0, Math.PI * 2);
+        ctx.arc(x + 24, y + 26, 2.2, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
     }
 
     function glyphSpectrum(ctx, x, y) {
         const hues = [0x3a6ad8, 0x2ab0c8, 0x48c060, 0xf0d040, 0xf07038];
         for (let index = 0; index < hues.length; index += 1) {
-            K().fillRound(ctx, x + 9 + index * 6, y + 14, 5, 22, 1.5, K().hex24(hues[index]));
+            const bx = x + 9 + index * 6;
+            const fill = ctx.createLinearGradient(bx, y + 14, bx, y + 36);
+            fill.addColorStop(0, K().hex24(hues[index]));
+            fill.addColorStop(1, "rgba(0,0,0,0.28)");
+            K().fillRound(ctx, bx, y + 14, 5, 22, 1.5, fill);
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            ctx.fillRect(bx + 1, y + 15, 3, 1);
         }
     }
 
     function glyphCapture(ctx, x, y) {
-        K().fillRound(ctx, x + 8, y + 16, 32, 20, 4, K().hex24(0xf2f4f6));
-        ctx.fillStyle = K().hex24(0xf2f4f6);
-        ctx.fillRect(x + 28, y + 13, 8, 4);
+        K().fillRound(ctx, x + 7, y + 15, 34, 22, 5, K().hex24(0xf2f4f6));
+        ctx.fillStyle = "rgba(255,255,255,0.70)";
+        ctx.fillRect(x + 11, y + 16, 26, 1);
+        ctx.fillStyle = K().hex24(0xe8eaee);
+        ctx.fillRect(x + 28, y + 12, 8, 4);
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 7, 0, Math.PI * 2);
+        ctx.arc(x + 24, y + 26, 7.4, 0, Math.PI * 2);
         ctx.fillStyle = K().hex24(0x2a3038);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 4, 0, Math.PI * 2);
-        ctx.fillStyle = K().hex24(0x68a8d0);
+        ctx.arc(x + 24, y + 26, 4.4, 0, Math.PI * 2);
+        const lens = ctx.createRadialGradient(x + 22, y + 24, 0.5, x + 24, y + 26, 4.4);
+        lens.addColorStop(0, "#b8d8f0");
+        lens.addColorStop(0.45, "#4a88b8");
+        lens.addColorStop(1, "#1a3040");
+        ctx.fillStyle = lens;
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(x + 22, y + 24, 1.4, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.arc(x + 22, y + 24, 1.3, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.78)";
         ctx.fill();
     }
 
     function glyphSettings(ctx, x, y) {
-        ctx.save();
-        ctx.translate(x + 24, y + 24);
-        ctx.fillStyle = K().hex24(0xe8eef4);
-        for (let spoke = 0; spoke < 8; spoke += 1) {
-            ctx.rotate(Math.PI / 4);
-            K().roundRectPath(ctx, -2.2, -14, 4.4, 8, 1.2);
-            ctx.fill();
+        function gear(ox, oy, fill) {
+            ctx.save();
+            ctx.translate(x + 24 + ox, y + 24 + oy);
+            ctx.fillStyle = fill;
+            for (let spoke = 0; spoke < 8; spoke += 1) {
+                ctx.rotate(Math.PI / 4);
+                K().roundRectPath(ctx, -2.3, -14.2, 4.6, 8.2, 1.2);
+                ctx.fill();
+            }
+            ctx.beginPath();
+            ctx.arc(0, 0, 7.4, 0, Math.PI * 2);
+            ctx.arc(0, 0, 3.0, 0, Math.PI * 2, true);
+            ctx.fill("evenodd");
+            ctx.restore();
         }
-        ctx.beginPath();
-        ctx.arc(0, 0, 7.2, 0, Math.PI * 2);
-        ctx.arc(0, 0, 3.1, 0, Math.PI * 2, true);
-        ctx.fill("evenodd");
-        ctx.restore();
+        gear(0.7, 0.9, "rgba(0,0,0,0.22)");
+        gear(-0.4, -0.5, "#f6f8fa");
+        gear(0, 0, K().hex24(0xd8dee4));
     }
 
     function glyphField(ctx, x, y) {
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.18)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
         K().fillRound(ctx, x + 12, y + 10, 24, 28, 3, K().hex24(0xfff8dc));
+        ctx.restore();
         ctx.fillStyle = K().hex24(0xf0a0c0);
         ctx.fillRect(x + 12, y + 10, 24, 7);
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillRect(x + 12, y + 10, 24, 2);
         ctx.strokeStyle = K().hex24(0xd8c070);
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -570,8 +632,20 @@
         plusFill.addColorStop(1, kit.hex24(C.SendBottom));
         ctx.fillStyle = plusFill;
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.60)";
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(304, toBarY + 11, 8, 0, Math.PI * 2);
+        ctx.clip();
+        const plusShine = ctx.createLinearGradient(296, toBarY + 3, 296, toBarY + 11);
+        plusShine.addColorStop(0, "rgba(255,255,255,0.72)");
+        plusShine.addColorStop(1, "rgba(255,255,255,0.08)");
+        ctx.fillStyle = plusShine;
+        ctx.fillRect(296, toBarY + 3, 16, 8);
+        ctx.restore();
+        ctx.strokeStyle = "rgba(255,255,255,0.70)";
         ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(304, toBarY + 11, 8, 0, Math.PI * 2);
         ctx.stroke();
         kit.text(ctx, "+", 304, toBarY + 3, C.White, {
             size: 14,
@@ -712,16 +786,20 @@
                 const action = actions[index];
                 const x = 6 + index * (btnW + 4);
                 ctx.save();
-                ctx.shadowColor = "rgba(0,0,0,0.18)";
+                ctx.shadowColor = "rgba(0,0,0,0.16)";
                 ctx.shadowBlur = 2;
                 ctx.shadowOffsetY = 1;
-                kit.panel(ctx, x, btnY, btnW, btnH, C.White, C.ButtonBottom, C.ButtonEdge, 5);
+                kit.panel(ctx, x, btnY, btnW, btnH, C.White, C.ButtonBottom, C.ButtonEdge, 6);
                 ctx.restore();
-                kit.gloss(ctx, x, btnY, btnW, btnH, 5, 0.52);
-                ctx.fillStyle = "rgba(255,255,255,0.75)";
-                ctx.fillRect(x + 4, btnY + 1, btnW - 8, 1);
+                kit.gloss(ctx, x, btnY, btnW, btnH, 6, 0.52);
+                ctx.fillStyle = "rgba(255,255,255,0.82)";
+                ctx.fillRect(x + 6, btnY + 1, btnW - 12, 1);
+                ctx.strokeStyle = "rgba(255,255,255,0.70)";
+                ctx.lineWidth = 1;
+                kit.roundRectPath(ctx, x + 1.2, btnY + 1.2, btnW - 2.4, btnH - 2.4, 5);
+                ctx.stroke();
                 const labelX = action.chevron ? x + btnW / 2 - 4 : x + btnW / 2;
-                kit.text(ctx, action.label, labelX, btnY + 5, 0x1a6adf, {
+                kit.text(ctx, action.label, labelX, btnY + 5, C.ButtonInk, {
                     size: 11,
                     weight: "700",
                     align: "center",

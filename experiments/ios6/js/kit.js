@@ -142,6 +142,28 @@
         ctx.restore();
     }
 
+    // iOS 6 candy glass: hard equator, top inner highlight, not a soft fade.
+    function hardGlass(ctx, pathFn, x, y, width, height, intensity) {
+        const bright = intensity === undefined ? 0.70 : intensity;
+        ctx.save();
+        pathFn();
+        ctx.clip();
+        const equator = y + Math.round(height * 0.48);
+        const shine = ctx.createLinearGradient(x, y, x, equator);
+        shine.addColorStop(0, "rgba(255,255,255," + bright.toFixed(2) + ")");
+        shine.addColorStop(0.58, "rgba(255,255,255," + (bright * 0.40).toFixed(2) + ")");
+        shine.addColorStop(1, "rgba(255,255,255," + (bright * 0.12).toFixed(2) + ")");
+        ctx.fillStyle = shine;
+        ctx.fillRect(x - 10, y, width + 20, Math.max(1, equator - y));
+        ctx.fillStyle = "rgba(255,255,255," + Math.min(0.72, bright * 0.78).toFixed(2) + ")";
+        ctx.fillRect(x - 10, equator, width + 20, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.16)";
+        ctx.fillRect(x - 10, equator + 1, width + 20, 1);
+        ctx.fillStyle = "rgba(255,255,255," + Math.min(0.82, bright * 0.90).toFixed(2) + ")";
+        ctx.fillRect(x + Math.max(4, width * 0.12), y + 1, width * 0.76, 1);
+        ctx.restore();
+    }
+
     function family() {
         const face = Ios6.state.font;
         if (face === "barlow") {
@@ -389,19 +411,22 @@
     }
 
     function wifi(ctx, x, y, color) {
+        // iOS 6 status Wi‑Fi is three filled fan wedges + a pip, not stroked arcs.
         const tone = color === undefined ? C.White : color;
         ctx.save();
-        ctx.strokeStyle = hex24(tone);
-        ctx.lineWidth = 1.5;
-        ctx.lineCap = "round";
-        for (let ring = 0; ring < 3; ring += 1) {
-            ctx.beginPath();
-            ctx.arc(x, y + 7, 2.2 + ring * 2.5, Math.PI * 1.20, Math.PI * 1.80);
-            ctx.stroke();
-        }
         ctx.fillStyle = hex24(tone);
+        const cy = y + 8;
+        for (let ring = 2; ring >= 0; ring -= 1) {
+            const outer = 2.3 + ring * 2.55;
+            const inner = Math.max(0.7, outer - 1.55);
+            ctx.beginPath();
+            ctx.arc(x, cy, outer, Math.PI * 1.22, Math.PI * 1.78, false);
+            ctx.arc(x, cy, inner, Math.PI * 1.78, Math.PI * 1.22, true);
+            ctx.closePath();
+            ctx.fill();
+        }
         ctx.beginPath();
-        ctx.arc(x, y + 7, 1, 0, Math.PI * 2);
+        ctx.arc(x, cy, 1.15, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
     }
@@ -448,11 +473,10 @@
             ctx.fillStyle = "rgba(0,0,0,0.28)";
             ctx.fillRect(0, height - 1, W, 1);
             const ink = 0x101418;
-            const accent = 0x1a6adf;
             const carrier = options.carrier || "LilyGO";
-            signalBars(ctx, 4, 13, filled, accent);
+            signalBars(ctx, 4, 13, filled, ink);
             const carrierW = text(ctx, carrier, 26, 3, ink, { size: 10, weight: "700" });
-            wifi(ctx, 26 + carrierW + 8, 3, accent);
+            wifi(ctx, 26 + carrierW + 8, 3, ink);
             text(ctx, clock, 160, 3, ink, { size: 10, weight: "700", align: "center" });
             text(ctx, "72%", 288, 3, ink, { size: 10, weight: "700", align: "right" });
             battery(ctx, 294, 3, { color: ink, fill: 0x4cb050 });
@@ -533,13 +557,21 @@
         ctx.fill();
         ctx.save();
         ctx.clip();
-        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.5);
-        shine.addColorStop(0, "rgba(255,255,255,0.45)");
-        shine.addColorStop(1, "rgba(255,255,255,0)");
+        const equator = y + Math.round(height * 0.48);
+        const shine = ctx.createLinearGradient(x, y, x, equator);
+        shine.addColorStop(0, "rgba(255,255,255,0.62)");
+        shine.addColorStop(0.62, "rgba(255,255,255,0.18)");
+        shine.addColorStop(1, "rgba(255,255,255,0.06)");
         ctx.fillStyle = shine;
-        ctx.fillRect(x, y, width + 4, height * 0.5);
+        ctx.fillRect(x, y, width + 4, equator - y);
+        ctx.fillStyle = "rgba(255,255,255,0.50)";
+        ctx.fillRect(x, equator, width + 4, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.14)";
+        ctx.fillRect(x, equator + 1, width + 4, 1);
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.fillRect(x + 10, y + 1, width - 12, 1);
         ctx.restore();
-        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.strokeStyle = "rgba(255,255,255,0.62)";
         ctx.lineWidth = 1.4;
         ctx.stroke();
         ctx.strokeStyle = hex24(C.NavEdge);
@@ -557,8 +589,10 @@
 
     function navButton(ctx, x, y, width, height, label, action) {
         panel(ctx, x, y, width, height, 0xa9c4e0, 0x3a5a86, C.NavEdge, 5);
-        gloss(ctx, x, y, width, height, 5, 0.5);
-        ctx.strokeStyle = "rgba(255,255,255,0.50)";
+        hardGlass(ctx, function () {
+            roundRectPath(ctx, x, y, width, height, 5);
+        }, x, y, width, height, 0.62);
+        ctx.strokeStyle = "rgba(255,255,255,0.62)";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1.5, y + 1.5, width - 3, height - 3, 4);
         ctx.stroke();
@@ -566,7 +600,7 @@
             size: 10,
             weight: "700",
             align: "center",
-            shadow: "rgba(0,0,0,0.45)",
+            shadow: "rgba(0,0,0,0.50)",
         });
         if (action) hit(x, y, width, height, action);
     }
@@ -595,22 +629,42 @@
         const top = tone.top === undefined ? C.SendTop : tone.top;
         const bottom = tone.bottom === undefined ? C.SendBottom : tone.bottom;
         const edge = tone.edge === undefined ? C.SendEdge : tone.edge;
-        panel(ctx, x, y, width, height, top, bottom, edge, 10);
-        gloss(ctx, x, y, width, height, 10, 0.5);
-        text(ctx, label, x + width / 2, y + Math.round((height - 8) / 2), C.White, {
-            size: 10,
+        const radius = height / 2;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.40)";
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetY = 1;
+        panel(ctx, x, y, width, height, top, bottom, edge, radius);
+        ctx.restore();
+        hardGlass(ctx, function () {
+            roundRectPath(ctx, x, y, width, height, radius);
+        }, x, y, width, height, 0.88);
+        ctx.strokeStyle = hex24(edge);
+        ctx.lineWidth = 1.15;
+        roundRectPath(ctx, x + 0.5, y + 0.5, width - 1, height - 1, radius);
+        ctx.stroke();
+        text(ctx, label, x + width / 2, y + Math.round((height - 10) / 2), C.White, {
+            size: 11,
             weight: "700",
             align: "center",
-            shadow: "rgba(0,0,0,0.35)",
+            shadow: "rgba(0,0,0,0.48)",
+            shadowY: 1,
         });
         if (action) hit(x, y, width, height, action);
     }
 
     function badge(ctx, x, y, value) {
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.42)";
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetY = 1;
         fillRound(ctx, x - 2, y - 2, 20, 18, 9, hex24(C.White));
         panel(ctx, x, y, 16, 14, C.BadgeTop, C.BadgeBottom, C.BadgeEdge, 7);
-        gloss(ctx, x, y, 16, 14, 7, 0.55);
-        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.restore();
+        hardGlass(ctx, function () {
+            roundRectPath(ctx, x, y, 16, 14, 7);
+        }, x, y, 16, 14, 0.58);
+        ctx.fillStyle = "rgba(255,255,255,0.50)";
         ctx.beginPath();
         ctx.ellipse(x + 8, y + 4, 5, 2.4, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -619,14 +673,23 @@
 
     function balloonPath(ctx, x, y, width, height, mine, radius) {
         const r = Math.min(radius, width / 2, height / 2);
+        const tail = 6.5;
         ctx.beginPath();
         if (mine) {
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + width - r, y);
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-            ctx.lineTo(x + width, y + height - 6);
-            ctx.lineTo(x + width + 6, y + height + 2);
-            ctx.quadraticCurveTo(x + width + 2, y + height + 1, x + width - 8, y + height);
+            ctx.lineTo(x + width, y + height - 5);
+            ctx.bezierCurveTo(
+                x + width + 1.6, y + height - 0.8,
+                x + width + tail, y + height + 2.2,
+                x + width + tail - 0.4, y + height + 3.8
+            );
+            ctx.bezierCurveTo(
+                x + width + 3.2, y + height + 1.6,
+                x + width - 1.2, y + height + 0.2,
+                x + width - 10, y + height
+            );
             ctx.lineTo(x + r, y + height);
             ctx.quadraticCurveTo(x, y + height, x, y + height - r);
             ctx.lineTo(x, y + r);
@@ -637,9 +700,17 @@
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
             ctx.lineTo(x + width, y + height - r);
             ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-            ctx.lineTo(x + 8, y + height);
-            ctx.quadraticCurveTo(x - 2, y + height + 1, x - 6, y + height + 2);
-            ctx.lineTo(x, y + height - 6);
+            ctx.lineTo(x + 10, y + height);
+            ctx.bezierCurveTo(
+                x + 1.2, y + height + 0.2,
+                x - 3.2, y + height + 1.6,
+                x - tail + 0.4, y + height + 3.8
+            );
+            ctx.bezierCurveTo(
+                x - tail, y + height + 2.2,
+                x - 1.6, y + height - 0.8,
+                x, y + height - 5
+            );
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
         }
@@ -653,15 +724,15 @@
         const top = mine ? (sms ? C.SmsTop : C.BlueTop) : C.GrayTop;
         const bottom = mine ? (sms ? C.SmsBottom : C.BlueBottom) : C.GrayBottom;
         const edge = mine ? (sms ? C.SmsEdge : C.BlueEdge) : C.GrayEdge;
-        const radius = 13;
+        const radius = 12;
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.20)";
-        ctx.shadowBlur = 2;
-        ctx.shadowOffsetY = 1;
+        ctx.shadowColor = "rgba(40,48,58,0.28)";
+        ctx.shadowBlur = 3.5;
+        ctx.shadowOffsetY = 1.6;
         balloonPath(ctx, x, y, width, height, mine, radius);
         const fill = ctx.createLinearGradient(x, y, x, y + height);
         fill.addColorStop(0, hex24(top));
-        fill.addColorStop(0.55, hex24(top));
+        fill.addColorStop(0.42, hex24(top));
         fill.addColorStop(1, hex24(bottom));
         ctx.fillStyle = fill;
         ctx.fill();
@@ -672,17 +743,23 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.clip();
-        // iOS 6 wet glass lives in the crown. A mid-bubble equator
+        // Wet glass lives in the crown only. A mid-bubble equator
         // reads as a strike through the type.
-        const crown = y + Math.max(5, Math.round(height * 0.30));
+        const crown = y + Math.max(6, Math.round(height * 0.40));
         const shine = ctx.createLinearGradient(x, y, x, crown);
-        shine.addColorStop(0, "rgba(255,255,255,0.78)");
-        shine.addColorStop(0.70, "rgba(255,255,255,0.16)");
+        shine.addColorStop(0, "rgba(255,255,255,0.90)");
+        shine.addColorStop(0.52, "rgba(255,255,255,0.32)");
+        shine.addColorStop(0.88, "rgba(255,255,255,0.06)");
         shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
-        ctx.fillRect(x - 8, y, width + 16, crown - y);
-        ctx.fillStyle = "rgba(255,255,255,0.50)";
-        ctx.fillRect(x + 7, y + 1, width - 14, 1);
+        ctx.fillRect(x - 10, y, width + 20, crown - y);
+        ctx.fillStyle = "rgba(255,255,255,0.70)";
+        ctx.fillRect(x + 8, y + 1, width - 16, 1);
+        const shade = ctx.createLinearGradient(x, y + height * 0.72, x, y + height);
+        shade.addColorStop(0, "rgba(0,0,0,0)");
+        shade.addColorStop(1, "rgba(0,0,0,0.10)");
+        ctx.fillStyle = shade;
+        ctx.fillRect(x - 10, y + height * 0.72, width + 20, height * 0.28);
         ctx.restore();
     }
 
@@ -708,26 +785,53 @@
     }
 
     function cameraWell(ctx, x, y, action) {
-        // iOS 6 Messages: rounded-rect silver well, camera silhouette.
-        const width = 26;
-        const height = 28;
-        panel(ctx, x, y, width, height, 0xd8dee4, 0x8a929a, 0x4a5258, 5);
-        gloss(ctx, x, y, width, height, 5, 0.5);
-        fillRound(ctx, x + 3, y + 4, width - 6, height - 8, 3, "rgba(0,0,0,0.22)");
-        panel(ctx, x + 4, y + 5, width - 8, height - 10, 0xf2f4f6, 0xb4bac0, 0x6a7278, 3);
-        const cx = x + width / 2;
-        const cy = y + height / 2 + 1;
-        fillRound(ctx, cx - 6, cy - 2, 12, 8, 1.6, "#2a3036");
-        fillRound(ctx, cx - 3, cy - 5, 6, 3.2, 1, "#2a3036");
+        // iOS 6 Messages: circular metallic ring, dark well, white camera.
+        const size = 28;
+        const cx = x + size / 2;
+        const cy = y + size / 2;
+        const outer = size / 2 - 0.4;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.28)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
+        const rim = ctx.createLinearGradient(x, y, x, y + size);
+        rim.addColorStop(0, "#f4f6f8");
+        rim.addColorStop(0.42, "#c5ccd4");
+        rim.addColorStop(1, "#6a727a");
         ctx.beginPath();
-        ctx.arc(cx, cy + 1.6, 2.4, 0, Math.PI * 2);
-        ctx.fillStyle = "#0a0e12";
+        ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+        ctx.fillStyle = rim;
+        ctx.fill();
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(30,36,42,0.55)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        const well = ctx.createRadialGradient(cx - 1, cy - 2, 1, cx, cy, outer - 3);
+        well.addColorStop(0, "#5a626a");
+        well.addColorStop(1, "#1c2228");
+        ctx.beginPath();
+        ctx.arc(cx, cy, outer - 3.1, 0, Math.PI * 2);
+        ctx.fillStyle = well;
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx - 0.6, cy + 1.0, 1.0, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.arc(cx, cy, outer - 3.1, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        fillRound(ctx, cx - 7, cy - 2.6, 14, 9.2, 1.8, "#ffffff");
+        fillRound(ctx, cx - 3.2, cy - 6.2, 6.4, 3.6, 1.1, "#ffffff");
+        ctx.beginPath();
+        ctx.arc(cx, cy + 1.4, 2.7, 0, Math.PI * 2);
+        ctx.fillStyle = "#1c2228";
         ctx.fill();
-        if (action) hit(x, y, width, height, action);
+        ctx.beginPath();
+        ctx.arc(cx - 0.7, cy + 0.6, 1.0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        ctx.fill();
+        if (action) hit(x, y, size, size, action);
     }
 
     function composerField(ctx, x, y, width, height) {
@@ -852,27 +956,36 @@
     }
 
     function iconGloss(ctx, x, y, size, radius) {
-        // Classic SpringBoard overlay: hard equator + radial from above
-        // (the old 57px icon recipe scaled onto 48px). Drawn ON TOP of the glyph.
+        // Classic 57px SpringBoard glass: curved cap, not a straight equator.
+        // Drawn ON TOP of the glyph.
         ctx.save();
         roundRectPath(ctx, x, y, size, size, radius);
         ctx.clip();
-        const equator = ctx.createLinearGradient(x, y, x, y + size);
-        equator.addColorStop(0, "rgba(255,255,255,0.58)");
-        equator.addColorStop(0.49, "rgba(255,255,255,0.10)");
-        equator.addColorStop(0.50, "rgba(255,255,255,0)");
-        equator.addColorStop(0.52, "rgba(0,0,0,0.08)");
-        equator.addColorStop(1, "rgba(0,0,0,0.28)");
-        ctx.fillStyle = equator;
-        ctx.fillRect(x, y, size, size);
+        ctx.beginPath();
+        ctx.moveTo(x - 1, y - 1);
+        ctx.lineTo(x + size + 1, y - 1);
+        ctx.lineTo(x + size + 1, y + size * 0.36);
+        ctx.quadraticCurveTo(x + size * 0.5, y + size * 0.70, x - 1, y + size * 0.36);
+        ctx.closePath();
+        const glass = ctx.createLinearGradient(x, y, x, y + size * 0.62);
+        glass.addColorStop(0, "rgba(255,255,255,0.64)");
+        glass.addColorStop(0.48, "rgba(255,255,255,0.20)");
+        glass.addColorStop(1, "rgba(255,255,255,0.02)");
+        ctx.fillStyle = glass;
+        ctx.fill();
         const shine = ctx.createRadialGradient(
-            x + size * 0.50, y - size * 0.82, 0,
-            x + size * 0.50, y - size * 0.82, size * 1.18
+            x + size * 0.50, y - size * 0.55, 0,
+            x + size * 0.50, y - size * 0.55, size * 1.05
         );
-        shine.addColorStop(0, "rgba(255,255,255,0.55)");
+        shine.addColorStop(0, "rgba(255,255,255,0.48)");
         shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
-        ctx.fillRect(x, y, size, size);
+        ctx.fillRect(x, y, size, size * 0.55);
+        const shade = ctx.createLinearGradient(x, y + size * 0.52, x, y + size);
+        shade.addColorStop(0, "rgba(0,0,0,0)");
+        shade.addColorStop(1, "rgba(0,0,0,0.26)");
+        ctx.fillStyle = shade;
+        ctx.fillRect(x, y + size * 0.52, size, size * 0.48);
         ctx.restore();
     }
 
