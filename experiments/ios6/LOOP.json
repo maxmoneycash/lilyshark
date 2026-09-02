@@ -1,0 +1,48 @@
+{
+  "active": true,
+  "pass": 2,
+  "stop_after_pass": 8,
+  "goal": "Make the 320x240 iOS 6 lab match the kit, then port winners to agent/ios6-chat-ui. Main stays the terminal chat.",
+  "done_when": "experiments/ios6/reference/chat.png exists and Messages RGB565 mismatch is under 8%, or the queue is empty.",
+  "completed": [
+    "lab-folder",
+    "kit-pin-from-2ae8e70",
+    "onion-skin-pixel-diff",
+    "ci-green",
+    "blue-glass-nav-buttons",
+    "status-bar-signal-pips",
+    "grouped-table-inner-highlight",
+    "section-headers"
+  ],
+  "queue": [
+    "firmware-ppm-reference-from-agent-ios6-chat-ui",
+    "messages-fit-three-bubbles",
+    "lock-camera-grip",
+    "icon-reflections-in-dock",
+    "messages-full-ios6-status-chrome-toggle"
+  ],
+  "branch": "cursor/ios6-ui-lab-240f",
+  "pr": "https://github.com/maxmoneycash/lilyshark/pull/15",
+  "base_branch": "main",
+  "hard_rules": [
+    "Do not edit src/sim_main.cpp on this branch.",
+    "Do not wait for the user. Do not ask the user to confirm.",
+    "Do not invent Apple copyrighted wallpapers or icons.",
+    "Bubbles stay content-sized and multi-line. Never collapse them to single-line strips.",
+    "Keep kIos6* / kChat* numbers in js/palette.js frozen to agent/ios6-chat-ui @ 2ae8e70.",
+    "Commit, push origin cursor/ios6-ui-lab-240f, and update PR 15 before ending a pass.",
+    "Re-subscribe timer + GitHub CI + GitHub PR if list_subscriptions is empty or expired.",
+    "Stop only when active is false, pass >= stop_after_pass, or done_when is met."
+  ],
+  "how_to_auto": [
+    "Read this file first. Take queue[0]. Increment pass at the start of the pass.",
+    "firmware-ppm-reference-from-agent-ios6-chat-ui: git fetch origin agent/ios6-chat-ui and worktree it. Do not checkout that branch onto this worktree. If PlatformIO can build -e simulator, run LILYSHARK_RENDER_DIR and copy chat-01.ppm (or a PNG conversion) into experiments/ios6/reference/. If the build is missing, skip and move the item to skipped.",
+    "messages-fit-three-bubbles: EVERYONE thread must show three content-sized bubbles on 320x240 without becoming single-line strips. Tight named headers and padding. Firmware condensed_12 already fits three.",
+    "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down.",
+    "After the item: move it to completed or skipped, write notes, run test/ios6_lab, commit, push, update PR 15, re-subscribe, end the turn.",
+    "cursor-subscriptions subscribe_timer name ios6-lab-loop delaySeconds 180 recurring. Prompt: read experiments/ios6/LOOP.json and do the next queue item with no user input.",
+    "Also subscribe_github_ci on cursor/ios6-ui-lab-240f with notifyOnSuccess true, and subscribe_github_pr on PR 15."
+  ],
+  "skipped": [],
+  "notes": "Pass 2: blue-glass nav controls, 5-pip signal, grouped-table inner highlight, section headers on Field/Settings, icon specular, kit catalog Nav on the same row as the other samples. Next autonomous pass: firmware PPM from a worktree of agent/ios6-chat-ui, or skip to messages-fit-three-bubbles if pio is missing."
+}

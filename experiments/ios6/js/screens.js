@@ -223,7 +223,7 @@
         K().statusBar(ctx, clockText());
         K().navBar(ctx, L.StatusH, "Home");
         K().backButton(ctx, 4, L.StatusH + 5, "Home", go("home"));
-        K().glossyButton(ctx, 252, L.StatusH + 5, 62, 18, "Setup", false, go("settings"));
+        K().navButton(ctx, 252, L.StatusH + 5, 62, 18, "Setup", go("settings"));
 
         K().panel(ctx, 10, 48, 300, 72, C.GrayTop, C.GrayBottom, C.GrayEdge, 8);
         K().text(ctx, "LISTENING", 22, 56, C.Lily, { size: 10, weight: "700" });
@@ -237,14 +237,16 @@
             ctx.fillRect(214 + bar * 10, 100 - bar, 8, 10 + bar);
         }
 
-        K().tableGroup(ctx, 10, 128, 300, [
+        K().sectionHeader(ctx, 16, 124, "RADIO");
+        K().tableGroup(ctx, 10, 136, 300, [
             { label: "Last RX", value: "RIDGE  ·  MESH", disclosure: true, action: go("nodes") },
             { label: "Link", value: "HOPS 1   SNR −12.7" },
             { label: "Heard", value: "4 nodes", disclosure: true, action: go("nodes") },
-        ], { rowH: 26 });
-        K().tableGroup(ctx, 10, 214, 300, [
+        ], { rowH: 24 });
+        K().sectionHeader(ctx, 16, 210, "LOCATION");
+        K().tableGroup(ctx, 10, 220, 300, [
             { label: "GPS", value: "37.7749 N  ·  ON", disclosure: true, action: go("radio") },
-        ], { rowH: 22 });
+        ], { rowH: 18 });
     }
 
     const THREADS = {
@@ -388,7 +390,7 @@
         K().statusBar(ctx, clockText());
         K().navBar(ctx, L.StatusH, "Nodes");
         K().backButton(ctx, 4, L.StatusH + 5, "Home", go("home"));
-        K().glossyButton(ctx, 252, L.StatusH + 5, 62, 18, "Chat", false, go("messages"));
+        K().navButton(ctx, 252, L.StatusH + 5, 62, 18, "Chat", go("messages"));
 
         const rows = [
             { name: "RIDGE", snr: "−8.2", age: "2m", tone: C.Lime },
@@ -474,17 +476,19 @@
         K().navBar(ctx, L.StatusH, "Settings");
         K().backButton(ctx, 4, L.StatusH + 5, "Home", go("home"));
 
-        K().tableGroup(ctx, 10, 48, 300, [
+        K().sectionHeader(ctx, 16, 42, "NETWORK");
+        K().tableGroup(ctx, 10, 54, 300, [
             { label: "Radio Profile", value: "LongFast", disclosure: true, action: go("radio") },
             { label: "Capture", value: "Off", disclosure: true },
             { label: "Device", value: "Ready", disclosure: true },
-        ], { rowH: 28 });
+        ], { rowH: 24 });
 
-        K().tableGroup(ctx, 10, 134, 300, [
+        K().sectionHeader(ctx, 16, 132, "DEVICE");
+        K().tableGroup(ctx, 10, 144, 300, [
             { label: "Display", value: "Input", disclosure: true },
             { label: "Help", value: "Keys", disclosure: true },
             { label: "About", value: "Alpha", disclosure: true },
-        ], { rowH: 26 });
+        ], { rowH: 24 });
 
         const rgb = Ios6.state.rgb565;
         K().text(ctx, "RGB565 preview", 16, 222, C.Meta, { size: 11 });
@@ -501,11 +505,12 @@
         K().navBar(ctx, L.StatusH, "Kit");
         K().backButton(ctx, 4, L.StatusH + 5, "Home", go("home"));
 
-        K().glossyButton(ctx, 10, 48, 72, 20, "Normal", false);
-        K().glossyButton(ctx, 88, 48, 72, 20, "Selected", true);
-        K().sendButton(ctx, 166, 46, 64, 24, "SEND");
-        K().badge(ctx, 238, 50, 3);
-        K().iosSwitch(ctx, 260, 49, true);
+        K().glossyButton(ctx, 10, 48, 64, 20, "Normal", false);
+        K().glossyButton(ctx, 78, 48, 64, 20, "Selected", true);
+        K().navButton(ctx, 146, 48, 48, 20, "Nav");
+        K().sendButton(ctx, 198, 46, 52, 24, "SEND");
+        K().badge(ctx, 256, 50, 3);
+        K().iosSwitch(ctx, 274, 49, true);
 
         K().bubble(ctx, 10, 78, 140, 28, false, false);
         K().text(ctx, "received", 20, 85, C.Ink, { size: 12 });

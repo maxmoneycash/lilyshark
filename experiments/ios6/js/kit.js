@@ -310,7 +310,14 @@
         ctx.fillStyle = options.clear ? "rgba(0,0,0,0.35)" : hex24(C.Status);
         ctx.fillRect(0, 0, W, Ios6.layout.StatusH);
         const ink = C.White;
-        text(ctx, options.carrier || "Lilyshark", 4, 2, ink, { size: 8, weight: "700" });
+        const filled = options.bars === undefined ? 4 : options.bars;
+        for (let pip = 0; pip < 5; pip += 1) {
+            ctx.beginPath();
+            ctx.arc(6 + pip * 5, 6, 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = pip < filled ? hex24(C.White) : "rgba(255,255,255,0.28)";
+            ctx.fill();
+        }
+        text(ctx, options.carrier || "Lilyshark", 32, 2, ink, { size: 8, weight: "700" });
         text(ctx, clock, 160, 2, ink, { size: 8, weight: "700", align: "center" });
         panel(ctx, 292, 3, 22, 7, 0x5ad35a, 0x2f9a2f, 0xffffff, 1);
         ctx.fillStyle = hex24(C.White);
@@ -350,17 +357,32 @@
         ctx.lineTo(x, y + height / 2);
         ctx.closePath();
         const gradient = ctx.createLinearGradient(x, y, x, y + height);
-        gradient.addColorStop(0, hex24(C.ButtonTop));
-        gradient.addColorStop(1, hex24(C.ButtonBottom));
+        gradient.addColorStop(0, hex24(0xa9c4e0));
+        gradient.addColorStop(1, hex24(0x3a5a86));
         ctx.fillStyle = gradient;
         ctx.fill();
         ctx.strokeStyle = hex24(C.NavEdge);
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.restore();
-        text(ctx, label, x + 12, y + 4, C.ButtonInk, { size: 10, weight: "700" });
+        text(ctx, label, x + 12, y + 4, C.White, {
+            size: 10,
+            weight: "700",
+            shadow: "rgba(0,0,0,0.45)",
+        });
         hit(x, y, width + 4, height, action);
         return width + 4;
+    }
+
+    function navButton(ctx, x, y, width, height, label, action) {
+        panel(ctx, x, y, width, height, 0xa9c4e0, 0x3a5a86, C.NavEdge, 5);
+        text(ctx, label, x + width / 2, y + Math.round((height - 8) / 2), C.White, {
+            size: 10,
+            weight: "700",
+            align: "center",
+            shadow: "rgba(0,0,0,0.45)",
+        });
+        if (action) hit(x, y, width, height, action);
     }
 
     function glossyButton(ctx, x, y, width, height, label, selected, action) {
@@ -432,6 +454,8 @@
         const labelX = spec.labelX || 12;
         const height = rows.length * rowH;
         panel(ctx, x, y, width, height, C.White, 0xf3f3f3, C.GrayEdge, 8);
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fillRect(x + 8, y + 1, width - 16, 1);
         for (let index = 0; index < rows.length; index += 1) {
             const row = rows[index];
             const top = y + index * rowH;
@@ -466,9 +490,15 @@
         if (action) hit(x, y, 40, 18, action);
     }
 
+    function sectionHeader(ctx, x, y, label) {
+        text(ctx, label, x, y, 0x4a5560, { size: 10, weight: "700" });
+    }
+
     function appIcon(ctx, x, y, top, bottom, edge, glyph, label, action, unread) {
         panel(ctx, x, y, 48, 48, top, bottom, edge, 10);
         gloss(ctx, x, y, 48, 48, 10, 0.52);
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillRect(x + 8, y + 1, 32, 1);
         glyph(ctx, x, y);
         text(ctx, label, x + 24, y + 50, C.White, {
             size: 9,
@@ -510,6 +540,8 @@
         statusBar: statusBar,
         navBar: navBar,
         backButton: backButton,
+        navButton: navButton,
+        sectionHeader: sectionHeader,
         glossyButton: glossyButton,
         sendButton: sendButton,
         badge: badge,

@@ -1,3 +1,4 @@
+import json
 import re
 import unittest
 from pathlib import Path
@@ -143,6 +144,21 @@ class Ios6LabTests(unittest.TestCase):
         self.assertIn('id="compare-mode"', self.index)
         self.assertIn('width="320"', self.index)
         self.assertIn('height="240"', self.index)
+
+    def test_nav_buttons_are_blue_glass(self):
+        self.assertIn("function navButton", self.kit)
+        self.assertIn("0xa9c4e0", self.kit)
+        self.assertIn("function sectionHeader", self.kit)
+
+    def test_loop_file_keeps_the_agent_running(self):
+        loop_path = REPO / "experiments/ios6/LOOP.json"
+        self.assertTrue(loop_path.is_file(), loop_path)
+        loop = json.loads(loop_path.read_text(encoding="utf-8"))
+        self.assertIn("queue", loop)
+        self.assertIn("done_when", loop)
+        self.assertIn("hard_rules", loop)
+        self.assertTrue(loop["hard_rules"], "hard_rules must tell the next agent not to wait")
+        self.assertNotIn("src/sim_main.cpp", "".join(loop.get("queue", [])))
 
     def test_compare_is_a_pixel_diff_not_a_guess(self):
         compare = KIT.parent.joinpath("compare.js").read_text(encoding="utf-8")
