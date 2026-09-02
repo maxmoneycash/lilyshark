@@ -143,8 +143,9 @@
     }
 
     // iOS 6 candy glass: hard equator, top inner highlight, not a soft fade.
-    function hardGlass(ctx, pathFn, x, y, width, height, intensity) {
+    function hardGlass(ctx, pathFn, x, y, width, height, intensity, options) {
         const bright = intensity === undefined ? 0.70 : intensity;
+        const spec = options || {};
         ctx.save();
         pathFn();
         ctx.clip();
@@ -155,10 +156,12 @@
         shine.addColorStop(1, "rgba(255,255,255," + (bright * 0.12).toFixed(2) + ")");
         ctx.fillStyle = shine;
         ctx.fillRect(x - 10, y, width + 20, Math.max(1, equator - y));
-        ctx.fillStyle = "rgba(255,255,255," + Math.min(0.72, bright * 0.78).toFixed(2) + ")";
-        ctx.fillRect(x - 10, equator, width + 20, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.16)";
-        ctx.fillRect(x - 10, equator + 1, width + 20, 1);
+        if (spec.hairline !== false) {
+            ctx.fillStyle = "rgba(255,255,255," + Math.min(0.72, bright * 0.78).toFixed(2) + ")";
+            ctx.fillRect(x - 10, equator, width + 20, 1);
+            ctx.fillStyle = "rgba(0,0,0,0.16)";
+            ctx.fillRect(x - 10, equator + 1, width + 20, 1);
+        }
         ctx.fillStyle = "rgba(255,255,255," + Math.min(0.82, bright * 0.90).toFixed(2) + ")";
         ctx.fillRect(x + Math.max(4, width * 0.12), y + 1, width * 0.76, 1);
         ctx.restore();
@@ -638,7 +641,7 @@
         ctx.restore();
         hardGlass(ctx, function () {
             roundRectPath(ctx, x, y, width, height, radius);
-        }, x, y, width, height, 0.88);
+        }, x, y, width, height, 0.88, { hairline: false });
         ctx.strokeStyle = hex24(edge);
         ctx.lineWidth = 1.15;
         roundRectPath(ctx, x + 0.5, y + 0.5, width - 1, height - 1, radius);
@@ -821,15 +824,15 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.fillStyle = "#ffffff";
-        fillRound(ctx, cx - 7, cy - 2.6, 14, 9.2, 1.8, "#ffffff");
-        fillRound(ctx, cx - 3.2, cy - 6.2, 6.4, 3.6, 1.1, "#ffffff");
+        fillRound(ctx, cx - 7.6, cy - 3.0, 15.2, 10.2, 2.0, "#ffffff");
+        fillRound(ctx, cx - 3.6, cy - 6.8, 7.2, 4.0, 1.2, "#ffffff");
         ctx.beginPath();
-        ctx.arc(cx, cy + 1.4, 2.7, 0, Math.PI * 2);
+        ctx.arc(cx, cy + 1.5, 3.0, 0, Math.PI * 2);
         ctx.fillStyle = "#1c2228";
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx - 0.7, cy + 0.6, 1.0, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        ctx.arc(cx - 0.8, cy + 0.6, 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.32)";
         ctx.fill();
         if (action) hit(x, y, size, size, action);
     }
