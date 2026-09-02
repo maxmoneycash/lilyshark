@@ -663,17 +663,7 @@
 
         const thread = token || THREADS.everyone;
         const sms = thread.service === "sms";
-        kit.panel(ctx, -1, 180, 322, 62, C.BarTop, C.BarBottom, C.BarEdge, 0);
-        const metal = ctx.createLinearGradient(0, 180, 0, H);
-        metal.addColorStop(0, "rgba(255,255,255,0.28)");
-        metal.addColorStop(0.18, "rgba(255,255,255,0.08)");
-        metal.addColorStop(1, "rgba(0,0,0,0.08)");
-        ctx.fillStyle = metal;
-        ctx.fillRect(0, 180, W, H - 180);
-        ctx.fillStyle = "rgba(255,255,255,0.38)";
-        ctx.fillRect(0, 180, W, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.32)";
-        ctx.fillRect(0, 181, W, 1);
+        kit.composerMetal(ctx);
         kit.cameraWell(ctx, 6, 188, go("settings"));
         kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
         const draft = Ios6.state.draft;
@@ -785,19 +775,7 @@
             for (let index = 0; index < actions.length; index += 1) {
                 const action = actions[index];
                 const x = 6 + index * (btnW + 4);
-                ctx.save();
-                ctx.shadowColor = "rgba(0,0,0,0.16)";
-                ctx.shadowBlur = 2;
-                ctx.shadowOffsetY = 1;
-                kit.panel(ctx, x, btnY, btnW, btnH, C.White, C.ButtonBottom, C.ButtonEdge, 6);
-                ctx.restore();
-                kit.gloss(ctx, x, btnY, btnW, btnH, 6, 0.52);
-                ctx.fillStyle = "rgba(255,255,255,0.82)";
-                ctx.fillRect(x + 6, btnY + 1, btnW - 12, 1);
-                ctx.strokeStyle = "rgba(255,255,255,0.70)";
-                ctx.lineWidth = 1;
-                kit.roundRectPath(ctx, x + 1.2, btnY + 1.2, btnW - 2.4, btnH - 2.4, 5);
-                ctx.stroke();
+                kit.whitePill(ctx, x, btnY, btnW, btnH);
                 const labelX = action.chevron ? x + btnW / 2 - 4 : x + btnW / 2;
                 kit.text(ctx, action.label, labelX, btnY + 5, C.ButtonInk, {
                     size: 11,
@@ -904,17 +882,7 @@
             kit.text(ctx, "TX FAILED", 10, L.ChatMetaY, C.Fault, { size: 8, weight: "700" });
         }
 
-        kit.panel(ctx, -1, 180, 322, 62, C.BarTop, C.BarBottom, C.BarEdge, 0);
-        const metal = ctx.createLinearGradient(0, 180, 0, H);
-        metal.addColorStop(0, "rgba(255,255,255,0.28)");
-        metal.addColorStop(0.18, "rgba(255,255,255,0.08)");
-        metal.addColorStop(1, "rgba(0,0,0,0.08)");
-        ctx.fillStyle = metal;
-        ctx.fillRect(0, 180, W, H - 180);
-        ctx.fillStyle = "rgba(255,255,255,0.38)";
-        ctx.fillRect(0, 180, W, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.32)";
-        ctx.fillRect(0, 181, W, 1);
+        kit.composerMetal(ctx);
         kit.cameraWell(ctx, 6, 188, go("settings"));
         kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
         const draft = Ios6.state.draft;

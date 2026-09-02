@@ -684,23 +684,14 @@
 
     function balloonPath(ctx, x, y, width, height, mine, radius) {
         const r = Math.min(radius, width / 2, height / 2);
-        const tail = 6.5;
         ctx.beginPath();
         if (mine) {
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + width - r, y);
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-            ctx.lineTo(x + width, y + height - 5);
-            ctx.bezierCurveTo(
-                x + width + 1.6, y + height - 0.8,
-                x + width + tail, y + height + 2.2,
-                x + width + tail - 0.4, y + height + 3.8
-            );
-            ctx.bezierCurveTo(
-                x + width + 3.2, y + height + 1.6,
-                x + width - 1.2, y + height + 0.2,
-                x + width - 10, y + height
-            );
+            ctx.lineTo(x + width, y + height - 4);
+            ctx.quadraticCurveTo(x + width + 6.5, y + height + 1.2, x + width + 7, y + height + 4);
+            ctx.quadraticCurveTo(x + width + 1.5, y + height + 1.2, x + width - 10, y + height);
             ctx.lineTo(x + r, y + height);
             ctx.quadraticCurveTo(x, y + height, x, y + height - r);
             ctx.lineTo(x, y + r);
@@ -712,16 +703,8 @@
             ctx.lineTo(x + width, y + height - r);
             ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
             ctx.lineTo(x + 10, y + height);
-            ctx.bezierCurveTo(
-                x + 1.2, y + height + 0.2,
-                x - 3.2, y + height + 1.6,
-                x - tail + 0.4, y + height + 3.8
-            );
-            ctx.bezierCurveTo(
-                x - tail, y + height + 2.2,
-                x - 1.6, y + height - 0.8,
-                x, y + height - 5
-            );
+            ctx.quadraticCurveTo(x - 1.5, y + height + 1.2, x - 7, y + height + 4);
+            ctx.quadraticCurveTo(x - 6.5, y + height + 1.2, x, y + height - 4);
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
         }
@@ -916,13 +899,55 @@
     }
 
     function chevron(ctx, x, y) {
+        ctx.save();
         ctx.strokeStyle = hex24(C.Chevron);
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.7;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
         ctx.beginPath();
         ctx.moveTo(x, y);
-        ctx.lineTo(x + 5, y + 5);
-        ctx.lineTo(x, y + 10);
+        ctx.lineTo(x + 4.2, y + 4.5);
+        ctx.lineTo(x, y + 9);
         ctx.stroke();
+        ctx.restore();
+    }
+
+    function whitePill(ctx, x, y, width, height) {
+        const radius = Math.min(8, height / 2);
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.18)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
+        panel(ctx, x, y, width, height, C.White, C.ButtonBottom, C.ButtonEdge, radius);
+        ctx.restore();
+        hardGlass(ctx, function () {
+            roundRectPath(ctx, x, y, width, height, radius);
+        }, x, y, width, height, 0.55, { hairline: false });
+        ctx.strokeStyle = "rgba(255,255,255,0.78)";
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, x + 1.2, y + 1.2, width - 2.4, height - 2.4, Math.max(1, radius - 1));
+        ctx.stroke();
+    }
+
+    function composerMetal(ctx) {
+        panel(ctx, -1, 180, 322, 62, C.BarTop, C.BarBottom, C.BarEdge, 0);
+        const metal = ctx.createLinearGradient(0, 180, 0, H);
+        metal.addColorStop(0, "rgba(255,255,255,0.36)");
+        metal.addColorStop(0.16, "rgba(255,255,255,0.10)");
+        metal.addColorStop(1, "rgba(0,0,0,0.10)");
+        ctx.fillStyle = metal;
+        ctx.fillRect(0, 180, W, H - 180);
+        ctx.save();
+        ctx.globalAlpha = 0.05;
+        for (let row = 182; row < H; row += 2) {
+            ctx.fillStyle = row % 4 === 0 ? "#ffffff" : "#202428";
+            ctx.fillRect(0, row, W, 1);
+        }
+        ctx.restore();
+        ctx.fillStyle = "rgba(255,255,255,0.44)";
+        ctx.fillRect(0, 180, W, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.34)";
+        ctx.fillRect(0, 181, W, 1);
     }
 
     function tableGroup(ctx, x, y, width, rows, options) {
@@ -1136,6 +1161,8 @@
         composeButton: composeButton,
         searchGlyph: searchGlyph,
         chevron: chevron,
+        whitePill: whitePill,
+        composerMetal: composerMetal,
         tableGroup: tableGroup,
         iosSwitch: iosSwitch,
         appIcon: appIcon,
