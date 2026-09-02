@@ -225,26 +225,35 @@
     }
 
     function glyphCapture(ctx, x, y) {
-        K().fillRound(ctx, x + 7, y + 15, 34, 22, 5, K().hex24(0xf2f4f6));
-        ctx.fillStyle = "rgba(255,255,255,0.70)";
+        const body = ctx.createLinearGradient(x + 7, y + 14, x + 7, y + 38);
+        body.addColorStop(0, "#f7f8fa");
+        body.addColorStop(0.45, "#d4d8de");
+        body.addColorStop(1, "#8a9098");
+        K().fillRound(ctx, x + 7, y + 15, 34, 22, 5, body);
+        ctx.fillStyle = "rgba(255,255,255,0.78)";
         ctx.fillRect(x + 11, y + 16, 26, 1);
-        ctx.fillStyle = K().hex24(0xe8eaee);
-        ctx.fillRect(x + 28, y + 12, 8, 4);
+        ctx.fillStyle = K().hex24(0xc8ccd2);
+        K().fillRound(ctx, x + 27, y + 11, 9, 5, 1.4, K().hex24(0xe8eaee));
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 7.4, 0, Math.PI * 2);
-        ctx.fillStyle = K().hex24(0x2a3038);
+        ctx.arc(x + 24, y + 26, 7.6, 0, Math.PI * 2);
+        ctx.fillStyle = K().hex24(0x1c2228);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 4.4, 0, Math.PI * 2);
-        const lens = ctx.createRadialGradient(x + 22, y + 24, 0.5, x + 24, y + 26, 4.4);
-        lens.addColorStop(0, "#b8d8f0");
-        lens.addColorStop(0.45, "#4a88b8");
-        lens.addColorStop(1, "#1a3040");
+        ctx.arc(x + 24, y + 26, 6.2, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x + 24, y + 26, 4.6, 0, Math.PI * 2);
+        const lens = ctx.createRadialGradient(x + 22, y + 24, 0.4, x + 24, y + 26, 4.6);
+        lens.addColorStop(0, "#d0e8f8");
+        lens.addColorStop(0.38, "#4a88b8");
+        lens.addColorStop(1, "#122030");
         ctx.fillStyle = lens;
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(x + 22, y + 24, 1.3, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.78)";
+        ctx.arc(x + 22.2, y + 23.8, 1.35, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.82)";
         ctx.fill();
     }
 
@@ -255,18 +264,30 @@
             ctx.fillStyle = fill;
             for (let spoke = 0; spoke < 8; spoke += 1) {
                 ctx.rotate(Math.PI / 4);
-                K().roundRectPath(ctx, -2.3, -14.2, 4.6, 8.2, 1.2);
+                K().roundRectPath(ctx, -2.5, -14.6, 5.0, 8.6, 1.4);
                 ctx.fill();
             }
             ctx.beginPath();
-            ctx.arc(0, 0, 7.4, 0, Math.PI * 2);
-            ctx.arc(0, 0, 3.0, 0, Math.PI * 2, true);
+            ctx.arc(0, 0, 7.8, 0, Math.PI * 2);
+            ctx.arc(0, 0, 3.1, 0, Math.PI * 2, true);
             ctx.fill("evenodd");
             ctx.restore();
         }
-        gear(0.7, 0.9, "rgba(0,0,0,0.22)");
-        gear(-0.4, -0.5, "#f6f8fa");
-        gear(0, 0, K().hex24(0xd8dee4));
+        gear(0.8, 1.0, "rgba(0,0,0,0.24)");
+        gear(-0.5, -0.6, "#f8fafc");
+        const metal = ctx.createLinearGradient(x + 10, y + 10, x + 38, y + 38);
+        metal.addColorStop(0, "#f2f4f6");
+        metal.addColorStop(0.48, "#c8ced4");
+        metal.addColorStop(1, "#6a7078");
+        gear(0, 0, metal);
+        ctx.beginPath();
+        ctx.arc(x + 24, y + 24, 3.1, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(20,24,28,0.35)";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 23, y + 22.8, 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.40)";
+        ctx.fill();
     }
 
     function glyphField(ctx, x, y) {
