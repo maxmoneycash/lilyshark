@@ -562,28 +562,29 @@
         ctx.lineTo(x, y + height / 2);
         ctx.closePath();
         const gradient = ctx.createLinearGradient(x, y, x, y + height);
-        gradient.addColorStop(0, hex24(0xa9c4e0));
-        gradient.addColorStop(1, hex24(0x3a5a86));
+        gradient.addColorStop(0, hex24(0x6e8cb0));
+        gradient.addColorStop(0.48, hex24(0x4a6a90));
+        gradient.addColorStop(1, hex24(0x2a4468));
         ctx.fillStyle = gradient;
         ctx.fill();
         ctx.save();
         ctx.clip();
         const equator = y + Math.round(height * 0.48);
         const shine = ctx.createLinearGradient(x, y, x, equator);
-        shine.addColorStop(0, "rgba(255,255,255,0.62)");
-        shine.addColorStop(0.62, "rgba(255,255,255,0.18)");
-        shine.addColorStop(1, "rgba(255,255,255,0.06)");
+        shine.addColorStop(0, "rgba(255,255,255,0.42)");
+        shine.addColorStop(0.62, "rgba(255,255,255,0.12)");
+        shine.addColorStop(1, "rgba(255,255,255,0.04)");
         ctx.fillStyle = shine;
         ctx.fillRect(x, y, width + 4, equator - y);
-        ctx.fillStyle = "rgba(255,255,255,0.50)";
+        ctx.fillStyle = "rgba(255,255,255,0.36)";
         ctx.fillRect(x, equator, width + 4, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.14)";
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
         ctx.fillRect(x, equator + 1, width + 4, 1);
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.fillStyle = hex24(0xa9c4e0);
         ctx.fillRect(x + 10, y + 1, width - 12, 1);
         ctx.restore();
-        ctx.strokeStyle = "rgba(255,255,255,0.62)";
-        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = hex24(0xa9c4e0);
+        ctx.lineWidth = 1.2;
         ctx.stroke();
         ctx.strokeStyle = hex24(C.NavEdge);
         ctx.lineWidth = 1;
@@ -599,11 +600,11 @@
     }
 
     function navButton(ctx, x, y, width, height, label, action) {
-        panel(ctx, x, y, width, height, 0xa9c4e0, 0x3a5a86, C.NavEdge, 5);
+        panel(ctx, x, y, width, height, 0x6e8cb0, 0x2a4468, C.NavEdge, 5);
         hardGlass(ctx, function () {
             roundRectPath(ctx, x, y, width, height, 5);
-        }, x, y, width, height, 0.62);
-        ctx.strokeStyle = "rgba(255,255,255,0.62)";
+        }, x, y, width, height, 0.40);
+        ctx.strokeStyle = hex24(0xa9c4e0);
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1.5, y + 1.5, width - 3, height - 3, 4);
         ctx.stroke();
