@@ -67,6 +67,12 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
                                    const ApiNodeEntry *nodes, std::size_t node_count,
                                    std::uint8_t *out, std::size_t capacity) noexcept;
 
+/// Encode one FromRadio{node_info} on its own, for the node that just
+/// appeared. The config dump tells the phone who was here at connect time;
+/// this is how it learns about everyone who arrives afterwards.
+std::size_t encodeApiNodeInfo(const ApiNodeEntry &node, std::uint8_t *out,
+                              std::size_t capacity) noexcept;
+
 /// Encode FromRadio{packet} carrying a text heard on the mesh, so the phone
 /// shows it in the right conversation. `to_node` distinguishes broadcast from
 /// a DM; rssi/snr ride along the way stock firmware reports them.

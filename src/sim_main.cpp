@@ -8883,9 +8883,35 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
             }
 #if defined(LILYSHARK_DEVICE)
             if (stored->raw.rf.direction != FrameDirection::Transmit) {
-                (void)announce_new_node(stored->decoded.source,
-                                        chat_payload.has_names ? chat_payload.short_name
-                                                               : nullptr);
+                const bool first_heard = announce_new_node(
+                    stored->decoded.source,
+                    chat_payload.has_names ? chat_payload.short_name : nullptr);
+#if defined(ESP_PLATFORM)
+                // The config dump told the phone who was here at connect
+                // time; an arrival after that has to be delivered, or the
+                // phone's node list is forever a photograph of one moment.
+                if (first_heard && tdeckBleStatus().connected) {
+                    ApiNodeEntry entry{};
+                    entry.num = stored->decoded.source;
+                    if (chat_payload.has_names && chat_payload.short_name[0] != '\0') {
+                        std::snprintf(entry.label, sizeof(entry.label), "%.8s",
+                                      chat_payload.short_name);
+                    } else {
+                        std::snprintf(entry.label, sizeof(entry.label), "%08lX",
+                                      static_cast<unsigned long>(stored->decoded.source));
+                    }
+                    entry.has_snr = true;
+                    entry.snr_x10 = stored->raw.rf.snr_db_x10;
+                    std::uint8_t ble_frame[192]{};
+                    const std::size_t ble_length =
+                        encodeApiNodeInfo(entry, ble_frame, sizeof(ble_frame));
+                    if (ble_length > 0U) {
+                        (void)queueBleFromRadio(ble_frame, ble_length);
+                    }
+                }
+#else
+                (void)first_heard;
+#endif
             }
 #endif
             // Delivery confirmations, both directions.

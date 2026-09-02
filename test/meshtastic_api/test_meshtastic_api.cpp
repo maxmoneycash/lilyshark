@@ -157,6 +157,32 @@ void testHeardTextRoundTripsThroughParse()
     assert(std::strcmp(message.text, "TRACK IS WASHED OUT") == 0);
 }
 
+void testLiveNodeInfoMatchesTheDump()
+{
+    // The phone hears about a node two ways -- the connect-time dump and the
+    // live announcement -- and they must be byte-identical for the same node,
+    // or the app would see one neighbour as two shapes.
+    setLocalMeshtasticNodeNum(0xcda172e0U);
+    ApiNodeEntry nodes[2]{};
+    nodes[0].num = 0xcda172e0U;
+    std::snprintf(nodes[0].label, sizeof(nodes[0].label), "1B99");
+    nodes[0].is_self = true;
+    nodes[1].num = 0x96f61b44U;
+    std::snprintf(nodes[1].label, sizeof(nodes[1].label), "96F61B44");
+    nodes[1].has_snr = true;
+    nodes[1].snr_x10 = -85;
+
+    std::uint8_t from_dump[256]{};
+    const std::size_t dump_length =
+        encodeApiConfigMessage(3, 7, "2.6.0", nodes, 2, from_dump, sizeof(from_dump));
+    std::uint8_t standalone[256]{};
+    const std::size_t live_length =
+        encodeApiNodeInfo(nodes[1], standalone, sizeof(standalone));
+    assert(dump_length > 0);
+    assert(live_length == dump_length);
+    assert(std::memcmp(from_dump, standalone, live_length) == 0);
+}
+
 void testEncodeRefusesTinyBuffers()
 {
     std::uint8_t out[4]{};
@@ -176,6 +202,7 @@ int main()
     testNonTextPortIsIgnoredButValid();
     testMalformedBytesRefuse();
     testHeardTextRoundTripsThroughParse();
+    testLiveNodeInfoMatchesTheDump();
     testEncodeRefusesTinyBuffers();
     std::printf("meshtastic_api: all assertions passed\n");
     return 0;

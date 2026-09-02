@@ -208,6 +208,25 @@ void parseMeshPacket(const std::uint8_t *bytes, std::size_t length,
     if (!reader.ok) out.kind = ApiToRadio::Kind::None;
 }
 
+void writeUser(Writer &writer, const ApiNodeEntry &node) noexcept;
+
+/// FromRadio{node_info} for one node, shared by the config dump and the
+/// live announcement so the phone hears the same shape both ways.
+void writeNodeInfoMessage(Writer &from_radio, const ApiNodeEntry &node) noexcept
+{
+    std::uint8_t scratch[128]{};
+    Writer child{scratch, sizeof(scratch)};
+    std::uint8_t user_scratch[64]{};
+    Writer user{user_scratch, sizeof(user_scratch)};
+    writeUser(user, node);
+    child.field_uint(1, node.num);
+    child.field_message(2, user);
+    if (node.has_snr) {
+        child.field_float(4, static_cast<float>(node.snr_x10) / 10.0f);
+    }
+    from_radio.field_message(4, child);
+}
+
 void writeUser(Writer &writer, const ApiNodeEntry &node) noexcept
 {
     char id[12]{};
@@ -279,17 +298,7 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
         child.field_uint(9, kHwModelTDeck);
         from_radio.field_message(13, child);
     } else if (index < 2U + node_count) {
-        // FromRadio.node_info
-        const ApiNodeEntry &node = nodes[index - 2U];
-        std::uint8_t user_scratch[64]{};
-        Writer user{user_scratch, sizeof(user_scratch)};
-        writeUser(user, node);
-        child.field_uint(1, node.num);
-        child.field_message(2, user);
-        if (node.has_snr) {
-            child.field_float(4, static_cast<float>(node.snr_x10) / 10.0f);
-        }
-        from_radio.field_message(4, child);
+        writeNodeInfoMessage(from_radio, nodes[index - 2U]);
     } else if (index == 2U + node_count) {
         // FromRadio.channel: the primary channel. A one-byte psk of 0x01 is
         // Meshtastic's own shorthand for "the published default key", which
@@ -323,6 +332,15 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
     } else {
         return 0;
     }
+    return from_radio.ok ? from_radio.length : 0;
+}
+
+std::size_t encodeApiNodeInfo(const ApiNodeEntry &node, std::uint8_t *out,
+                              std::size_t capacity) noexcept
+{
+    if (out == nullptr || capacity == 0U || node.num == 0U) return 0;
+    Writer from_radio{out, capacity};
+    writeNodeInfoMessage(from_radio, node);
     return from_radio.ok ? from_radio.length : 0;
 }
 
