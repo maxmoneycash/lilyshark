@@ -602,19 +602,44 @@
     }
 
     function navButton(ctx, x, y, width, height, label, action) {
-        panel(ctx, x, y, width, height, 0x6e8cb0, 0x2a4468, C.NavEdge, 5);
-        hardGlass(ctx, function () {
-            roundRectPath(ctx, x, y, width, height, 5);
-        }, x, y, width, height, 0.40);
+        // Same candy glass as Messages back: 3-stop fill, equator, inner rim.
+        const radius = 5;
+        ctx.save();
+        roundRectPath(ctx, x, y, width, height, radius);
+        const gradient = ctx.createLinearGradient(x, y, x, y + height);
+        gradient.addColorStop(0, hex24(0x6e8cb0));
+        gradient.addColorStop(0.48, hex24(0x4a6a90));
+        gradient.addColorStop(1, hex24(0x2a4468));
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.save();
+        ctx.clip();
+        const equator = y + Math.round(height * 0.48);
+        const shine = ctx.createLinearGradient(x, y, x, equator);
+        shine.addColorStop(0, "rgba(255,255,255,0.42)");
+        shine.addColorStop(0.62, "rgba(255,255,255,0.12)");
+        shine.addColorStop(1, "rgba(255,255,255,0.04)");
+        ctx.fillStyle = shine;
+        ctx.fillRect(x, y, width, equator - y);
+        ctx.fillStyle = "rgba(255,255,255,0.36)";
+        ctx.fillRect(x, equator, width, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
+        ctx.fillRect(x, equator + 1, width, 1);
+        ctx.fillStyle = hex24(0xa9c4e0);
+        ctx.fillRect(x + 4, y + 1, width - 8, 1);
+        ctx.restore();
         ctx.strokeStyle = hex24(0xa9c4e0);
-        ctx.lineWidth = 1;
-        roundRectPath(ctx, x + 1.5, y + 1.5, width - 3, height - 3, 4);
+        ctx.lineWidth = 1.2;
         ctx.stroke();
+        ctx.strokeStyle = hex24(C.NavEdge);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
         text(ctx, label, x + width / 2, y + Math.round((height - 8) / 2), C.White, {
             size: 10,
             weight: "700",
             align: "center",
-            shadow: "rgba(0,0,0,0.50)",
+            shadow: "rgba(0,0,0,0.45)",
         });
         if (action) hit(x, y, width, height, action);
     }
@@ -761,15 +786,17 @@
     }
 
     function balloonPath(ctx, x, y, width, height, mine, radius) {
+        // iOS 6 fin: straight outer wall past the bottom, then a short
+        // outward point and a concave hook back into the body.
         const r = Math.min(radius, width / 2, height / 2);
         ctx.beginPath();
         if (mine) {
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + width - r, y);
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-            ctx.lineTo(x + width, y + height - 5);
-            ctx.lineTo(x + width + 6.2, y + height + 3.2);
-            ctx.quadraticCurveTo(x + width + 1.4, y + height + 1.4, x + width - 8, y + height);
+            ctx.lineTo(x + width, y + height + 4.8);
+            ctx.lineTo(x + width + 5.2, y + height + 6.1);
+            ctx.quadraticCurveTo(x + width + 0.4, y + height + 2.1, x + width - 7.4, y + height);
             ctx.lineTo(x + r, y + height);
             ctx.quadraticCurveTo(x, y + height, x, y + height - r);
             ctx.lineTo(x, y + r);
@@ -780,9 +807,9 @@
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
             ctx.lineTo(x + width, y + height - r);
             ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-            ctx.lineTo(x + 8, y + height);
-            ctx.quadraticCurveTo(x - 1.4, y + height + 1.4, x - 6.2, y + height + 3.2);
-            ctx.lineTo(x, y + height - 5);
+            ctx.lineTo(x + 7.4, y + height);
+            ctx.quadraticCurveTo(x - 0.4, y + height + 2.1, x - 5.2, y + height + 6.1);
+            ctx.lineTo(x, y + height + 4.8);
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
         }
@@ -796,7 +823,7 @@
         const top = mine ? (sms ? C.SmsTop : C.BlueTop) : C.GrayTop;
         const bottom = mine ? (sms ? C.SmsBottom : C.BlueBottom) : C.GrayBottom;
         const edge = mine ? (sms ? C.SmsEdge : C.BlueEdge) : C.GrayEdge;
-        const radius = 12;
+        const radius = 14;
         ctx.save();
         ctx.shadowColor = "rgba(40,48,58,0.28)";
         ctx.shadowBlur = 3.5;
@@ -819,16 +846,16 @@
         ctx.beginPath();
         ctx.moveTo(x - 4, y - 1);
         ctx.lineTo(x + width + 4, y - 1);
-        ctx.lineTo(x + width + 4, y + height * 0.30);
-        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.58, x - 4, y + height * 0.30);
+        ctx.lineTo(x + width + 4, y + height * 0.34);
+        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.64, x - 4, y + height * 0.34);
         ctx.closePath();
-        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.52);
-        shine.addColorStop(0, "rgba(255,255,255,0.88)");
-        shine.addColorStop(0.48, "rgba(255,255,255,0.28)");
+        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.56);
+        shine.addColorStop(0, "rgba(255,255,255,0.92)");
+        shine.addColorStop(0.48, "rgba(255,255,255,0.30)");
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.72)";
+        ctx.fillStyle = "rgba(255,255,255,0.78)";
         ctx.fillRect(x + 8, y + 1, width - 16, 1);
         const shade = ctx.createLinearGradient(x, y + height * 0.72, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");

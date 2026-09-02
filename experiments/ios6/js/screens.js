@@ -76,9 +76,10 @@
         ctx.fillStyle = body;
         ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(x + 15.2, y + 29.6);
-        ctx.quadraticCurveTo(x + 12.4, y + 34.2, x + 8.6, y + 39.4);
-        ctx.quadraticCurveTo(x + 16.8, y + 34.0, x + 22.6, y + 30.8);
+        ctx.moveTo(x + 16.4, y + 28.8);
+        ctx.lineTo(x + 11.0, y + 35.8);
+        ctx.lineTo(x + 8.0, y + 39.8);
+        ctx.quadraticCurveTo(x + 15.4, y + 34.6, x + 23.0, y + 30.4);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
