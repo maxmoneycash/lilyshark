@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 9,
+  "pass": 10,
   "stop_after_pass": 16,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
@@ -23,7 +23,10 @@
     "organic-balloon-tails-and-gloss",
     "circular-camera-well",
     "nav-glass-light-rim",
-    "composer-brushed-metal"
+    "composer-brushed-metal",
+    "status-bars-carrier-wifi-order",
+    "nav-hard-glass-equator",
+    "silver-camera-disc"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -58,5 +61,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 9: organic balloon path+gloss, circular camera well, nav light rim, brushed composer. User: do everything and continue to run."
+  "notes": "Pass 10: iOS 6 status order (bars, carrier, Wi-Fi), hard nav glass equator, silver camera disc, metallic composer without heavy ribs. Selftest ok, everyoneBubbles 3."
 }

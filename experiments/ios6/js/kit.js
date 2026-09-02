@@ -447,11 +447,12 @@
             ctx.fillRect(0, height - 1, W, 1);
             const ink = 0x101418;
             const accent = 0x1a6adf;
+            const carrier = options.carrier || "LilyGO";
             signalBars(ctx, 4, 13, filled, accent);
-            wifi(ctx, 26, 3, accent);
-            text(ctx, options.carrier || "LilyGO", 42, 3, ink, { size: 10, weight: "700" });
+            const carrierW = text(ctx, carrier, 26, 3, ink, { size: 10, weight: "700" });
+            wifi(ctx, 26 + carrierW + 8, 3, accent);
             text(ctx, clock, 160, 3, ink, { size: 10, weight: "700", align: "center" });
-            text(ctx, "72%", 290, 3, ink, { size: 10, weight: "700", align: "right" });
+            text(ctx, "72%", 288, 3, ink, { size: 10, weight: "700", align: "right" });
             battery(ctx, 294, 3, { color: ink, fill: 0x4cb050 });
             return;
         }
@@ -486,12 +487,18 @@
         const spec = options || {};
         const height = spec.height || Ios6.layout.NavH;
         panel(ctx, -1, y, W + 2, height, C.NavTop, C.NavBottom, C.NavEdge, 0);
-        const shine = ctx.createLinearGradient(0, y, 0, y + height * 0.52);
-        shine.addColorStop(0, "rgba(255,255,255,0.48)");
-        shine.addColorStop(0.45, "rgba(255,255,255,0.12)");
+        // iOS 6 glass: hard equator, not a soft fade.
+        const equator = y + Math.round(height * 0.48);
+        const shine = ctx.createLinearGradient(0, y, 0, equator);
+        shine.addColorStop(0, "rgba(255,255,255,0.52)");
+        shine.addColorStop(0.70, "rgba(255,255,255,0.14)");
         shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
-        ctx.fillRect(0, y, W, height * 0.52);
+        ctx.fillRect(0, y, W, equator - y);
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
+        ctx.fillRect(0, equator, W, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.10)";
+        ctx.fillRect(0, equator + 1, W, 1);
         ctx.fillStyle = "rgba(0,0,0,0.35)";
         ctx.fillRect(0, y + height - 1, W, 1);
         text(ctx, title, 160, y + Math.round((height - 14) / 2), C.White, {
@@ -668,6 +675,8 @@
         ctx.fillRect(x - 8, y, width + 16, height * 0.52);
         fillRound(ctx, x + 12, y + 2, width - 24, Math.max(4, Math.round(height * 0.16)), 5,
             "rgba(255,255,255,0.40)");
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.fillRect(x + 6, y + 1, width - 12, 1);
         ctx.restore();
     }
 
@@ -693,32 +702,41 @@
     }
 
     function cameraWell(ctx, x, y, action) {
+        // iOS 6: silver disc in a shallow well, black camera glyph.
         const cx = x + 13;
         const cy = y + 15;
         ctx.save();
         ctx.beginPath();
-        ctx.arc(cx, cy, 12.5, 0, Math.PI * 2);
-        const rim = ctx.createLinearGradient(cx, cy - 13, cx, cy + 13);
-        rim.addColorStop(0, "#0c1014");
-        rim.addColorStop(0.45, "#3a424c");
-        rim.addColorStop(1, "#c8d0d8");
-        ctx.fillStyle = rim;
+        ctx.arc(cx, cy, 13, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(12,16,20,0.45)";
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx, cy, 10.6, 0, Math.PI * 2);
-        const well = ctx.createRadialGradient(cx - 2, cy - 3, 1, cx, cy, 11);
-        well.addColorStop(0, "#3a444e");
-        well.addColorStop(0.65, "#161c22");
-        well.addColorStop(1, "#080a0c");
-        ctx.fillStyle = well;
+        ctx.arc(cx, cy, 11.2, 0, Math.PI * 2);
+        const disc = ctx.createLinearGradient(cx, cy - 12, cx, cy + 12);
+        disc.addColorStop(0, "#f2f4f6");
+        disc.addColorStop(0.48, "#c8ced4");
+        disc.addColorStop(0.52, "#9aa2aa");
+        disc.addColorStop(1, "#6a727a");
+        ctx.fillStyle = disc;
         ctx.fill();
+        ctx.strokeStyle = "#3a4248";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 10.2, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.stroke();
         ctx.restore();
-        ctx.fillStyle = "rgba(210,216,222,0.88)";
+        ctx.fillStyle = "#2a3036";
         fillRound(ctx, cx - 6, cy - 2, 12, 7, 1.6, ctx.fillStyle);
         fillRound(ctx, cx - 2.5, cy - 5, 5, 3, 1, ctx.fillStyle);
         ctx.beginPath();
-        ctx.arc(cx, cy + 1.5, 2.1, 0, Math.PI * 2);
+        ctx.arc(cx, cy + 1.4, 2.2, 0, Math.PI * 2);
         ctx.fillStyle = "#0a0e12";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, cy + 1.4, 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = "#4a606c";
         ctx.fill();
         if (action) hit(x, y, 26, 30, action);
     }
