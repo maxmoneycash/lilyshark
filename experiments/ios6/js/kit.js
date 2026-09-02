@@ -697,6 +697,49 @@
         if (action) hit(x, y, width, height, action);
     }
 
+    function tokenChip(ctx, x, y, width, height, label) {
+        const radius = height / 2;
+        ctx.save();
+        ctx.shadowColor = "rgba(20,40,80,0.28)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
+        panel(ctx, x, y, width, height, C.SendTop, C.SendBottom, C.SendEdge, radius);
+        ctx.restore();
+        candyGlass(ctx, x, y, width, height, 0.84);
+        text(ctx, label, x + width / 2, y + Math.round((height - 10) / 2), C.White, {
+            size: 11,
+            weight: "700",
+            align: "center",
+        });
+    }
+
+    function plusDisc(ctx, cx, cy, radius) {
+        const x = cx - radius;
+        const y = cy - radius;
+        const size = radius * 2;
+        ctx.save();
+        ctx.shadowColor = "rgba(20,40,80,0.30)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        const fill = ctx.createLinearGradient(x, y, x, y + size);
+        fill.addColorStop(0, hex24(C.SendTop));
+        fill.addColorStop(1, hex24(C.SendBottom));
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.restore();
+        candyGlass(ctx, x, y, size, size, 0.82);
+        ctx.strokeStyle = hex24(C.SendEdge);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = hex24(C.White);
+        ctx.fillRect(cx - 4.4, cy - 1.05, 8.8, 2.1);
+        ctx.fillRect(cx - 1.05, cy - 4.4, 2.1, 8.8);
+    }
+
     function badge(ctx, x, y, value) {
         ctx.save();
         ctx.shadowColor = "rgba(0,0,0,0.42)";
@@ -1210,6 +1253,8 @@
         sectionHeader: sectionHeader,
         glossyButton: glossyButton,
         sendButton: sendButton,
+        tokenChip: tokenChip,
+        plusDisc: plusDisc,
         badge: badge,
         bubble: bubble,
         messageStamp: messageStamp,

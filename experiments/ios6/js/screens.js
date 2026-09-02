@@ -584,23 +584,26 @@
             const last = thread.messages[thread.messages.length - 1];
             const top = tableY + index * rowH;
             ctx.fillStyle = kit.hex24(C.Rule);
-            ctx.fillRect(18, top + rowH - 1, W - 18, 1);
+            ctx.fillRect(22, top + rowH - 1, W - 22, 1);
             if (thread.unread) {
                 ctx.fillStyle = kit.hex24(0x147efb);
                 ctx.beginPath();
-                ctx.arc(10, top + 22, 3.5, 0, Math.PI * 2);
+                ctx.arc(10, top + 22, 3.6, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = "rgba(255,255,255,0.50)";
+                ctx.fillStyle = "rgba(255,255,255,0.55)";
                 ctx.beginPath();
-                ctx.ellipse(9.2, top + 20.6, 1.6, 1.1, 0, 0, Math.PI * 2);
+                ctx.ellipse(9.1, top + 20.5, 1.7, 1.15, 0, 0, Math.PI * 2);
                 ctx.fill();
             }
-            kit.text(ctx, thread.name, 22, top + 7, C.Ink, { size: 14, weight: "700" });
+            kit.text(ctx, thread.name, 22, top + 7, C.Ink, {
+                size: 14,
+                weight: thread.unread ? "700" : "500",
+            });
             kit.text(ctx, last ? last.text : "", 22, top + 25, C.Meta, {
                 size: 11,
                 maxWidth: 230,
             });
-            kit.text(ctx, thread.when, 292, top + 9, C.Meta, { size: 11, align: "right" });
+            kit.text(ctx, thread.when, 292, top + 9, C.Chevron, { size: 11, align: "right" });
             kit.chevron(ctx, 300, top + 17);
             kit.hit(0, top, W, rowH, openThread(key));
         }
@@ -618,57 +621,24 @@
             Ios6.redraw();
         });
         const toBarY = L.StatusH + L.NavH;
-        const toBarH = 22;
+        const toBarH = 26;
         ctx.fillStyle = kit.hex24(C.White);
         ctx.fillRect(0, toBarY, W, toBarH);
         ctx.fillStyle = kit.hex24(C.Rule);
         ctx.fillRect(0, toBarY + toBarH - 1, W, 1);
-        kit.text(ctx, "To:", 8, toBarY + 5, C.Meta, { size: 12, weight: "700" });
+        kit.text(ctx, "To:", 8, toBarY + 6, C.Meta, { size: 13, weight: "500" });
         const tokenKey = Ios6.state.composeTo;
         const token = tokenKey && THREADS[tokenKey];
+        let caretX = 32;
         if (token) {
             const nameSpec = { size: 11, weight: "700" };
-            const chipW = Math.ceil(kit.measureWidth(ctx, token.name, nameSpec) + 16);
-            kit.panel(ctx, 32, toBarY + 3, chipW, 16, C.SendTop, C.SendBottom, C.SendEdge, 8);
-            kit.gloss(ctx, 32, toBarY + 3, chipW, 16, 8, 0.62);
-            ctx.fillStyle = "rgba(255,255,255,0.55)";
-            ctx.fillRect(36, toBarY + 4, chipW - 8, 1);
-            kit.text(ctx, token.name, 32 + chipW / 2, toBarY + 5, C.White, {
-                size: 11,
-                weight: "700",
-                align: "center",
-            });
-        } else {
-            ctx.fillStyle = kit.hex24(0x1a6adf);
-            ctx.fillRect(32, toBarY + 5, 1.5, 12);
+            const chipW = Math.ceil(kit.measureWidth(ctx, token.name, nameSpec) + 18);
+            kit.tokenChip(ctx, 32, toBarY + 4, chipW, 18, token.name);
+            caretX = 32 + chipW + 4;
         }
-        ctx.beginPath();
-        ctx.arc(304, toBarY + 11, 8, 0, Math.PI * 2);
-        const plusFill = ctx.createLinearGradient(296, toBarY + 3, 296, toBarY + 19);
-        plusFill.addColorStop(0, kit.hex24(C.SendTop));
-        plusFill.addColorStop(1, kit.hex24(C.SendBottom));
-        ctx.fillStyle = plusFill;
-        ctx.fill();
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(304, toBarY + 11, 8, 0, Math.PI * 2);
-        ctx.clip();
-        const plusShine = ctx.createLinearGradient(296, toBarY + 3, 296, toBarY + 11);
-        plusShine.addColorStop(0, "rgba(255,255,255,0.72)");
-        plusShine.addColorStop(1, "rgba(255,255,255,0.08)");
-        ctx.fillStyle = plusShine;
-        ctx.fillRect(296, toBarY + 3, 16, 8);
-        ctx.restore();
-        ctx.strokeStyle = "rgba(255,255,255,0.70)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(304, toBarY + 11, 8, 0, Math.PI * 2);
-        ctx.stroke();
-        kit.text(ctx, "+", 304, toBarY + 3, C.White, {
-            size: 14,
-            weight: "700",
-            align: "center",
-        });
+        ctx.fillStyle = kit.hex24(0x1478e6);
+        ctx.fillRect(caretX, toBarY + 6, 1.4, 14);
+        kit.plusDisc(ctx, 304, toBarY + 13, 9);
         kit.hit(292, toBarY, 24, toBarH, function () {
             const keys = ["", "fjell", "hytta", "everyone"];
             const current = Ios6.state.composeTo || "";
