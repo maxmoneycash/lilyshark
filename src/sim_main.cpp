@@ -8958,6 +8958,25 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                                         stored->decoded.packet_id);
             }
 #endif
+#if defined(ESP_PLATFORM)
+            // A heard position goes to the paired phone as the same
+            // POSITION_APP packet stock firmware would forward, which is what
+            // lets the app's map place the node instead of staying empty.
+            if (chat_payload.has_position &&
+                stored->decoded.source != localMeshtasticNodeNum() &&
+                tdeckBleStatus().connected) {
+                std::uint8_t ble_frame[128]{};
+                const std::size_t ble_length = encodeApiPositionPacket(
+                    stored->decoded.source, stored->decoded.packet_id,
+                    static_cast<std::int32_t>(
+                        std::llround(chat_payload.latitude_degrees * 1e7)),
+                    static_cast<std::int32_t>(
+                        std::llround(chat_payload.longitude_degrees * 1e7)),
+                    stored->raw.rf.rssi_dbm_x10, stored->raw.rf.snr_db_x10,
+                    ble_frame, sizeof(ble_frame));
+                if (ble_length > 0U) (void)queueBleFromRadio(ble_frame, ble_length);
+            }
+#endif
             if (chat_payload.has_text) {
                 const std::uint32_t dest = stored->decoded.destination;
                 const bool broadcast = dest == 0xffffffffU;
@@ -14432,6 +14451,16 @@ void service_ble_api() noexcept
     formatLocalMeshtasticShortName(nodes[node_count].label,
                                    sizeof(nodes[node_count].label));
     nodes[node_count].is_self = true;
+    {
+        const GpsStatus &gps = hardware_status.snapshot().gps;
+        if (gps.state == GpsState::Fix && gps.position_valid) {
+            nodes[node_count].has_position = true;
+            nodes[node_count].latitude_i =
+                static_cast<std::int32_t>(std::llround(gps.latitude_degrees * 1e7));
+            nodes[node_count].longitude_i =
+                static_cast<std::int32_t>(std::llround(gps.longitude_degrees * 1e7));
+        }
+    }
     ++node_count;
     for (std::size_t index = 0; index < heard_count && node_count < 9U; ++index) {
         const LiveNodeSummary &summary = heard[index];
@@ -14444,6 +14473,13 @@ void service_ble_api() noexcept
         std::snprintf(entry.label, sizeof(entry.label), "%s", summary.label);
         entry.has_snr = summary.frames > 0U;
         entry.snr_x10 = summary.latest_snr_x10;
+        if (summary.has_position) {
+            entry.has_position = true;
+            entry.latitude_i = static_cast<std::int32_t>(
+                std::llround(summary.latitude_degrees * 1e7));
+            entry.longitude_i = static_cast<std::int32_t>(
+                std::llround(summary.longitude_degrees * 1e7));
+        }
     }
 
     std::uint8_t frame[512]{};

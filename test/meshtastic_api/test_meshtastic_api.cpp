@@ -183,6 +183,60 @@ void testLiveNodeInfoMatchesTheDump()
     assert(std::memcmp(from_dump, standalone, live_length) == 0);
 }
 
+void testPositionExactBytes()
+{
+    // Position{latitude_i, longitude_i} for 37.3952800 N, 122.0841600 W --
+    // sfixed32 little-endian in 1e-7 degrees, computed by hand:
+    // 373952800 = 0x164a1120, -1220841600 = 0xb73b6f80 two's complement,
+    // both little-endian on the wire (computed, not eyeballed -- the first
+    // draft of this vector transposed digits and failed its own test).
+    std::uint8_t out[128]{};
+    const std::size_t length = encodeApiPositionPacket(
+        0x96f61b44U, 9, 373952800, -1220841600, 0, 0, out, sizeof(out));
+    assert(length > 0);
+    const std::uint8_t position[] = {
+        0x0d, 0x20, 0x11, 0x4a, 0x16,  // latitude_i, field 1 fixed32
+        0x15, 0x80, 0x6f, 0x3b, 0xb7,  // longitude_i, field 2 fixed32
+    };
+    bool found = false;
+    for (std::size_t index = 0; index + sizeof(position) <= length; ++index) {
+        if (std::memcmp(out + index, position, sizeof(position)) == 0) found = true;
+    }
+    assert(found);
+    // The equator-and-meridian point still writes both coordinates: zero is
+    // a place, not an absence.
+    const std::size_t zero_length =
+        encodeApiPositionPacket(1, 2, 0, 0, 0, 0, out, sizeof(out));
+    assert(zero_length > 0);
+    const std::uint8_t zero_position[] = {
+        0x0d, 0x00, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00,
+    };
+    found = false;
+    for (std::size_t index = 0; index + sizeof(zero_position) <= zero_length; ++index) {
+        if (std::memcmp(out + index, zero_position, sizeof(zero_position)) == 0) {
+            found = true;
+        }
+    }
+    assert(found);
+}
+
+void testNodeInfoCarriesPosition()
+{
+    ApiNodeEntry node{};
+    node.num = 0x96f61b44U;
+    std::snprintf(node.label, sizeof(node.label), "96F6");
+    node.has_position = true;
+    node.latitude_i = 373952800;
+    node.longitude_i = -1220841600;
+    std::uint8_t with[192]{};
+    const std::size_t with_length = encodeApiNodeInfo(node, with, sizeof(with));
+    node.has_position = false;
+    std::uint8_t without[192]{};
+    const std::size_t without_length = encodeApiNodeInfo(node, without, sizeof(without));
+    // 10 bytes of coordinates plus the submessage tag and length.
+    assert(with_length == without_length + 12U);
+}
+
 void testEncodeRefusesTinyBuffers()
 {
     std::uint8_t out[4]{};
@@ -203,6 +257,8 @@ int main()
     testMalformedBytesRefuse();
     testHeardTextRoundTripsThroughParse();
     testLiveNodeInfoMatchesTheDump();
+    testPositionExactBytes();
+    testNodeInfoCarriesPosition();
     testEncodeRefusesTinyBuffers();
     std::printf("meshtastic_api: all assertions passed\n");
     return 0;

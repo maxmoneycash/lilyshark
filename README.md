@@ -444,7 +444,7 @@ The deck advertises Meshtastic's client Bluetooth service, so the official Mesht
 
 Texts flow both ways. A message the deck hears on the air appears in the app's conversation view; a message typed in the app goes out through the same transmit path as one typed on the deck's own keyboard — same packet ids, same want-ack request on direct messages, and it lands in the deck's chat log alongside everything else, where the peer's acknowledgement marks it DELIVERED.
 
-What pairing does not yet do, so nobody discovers it the hard way: node positions are not forwarded, so the app's map stays empty even when the deck's map is placing nodes; and settings changed in the app are read back but not applied — the deck's own Settings screen remains the way to change the radio.
+Positions travel too: nodes with a known location arrive in the app with coordinates at pairing, and a position heard afterwards is forwarded as the same POSITION_APP packet stock firmware would send, so the app's map places nodes the way the deck's own map does. What pairing does not yet do, so nobody discovers it the hard way: settings changed in the app are read back but not applied — the deck's own Settings screen remains the way to change the radio.
 
 ## Protocol coverage
 
@@ -844,7 +844,8 @@ The standalone C++ tests compile with warnings as errors and run under AddressSa
 - [x] Read LXMF messages out of Reticulum payloads.
 - [x] Advertise Meshtastic's client BLE service and answer the app's configuration handshake with identity, node list, channel, and LoRa config.
 - [x] Bridge texts both ways between a paired phone and the mesh, through the same transmit path as the deck's own keyboard.
-- [ ] Forward node positions to the paired phone and apply settings the app writes back.
+- [x] Forward node positions to the paired phone, at pairing and live as they arrive.
+- [ ] Apply settings the phone app writes back.
 - [ ] Capture known MeshCore and RNode fixtures over the air and compare bytes with desktop captures.
 - [ ] Calibrate touch orientation, battery voltage, and spectral power against known references.
 - [ ] Exercise scan cancellation, SD removal, CRC bursts, missing peripherals, and radio recovery.

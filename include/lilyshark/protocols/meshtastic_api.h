@@ -28,6 +28,11 @@ struct ApiNodeEntry {
     bool is_self = false;
     bool has_snr = false;
     std::int16_t snr_x10 = 0;
+    /// Coordinates in Meshtastic's own unit, 1e-7 degrees. Only written to
+    /// the phone when has_position is set -- zero is the equator, not absent.
+    bool has_position = false;
+    std::int32_t latitude_i = 0;
+    std::int32_t longitude_i = 0;
 };
 
 /// A message the phone wrote to ToRadio, reduced to what the deck acts on.
@@ -72,6 +77,13 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
 /// this is how it learns about everyone who arrives afterwards.
 std::size_t encodeApiNodeInfo(const ApiNodeEntry &node, std::uint8_t *out,
                               std::size_t capacity) noexcept;
+
+/// Encode FromRadio{packet} carrying a position heard on the mesh, so the
+/// phone's map places the node. Coordinates in 1e-7 degrees.
+std::size_t encodeApiPositionPacket(std::uint32_t from_node, std::uint32_t packet_id,
+                                    std::int32_t latitude_i, std::int32_t longitude_i,
+                                    std::int16_t rssi_x10, std::int16_t snr_x10,
+                                    std::uint8_t *out, std::size_t capacity) noexcept;
 
 /// Encode FromRadio{packet} carrying a text heard on the mesh, so the phone
 /// shows it in the right conversation. `to_node` distinguishes broadcast from

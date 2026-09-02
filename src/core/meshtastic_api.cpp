@@ -52,6 +52,16 @@ struct Writer {
         tag(field, kWireVarint);
         varint(value);
     }
+    /// For proto2-style optional fixed fields whose zero is a real value --
+    /// latitude_i of 0 is the equator, and skipping it would move the node.
+    void field_sfixed32_always(std::uint32_t field, std::int32_t value) noexcept
+    {
+        tag(field, kWireFixed32);
+        const std::uint32_t bits = static_cast<std::uint32_t>(value);
+        for (int shift = 0; shift < 32; shift += 8) {
+            byte(static_cast<std::uint8_t>(bits >> shift));
+        }
+    }
     void field_fixed32(std::uint32_t field, std::uint32_t value) noexcept
     {
         if (value == 0U) return;
@@ -160,6 +170,7 @@ struct Reader {
 
 // mesh.proto PortNum.
 constexpr std::uint64_t kPortText = 1;
+constexpr std::uint64_t kPortPosition = 3;
 
 void parseDataForText(const std::uint8_t *bytes, std::size_t length,
                       ApiToRadio &out) noexcept
@@ -221,6 +232,13 @@ void writeNodeInfoMessage(Writer &from_radio, const ApiNodeEntry &node) noexcept
     writeUser(user, node);
     child.field_uint(1, node.num);
     child.field_message(2, user);
+    if (node.has_position) {
+        std::uint8_t position_scratch[16]{};
+        Writer position{position_scratch, sizeof(position_scratch)};
+        position.field_sfixed32_always(1, node.latitude_i);
+        position.field_sfixed32_always(2, node.longitude_i);
+        child.field_message(3, position);
+    }
     if (node.has_snr) {
         child.field_float(4, static_cast<float>(node.snr_x10) / 10.0f);
     }
@@ -341,6 +359,36 @@ std::size_t encodeApiNodeInfo(const ApiNodeEntry &node, std::uint8_t *out,
     if (out == nullptr || capacity == 0U || node.num == 0U) return 0;
     Writer from_radio{out, capacity};
     writeNodeInfoMessage(from_radio, node);
+    return from_radio.ok ? from_radio.length : 0;
+}
+
+std::size_t encodeApiPositionPacket(std::uint32_t from_node, std::uint32_t packet_id,
+                                    std::int32_t latitude_i, std::int32_t longitude_i,
+                                    std::int16_t rssi_x10, std::int16_t snr_x10,
+                                    std::uint8_t *out, std::size_t capacity) noexcept
+{
+    if (out == nullptr || capacity == 0U) return 0;
+    std::uint8_t position_scratch[16]{};
+    Writer position{position_scratch, sizeof(position_scratch)};
+    position.field_sfixed32_always(1, latitude_i);
+    position.field_sfixed32_always(2, longitude_i);
+
+    std::uint8_t data_scratch[32]{};
+    Writer data{data_scratch, sizeof(data_scratch)};
+    data.field_uint(1, kPortPosition);
+    data.field_message(2, position);
+
+    std::uint8_t packet_scratch[64]{};
+    Writer packet{packet_scratch, sizeof(packet_scratch)};
+    packet.field_fixed32(1, from_node);
+    packet.field_fixed32(2, 0xffffffffU);
+    packet.field_message(4, data);
+    packet.field_fixed32(6, packet_id);
+    packet.field_float(8, static_cast<float>(snr_x10) / 10.0f);
+    packet.field_int32(12, rssi_x10 / 10);
+
+    Writer from_radio{out, capacity};
+    from_radio.field_message(2, packet);
     return from_radio.ok ? from_radio.length : 0;
 }
 

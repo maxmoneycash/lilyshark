@@ -82,8 +82,8 @@ Meshtastic app, scan, and connect to **Lilyshark <shortname>** — the app gets
 your node identity, the node list the deck can currently hear, the LongFast
 channel, and the radio settings, and then texts flow both ways: what the deck
 hears shows up in the app, and what you type in the app goes out over the
-deck's radio and into its chat log. Positions are not forwarded yet, so use
-the deck's own map for who-is-where.
+deck's radio and into its chat log. Node positions come across as well, so
+the app's map places your neighbours.
 
 ## 5. What you will and won't see of each other
 
