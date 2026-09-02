@@ -296,7 +296,7 @@
 
     let grainTile = null;
 
-    function applyGrain(ctx, x, y, width, height) {
+    function applyGrain(ctx, x, y, width, height, alpha) {
         if (typeof document === "undefined") return;
         if (!grainTile) {
             grainTile = document.createElement("canvas");
@@ -316,7 +316,7 @@
         const pattern = ctx.createPattern(grainTile, "repeat");
         if (!pattern) return;
         ctx.save();
-        ctx.globalAlpha = 0.22;
+        ctx.globalAlpha = alpha === undefined ? 0.22 : alpha;
         ctx.fillStyle = pattern;
         ctx.fillRect(x, y, width, height);
         ctx.restore();
@@ -369,9 +369,11 @@
     }
 
     function messagePaper(ctx) {
-        // iOS 6 Messages paper is pale blue-grey. Visible stripes read as Settings.
+        // iOS 6 Messages paper is pale blue-grey with a fine tooth.
+        // Visible stripes read as Settings.
         ctx.fillStyle = hex24(C.Backdrop);
         ctx.fillRect(0, 0, W, H);
+        applyGrain(ctx, 0, 0, W, H, 0.14);
     }
 
     function signalBars(ctx, x, y, filled, color) {
