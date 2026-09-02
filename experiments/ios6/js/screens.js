@@ -673,7 +673,7 @@
 
         const group = Ios6.state.peer === "everyone";
         const toBarY = L.StatusH + L.NavH;
-        const stripH = group ? 12 : 22;
+        const stripH = group ? 12 : 26;
         const transcriptTop = toBarY + stripH;
         if (group) {
             const toFill = ctx.createLinearGradient(0, toBarY, 0, toBarY + stripH);
@@ -706,24 +706,29 @@
                 { label: "Contact", chevron: true },
             ];
             const btnW = 100;
-            const btnH = 16;
+            const btnH = 20;
             const btnY = toBarY + 3;
             for (let index = 0; index < actions.length; index += 1) {
                 const action = actions[index];
                 const x = 6 + index * (btnW + 4);
-                kit.panel(ctx, x, btnY, btnW, btnH, C.White, C.ButtonBottom, C.ButtonEdge, 4);
-                kit.gloss(ctx, x, btnY, btnW, btnH, 4, 0.58);
-                ctx.fillStyle = "rgba(255,255,255,0.70)";
-                ctx.fillRect(x + 3, btnY + 1, btnW - 6, 1);
+                ctx.save();
+                ctx.shadowColor = "rgba(0,0,0,0.18)";
+                ctx.shadowBlur = 2;
+                ctx.shadowOffsetY = 1;
+                kit.panel(ctx, x, btnY, btnW, btnH, C.White, C.ButtonBottom, C.ButtonEdge, 5);
+                ctx.restore();
+                kit.gloss(ctx, x, btnY, btnW, btnH, 5, 0.52);
+                ctx.fillStyle = "rgba(255,255,255,0.75)";
+                ctx.fillRect(x + 4, btnY + 1, btnW - 8, 1);
                 const labelX = action.chevron ? x + btnW / 2 - 4 : x + btnW / 2;
-                kit.text(ctx, action.label, labelX, btnY + 3, 0x1a6adf, {
-                    size: 10,
+                kit.text(ctx, action.label, labelX, btnY + 5, 0x1a6adf, {
+                    size: 11,
                     weight: "700",
                     align: "center",
                 });
                 if (action.chevron) {
                     const chevronX = x + btnW - 11;
-                    const chevronY = btnY + 4;
+                    const chevronY = btnY + 6;
                     ctx.strokeStyle = kit.hex24(C.Chevron);
                     ctx.lineWidth = 1.5;
                     ctx.lineCap = "round";
