@@ -550,16 +550,18 @@
 
     function backButton(ctx, x, y, label, action) {
         const height = 18;
-        const width = 8 + label.length * (Ios6.state.font === "pixel" ? 6 : 6.2) + 14;
+        const point = 9;
+        const width = point + label.length * (Ios6.state.font === "pixel" ? 6 : 6.2) + 14;
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(x + 8, y);
+        ctx.moveTo(x + point, y);
         ctx.lineTo(x + width, y);
         ctx.quadraticCurveTo(x + width + 4, y, x + width + 4, y + 4);
         ctx.lineTo(x + width + 4, y + height - 4);
         ctx.quadraticCurveTo(x + width + 4, y + height, x + width, y + height);
-        ctx.lineTo(x + 8, y + height);
-        ctx.lineTo(x, y + height / 2);
+        ctx.lineTo(x + point, y + height);
+        ctx.quadraticCurveTo(x + 2.1, y + height * 0.60, x, y + height / 2);
+        ctx.quadraticCurveTo(x + 2.1, y + height * 0.40, x + point, y);
         ctx.closePath();
         const gradient = ctx.createLinearGradient(x, y, x, y + height);
         gradient.addColorStop(0, hex24(0x6e8cb0));
@@ -581,7 +583,7 @@
         ctx.fillStyle = "rgba(0,0,0,0.18)";
         ctx.fillRect(x, equator + 1, width + 4, 1);
         ctx.fillStyle = hex24(0xa9c4e0);
-        ctx.fillRect(x + 10, y + 1, width - 12, 1);
+        ctx.fillRect(x + point + 2, y + 1, width - point - 4, 1);
         ctx.restore();
         ctx.strokeStyle = hex24(0xa9c4e0);
         ctx.lineWidth = 1.2;
@@ -590,7 +592,7 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.restore();
-        text(ctx, label, x + 12, y + 4, C.White, {
+        text(ctx, label, x + point + 4, y + 4, C.White, {
             size: 10,
             weight: "700",
             shadow: "rgba(0,0,0,0.45)",
@@ -860,51 +862,51 @@
     }
 
     function cameraWell(ctx, x, y, action) {
-        // iOS 6 Messages: circular metallic ring, dark well, white camera.
+        // iOS 6 Messages: chrome-beveled ring, dark well, white camera.
         const size = 28;
         const cx = x + size / 2;
         const cy = y + size / 2;
-        const outer = size / 2 - 0.4;
+        const outer = size / 2 - 0.3;
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.28)";
-        ctx.shadowBlur = 2;
+        ctx.shadowColor = "rgba(0,0,0,0.34)";
+        ctx.shadowBlur = 2.2;
         ctx.shadowOffsetY = 1;
-        const rim = ctx.createLinearGradient(x, y, x, y + size);
-        rim.addColorStop(0, "#f4f6f8");
-        rim.addColorStop(0.42, "#c5ccd4");
-        rim.addColorStop(1, "#6a727a");
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+        const rim = ctx.createLinearGradient(cx - outer, cy - outer, cx + outer, cy + outer);
+        rim.addColorStop(0, "#f8f9fb");
+        rim.addColorStop(0.28, "#d4d8de");
+        rim.addColorStop(0.52, "#8c929a");
+        rim.addColorStop(1, "#3c424a");
         ctx.fillStyle = rim;
         ctx.fill();
         ctx.restore();
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(30,36,42,0.55)";
+        ctx.strokeStyle = "rgba(24,28,34,0.58)";
         ctx.lineWidth = 1;
         ctx.stroke();
-        const well = ctx.createRadialGradient(cx - 1, cy - 2, 1, cx, cy, outer - 3);
-        well.addColorStop(0, "#5a626a");
-        well.addColorStop(1, "#1c2228");
         ctx.beginPath();
-        ctx.arc(cx, cy, outer - 3.1, 0, Math.PI * 2);
+        ctx.arc(cx, cy, outer - 2.15, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,255,255,0.38)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        const well = ctx.createRadialGradient(cx - 1.4, cy - 2.4, 0.6, cx, cy, outer - 3.35);
+        well.addColorStop(0, "#3a4048");
+        well.addColorStop(1, "#101418");
+        ctx.beginPath();
+        ctx.arc(cx, cy, outer - 3.35, 0, Math.PI * 2);
         ctx.fillStyle = well;
         ctx.fill();
+        fillRound(ctx, cx - 8.2, cy - 3.2, 16.4, 11.0, 2.2, "#ffffff");
+        fillRound(ctx, cx - 4.0, cy - 7.2, 8.0, 4.2, 1.3, "#ffffff");
         ctx.beginPath();
-        ctx.arc(cx, cy, outer - 3.1, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(255,255,255,0.18)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = "#ffffff";
-        fillRound(ctx, cx - 7.6, cy - 3.0, 15.2, 10.2, 2.0, "#ffffff");
-        fillRound(ctx, cx - 3.6, cy - 6.8, 7.2, 4.0, 1.2, "#ffffff");
-        ctx.beginPath();
-        ctx.arc(cx, cy + 1.5, 3.0, 0, Math.PI * 2);
-        ctx.fillStyle = "#1c2228";
+        ctx.arc(cx + 0.2, cy + 1.6, 3.2, 0, Math.PI * 2);
+        ctx.fillStyle = "#101418";
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx - 0.8, cy + 0.6, 1.1, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.32)";
+        ctx.arc(cx - 0.6, cy + 0.6, 1.15, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.40)";
         ctx.fill();
         if (action) hit(x, y, size, size, action);
     }
