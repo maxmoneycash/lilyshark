@@ -144,11 +144,13 @@
         const trackY = 198;
         const trackW = 248;
         const trackH = 32;
-        K().panel(ctx, trackX, trackY, trackW, trackH, 0x5a6168, 0x2c3136, 0x1a1d20, 16);
+        K().panel(ctx, trackX, trackY, trackW, trackH, 0x6a727c, 0x2a3038, 0x14181c, 16);
+        ctx.fillStyle = "rgba(255,255,255,0.12)";
+        ctx.fillRect(trackX + 12, trackY + 1, trackW - 24, 1);
         const slide = Ios6.state.unlockSlide;
         const knobW = 46;
         const knobX = trackX + 2 + slide;
-        K().text(ctx, "slide to unlock", trackX + 24 + slide * 0.15, trackY + 9, 0xc8c8c8, {
+        K().text(ctx, "slide to unlock", trackX + knobW + 12 + slide * 0.15, trackY + 9, 0xd0d0d0, {
             size: 14,
             weight: "400",
             align: "left",
@@ -167,7 +169,7 @@
         ctx.restore();
         K().panel(ctx, knobX, trackY + 2, knobW, trackH - 4, C.ButtonTop, C.ButtonBottom, C.ButtonEdge, 14);
         K().gloss(ctx, knobX, trackY + 2, knobW, trackH - 4, 14, 0.5);
-        ctx.fillStyle = K().hex24(C.ButtonInk);
+        ctx.fillStyle = "#6a6a6a";
         ctx.beginPath();
         ctx.moveTo(knobX + 18, trackY + 10);
         ctx.lineTo(knobX + 28, trackY + 16);
@@ -261,9 +263,13 @@
         ], { rowH: 18 });
     }
 
+    function titleCase(value) {
+        return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+    }
+
     const THREADS = {
         everyone: {
-            name: "EVERYONE",
+            name: "Everyone",
             messages: [
                 { from: "FJELL", text: "anyone on LongFast", mine: false },
                 { from: "ME", text: "here. walnut creek", mine: true },
@@ -273,14 +279,14 @@
             ],
         },
         fjell: {
-            name: "FJELL",
+            name: "Fjell",
             messages: [
                 { from: "FJELL", text: "trailhead in 10", mine: false },
                 { from: "ME", text: "COPY, TEN MINUTES", mine: true, acked: true },
             ],
         },
         hytta: {
-            name: "HYTTA",
+            name: "Hytta",
             unread: 1,
             messages: [
                 { from: "HYTTA", text: "bring water", mine: false },
@@ -297,14 +303,8 @@
     function drawMessages(ctx) {
         const kit = K();
         kit.messagePaper(ctx);
-        kit.panel(ctx, -1, -2, 322, 26, C.NavTop, C.NavBottom, C.NavEdge, 0);
         const thread = activeThread();
-        kit.text(ctx, thread.name, 160, 5, C.White, {
-            size: 12,
-            weight: "700",
-            align: "center",
-            shadow: "rgba(0,0,0,0.5)",
-        });
+        kit.navBar(ctx, -2, thread.name, { height: 26, titleSize: 13 });
         if (Ios6.state.messagesStatusChrome) {
             kit.navStatusChrome(ctx, { carrier: "LilyGO" });
         }
@@ -316,24 +316,30 @@
         });
 
         const shown = PEERS.length;
-        const tabW = W / shown;
+        const tabW = (W - 16) / shown;
+        kit.panel(ctx, 8, L.ChatTabY, W - 16, L.ChatTabH, C.ButtonTop, C.ButtonBottom, C.ButtonEdge, 5);
         for (let index = 0; index < shown; index += 1) {
             const key = PEERS[index];
             const peer = THREADS[key];
             const selected = key === Ios6.state.peer;
-            const x = index * tabW;
-            kit.panel(ctx, x + 2, L.ChatTabY, tabW - 4, L.ChatTabH,
-                selected ? C.SendTop : C.ButtonTop,
-                selected ? C.SendBottom : C.ButtonBottom,
-                selected ? C.SendEdge : C.ButtonEdge, 5);
+            const x = 8 + index * tabW;
+            if (selected) {
+                kit.panel(ctx, x, L.ChatTabY, tabW, L.ChatTabH,
+                    C.SendTop, C.SendBottom, C.SendEdge,
+                    { tl: index === 0 ? 5 : 0, bl: index === 0 ? 5 : 0,
+                      tr: index === shown - 1 ? 5 : 0, br: index === shown - 1 ? 5 : 0 });
+            } else if (index > 0) {
+                ctx.fillStyle = kit.hex24(C.ButtonEdge);
+                ctx.fillRect(x, L.ChatTabY + 2, 1, L.ChatTabH - 4);
+            }
             kit.text(ctx, peer.name, x + tabW / 2, L.ChatTabY + 4,
                 selected ? C.White : C.ButtonInk, {
-                    size: 8,
+                    size: 9,
                     weight: "700",
                     align: "center",
                 });
             if (peer.unread && !selected) {
-                kit.badge(ctx, x + tabW - 18, L.ChatTabY + 2, peer.unread);
+                kit.badge(ctx, x + tabW - 16, L.ChatTabY + 2, peer.unread);
             }
             kit.hit(x, L.ChatTabY, tabW, L.ChatTabH, function () {
                 Ios6.state.peer = key;
@@ -343,8 +349,8 @@
         ctx.fillStyle = kit.hex24(C.Rule);
         ctx.fillRect(0, L.ChatRuleY, W, 1);
 
-        const link = Ios6.state.peer === "everyone" ? "SNR -8.6" : "SNR -12.7";
-        kit.text(ctx, link, 312, L.ChatMetaY, C.Meta, { size: 8, align: "right" });
+        const link = Ios6.state.peer === "everyone" ? "SNR −8.6" : "SNR −12.7";
+        kit.text(ctx, link, 312, L.ChatMetaY, C.Meta, { size: 10, align: "right" });
 
         const messages = thread.messages.slice();
         const spec = { size: 12, weight: "500" };
@@ -376,10 +382,10 @@
                 kit.text(ctx, lines[row], bubbleX + 10, bubbleY + 6 + row * kit.lineHeight(spec), C.Ink, spec);
             }
             if (delivered) {
-                kit.text(ctx, "DELIVERED", 310, bubbleY + bubbleH + 1, C.Meta, { size: 8, align: "right" });
+                kit.text(ctx, "Delivered", 310, bubbleY + bubbleH + 1, C.Meta, { size: 10, align: "right" });
             }
             if (header) {
-                kit.text(ctx, line.from, 12, bubbleY - 10, C.Meta, { size: 8 });
+                kit.text(ctx, titleCase(line.from), 12, bubbleY - 10, C.Meta, { size: 10 });
             }
             cursor = bubbleY - header - L.ChatBubbleGap;
             painted += 1;
@@ -389,14 +395,14 @@
         if (olderLeft > 0 || scroll > 0) {
             kit.panel(ctx, L.ChatOlderBtnX, L.ChatOlderY, L.ChatOlderBtnW, L.ChatOlderH,
                 C.OlderTop, C.OlderBottom, C.OlderEdge, 5);
-            kit.text(ctx, "OLDER", L.ChatOlderBtnX + L.ChatOlderBtnW / 2, L.ChatOlderY + 5, C.White, {
+            kit.text(ctx, "Older", L.ChatOlderBtnX + L.ChatOlderBtnW / 2, L.ChatOlderY + 5, C.White, {
                 size: 8,
                 weight: "700",
                 align: "center",
             });
             kit.panel(ctx, L.ChatNewerBtnX, L.ChatOlderY, L.ChatNewerBtnW, L.ChatOlderH,
                 C.OlderTop, C.OlderBottom, C.OlderEdge, 5);
-            kit.text(ctx, "NEWER", L.ChatNewerBtnX + L.ChatNewerBtnW / 2, L.ChatOlderY + 5, C.White, {
+            kit.text(ctx, "Newer", L.ChatNewerBtnX + L.ChatNewerBtnW / 2, L.ChatOlderY + 5, C.White, {
                 size: 8,
                 weight: "700",
                 align: "center",
@@ -422,10 +428,10 @@
         kit.panel(ctx, -1, 180, 322, 44, C.BarTop, C.BarBottom, C.BarEdge, 0);
         kit.panel(ctx, 6, 186, 250, 30, C.InputTop, C.InputBottom, C.InputEdge, 15);
         const draft = Ios6.state.draft;
-        kit.text(ctx, draft || "TYPE A MESSAGE", 18, 194,
+        kit.text(ctx, draft || "Text Message", 18, 194,
             draft ? C.Ink : C.Placeholder, {
-                size: draft ? 12 : 8,
-                weight: draft ? "600" : "500",
+                size: 12,
+                weight: draft ? "500" : "400",
             });
         if (draft) {
             const left = Math.max(0, 39 - draft.length);
@@ -434,7 +440,7 @@
                 align: "right",
             });
         }
-        kit.sendButton(ctx, L.ChatSendX, L.ChatSendY, L.ChatSendW, L.ChatSendH, "SEND", function () {
+        kit.sendButton(ctx, L.ChatSendX, L.ChatSendY, L.ChatSendW, L.ChatSendH, "Send", function () {
             Ios6.sendDraft();
         });
         kit.hit(6, 186, 250, 30, function () {

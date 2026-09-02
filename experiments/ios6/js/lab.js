@@ -7,7 +7,7 @@
         screen: "home",
         scale: 2,
         font: "helvetica",
-        rgb565: true,
+        rgb565: false,
         peer: "everyone",
         chatScroll: 0,
         messagesVisible: 0,

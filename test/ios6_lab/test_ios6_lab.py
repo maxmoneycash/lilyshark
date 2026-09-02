@@ -160,7 +160,7 @@ class Ios6LabTests(unittest.TestCase):
         self.assertIn("measureWidth", self.kit)
         self.assertIn("messagesVisible", self.lab)
         self.assertIn("everyoneBubbles", self.lab)
-        self.assertIn('"OLDER"', self.screens)
+        self.assertIn('"Older"', self.screens)
         self.assertIn("anyone on LongFast", self.screens)
         self.assertGreaterEqual(self.screens.count("mine:"), 2)
         bubble = KIT_LAYOUT["ChatBubblePad"] + 12
@@ -188,6 +188,12 @@ class Ios6LabTests(unittest.TestCase):
         self.assertIn("function dock", self.kit)
         self.assertIn("scale(1, -0.55)", self.kit)
         self.assertIn("iconLift", self.kit)
+
+    def test_home_uses_linen_and_signal_bars(self):
+        self.assertIn("function linen", self.kit)
+        self.assertIn("function signalBars", self.kit)
+        self.assertIn("function iconGloss", self.kit)
+        self.assertIn("function battery", self.kit)
 
     def test_lock_has_a_camera_well(self):
         self.assertIn("cameraX", self.screens)

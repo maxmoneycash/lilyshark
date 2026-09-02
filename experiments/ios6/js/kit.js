@@ -268,105 +268,127 @@
         Ios6.hits.push({ x: x, y: y, w: width, h: height, action: action });
     }
 
-    function wallpaper(ctx) {
-        const sky = ctx.createLinearGradient(0, 0, 0, H);
-        sky.addColorStop(0, "#1b2a4a");
-        sky.addColorStop(0.42, "#2a163f");
-        sky.addColorStop(1, "#0b141c");
-        ctx.fillStyle = sky;
-        ctx.fillRect(0, 0, W, H);
-
-        function blob(cx, cy, radius, fill) {
-            const glow = ctx.createRadialGradient(cx, cy, radius * 0.1, cx, cy, radius);
-            glow.addColorStop(0, fill);
-            glow.addColorStop(1, "rgba(0,0,0,0)");
-            ctx.fillStyle = glow;
-            ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    function linen(ctx, x, y, width, height, options) {
+        const spec = options || {};
+        ctx.fillStyle = spec.base || "#8a8476";
+        ctx.fillRect(x, y, width, height);
+        for (let col = x; col < x + width; col += 2) {
+            ctx.fillStyle = (col + y) % 4 === 0 ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)";
+            ctx.fillRect(col, y, 1, height);
         }
+        for (let row = y; row < y + height; row += 2) {
+            ctx.fillStyle = (row + x) % 4 === 0 ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.07)";
+            ctx.fillRect(x, row, width, 1);
+        }
+        if (spec.vignette) {
+            const fade = ctx.createRadialGradient(160, 110, 40, 160, 120, 210);
+            fade.addColorStop(0, "rgba(0,0,0,0)");
+            fade.addColorStop(1, "rgba(0,0,0,0.38)");
+            ctx.fillStyle = fade;
+            ctx.fillRect(x, y, width, height);
+        }
+    }
 
-        blob(70, 50, 95, "rgba(255,79,157,0.20)");
-        blob(250, 90, 120, "rgba(70,110,210,0.28)");
-        blob(150, 200, 90, "rgba(40,160,150,0.16)");
-        blob(300, 210, 70, "rgba(120,60,180,0.18)");
-
-        ctx.fillStyle = "rgba(0,0,0,0.22)";
-        for (let y = 0; y < H; y += 2) ctx.fillRect(0, y, W, 1);
-        const vignette = ctx.createRadialGradient(160, 120, 60, 160, 120, 220);
-        vignette.addColorStop(0, "rgba(0,0,0,0)");
-        vignette.addColorStop(1, "rgba(0,0,0,0.45)");
-        ctx.fillStyle = vignette;
-        ctx.fillRect(0, 0, W, H);
+    function wallpaper(ctx) {
+        linen(ctx, 0, 0, W, H, { vignette: true });
     }
 
     function pinstripe(ctx, x, y, width, height) {
         ctx.fillStyle = hex24(C.Pin);
         ctx.fillRect(x, y, width, height);
-        for (let row = 0; row < height; row += 3) {
-            ctx.fillStyle = "rgba(255,255,255,0.22)";
-            ctx.fillRect(x, y + row, width, 1);
-            ctx.fillStyle = "rgba(0,0,0,0.05)";
-            ctx.fillRect(x, y + row + 1, width, 1);
+        for (let col = x; col < x + width; col += 4) {
+            ctx.fillStyle = "rgba(255,255,255,0.30)";
+            ctx.fillRect(col, y, 2, height);
+            ctx.fillStyle = "rgba(40,50,70,0.07)";
+            ctx.fillRect(col + 2, y, 1, height);
         }
     }
 
     function messagePaper(ctx) {
         ctx.fillStyle = hex24(C.Backdrop);
         ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = "rgba(255,255,255,0.18)";
-        for (let column = 6; column < W; column += 8) {
-            ctx.fillRect(column, 0, 1, H);
+        for (let column = 0; column < W; column += 7) {
+            ctx.fillStyle = "rgba(255,255,255,0.38)";
+            ctx.fillRect(column, 0, 3, H);
+            ctx.fillStyle = "rgba(70,90,120,0.07)";
+            ctx.fillRect(column + 4, 0, 1, H);
         }
+    }
+
+    function signalBars(ctx, x, y, filled) {
+        const count = filled === undefined ? 4 : filled;
+        for (let bar = 0; bar < 5; bar += 1) {
+            const height = 3 + bar;
+            ctx.fillStyle = bar < count ? hex24(C.White) : "rgba(255,255,255,0.28)";
+            ctx.fillRect(x + bar * 4, y - height, 3, height);
+        }
+    }
+
+    function wifi(ctx, x, y) {
+        ctx.save();
+        ctx.strokeStyle = hex24(C.White);
+        ctx.lineWidth = 1.2;
+        ctx.lineCap = "round";
+        for (let ring = 0; ring < 3; ring += 1) {
+            ctx.beginPath();
+            ctx.arc(x, y + 7, 2 + ring * 2.3, Math.PI * 1.22, Math.PI * 1.78);
+            ctx.stroke();
+        }
+        ctx.fillStyle = hex24(C.White);
+        ctx.beginPath();
+        ctx.arc(x, y + 7, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function battery(ctx, x, y, options) {
+        const spec = options || {};
+        const level = spec.level === undefined ? 0.72 : spec.level;
+        ctx.strokeStyle = hex24(C.White);
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, x + 0.5, y + 0.5, 20, 9, 2);
+        ctx.stroke();
+        ctx.fillStyle = hex24(C.White);
+        ctx.fillRect(x + 21, y + 3, 2, 4);
+        fillRound(ctx, x + 2, y + 2, Math.max(2, Math.round(16 * level)), 6, 1, hex24(C.White));
     }
 
     function statusBar(ctx, clock, opts) {
         const options = opts || {};
-        ctx.fillStyle = options.clear ? "rgba(0,0,0,0.35)" : hex24(C.Status);
+        ctx.fillStyle = options.clear ? "rgba(0,0,0,0.42)" : hex24(C.Status);
         ctx.fillRect(0, 0, W, Ios6.layout.StatusH);
-        const ink = C.White;
         const filled = options.bars === undefined ? 4 : options.bars;
-        for (let pip = 0; pip < 5; pip += 1) {
-            ctx.beginPath();
-            ctx.arc(6 + pip * 5, 6, 1.5, 0, Math.PI * 2);
-            ctx.fillStyle = pip < filled ? hex24(C.White) : "rgba(255,255,255,0.28)";
-            ctx.fill();
-        }
-        text(ctx, options.carrier || "Lilyshark", 32, 2, ink, { size: 8, weight: "700" });
-        text(ctx, clock, 160, 2, ink, { size: 8, weight: "700", align: "center" });
-        panel(ctx, 292, 3, 22, 7, 0x5ad35a, 0x2f9a2f, 0xffffff, 1);
-        ctx.fillStyle = hex24(C.White);
-        ctx.fillRect(314, 5, 2, 3);
+        signalBars(ctx, 4, 10, filled);
+        wifi(ctx, 26, 1);
+        text(ctx, options.carrier || "LilyGO", 38, 2, C.White, { size: 8, weight: "700" });
+        text(ctx, clock, 160, 2, C.White, { size: 8, weight: "700", align: "center" });
+        battery(ctx, 294, 1);
     }
 
     function navStatusChrome(ctx, options) {
         const spec = options || {};
         const left = spec.left === undefined ? 58 : spec.left;
-        const filled = spec.bars === undefined ? 4 : spec.bars;
-        for (let pip = 0; pip < 5; pip += 1) {
-            ctx.beginPath();
-            ctx.arc(left + pip * 5, 6, 1.5, 0, Math.PI * 2);
-            ctx.fillStyle = pip < filled ? hex24(C.White) : "rgba(255,255,255,0.28)";
-            ctx.fill();
-        }
-        text(ctx, spec.carrier || "LilyGO", left + 28, 2, C.White, {
+        signalBars(ctx, left, 10, spec.bars === undefined ? 4 : spec.bars);
+        text(ctx, spec.carrier || "LilyGO", left + 24, 2, C.White, {
             size: 8,
             weight: "700",
             shadow: "rgba(0,0,0,0.45)",
         });
-        const batteryX = spec.batteryX === undefined ? 238 : spec.batteryX;
-        panel(ctx, batteryX, 3, 22, 7, 0x5ad35a, 0x2f9a2f, 0xffffff, 1);
-        ctx.fillStyle = hex24(C.White);
-        ctx.fillRect(batteryX + 22, 5, 2, 3);
+        battery(ctx, spec.batteryX === undefined ? 236 : spec.batteryX, 1);
     }
 
     function navBar(ctx, y, title, options) {
         const spec = options || {};
         const height = spec.height || Ios6.layout.NavH;
         panel(ctx, -1, y, W + 2, height, C.NavTop, C.NavBottom, C.NavEdge, 0);
-        const shine = ctx.createLinearGradient(0, y, 0, y + height * 0.55);
-        shine.addColorStop(0, "rgba(255,255,255,0.28)");
+        const shine = ctx.createLinearGradient(0, y, 0, y + height * 0.52);
+        shine.addColorStop(0, "rgba(255,255,255,0.48)");
+        shine.addColorStop(0.45, "rgba(255,255,255,0.12)");
         shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
-        ctx.fillRect(0, y, W, height * 0.55);
+        ctx.fillRect(0, y, W, height * 0.52);
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.fillRect(0, y + height - 1, W, 1);
         text(ctx, title, 160, y + Math.round((height - 14) / 2), C.White, {
             size: spec.titleSize || 14,
             weight: "700",
@@ -395,6 +417,14 @@
         gradient.addColorStop(1, hex24(0x3a5a86));
         ctx.fillStyle = gradient;
         ctx.fill();
+        ctx.save();
+        ctx.clip();
+        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.5);
+        shine.addColorStop(0, "rgba(255,255,255,0.45)");
+        shine.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = shine;
+        ctx.fillRect(x, y, width + 4, height * 0.5);
+        ctx.restore();
         ctx.strokeStyle = hex24(C.NavEdge);
         ctx.lineWidth = 1;
         ctx.stroke();
@@ -410,6 +440,7 @@
 
     function navButton(ctx, x, y, width, height, label, action) {
         panel(ctx, x, y, width, height, 0xa9c4e0, 0x3a5a86, C.NavEdge, 5);
+        gloss(ctx, x, y, width, height, 5, 0.5);
         text(ctx, label, x + width / 2, y + Math.round((height - 8) / 2), C.White, {
             size: 10,
             weight: "700",
@@ -516,29 +547,50 @@
 
     function iosSwitch(ctx, x, y, on, action) {
         panel(ctx, x, y, 40, 18,
-            on ? C.SwitchOnTop : C.GrayTop,
-            on ? C.SwitchOnBottom : C.GrayBottom,
-            on ? C.SwitchOnEdge : C.GrayEdge, 9);
+            on ? C.SwitchOnTop : 0xf0f0f0,
+            on ? C.SwitchOnBottom : 0xb8b8b8,
+            on ? C.SwitchOnEdge : 0x8a8a8a, 9);
+        gloss(ctx, x, y, 40, 18, 9, 0.55);
+        text(ctx, on ? "ON" : "OFF", on ? x + 7 : x + 22, y + 5,
+            on ? C.White : 0x666666, { size: 8, weight: "700" });
         const knobX = on ? x + 22 : x + 2;
         panel(ctx, knobX, y + 1, 16, 16, C.White, 0xe8e8e8, 0xb0b0b0, 8);
         if (action) hit(x, y, 40, 18, action);
     }
 
     function sectionHeader(ctx, x, y, label) {
-        text(ctx, label, x, y, 0x4a5560, { size: 10, weight: "700" });
+        text(ctx, label, x, y + 1, 0xffffff, { size: 11, weight: "700" });
+        text(ctx, label, x, y, 0x4c566c, { size: 11, weight: "700" });
+    }
+
+    function iconGloss(ctx, x, y, size, radius) {
+        ctx.save();
+        roundRectPath(ctx, x, y, size, size, radius);
+        ctx.clip();
+        const shade = ctx.createLinearGradient(x, y + size * 0.55, x, y + size);
+        shade.addColorStop(0, "rgba(0,0,0,0)");
+        shade.addColorStop(1, "rgba(0,0,0,0.22)");
+        ctx.fillStyle = shade;
+        ctx.fillRect(x, y + size * 0.55, size, size * 0.45);
+        const shine = ctx.createLinearGradient(x, y, x, y + size * 0.48);
+        shine.addColorStop(0, "rgba(255,255,255,0.72)");
+        shine.addColorStop(1, "rgba(255,255,255,0.06)");
+        ctx.fillStyle = shine;
+        ctx.fillRect(x, y, size, size * 0.48);
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.fillRect(x + 6, y + 1, size - 12, 1);
+        ctx.restore();
     }
 
     function appIcon(ctx, x, y, top, bottom, edge, glyph, label, action, unread) {
         panel(ctx, x, y, 48, 48, top, bottom, edge, 10);
-        gloss(ctx, x, y, 48, 48, 10, 0.52);
-        ctx.fillStyle = "rgba(255,255,255,0.45)";
-        ctx.fillRect(x + 8, y + 1, 32, 1);
+        iconGloss(ctx, x, y, 48, 10);
         glyph(ctx, x, y);
         text(ctx, label, x + 24, y + 50, C.White, {
-            size: 9,
-            weight: "600",
+            size: 10,
+            weight: "700",
             align: "center",
-            shadow: "rgba(0,0,0,0.7)",
+            shadow: "rgba(0,0,0,0.75)",
         });
         if (unread) badge(ctx, x + 36, y - 3, unread);
         if (action) hit(x - 4, y - 2, 56, 66, action);
@@ -547,30 +599,44 @@
     function dock(ctx, y, icons) {
         const dockH = 46;
         const iconLift = 24;
-        panel(ctx, 6, y, 308, dockH, 0x6a737c, 0x2a3036, 0x1a1e22, 8);
-        ctx.fillStyle = "rgba(255,255,255,0.22)";
-        ctx.fillRect(8, y + 1, 304, 1);
+        ctx.save();
+        roundRectPath(ctx, 6, y, 308, dockH, 12);
+        ctx.clip();
+        const glass = ctx.createLinearGradient(0, y, 0, y + dockH);
+        glass.addColorStop(0, "rgba(255,255,255,0.70)");
+        glass.addColorStop(0.08, "rgba(255,255,255,0.28)");
+        glass.addColorStop(0.4, "rgba(230,230,235,0.16)");
+        glass.addColorStop(1, "rgba(40,38,36,0.28)");
+        ctx.fillStyle = glass;
+        ctx.fillRect(6, y, 308, dockH);
+        ctx.restore();
+        ctx.strokeStyle = "rgba(255,255,255,0.40)";
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, 6.5, y + 0.5, 307, dockH - 1, 12);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.fillRect(16, y + 1, 288, 1);
         const slot = 308 / icons.length;
         for (let index = 0; index < icons.length; index += 1) {
             const icon = icons[index];
             const x = 6 + Math.round(slot * index + (slot - 48) / 2);
             const iconY = y - iconLift;
             ctx.save();
-            roundRectPath(ctx, 6, y, 308, dockH, 8);
+            roundRectPath(ctx, 6, y, 308, dockH, 12);
             ctx.clip();
             ctx.translate(x, iconY + 48);
             ctx.scale(1, -0.55);
-            ctx.globalAlpha = 0.34;
+            ctx.globalAlpha = 0.38;
             panel(ctx, 0, 0, 48, 48, icon.bottom, icon.top, icon.edge, 10);
             if (icon.glyph) icon.glyph(ctx, 0, 0);
             ctx.restore();
             ctx.save();
-            roundRectPath(ctx, 6, y, 308, dockH, 8);
+            roundRectPath(ctx, 6, y, 308, dockH, 12);
             ctx.clip();
             const fade = ctx.createLinearGradient(0, iconY + 48, 0, y + dockH);
-            fade.addColorStop(0, "rgba(24,28,32,0.08)");
-            fade.addColorStop(0.4, "rgba(24,28,32,0.38)");
-            fade.addColorStop(1, "rgba(24,28,32,0.82)");
+            fade.addColorStop(0, "rgba(40,36,32,0.04)");
+            fade.addColorStop(0.45, "rgba(40,36,32,0.22)");
+            fade.addColorStop(1, "rgba(20,18,16,0.50)");
             ctx.fillStyle = fade;
             ctx.fillRect(x - 2, iconY + 46, 52, y + dockH - (iconY + 46));
             ctx.restore();
@@ -591,7 +657,11 @@
         wrapLines: wrapLines,
         lineHeight: lineHeight,
         hit: hit,
+        linen: linen,
         wallpaper: wallpaper,
+        signalBars: signalBars,
+        battery: battery,
+        iconGloss: iconGloss,
         pinstripe: pinstripe,
         messagePaper: messagePaper,
         statusBar: statusBar,

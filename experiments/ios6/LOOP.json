@@ -43,5 +43,5 @@
     "To resume: drop experiments/ios6/reference/chat.png, set active true, queue kit-png-onion-skin, re-subscribe the timer.",
     "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down."
   ],
-  "notes": "Pass 6: Messages status chrome is a toggle. It paints signal pips, LilyGO, and a battery in the nav gaps (x=58 and x=238) so OLDER/NEWER stay at ChatOlderY=3. Default off for kit compare. Queue empty — loop parked."
+  "notes": "Pass 7 (user: does not look like iOS 6): linen SpringBoard/lock, signal bars + wifi + outline battery, hard icon gloss, glass dock over linen, Messages title case + segmented control + Text Message/Send. Kit hex values unchanged. Queue still empty."
 }
