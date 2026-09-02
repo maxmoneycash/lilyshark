@@ -159,6 +159,21 @@ void testLongFastHashMatchesKnownFrame()
 {
     assert(meshtasticChannelHash(kMeshtasticDefaultChannelName, kMeshtasticDefaultPsk,
                                  sizeof(kMeshtasticDefaultPsk)) == 0x08);
+
+    // The default channel's name follows the modem preset, and the hash
+    // follows the name: a MediumFast frame and a LongFast frame must not
+    // share a header hash, or the Bay Area profile would transmit frames
+    // the community's nodes silently drop.
+    assert(std::strcmp(meshtasticDefaultChannelName(11, 250000U), "LongFast") == 0);
+    assert(std::strcmp(meshtasticDefaultChannelName(9, 250000U), "MediumFast") == 0);
+    assert(std::strcmp(meshtasticDefaultChannelName(10, 250000U), "MediumSlow") == 0);
+    assert(std::strcmp(meshtasticDefaultChannelName(12, 125000U), "LongSlow") == 0);
+    // An unmapped combination falls back to LongFast rather than inventing.
+    assert(std::strcmp(meshtasticDefaultChannelName(6, 41700U), "LongFast") == 0);
+    assert(meshtasticChannelHash("MediumFast", kMeshtasticDefaultPsk,
+                                 sizeof(kMeshtasticDefaultPsk)) !=
+           meshtasticChannelHash("LongFast", kMeshtasticDefaultPsk,
+                                 sizeof(kMeshtasticDefaultPsk)));
 }
 
 void testEncodeTextRoundTripsThroughDefaultKeyReader()

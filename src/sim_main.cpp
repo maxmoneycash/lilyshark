@@ -12452,7 +12452,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xa066240e572f0e6aULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
-        0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0x22ed3faf3d1304e6ULL,
+        0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0xdbf9317cdfe0b856ULL,
         0x7e1363de7108f530ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
         0xde0a7b1d16ecf53aULL, 0x7ed210334475e24aULL, 0x14f80c364b5d4568ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
@@ -14235,6 +14235,11 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to
     request.text = text;
     request.short_name = short_name;
     request.long_name = long_name;
+    // The header's channel hash names the preset in use. Stamping LongFast
+    // while tuned to the Bay Area's MediumFast slot would make every stock
+    // node in earshot drop us on arrival.
+    request.channel_name = meshtasticDefaultChannelName(
+        shell_active_profile().spreading_factor, shell_active_profile().bandwidth_hz);
     // A direct text asks the peer's radio to confirm receipt; official
     // firmware answers a want-ack packet with a Routing acknowledgement, and
     // so do we. Broadcasts stay fire-and-forget like the rest of the channel.
@@ -14249,7 +14254,7 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to
     if (text != nullptr && text[0] != '\0') {
         std::snprintf(shell_notice, sizeof(shell_notice), "TX  %.40s", text);
         char event[80]{};
-        std::snprintf(event, sizeof(event), "TX LongFast  %.48s", text);
+        std::snprintf(event, sizeof(event), "TX %s  %.44s", request.channel_name, text);
         record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Radio, event);
         chat_push("ME", text, true, to_node, nullptr,
                   request.want_ack ? request.packet_id : 0U);
@@ -14267,6 +14272,8 @@ void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id) noe
     request.packet_id = next_meshtastic_packet_id();
     request.port = MeshtasticPort::Routing;
     request.request_id = packet_id;
+    request.channel_name = meshtasticDefaultChannelName(
+        shell_active_profile().spreading_factor, shell_active_profile().bandwidth_hz);
     (void)transmit_meshtastic_request(request);
 }
 

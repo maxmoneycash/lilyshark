@@ -166,7 +166,10 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
     const std::uint8_t hop = static_cast<std::uint8_t>(request.hop_limit & 0x07U);
     out[12] = static_cast<std::uint8_t>(hop | (request.want_ack ? 0x08U : 0U) |
                                         static_cast<std::uint8_t>(hop << 5U));
-    out[13] = meshtasticChannelHash(kMeshtasticDefaultChannelName, kMeshtasticDefaultPsk,
+    out[13] = meshtasticChannelHash(request.channel_name != nullptr
+                                        ? request.channel_name
+                                        : kMeshtasticDefaultChannelName,
+                                    kMeshtasticDefaultPsk,
                                     sizeof(kMeshtasticDefaultPsk));
     out[14] = 0;
     out[15] = 0;

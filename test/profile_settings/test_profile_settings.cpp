@@ -104,13 +104,15 @@ void testV1DeploymentCentersAndPreamblesArePreserved()
     assert(profile.center_frequency_hz == 910525000U);
     assert(profile.preamble_symbols == 32U);
 
+    // Profile id 4 used to be the EU RNode example; it is the Bay Area
+    // Meshtastic preset now. A v1 save carrying the old EU tune must be
+    // rejected outright -- migrating an 867 MHz Reticulum deployment onto a
+    // US Meshtastic base would produce a profile that is a lie twice over.
+    // Rejection sends the deck back to builtin defaults, which is the only
+    // honest place for a save whose meaning no longer exists.
     bytes = makeV1(4U, 867200000U, 250000U, 7U, 5U);
     assert(decodeSavedProfile(bytes.data(), bytes.size(), profile) ==
-           SavedProfileDecodeResult::MigratedV1);
-    assert(profile.protocol_hint == ProtocolId::Reticulum);
-    assert(profile.frequency_tuning_policy == FrequencyTuningPolicy::DeploymentDefined);
-    assert(profile.center_frequency_hz == 867200000U);
-    assert(profile.preamble_symbols == 47U);
+           SavedProfileDecodeResult::Invalid);
 }
 
 void testInvalidV1ValuesAreRejectedWithoutChangingOutput()

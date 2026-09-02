@@ -30,6 +30,16 @@ RadioProfile makeProfile(std::uint16_t id, const char *name, ProtocolId protocol
     return profile;
 }
 
+/// A community that names a frequency slot has pinned it on purpose; hashing
+/// the channel name would land somewhere else. Slots here are the grid's
+/// 0-based index -- one less than the number the Meshtastic UI displays.
+RadioProfile withExplicitSlot(RadioProfile profile, std::uint16_t slot) noexcept
+{
+    profile.frequency_tuning_policy = FrequencyTuningPolicy::ExplicitSlot;
+    profile.frequency_slot = slot;
+    return profile;
+}
+
 const RadioProfile profiles[] = {
     // US LongFast center frequency follows Meshtastic's DJB2 slot selection:
     // 902 + 0.125 + (19 * 0.250) = 906.875 MHz.
@@ -40,7 +50,16 @@ const RadioProfile profiles[] = {
     makeProfile(3, "MESHCORE LEGACY", ProtocolId::MeshCore, 915000000U, 250000U, 10, 5, 0x1424),
     // Official RNode documentation example, intentionally labeled as an
     // example because Reticulum/RNode PHY settings are user-defined.
-    makeProfile(4, "RNODE EXAMPLE EU", ProtocolId::Reticulum, 867200000U, 125000U, 8, 5, 0x1424),
+    // Bay Area Mesh's published settings: Medium Range Fast, frequency slot
+    // 45 -- 902.0 + 0.125 + 44 * 0.250 = 913.125 MHz -- default key, hop
+    // limit high. The community moved off LongFast, so a deck that wants to
+    // talk to strangers around the Bay needs this preset, not slot 20. The
+    // EU RNode example it replaces demonstrated a band this hardware cannot
+    // legally use here anyway.
+    withExplicitSlot(
+        makeProfile(4, "MESHTASTIC BAY MF", ProtocolId::Meshtastic, 913125000U, 250000U, 9,
+                    5, 0x2b),
+        44),
     // A US-band starting point for deployment-defined RNode settings. This is
     // not a universal Reticulum channel; tune it to the peer interface.
     makeProfile(5, "RNODE EXAMPLE US", ProtocolId::Reticulum, 915000000U, 125000U, 8, 5, 0x1424),
