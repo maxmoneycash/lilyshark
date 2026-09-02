@@ -754,7 +754,7 @@
 
         const group = Ios6.state.peer === "everyone";
         const toBarY = L.StatusH + L.NavH;
-        const stripH = group ? 12 : 26;
+        const stripH = group ? 18 : 26;
         const transcriptTop = toBarY + stripH;
         if (group) {
             const toFill = ctx.createLinearGradient(0, toBarY, 0, toBarY + stripH);
@@ -762,12 +762,15 @@
             toFill.addColorStop(1, "#ececf0");
             ctx.fillStyle = toFill;
             ctx.fillRect(0, toBarY, W, stripH);
+            ctx.fillStyle = "rgba(255,255,255,0.85)";
+            ctx.fillRect(0, toBarY, W, 1);
             ctx.fillStyle = kit.hex24(C.Rule);
             ctx.fillRect(0, toBarY + stripH - 1, W, 1);
-            kit.text(ctx, "To:", 8, toBarY + 1, C.Meta, { size: 10, weight: "700" });
-            kit.text(ctx, "Fjell, Hytta", 28, toBarY + 1, C.Ink, { size: 10 });
-            kit.text(ctx, "Details", 312, toBarY + 1, C.ButtonInk, {
-                size: 10,
+            const toTextY = toBarY + 4;
+            kit.text(ctx, "To:", 8, toTextY, C.Meta, { size: 11, weight: "700" });
+            kit.text(ctx, "Fjell, Hytta", 30, toTextY, C.Ink, { size: 11 });
+            kit.text(ctx, "Details", 312, toTextY, C.ButtonInk, {
+                size: 11,
                 weight: "700",
                 align: "right",
             });

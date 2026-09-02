@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 27,
+  "pass": 28,
   "stop_after_pass": 30,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
@@ -53,7 +53,8 @@
     "triangular-balloon-hooks",
     "inbox-search-recess-and-unread-pip",
     "imessage-stamp-dashed-gap",
-    "darker-ios6-nav-buttons"
+    "darker-ios6-nav-buttons",
+    "everyone-readable-to-bar"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -65,7 +66,7 @@
     },
     {
       "id": "call-facetime-contact-on-everyone",
-      "reason": "Everyone already uses a 12px To: bar. Adding Call/FaceTime/Contact there would steal transcript and drop everyoneBubbles below 3. 1:1 threads now have the 22px action strip."
+      "reason": "Everyone uses an 18px To: bar. Adding Call/FaceTime/Contact there would steal transcript and drop everyoneBubbles below 3. 1:1 threads have the 26px action strip."
     }
   ],
   "branch": "cursor/ios6-ui-lab-240f",
@@ -88,5 +89,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 27: Messages/Edit/Cancel are darker inset blue glass (0xa9c4e0 kept as the light inner rim). Selftest and 16 host tests must stay green."
+  "notes": "Pass 28: Everyone To: bar is 18px so To:/names/Details read like iOS 6. Three content-sized bubbles must still fit. Selftest and 16 host tests must stay green."
 }
