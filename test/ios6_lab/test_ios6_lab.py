@@ -146,6 +146,7 @@ class Ios6LabTests(unittest.TestCase):
             self.assertIn("js/" + name, self.index)
         self.assertIn('id="panel"', self.index)
         self.assertIn('id="compare-mode"', self.index)
+        self.assertIn('id="messages-chrome"', self.index)
         self.assertIn('width="320"', self.index)
         self.assertIn('height="240"', self.index)
 
@@ -175,6 +176,13 @@ class Ios6LabTests(unittest.TestCase):
             cursor = cursor - delivered - bubble - header - KIT_LAYOUT["ChatBubbleGap"]
             painted += 1
         self.assertGreaterEqual(painted, 3)
+
+    def test_messages_status_chrome_leaves_the_older_band(self):
+        self.assertIn("function navStatusChrome", self.kit)
+        self.assertIn("messagesStatusChrome", self.lab)
+        self.assertIn("navStatusChrome", self.screens)
+        self.assertEqual(KIT_LAYOUT["ChatOlderY"], 3)
+        self.assertIn("ChatOlderY: 3", self.palette)
 
     def test_dock_paints_icon_reflections(self):
         self.assertIn("function dock", self.kit)

@@ -1,6 +1,6 @@
 {
-  "active": true,
-  "pass": 5,
+  "active": false,
+  "pass": 6,
   "stop_after_pass": 8,
   "goal": "Make the 320x240 iOS 6 lab match the kit, then port winners to agent/ios6-chat-ui. Main stays the terminal chat.",
   "done_when": "experiments/ios6/reference/chat.png exists and Messages RGB565 mismatch is under 8%, or the queue is empty.",
@@ -15,11 +15,10 @@
     "section-headers",
     "messages-fit-three-bubbles",
     "lock-camera-grip",
-    "icon-reflections-in-dock"
-  ],
-  "queue": [
+    "icon-reflections-in-dock",
     "messages-full-ios6-status-chrome-toggle"
   ],
+  "queue": [],
   "skipped": [
     {
       "id": "firmware-ppm-reference-from-agent-ios6-chat-ui",
@@ -40,12 +39,9 @@
     "Stop only when active is false, pass >= stop_after_pass, or done_when is met."
   ],
   "how_to_auto": [
-    "Read this file first. Take queue[0]. Increment pass at the start of the pass.",
-    "messages-full-ios6-status-chrome-toggle: optional status-bar + carrier chrome on Messages that still keeps the kit title/OLDER/NEWER row. Do not steal the 3 px OLDER band (ChatOlderY=3).",
-    "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down.",
-    "After the item: move it to completed or skipped, write notes, run test/ios6_lab, commit, push, update PR 15, re-subscribe, end the turn.",
-    "cursor-subscriptions subscribe_timer name ios6-lab-loop delaySeconds 180 recurring. Prompt: read experiments/ios6/LOOP.json and do the next queue item with no user input.",
-    "Also subscribe_github_ci on cursor/ios6-ui-lab-240f with notifyOnSuccess true, and subscribe_github_pr on PR 15."
+    "Queue is empty and active is false. Unsubscribe ios6-lab-loop.",
+    "To resume: drop experiments/ios6/reference/chat.png, set active true, queue kit-png-onion-skin, re-subscribe the timer.",
+    "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down."
   ],
-  "notes": "Pass 5: Home dock icons sit on the glass shelf with a squashed inverted reflection that fades into the dock. Page dots moved to y=154 so they sit between the grid and the lifted dock icons. Next: messages-full-ios6-status-chrome-toggle."
+  "notes": "Pass 6: Messages status chrome is a toggle. It paints signal pips, LilyGO, and a battery in the nav gaps (x=58 and x=238) so OLDER/NEWER stay at ChatOlderY=3. Default off for kit compare. Queue empty — loop parked."
 }

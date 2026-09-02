@@ -305,6 +305,15 @@
             align: "center",
             shadow: "rgba(0,0,0,0.5)",
         });
+        if (Ios6.state.messagesStatusChrome) {
+            kit.navStatusChrome(ctx, { carrier: "LilyGO" });
+        }
+        kit.hit(100, 0, 120, 22, function () {
+            Ios6.state.messagesStatusChrome = !Ios6.state.messagesStatusChrome;
+            const box = document.getElementById("messages-chrome");
+            if (box) box.checked = Ios6.state.messagesStatusChrome;
+            Ios6.redraw();
+        });
 
         const shown = PEERS.length;
         const tabW = W / shown;
@@ -585,7 +594,7 @@
         lock: { id: "lock", title: "Lock", hint: "Drag the slider. The camera well on the right opens Capture.", draw: drawLock },
         home: { id: "home", title: "Home", hint: "SpringBoard icons open the other drafts.", draw: drawHome },
         field: { id: "field", title: "Field", hint: "HOME’s radio facts, in grouped iOS 6 chrome.", draw: drawField },
-        messages: { id: "messages", title: "Messages", hint: "The agent/ios6-chat-ui layout. Type, then SEND.", draw: drawMessages },
+        messages: { id: "messages", title: "Messages", hint: "The agent/ios6-chat-ui layout. Type, then SEND. Tap the title or the sidebar box for status chrome — OLDER/NEWER stay at y=3.", draw: drawMessages },
         nodes: { id: "nodes", title: "Nodes", hint: "A row opens that conversation.", draw: drawNodes },
         radio: { id: "radio", title: "Radio", hint: "LISTEN toggles the receiver caption.", draw: drawRadio },
         settings: { id: "settings", title: "Settings", hint: "The switch mirrors the RGB565 checkbox.", draw: drawSettings },

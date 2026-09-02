@@ -337,6 +337,27 @@
         ctx.fillRect(314, 5, 2, 3);
     }
 
+    function navStatusChrome(ctx, options) {
+        const spec = options || {};
+        const left = spec.left === undefined ? 58 : spec.left;
+        const filled = spec.bars === undefined ? 4 : spec.bars;
+        for (let pip = 0; pip < 5; pip += 1) {
+            ctx.beginPath();
+            ctx.arc(left + pip * 5, 6, 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = pip < filled ? hex24(C.White) : "rgba(255,255,255,0.28)";
+            ctx.fill();
+        }
+        text(ctx, spec.carrier || "LilyGO", left + 28, 2, C.White, {
+            size: 8,
+            weight: "700",
+            shadow: "rgba(0,0,0,0.45)",
+        });
+        const batteryX = spec.batteryX === undefined ? 238 : spec.batteryX;
+        panel(ctx, batteryX, 3, 22, 7, 0x5ad35a, 0x2f9a2f, 0xffffff, 1);
+        ctx.fillStyle = hex24(C.White);
+        ctx.fillRect(batteryX + 22, 5, 2, 3);
+    }
+
     function navBar(ctx, y, title, options) {
         const spec = options || {};
         const height = spec.height || Ios6.layout.NavH;
@@ -574,6 +595,7 @@
         pinstripe: pinstripe,
         messagePaper: messagePaper,
         statusBar: statusBar,
+        navStatusChrome: navStatusChrome,
         navBar: navBar,
         backButton: backButton,
         navButton: navButton,

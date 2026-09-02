@@ -11,6 +11,7 @@
         peer: "everyone",
         chatScroll: 0,
         messagesVisible: 0,
+        messagesStatusChrome: false,
         draft: "",
         composerFocus: false,
         txFailed: false,
@@ -248,6 +249,10 @@
             Ios6.state.rgb565 = event.target.checked;
             Ios6.redraw();
         });
+        document.getElementById("messages-chrome").addEventListener("change", function (event) {
+            Ios6.state.messagesStatusChrome = event.target.checked;
+            Ios6.redraw();
+        });
         document.querySelectorAll("#scale-row button").forEach(function (button) {
             button.addEventListener("click", function () {
                 Ios6.state.scale = Number(button.getAttribute("data-scale"));
@@ -304,6 +309,11 @@
         Ios6.state.screen = "messages";
         Ios6.redraw();
         report.everyoneBubbles = Ios6.state.messagesVisible;
+        Ios6.state.messagesStatusChrome = true;
+        Ios6.redraw();
+        report.chromeOn = Ios6.state.messagesStatusChrome === true &&
+            Ios6.state.colorCount > 200;
+        Ios6.state.messagesStatusChrome = false;
         const before = Ios6.threads.everyone.messages.length;
         Ios6.state.draft = "hello ridge";
         Ios6.sendDraft();
@@ -319,7 +329,7 @@
         report.home565 = Ios6.state.colorCount;
         report.ok = !Ios6.SCREEN_ORDER.some(function (id) {
             return report.screens[id].blank;
-        }) && report.send && report.everyoneBubbles >= 3 &&
+        }) && report.send && report.everyoneBubbles >= 3 && report.chromeOn &&
             report.home565 > 200 && report.homeFull >= report.home565;
         return report;
     };
@@ -329,6 +339,11 @@
         applyScale();
         await loadFaces();
         Ios6.compareApi.loadUrl("reference/chat.png");
+        if (/\bchrome=1\b/.test(location.search)) {
+            Ios6.state.messagesStatusChrome = true;
+            const box = document.getElementById("messages-chrome");
+            if (box) box.checked = true;
+        }
         const initial = location.hash.replace("#", "");
         Ios6.open(Ios6.screens[initial] ? initial : "home");
         if (/\bselftest=1\b/.test(location.search)) {
