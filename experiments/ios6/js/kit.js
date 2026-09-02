@@ -607,8 +607,13 @@
     }
 
     function badge(ctx, x, y, value) {
+        fillRound(ctx, x - 2, y - 2, 20, 18, 9, hex24(C.White));
         panel(ctx, x, y, 16, 14, C.BadgeTop, C.BadgeBottom, C.BadgeEdge, 7);
-        gloss(ctx, x, y, 16, 14, 7, 0.5);
+        gloss(ctx, x, y, 16, 14, 7, 0.55);
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.beginPath();
+        ctx.ellipse(x + 8, y + 4, 5, 2.4, 0, 0, Math.PI * 2);
+        ctx.fill();
         text(ctx, String(value), x + 8, y + 3, C.White, { size: 8, weight: "700", align: "center" });
     }
 

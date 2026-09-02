@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 18,
+  "pass": 19,
   "stop_after_pass": 22,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
@@ -36,7 +36,8 @@
     "imessage-paper-tooth",
     "crown-only-balloon-glass",
     "messages-icon-stripes-and-oval",
-    "new-message-compose-sheet"
+    "new-message-compose-sheet",
+    "ios6-badge-white-rim"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -71,5 +72,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 18: inbox compose opens iOS 6 New Message (Cancel, To:, + token). Selftest ok, everyoneBubbles 3."
+  "notes": "Pass 19: SpringBoard badges have the iOS 6 white rim and crown gloss. Selftest ok, everyoneBubbles 3."
 }
