@@ -173,9 +173,13 @@ body {
     width: 640px;
     height: 480px;
     background: #000;
+    image-rendering: auto;
+    cursor: pointer;
+}
+
+#panel.device-pixels {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    cursor: pointer;
 }
 
 .meters {

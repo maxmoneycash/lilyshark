@@ -144,8 +144,13 @@
 
     function family() {
         const face = Ios6.state.font;
-        if (face === "barlow") return '"Barlow Condensed", "Helvetica Neue", sans-serif';
-        return '"Helvetica Neue", Helvetica, Arial, sans-serif';
+        if (face === "barlow") {
+            return '"Barlow Condensed", "Helvetica Neue", "Liberation Sans", sans-serif';
+        }
+        // Liberation Sans is the Helvetica/Arial-metric face on this host.
+        // Helvetica Neue is what iOS 6 used; without it the canvas was falling
+        // through to a geometric grotesque and reading as iOS 7.
+        return '"Helvetica Neue", Helvetica, "Liberation Sans", Arial, sans-serif';
     }
 
     function pixelScale(size) {
@@ -289,8 +294,67 @@
         }
     }
 
+    let grainTile = null;
+
+    function applyGrain(ctx, x, y, width, height) {
+        if (typeof document === "undefined") return;
+        if (!grainTile) {
+            grainTile = document.createElement("canvas");
+            grainTile.width = 8;
+            grainTile.height = 8;
+            const tile = grainTile.getContext("2d");
+            const pixels = tile.createImageData(8, 8);
+            for (let index = 0; index < 64; index += 1) {
+                const tone = ((index * 47) ^ (index * 13) ^ 0xa5) & 255;
+                pixels.data[index * 4] = tone;
+                pixels.data[index * 4 + 1] = tone;
+                pixels.data[index * 4 + 2] = tone;
+                pixels.data[index * 4 + 3] = 22;
+            }
+            tile.putImageData(pixels, 0, 0);
+        }
+        const pattern = ctx.createPattern(grainTile, "repeat");
+        if (!pattern) return;
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = pattern;
+        ctx.fillRect(x, y, width, height);
+        ctx.restore();
+    }
+
     function wallpaper(ctx) {
-        linen(ctx, 0, 0, W, H, { vignette: true });
+        // Original photo-like field. Not Apple art. Not linen — linen is
+        // Notification Center / folders, not SpringBoard.
+        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, "#7aa4b8");
+        sky.addColorStop(0.22, "#4e8896");
+        sky.addColorStop(0.55, "#2a6570");
+        sky.addColorStop(0.82, "#163a44");
+        sky.addColorStop(1, "#0b1e26");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, W, H);
+
+        function orb(cx, cy, radius, fill) {
+            const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+            glow.addColorStop(0, fill);
+            glow.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.fillStyle = glow;
+            ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+        }
+        orb(72, 18, 120, "rgba(255,244,220,0.55)");
+        orb(250, 40, 90, "rgba(190,230,240,0.22)");
+        orb(40, 130, 70, "rgba(255,255,255,0.10)");
+        orb(200, 150, 55, "rgba(255,255,255,0.08)");
+        orb(300, 190, 80, "rgba(20,60,70,0.28)");
+        orb(120, 210, 90, "rgba(0,0,0,0.22)");
+
+        applyGrain(ctx, 0, 0, W, H);
+
+        const vignette = ctx.createRadialGradient(160, 90, 40, 160, 120, 220);
+        vignette.addColorStop(0, "rgba(0,0,0,0)");
+        vignette.addColorStop(1, "rgba(0,0,0,0.28)");
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, W, H);
     }
 
     function pinstripe(ctx, x, y, width, height) {
@@ -316,11 +380,12 @@
     }
 
     function signalBars(ctx, x, y, filled) {
+        // iOS 6 used five rising bars. Dots are iOS 7.
         const count = filled === undefined ? 4 : filled;
         for (let bar = 0; bar < 5; bar += 1) {
-            const height = 3 + bar;
+            const height = 4 + bar;
             ctx.fillStyle = bar < count ? hex24(C.White) : "rgba(255,255,255,0.28)";
-            ctx.fillRect(x + bar * 4, y - height, 3, height);
+            fillRound(ctx, x + bar * 4, y - height, 3, height, 0.6, ctx.fillStyle);
         }
     }
 
@@ -353,16 +418,35 @@
         fillRound(ctx, x + 2, y + 2, Math.max(2, Math.round(16 * level)), 6, 1, hex24(C.White));
     }
 
+    function padlock(ctx, x, y) {
+        ctx.save();
+        ctx.strokeStyle = hex24(C.White);
+        ctx.lineWidth = 1.4;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.arc(x, y + 3.2, 2.6, Math.PI, 0, false);
+        ctx.stroke();
+        fillRound(ctx, x - 4, y + 4, 8, 6.5, 1.2, hex24(C.White));
+        ctx.restore();
+    }
+
     function statusBar(ctx, clock, opts) {
         const options = opts || {};
-        ctx.fillStyle = options.clear ? "rgba(0,0,0,0.42)" : hex24(C.Status);
-        ctx.fillRect(0, 0, W, Ios6.layout.StatusH);
-        const filled = options.bars === undefined ? 4 : options.bars;
-        signalBars(ctx, 4, 10, filled);
-        wifi(ctx, 26, 1);
-        text(ctx, options.carrier || "LilyGO", 38, 2, C.White, { size: 8, weight: "700" });
-        text(ctx, clock, 160, 2, C.White, { size: 8, weight: "700", align: "center" });
-        battery(ctx, 294, 1);
+        const height = Ios6.layout.StatusH;
+        ctx.fillStyle = options.clear ? "rgba(0,0,0,0.48)" : hex24(C.Status);
+        ctx.fillRect(0, 0, W, height);
+        ctx.fillStyle = options.clear ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.10)";
+        ctx.fillRect(0, height - 1, W, 1);
+        const filled = options.bars === undefined ? 5 : options.bars;
+        signalBars(ctx, 4, 13, filled);
+        wifi(ctx, 26, 3);
+        text(ctx, options.carrier || "LilyGO", 38, 3, C.White, { size: 10, weight: "700" });
+        if (options.lock) {
+            padlock(ctx, 160, 2);
+        } else {
+            text(ctx, clock, 160, 3, C.White, { size: 10, weight: "700", align: "center" });
+        }
+        battery(ctx, 294, 3);
     }
 
     function navStatusChrome(ctx, options) {
@@ -481,8 +565,9 @@
     }
 
     function badge(ctx, x, y, value) {
-        panel(ctx, x, y, 14, 11, C.BadgeTop, C.BadgeBottom, C.BadgeEdge, 5);
-        text(ctx, String(value), x + 7, y + 2, C.White, { size: 8, weight: "700", align: "center" });
+        panel(ctx, x, y, 16, 14, C.BadgeTop, C.BadgeBottom, C.BadgeEdge, 7);
+        gloss(ctx, x, y, 16, 14, 7, 0.5);
+        text(ctx, String(value), x + 8, y + 3, C.White, { size: 8, weight: "700", align: "center" });
     }
 
     function bubbleTail(ctx, x, y, mine) {
@@ -500,6 +585,7 @@
         const bottom = mine ? C.BlueBottom : (viaNet ? C.NetBottom : C.GrayBottom);
         const edge = mine ? C.BlueEdge : (viaNet ? C.NetEdge : C.GrayEdge);
         panel(ctx, x, y, width, height, top, bottom, edge, 11);
+        gloss(ctx, x, y, width, height, 11, 0.48);
         bubbleTail(ctx, mine ? x + width - 3 : x - 2, y + height - 5, mine);
     }
 
@@ -564,81 +650,116 @@
     }
 
     function iconGloss(ctx, x, y, size, radius) {
+        // Classic SpringBoard overlay: hard equator + radial from above
+        // (the old 57px icon recipe scaled onto 48px). Drawn ON TOP of the glyph.
         ctx.save();
         roundRectPath(ctx, x, y, size, size, radius);
         ctx.clip();
-        const shade = ctx.createLinearGradient(x, y + size * 0.55, x, y + size);
-        shade.addColorStop(0, "rgba(0,0,0,0)");
-        shade.addColorStop(1, "rgba(0,0,0,0.22)");
-        ctx.fillStyle = shade;
-        ctx.fillRect(x, y + size * 0.55, size, size * 0.45);
-        const shine = ctx.createLinearGradient(x, y, x, y + size * 0.48);
-        shine.addColorStop(0, "rgba(255,255,255,0.72)");
-        shine.addColorStop(1, "rgba(255,255,255,0.06)");
+        const equator = ctx.createLinearGradient(x, y, x, y + size);
+        equator.addColorStop(0, "rgba(255,255,255,0.58)");
+        equator.addColorStop(0.49, "rgba(255,255,255,0.10)");
+        equator.addColorStop(0.50, "rgba(255,255,255,0)");
+        equator.addColorStop(0.52, "rgba(0,0,0,0.08)");
+        equator.addColorStop(1, "rgba(0,0,0,0.28)");
+        ctx.fillStyle = equator;
+        ctx.fillRect(x, y, size, size);
+        const shine = ctx.createRadialGradient(
+            x + size * 0.50, y - size * 0.82, 0,
+            x + size * 0.50, y - size * 0.82, size * 1.18
+        );
+        shine.addColorStop(0, "rgba(255,255,255,0.55)");
+        shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
-        ctx.fillRect(x, y, size, size * 0.48);
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
-        ctx.fillRect(x + 6, y + 1, size - 12, 1);
+        ctx.fillRect(x, y, size, size);
         ctx.restore();
     }
 
     function appIcon(ctx, x, y, top, bottom, edge, glyph, label, action, unread) {
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.50)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetY = 2;
         panel(ctx, x, y, 48, 48, top, bottom, edge, 10);
+        ctx.restore();
+        if (glyph) glyph(ctx, x, y);
         iconGloss(ctx, x, y, 48, 10);
-        glyph(ctx, x, y);
-        text(ctx, label, x + 24, y + 50, C.White, {
-            size: 10,
-            weight: "700",
-            align: "center",
-            shadow: "rgba(0,0,0,0.75)",
-        });
-        if (unread) badge(ctx, x + 36, y - 3, unread);
+        if (label) {
+            text(ctx, label, x + 24, y + 50, C.White, {
+                size: 10,
+                weight: "700",
+                align: "center",
+                shadow: "rgba(0,0,0,0.80)",
+            });
+        }
+        if (unread) badge(ctx, x + 36, y - 4, unread);
         if (action) hit(x - 4, y - 2, 56, 66, action);
     }
 
     function dock(ctx, y, icons) {
-        const dockH = 46;
         const iconLift = 24;
+        const frontY = y + 30;
+        const lipH = 12;
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
+        ctx.fillRect(0, y - 4, W, H - y + 4);
         ctx.save();
-        roundRectPath(ctx, 6, y, 308, dockH, 12);
+        ctx.beginPath();
+        ctx.moveTo(28, y);
+        ctx.lineTo(292, y);
+        ctx.lineTo(318, frontY);
+        ctx.lineTo(2, frontY);
+        ctx.closePath();
         ctx.clip();
-        const glass = ctx.createLinearGradient(0, y, 0, y + dockH);
-        glass.addColorStop(0, "rgba(255,255,255,0.70)");
-        glass.addColorStop(0.08, "rgba(255,255,255,0.28)");
-        glass.addColorStop(0.4, "rgba(230,230,235,0.16)");
-        glass.addColorStop(1, "rgba(40,38,36,0.28)");
+        const glass = ctx.createLinearGradient(0, y, 0, frontY);
+        glass.addColorStop(0, "rgba(255,255,255,0.10)");
+        glass.addColorStop(0.45, "rgba(230,236,242,0.22)");
+        glass.addColorStop(1, "rgba(255,255,255,0.40)");
         ctx.fillStyle = glass;
-        ctx.fillRect(6, y, 308, dockH);
+        ctx.fillRect(0, y, W, frontY - y + 2);
         ctx.restore();
-        ctx.strokeStyle = "rgba(255,255,255,0.40)";
+
+        ctx.beginPath();
+        ctx.moveTo(28, y);
+        ctx.lineTo(292, y);
+        ctx.lineTo(318, frontY);
+        ctx.lineTo(2, frontY);
+        ctx.closePath();
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
         ctx.lineWidth = 1;
-        roundRectPath(ctx, 6.5, y + 0.5, 307, dockH - 1, 12);
         ctx.stroke();
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
-        ctx.fillRect(16, y + 1, 288, 1);
+
+        ctx.beginPath();
+        ctx.moveTo(2, frontY);
+        ctx.lineTo(318, frontY);
+        ctx.lineTo(312, frontY + lipH);
+        ctx.quadraticCurveTo(160, frontY + lipH + 3, 8, frontY + lipH);
+        ctx.closePath();
+        const lip = ctx.createLinearGradient(0, frontY, 0, frontY + lipH);
+        lip.addColorStop(0, "rgba(255,255,255,0.42)");
+        lip.addColorStop(0.35, "rgba(180,190,200,0.24)");
+        lip.addColorStop(1, "rgba(8,12,16,0.45)");
+        ctx.fillStyle = lip;
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.40)";
+        ctx.fillRect(16, frontY, 288, 1);
+
         const slot = 308 / icons.length;
         for (let index = 0; index < icons.length; index += 1) {
             const icon = icons[index];
             const x = 6 + Math.round(slot * index + (slot - 48) / 2);
             const iconY = y - iconLift;
             ctx.save();
-            roundRectPath(ctx, 6, y, 308, dockH, 12);
+            ctx.beginPath();
+            ctx.moveTo(28, y);
+            ctx.lineTo(292, y);
+            ctx.lineTo(318, frontY);
+            ctx.lineTo(2, frontY);
+            ctx.closePath();
             ctx.clip();
             ctx.translate(x, iconY + 48);
             ctx.scale(1, -0.55);
             ctx.globalAlpha = 0.38;
             panel(ctx, 0, 0, 48, 48, icon.bottom, icon.top, icon.edge, 10);
             if (icon.glyph) icon.glyph(ctx, 0, 0);
-            ctx.restore();
-            ctx.save();
-            roundRectPath(ctx, 6, y, 308, dockH, 12);
-            ctx.clip();
-            const fade = ctx.createLinearGradient(0, iconY + 48, 0, y + dockH);
-            fade.addColorStop(0, "rgba(40,36,32,0.04)");
-            fade.addColorStop(0.45, "rgba(40,36,32,0.22)");
-            fade.addColorStop(1, "rgba(20,18,16,0.50)");
-            ctx.fillStyle = fade;
-            ctx.fillRect(x - 2, iconY + 46, 52, y + dockH - (iconY + 46));
             ctx.restore();
             appIcon(ctx, x, iconY, icon.top, icon.bottom, icon.edge, icon.glyph, "", icon.action, icon.unread);
         }

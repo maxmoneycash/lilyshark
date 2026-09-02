@@ -1,6 +1,6 @@
 {
   "active": false,
-  "pass": 6,
+  "pass": 8,
   "stop_after_pass": 8,
   "goal": "Make the 320x240 iOS 6 lab match the kit, then port winners to agent/ios6-chat-ui. Main stays the terminal chat.",
   "done_when": "experiments/ios6/reference/chat.png exists and Messages RGB565 mismatch is under 8%, or the queue is empty.",
@@ -43,5 +43,5 @@
     "To resume: drop experiments/ios6/reference/chat.png, set active true, queue kit-png-onion-skin, re-subscribe the timer.",
     "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down."
   ],
-  "notes": "Pass 7 (user: does not look like iOS 6): linen SpringBoard/lock, signal bars + wifi + outline battery, hard icon gloss, glass dock over linen, Messages title case + segmented control + Text Message/Send. Kit hex values unchanged. Queue still empty."
+  "notes": "Pass 8 (user: still does not look like iOS 6): SpringBoard wallpaper instead of linen, unpixelated 2x/3x type, Liberation Sans Helvetica metric, radial+equator icon gloss over glyphs, 3D glass dock, metallic lock slider + status padlock, iOS 6 five bars (not iOS 7 dots). Kit hex and Chat* layout unchanged. Queue empty. active false."
 }

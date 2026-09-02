@@ -77,7 +77,7 @@
         ChatBubbleGap: 3,
         ChatNameH: 11,
         ChatDeliveredH: 10,
-        StatusH: 12,
+        StatusH: 16,
         NavH: 28,
         DockH: 52,
     };

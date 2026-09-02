@@ -29,171 +29,257 @@
     }
 
     function glyphMessage(ctx, x, y) {
-        K().panel(ctx, x + 10, y + 14, 28, 20, C.White, 0xe8e8e8, 0xc0c0c0, 4);
-        ctx.fillStyle = K().hex24(C.BlueBottom);
+        K().fillRound(ctx, x + 8, y + 12, 32, 20, 8, K().hex24(C.White));
         ctx.beginPath();
-        ctx.moveTo(x + 16, y + 34);
-        ctx.lineTo(x + 16, y + 40);
-        ctx.lineTo(x + 24, y + 34);
+        ctx.moveTo(x + 14, y + 31);
+        ctx.lineTo(x + 14, y + 40);
+        ctx.lineTo(x + 24, y + 31);
+        ctx.closePath();
+        ctx.fillStyle = K().hex24(C.White);
         ctx.fill();
     }
 
     function glyphNodes(ctx, x, y) {
         ctx.fillStyle = K().hex24(C.White);
         ctx.beginPath();
-        ctx.arc(x + 24, y + 16, 6, 0, Math.PI * 2);
+        ctx.arc(x + 18, y + 16, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.ellipse(x + 24, y + 34, 12, 8, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 18, y + 34, 10, 7, 0, Math.PI, 0, true);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 31, y + 18, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(x + 32, y + 35, 9, 6, 0, Math.PI, 0, true);
         ctx.fill();
     }
 
     function glyphMap(ctx, x, y) {
+        ctx.fillStyle = K().hex24(0xd8e8c8);
+        ctx.beginPath();
+        ctx.moveTo(x + 10, y + 14);
+        ctx.lineTo(x + 22, y + 10);
+        ctx.lineTo(x + 38, y + 15);
+        ctx.lineTo(x + 38, y + 38);
+        ctx.lineTo(x + 22, y + 34);
+        ctx.lineTo(x + 10, y + 38);
+        ctx.closePath();
+        ctx.fill();
         ctx.strokeStyle = K().hex24(C.White);
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(x + 12, y + 32);
-        ctx.lineTo(x + 20, y + 14);
-        ctx.lineTo(x + 28, y + 28);
-        ctx.lineTo(x + 36, y + 16);
+        ctx.moveTo(x + 14, y + 34);
+        ctx.lineTo(x + 24, y + 14);
+        ctx.lineTo(x + 34, y + 30);
         ctx.stroke();
-        ctx.fillStyle = K().hex24(0xffe36b);
         ctx.beginPath();
-        ctx.arc(x + 24, y + 22, 3, 0, Math.PI * 2);
+        ctx.moveTo(x + 24, y + 14);
+        ctx.lineTo(x + 20, y + 22);
+        ctx.lineTo(x + 28, y + 22);
+        ctx.closePath();
+        ctx.fillStyle = K().hex24(C.White);
         ctx.fill();
     }
 
     function glyphTraffic(ctx, x, y) {
         ctx.fillStyle = K().hex24(C.White);
-        for (let index = 0; index < 5; index += 1) {
-            const bar = 6 + ((index * 13) % 18);
-            ctx.fillRect(x + 10 + index * 6, y + 36 - bar, 4, bar);
+        const bars = [10, 16, 12, 20, 14];
+        for (let index = 0; index < bars.length; index += 1) {
+            const bar = bars[index];
+            K().fillRound(ctx, x + 9 + index * 7, y + 36 - bar, 5, bar, 1, K().hex24(C.White));
         }
     }
 
     function glyphRadio(ctx, x, y) {
         ctx.strokeStyle = K().hex24(C.White);
         ctx.lineWidth = 2;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 6, 0, Math.PI * 2);
+        ctx.arc(x + 24, y + 26, 5, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 12, -Math.PI * 0.7, -Math.PI * 0.3);
+        ctx.arc(x + 24, y + 26, 11, -Math.PI * 0.75, -Math.PI * 0.25);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 12, Math.PI * 0.3, Math.PI * 0.7);
+        ctx.arc(x + 24, y + 26, 11, Math.PI * 0.25, Math.PI * 0.75);
         ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x + 24, y + 26, 16, -Math.PI * 0.7, -Math.PI * 0.3);
+        ctx.stroke();
+        ctx.fillStyle = K().hex24(C.White);
+        ctx.beginPath();
+        ctx.arc(x + 24, y + 26, 2, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     function glyphSpectrum(ctx, x, y) {
-        const gradient = ctx.createLinearGradient(x + 10, 0, x + 38, 0);
-        gradient.addColorStop(0, "#103a78");
-        gradient.addColorStop(0.5, "#45c7d8");
-        gradient.addColorStop(1, "#ffe36b");
-        ctx.fillStyle = gradient;
-        ctx.fillRect(x + 10, y + 14, 28, 22);
+        const hues = [0x3a6ad8, 0x2ab0c8, 0x48c060, 0xf0d040, 0xf07038];
+        for (let index = 0; index < hues.length; index += 1) {
+            K().fillRound(ctx, x + 9 + index * 6, y + 14, 5, 22, 1.5, K().hex24(hues[index]));
+        }
     }
 
     function glyphCapture(ctx, x, y) {
-        K().panel(ctx, x + 12, y + 16, 24, 18, C.White, 0xdddddd, 0xbbbbbb, 3);
-        ctx.fillStyle = K().hex24(C.BadgeBottom);
+        K().fillRound(ctx, x + 8, y + 16, 32, 20, 4, K().hex24(0xf2f4f6));
+        ctx.fillStyle = K().hex24(0xf2f4f6);
+        ctx.fillRect(x + 28, y + 13, 8, 4);
         ctx.beginPath();
-        ctx.arc(x + 24, y + 25, 5, 0, Math.PI * 2);
+        ctx.arc(x + 24, y + 26, 7, 0, Math.PI * 2);
+        ctx.fillStyle = K().hex24(0x2a3038);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 24, y + 26, 4, 0, Math.PI * 2);
+        ctx.fillStyle = K().hex24(0x68a8d0);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 22, y + 24, 1.4, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
         ctx.fill();
     }
 
     function glyphSettings(ctx, x, y) {
-        ctx.strokeStyle = K().hex24(C.White);
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(x + 24, y + 24, 8, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        for (let spoke = 0; spoke < 6; spoke += 1) {
-            const angle = spoke * Math.PI / 3;
-            ctx.moveTo(x + 24 + Math.cos(angle) * 11, y + 24 + Math.sin(angle) * 11);
-            ctx.lineTo(x + 24 + Math.cos(angle) * 15, y + 24 + Math.sin(angle) * 15);
+        ctx.save();
+        ctx.translate(x + 24, y + 24);
+        ctx.fillStyle = K().hex24(0xe8eef4);
+        for (let spoke = 0; spoke < 8; spoke += 1) {
+            ctx.rotate(Math.PI / 4);
+            K().roundRectPath(ctx, -2.2, -14, 4.4, 8, 1.2);
+            ctx.fill();
         }
-        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, 7.2, 0, Math.PI * 2);
+        ctx.arc(0, 0, 3.1, 0, Math.PI * 2, true);
+        ctx.fill("evenodd");
+        ctx.restore();
     }
 
     function glyphField(ctx, x, y) {
-        ctx.fillStyle = K().hex24(C.Lily);
-        ctx.fillRect(x + 14, y + 14, 20, 8);
-        ctx.fillStyle = K().hex24(C.White);
-        ctx.fillRect(x + 14, y + 24, 20, 12);
+        K().fillRound(ctx, x + 12, y + 10, 24, 28, 3, K().hex24(0xfff8dc));
+        ctx.fillStyle = K().hex24(0xf0a0c0);
+        ctx.fillRect(x + 12, y + 10, 24, 7);
+        ctx.strokeStyle = K().hex24(0xd8c070);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 16, y + 22);
+        ctx.lineTo(x + 32, y + 22);
+        ctx.moveTo(x + 16, y + 27);
+        ctx.lineTo(x + 32, y + 27);
+        ctx.moveTo(x + 16, y + 32);
+        ctx.lineTo(x + 28, y + 32);
+        ctx.stroke();
+    }
+
+    function drawLockClock(ctx, value, cx, y) {
+        const chars = String(value).split("");
+        ctx.save();
+        ctx.font = "300 54px \"Helvetica Neue\", Helvetica, \"Liberation Sans\", Arial, sans-serif";
+        ctx.textBaseline = "top";
+        ctx.textAlign = "left";
+        let width = 0;
+        const widths = chars.map(function (ch) {
+            const w = ctx.measureText(ch).width + (ch === ":" ? 2 : 3);
+            width += w;
+            return w;
+        });
+        let left = Math.round(cx - width / 2);
+        chars.forEach(function (ch, index) {
+            ctx.fillStyle = "rgba(0,0,0,0.40)";
+            ctx.fillText(ch, left, y + 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(ch, left, y);
+            left += widths[index];
+        });
+        ctx.restore();
     }
 
     function drawLock(ctx) {
         K().wallpaper(ctx);
-        K().statusBar(ctx, clockText(), { clear: true, carrier: "LilyGO" });
-        K().text(ctx, clockText(), 160, 36, C.White, {
-            size: 44,
-            weight: "200",
-            align: "center",
-            shadow: "rgba(0,0,0,0.45)",
-        });
-        K().text(ctx, dateText(), 160, 90, C.White, {
+        K().statusBar(ctx, clockText(), { clear: true, carrier: "LilyGO", lock: true });
+        drawLockClock(ctx, clockText(), 160, 34);
+        K().text(ctx, dateText(), 160, 96, C.White, {
             size: 13,
             weight: "500",
             align: "center",
-            shadow: "rgba(0,0,0,0.45)",
+            shadow: "rgba(0,0,0,0.50)",
         });
 
-        const trackX = 10;
+        const glass = ctx.createLinearGradient(0, 184, 0, H);
+        glass.addColorStop(0, "rgba(18,22,28,0.55)");
+        glass.addColorStop(0.35, "rgba(8,10,14,0.82)");
+        glass.addColorStop(1, "rgba(0,0,0,0.92)");
+        ctx.fillStyle = glass;
+        ctx.fillRect(0, 184, W, H - 184);
+        ctx.fillStyle = "rgba(255,255,255,0.16)";
+        ctx.fillRect(0, 184, W, 1);
+
+        const trackX = 8;
         const trackY = 198;
-        const trackW = 248;
-        const trackH = 32;
-        K().panel(ctx, trackX, trackY, trackW, trackH, 0x6a727c, 0x2a3038, 0x14181c, 16);
-        ctx.fillStyle = "rgba(255,255,255,0.12)";
-        ctx.fillRect(trackX + 12, trackY + 1, trackW - 24, 1);
+        const trackW = 250;
+        const trackH = 30;
+        K().panel(ctx, trackX, trackY, trackW, trackH, 0x1c2228, 0x07090c, 0x000000, 15);
+        ctx.fillStyle = "rgba(255,255,255,0.10)";
+        ctx.fillRect(trackX + 14, trackY + 1, trackW - 28, 1);
         const slide = Ios6.state.unlockSlide;
-        const knobW = 46;
+        const knobW = 48;
         const knobX = trackX + 2 + slide;
-        K().text(ctx, "slide to unlock", trackX + knobW + 12 + slide * 0.15, trackY + 9, 0xd0d0d0, {
-            size: 14,
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(trackX + knobW + 4, trackY + 2, trackW - knobW - 10, trackH - 4);
+        ctx.clip();
+        K().text(ctx, "slide to unlock", trackX + knobW + 14 + slide * 0.12, trackY + 7, 0x9aa2aa, {
+            size: 15,
             weight: "400",
             align: "left",
         });
         const shimmer = Ios6.state.shimmer;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(trackX + 50, trackY + 4, 200, 24);
-        ctx.clip();
-        const shine = ctx.createLinearGradient(trackX + shimmer - 40, 0, trackX + shimmer + 40, 0);
+        const shine = ctx.createLinearGradient(trackX + shimmer - 36, 0, trackX + shimmer + 36, 0);
         shine.addColorStop(0, "rgba(255,255,255,0)");
-        shine.addColorStop(0.5, "rgba(255,255,255,0.55)");
+        shine.addColorStop(0.5, "rgba(255,255,255,0.70)");
         shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
         ctx.fillRect(trackX, trackY, trackW, trackH);
         ctx.restore();
-        K().panel(ctx, knobX, trackY + 2, knobW, trackH - 4, C.ButtonTop, C.ButtonBottom, C.ButtonEdge, 14);
-        K().gloss(ctx, knobX, trackY + 2, knobW, trackH - 4, 14, 0.5);
-        ctx.fillStyle = "#6a6a6a";
+
+        K().panel(ctx, knobX, trackY + 2, knobW, trackH - 4, 0xf7f9fb, 0xb8c0c8, 0x8a929a, 13);
+        K().gloss(ctx, knobX, trackY + 2, knobW, trackH - 4, 13, 0.52);
+        ctx.fillStyle = "#5a626a";
+        ctx.beginPath();
+        ctx.moveTo(knobX + 18, trackY + 9);
+        ctx.lineTo(knobX + 30, trackY + 15);
+        ctx.lineTo(knobX + 18, trackY + 21);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#d8dee4";
         ctx.beginPath();
         ctx.moveTo(knobX + 18, trackY + 10);
-        ctx.lineTo(knobX + 28, trackY + 16);
-        ctx.lineTo(knobX + 18, trackY + 22);
+        ctx.lineTo(knobX + 27, trackY + 15);
+        ctx.lineTo(knobX + 18, trackY + 20);
+        ctx.closePath();
         ctx.fill();
         Ios6.state.unlockTrack = { x: trackX, y: trackY, w: trackW, h: trackH, knobW: knobW };
 
         const cameraX = 266;
-        K().panel(ctx, cameraX, trackY, 44, trackH, 0x3a4048, 0x1c2024, 0x0e1012, 10);
-        K().gloss(ctx, cameraX, trackY, 44, trackH, 10, 0.28);
-        K().panel(ctx, cameraX + 10, trackY + 8, 24, 16, C.ButtonTop, C.ButtonBottom, C.ButtonEdge, 3);
-        ctx.fillStyle = K().hex24(C.ButtonTop);
-        ctx.fillRect(cameraX + 18, trackY + 6, 8, 3);
-        ctx.fillStyle = K().hex24(C.BadgeBottom);
+        K().panel(ctx, cameraX, trackY, 46, trackH, 0x3a424c, 0x14181c, 0x080a0c, 8);
+        K().gloss(ctx, cameraX, trackY, 46, trackH, 8, 0.30);
+        K().panel(ctx, cameraX + 11, trackY + 7, 24, 16, 0xf0f2f4, 0xc8ccd0, 0x9aa0a6, 3);
+        ctx.fillStyle = K().hex24(0xf0f2f4);
+        ctx.fillRect(cameraX + 19, trackY + 5, 8, 3);
         ctx.beginPath();
-        ctx.arc(cameraX + 22, trackY + 16, 4, 0, Math.PI * 2);
+        ctx.arc(cameraX + 23, trackY + 15, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = K().hex24(0x2a3038);
         ctx.fill();
-        K().hit(cameraX, trackY, 44, trackH, go("settings"));
+        ctx.beginPath();
+        ctx.arc(cameraX + 23, trackY + 15, 2.4, 0, Math.PI * 2);
+        ctx.fillStyle = K().hex24(0x68a8d0);
+        ctx.fill();
+        K().hit(cameraX, trackY, 46, trackH, go("settings"));
     }
 
     function iconCell(column, row) {
         return {
-            x: 16 + column * 76,
-            y: 22 + row * 70,
+            x: 14 + column * 76,
+            y: 20 + row * 68,
         };
     }
 
@@ -201,14 +287,14 @@
         K().wallpaper(ctx);
         K().statusBar(ctx, clockText(), { clear: true });
         const apps = [
-            { label: "Messages", top: 0x7fe07a, bottom: 0x1b9a22, edge: 0x0e6a14, glyph: glyphMessage, go: "messages", unread: 2 },
-            { label: "Nodes", top: 0xf6ae43, bottom: 0xc46a12, edge: 0x8a4a0c, glyph: glyphNodes, go: "nodes" },
-            { label: "Field", top: 0xff7ab3, bottom: 0xc01860, edge: 0x8a1048, glyph: glyphField, go: "field" },
-            { label: "Traffic", top: 0x6ad0d8, bottom: 0x1a6a88, edge: 0x0e4058, glyph: glyphTraffic, go: "kit" },
-            { label: "Radio", top: 0x8a93a0, bottom: 0x3a4048, edge: 0x22262c, glyph: glyphRadio, go: "radio" },
-            { label: "Spectrum", top: 0x8a6adf, bottom: 0x3a2088, edge: 0x241058, glyph: glyphSpectrum, go: "kit" },
-            { label: "Capture", top: 0xf06c65, bottom: 0xa01820, edge: 0x6a1014, glyph: glyphCapture, go: "settings" },
-            { label: "Settings", top: 0xd0d4d8, bottom: 0x6a7078, edge: 0x404448, glyph: glyphSettings, go: "settings" },
+            { label: "Messages", top: 0x6ee66a, bottom: 0x169a22, edge: 0x0c6a14, glyph: glyphMessage, go: "messages", unread: 2 },
+            { label: "Nodes", top: 0xf8b44a, bottom: 0xc46a10, edge: 0x8a4a0c, glyph: glyphNodes, go: "nodes" },
+            { label: "Field", top: 0xff86b8, bottom: 0xc01860, edge: 0x8a1048, glyph: glyphField, go: "field" },
+            { label: "Traffic", top: 0x6ad8e0, bottom: 0x1a6a88, edge: 0x0e4058, glyph: glyphTraffic, go: "kit" },
+            { label: "Radio", top: 0x9aa2aa, bottom: 0x3a4248, edge: 0x22262c, glyph: glyphRadio, go: "radio" },
+            { label: "Spectrum", top: 0x9a78e8, bottom: 0x3a2088, edge: 0x241058, glyph: glyphSpectrum, go: "kit" },
+            { label: "Capture", top: 0x8a929a, bottom: 0x3a4248, edge: 0x22262c, glyph: glyphCapture, go: "settings" },
+            { label: "Settings", top: 0xd8dce0, bottom: 0x6a7078, edge: 0x404448, glyph: glyphSettings, go: "settings" },
         ];
         for (let index = 0; index < apps.length; index += 1) {
             const cell = iconCell(index % 4, Math.floor(index / 4));
@@ -216,20 +302,20 @@
             K().appIcon(ctx, cell.x, cell.y, app.top, app.bottom, app.edge, app.glyph, app.label,
                 go(app.go), app.unread);
         }
-        K().dock(ctx, 188, [
-            { top: 0x7fe07a, bottom: 0x1b9a22, edge: 0x0e6a14, glyph: glyphMessage, action: go("messages"), unread: 2 },
-            { top: 0xf6ae43, bottom: 0xc46a12, edge: 0x8a4a0c, glyph: glyphNodes, action: go("nodes") },
-            { top: 0x6ad0d8, bottom: 0x1a6a88, edge: 0x0e4058, glyph: glyphMap, action: go("field") },
-            { top: 0x8a93a0, bottom: 0x3a4048, edge: 0x22262c, glyph: glyphRadio, action: go("radio") },
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.beginPath();
+        ctx.arc(154, 158, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.32)";
+        ctx.beginPath();
+        ctx.arc(166, 158, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        K().dock(ctx, 190, [
+            { top: 0x6ee66a, bottom: 0x169a22, edge: 0x0c6a14, glyph: glyphMessage, action: go("messages"), unread: 2 },
+            { top: 0xf8b44a, bottom: 0xc46a10, edge: 0x8a4a0c, glyph: glyphNodes, action: go("nodes") },
+            { top: 0x88c868, bottom: 0x2a6820, edge: 0x184818, glyph: glyphMap, action: go("field") },
+            { top: 0x9aa2aa, bottom: 0x3a4248, edge: 0x22262c, glyph: glyphRadio, action: go("radio") },
         ]);
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.beginPath();
-        ctx.arc(154, 154, 2.4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.28)";
-        ctx.beginPath();
-        ctx.arc(166, 154, 2.4, 0, Math.PI * 2);
-        ctx.fill();
     }
 
     function drawField(ctx) {
@@ -558,6 +644,7 @@
         K().iosSwitch(ctx, 256, 218, rgb, function () {
             Ios6.state.rgb565 = !Ios6.state.rgb565;
             document.getElementById("rgb565").checked = Ios6.state.rgb565;
+            if (Ios6.applyScale) Ios6.applyScale();
             Ios6.redraw();
         });
     }

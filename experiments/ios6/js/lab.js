@@ -40,11 +40,13 @@
         const node = canvas();
         node.style.width = (W * Ios6.state.scale) + "px";
         node.style.height = (H * Ios6.state.scale) + "px";
+        node.classList.toggle("device-pixels", Ios6.state.rgb565);
         document.getElementById("scale-readout").textContent = Ios6.state.scale + "×";
         document.querySelectorAll("#scale-row button").forEach(function (button) {
             button.setAttribute("aria-pressed", button.getAttribute("data-scale") === String(Ios6.state.scale));
         });
     }
+    Ios6.applyScale = applyScale;
 
     function syncScreenList() {
         const list = document.getElementById("screen-list");
@@ -247,6 +249,7 @@
         });
         document.getElementById("rgb565").addEventListener("change", function (event) {
             Ios6.state.rgb565 = event.target.checked;
+            applyScale();
             Ios6.redraw();
         });
         document.getElementById("messages-chrome").addEventListener("change", function (event) {
