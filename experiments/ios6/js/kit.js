@@ -758,19 +758,21 @@
     }
 
     function messageStamp(ctx, y, label, when) {
+        const spec = { size: 10, weight: "700" };
+        const labelW = measureWidth(ctx, label, spec);
+        const left = 160 - labelW / 2 - 8;
+        const right = 160 + labelW / 2 + 8;
         ctx.save();
         ctx.strokeStyle = hex24(C.Meta);
         ctx.lineWidth = 1;
-        ctx.setLineDash([1, 2]);
+        ctx.setLineDash([1, 3]);
         ctx.beginPath();
         ctx.moveTo(16, y + 6);
+        ctx.lineTo(left, y + 6);
+        ctx.moveTo(right, y + 6);
         ctx.lineTo(W - 16, y + 6);
         ctx.stroke();
         ctx.restore();
-        const spec = { size: 10, weight: "700" };
-        const labelW = measureWidth(ctx, label, spec);
-        ctx.fillStyle = hex24(C.Backdrop);
-        ctx.fillRect(160 - labelW / 2 - 7, y, labelW + 14, 13);
         text(ctx, label, 160, y, C.Meta, { size: 10, weight: "700", align: "center" });
         if (when) {
             text(ctx, when, 160, y + 14, C.Meta, { size: 10, weight: "500", align: "center" });

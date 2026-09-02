@@ -551,13 +551,24 @@
         });
         const searchY = L.StatusH + L.NavH;
         const searchBar = ctx.createLinearGradient(0, searchY, 0, searchY + 28);
-        searchBar.addColorStop(0, "#d8d8dc");
-        searchBar.addColorStop(1, "#b4b4ba");
+        searchBar.addColorStop(0, "#cfd0d6");
+        searchBar.addColorStop(1, "#9ea0a8");
         ctx.fillStyle = searchBar;
         ctx.fillRect(0, searchY, W, 28);
-        ctx.fillStyle = "rgba(0,0,0,0.18)";
+        ctx.fillStyle = "rgba(255,255,255,0.42)";
+        ctx.fillRect(0, searchY, W, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
         ctx.fillRect(0, searchY + 27, W, 1);
-        kit.panel(ctx, 8, searchY + 4, 304, 20, 0xffffff, 0xf2f2f2, 0x8a8a8a, 10);
+        kit.panel(ctx, 8, searchY + 4, 304, 20, 0xffffff, 0xf4f4f6, 0x7a7a82, 10);
+        ctx.save();
+        kit.roundRectPath(ctx, 8, searchY + 4, 304, 20, 10);
+        ctx.clip();
+        const inset = ctx.createLinearGradient(0, searchY + 4, 0, searchY + 14);
+        inset.addColorStop(0, "rgba(0,0,0,0.28)");
+        inset.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = inset;
+        ctx.fillRect(8, searchY + 4, 304, 10);
+        ctx.restore();
         kit.searchGlyph(ctx, 22, searchY + 14, C.Placeholder);
         kit.text(ctx, "Search", 32, searchY + 7, C.Placeholder, { size: 12 });
 
@@ -575,9 +586,13 @@
             ctx.fillStyle = kit.hex24(C.Rule);
             ctx.fillRect(18, top + rowH - 1, W - 18, 1);
             if (thread.unread) {
-                ctx.fillStyle = kit.hex24(0x1a6adf);
+                ctx.fillStyle = kit.hex24(0x147efb);
                 ctx.beginPath();
-                ctx.arc(10, top + 22, 4, 0, Math.PI * 2);
+                ctx.arc(10, top + 22, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "rgba(255,255,255,0.50)";
+                ctx.beginPath();
+                ctx.ellipse(9.2, top + 20.6, 1.6, 1.1, 0, 0, Math.PI * 2);
                 ctx.fill();
             }
             kit.text(ctx, thread.name, 22, top + 7, C.Ink, { size: 14, weight: "700" });
@@ -615,7 +630,9 @@
             const nameSpec = { size: 11, weight: "700" };
             const chipW = Math.ceil(kit.measureWidth(ctx, token.name, nameSpec) + 16);
             kit.panel(ctx, 32, toBarY + 3, chipW, 16, C.SendTop, C.SendBottom, C.SendEdge, 8);
-            kit.gloss(ctx, 32, toBarY + 3, chipW, 16, 8, 0.5);
+            kit.gloss(ctx, 32, toBarY + 3, chipW, 16, 8, 0.62);
+            ctx.fillStyle = "rgba(255,255,255,0.55)";
+            ctx.fillRect(36, toBarY + 4, chipW - 8, 1);
             kit.text(ctx, token.name, 32 + chipW / 2, toBarY + 5, C.White, {
                 size: 11,
                 weight: "700",
@@ -749,7 +766,7 @@
             ctx.fillRect(0, toBarY + stripH - 1, W, 1);
             kit.text(ctx, "To:", 8, toBarY + 1, C.Meta, { size: 10, weight: "700" });
             kit.text(ctx, "Fjell, Hytta", 28, toBarY + 1, C.Ink, { size: 10 });
-            kit.text(ctx, "Details", 312, toBarY + 1, 0x1a6adf, {
+            kit.text(ctx, "Details", 312, toBarY + 1, C.ButtonInk, {
                 size: 10,
                 weight: "700",
                 align: "right",
