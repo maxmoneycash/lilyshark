@@ -685,23 +685,19 @@
         kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
         const draft = Ios6.state.draft;
         const placeholder = serviceLabel(thread);
-        kit.text(ctx, draft || placeholder, 54, 194,
+        kit.text(ctx, draft || placeholder, 48, 194,
             draft ? C.Ink : C.Placeholder, {
                 size: 12,
                 weight: draft ? "500" : "400",
             });
         if (Ios6.state.composerFocus) {
             const caretX = draft
-                ? 54 + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
-                : 50;
-            ctx.fillStyle = kit.hex24(0x1a6adf);
-            ctx.fillRect(Math.min(caretX, 246), 192, 1.5, 16);
+                ? 48 + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
+                : 46;
+            ctx.fillStyle = kit.hex24(0x1478e6);
+            ctx.fillRect(Math.min(caretX, 246), 192, 1.4, 16);
         }
-        const sendTone = !draft ? {
-            top: 0xa8b0b8,
-            bottom: 0x6a727a,
-            edge: 0x4a525a,
-        } : (sms ? {
+        const sendTone = !draft ? { idle: true } : (sms ? {
             top: C.SmsTop,
             bottom: C.SmsBottom,
             edge: C.SmsEdge,
@@ -907,23 +903,19 @@
         kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
         const draft = Ios6.state.draft;
         const placeholder = serviceLabel(thread);
-        kit.text(ctx, draft || placeholder, 54, 194,
+        kit.text(ctx, draft || placeholder, 48, 194,
             draft ? C.Ink : C.Placeholder, {
                 size: 12,
                 weight: draft ? "500" : "400",
             });
         if (Ios6.state.composerFocus) {
             const caretX = draft
-                ? 54 + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
-                : 50;
-            ctx.fillStyle = kit.hex24(0x1a6adf);
-            ctx.fillRect(Math.min(caretX, 246), 192, 1.5, 16);
+                ? 48 + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
+                : 46;
+            ctx.fillStyle = kit.hex24(0x1478e6);
+            ctx.fillRect(Math.min(caretX, 246), 192, 1.4, 16);
         }
-        const sendTone = !draft ? {
-            top: 0xa8b0b8,
-            bottom: 0x6a727a,
-            edge: 0x4a525a,
-        } : (sms ? {
+        const sendTone = !draft ? { idle: true } : (sms ? {
             top: C.SmsTop,
             bottom: C.SmsBottom,
             edge: C.SmsEdge,
