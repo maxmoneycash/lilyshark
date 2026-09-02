@@ -417,10 +417,25 @@
         applyScale();
         await loadFaces();
         Ios6.compareApi.loadUrl("reference/chat.png");
+        if (/\bsnap=1\b/.test(location.search)) {
+            document.body.classList.add("snap");
+        }
         if (/\bchrome=1\b/.test(location.search)) {
             Ios6.state.messagesStatusChrome = true;
             const box = document.getElementById("messages-chrome");
             if (box) box.checked = true;
+        }
+        if (/\binbox=1\b/.test(location.search)) {
+            Ios6.state.messagesInbox = true;
+        }
+        const peerMatch = /(?:\?|&)peer=([a-z]+)/.exec(location.search);
+        if (peerMatch && Ios6.threads && Ios6.threads[peerMatch[1]]) {
+            Ios6.state.peer = peerMatch[1];
+        }
+        const draftMatch = /(?:\?|&)draft=([^&]*)/.exec(location.search);
+        if (draftMatch) {
+            Ios6.state.draft = decodeURIComponent(draftMatch[1].replace(/\+/g, " "));
+            Ios6.state.composerFocus = true;
         }
         const initial = location.hash.replace("#", "");
         Ios6.open(Ios6.screens[initial] ? initial : "home");

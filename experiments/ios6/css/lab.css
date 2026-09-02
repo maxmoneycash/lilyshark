@@ -211,6 +211,31 @@ body {
     max-width: 52em;
 }
 
+body.snap {
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+}
+
+body.snap .masthead,
+body.snap .rail,
+body.snap .meters,
+body.snap .bezel-caption {
+    display: none;
+}
+
+body.snap .bench,
+body.snap .stage,
+body.snap .bezel {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #000;
+    max-width: none;
+}
+
 @media (max-width: 900px) {
     .bench {
         flex-direction: column;

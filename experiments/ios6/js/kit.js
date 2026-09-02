@@ -369,16 +369,9 @@
     }
 
     function messagePaper(ctx) {
-        // iOS 6 Messages paper: pale blue-grey, almost flat, faint textile.
+        // iOS 6 Messages paper is pale blue-grey. Visible stripes read as Settings.
         ctx.fillStyle = hex24(C.Backdrop);
         ctx.fillRect(0, 0, W, H);
-        ctx.save();
-        ctx.globalAlpha = 0.10;
-        for (let column = 0; column < W; column += 2) {
-            ctx.fillStyle = column % 4 === 0 ? "#ffffff" : "#5a6e8c";
-            ctx.fillRect(column, 0, 1, H);
-        }
-        ctx.restore();
     }
 
     function signalBars(ctx, x, y, filled, color) {
@@ -456,7 +449,7 @@
             const accent = 0x1a6adf;
             signalBars(ctx, 4, 13, filled, accent);
             wifi(ctx, 26, 3, accent);
-            text(ctx, options.carrier || "LilyGO", 38, 3, ink, { size: 10, weight: "700" });
+            text(ctx, options.carrier || "LilyGO", 42, 3, ink, { size: 10, weight: "700" });
             text(ctx, clock, 160, 3, ink, { size: 10, weight: "700", align: "center" });
             text(ctx, "72%", 290, 3, ink, { size: 10, weight: "700", align: "right" });
             battery(ctx, 294, 3, { color: ink, fill: 0x4cb050 });
@@ -666,23 +659,28 @@
     function cameraWell(ctx, x, y, action) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(x + 12, y + 13, 12, 0, Math.PI * 2);
-        const well = ctx.createRadialGradient(x + 10, y + 10, 2, x + 12, y + 13, 12);
-        well.addColorStop(0, hex24(0x6a7380));
-        well.addColorStop(1, hex24(0x2a323c));
+        ctx.arc(x + 13, y + 15, 13, 0, Math.PI * 2);
+        const rim = ctx.createLinearGradient(x, y, x, y + 30);
+        rim.addColorStop(0, "#1a2028");
+        rim.addColorStop(0.5, "#5a646e");
+        rim.addColorStop(1, "#c4ccd4");
+        ctx.fillStyle = rim;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 13, y + 15, 11.2, 0, Math.PI * 2);
+        const well = ctx.createLinearGradient(x, y + 28, x, y + 4);
+        well.addColorStop(0, "#3a424c");
+        well.addColorStop(1, "#0c1014");
         ctx.fillStyle = well;
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.28)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
         ctx.restore();
-        panel(ctx, x + 5, y + 10, 14, 9, 0xd8dee4, 0x8a929a, 0x5a626a, 2);
-        fillRound(ctx, x + 9, y + 8, 6, 3, 1, hex24(0xc8ced4));
+        panel(ctx, x + 6, y + 12, 14, 8, 0xd0d6dc, 0x8a929a, 0x5a626a, 2);
+        fillRound(ctx, x + 10, y + 10, 6, 3, 1, hex24(0xb8bec4));
         ctx.beginPath();
-        ctx.arc(x + 12, y + 15, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = hex24(0x2a3038);
+        ctx.arc(x + 13, y + 16, 2.4, 0, Math.PI * 2);
+        ctx.fillStyle = hex24(0x1a2028);
         ctx.fill();
-        if (action) hit(x, y, 24, 26, action);
+        if (action) hit(x, y, 26, 30, action);
     }
 
     function composerField(ctx, x, y, width, height) {

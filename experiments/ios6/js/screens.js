@@ -438,7 +438,8 @@
 
     function drawMessagesInbox(ctx) {
         const kit = K();
-        kit.pinstripe(ctx, 0, 0, W, H);
+        ctx.fillStyle = "#d0d0d4";
+        ctx.fillRect(0, 0, W, H);
         kit.statusBar(ctx, clockText(true), { light: true, carrier: "LilyGO" });
         kit.navBar(ctx, L.StatusH, "Messages");
         kit.navButton(ctx, 6, L.StatusH + 5, 44, 18, "Edit");
@@ -448,11 +449,19 @@
             Ios6.state.composerFocus = true;
             Ios6.redraw();
         });
-        kit.panel(ctx, 8, 48, 304, 22, 0xe8e8e8, 0xffffff, 0x8a8a8a, 11);
-        kit.text(ctx, "Search", 160, 53, C.Placeholder, { size: 12, align: "center" });
+        const searchY = L.StatusH + L.NavH;
+        const searchBar = ctx.createLinearGradient(0, searchY, 0, searchY + 28);
+        searchBar.addColorStop(0, "#d8d8dc");
+        searchBar.addColorStop(1, "#b4b4ba");
+        ctx.fillStyle = searchBar;
+        ctx.fillRect(0, searchY, W, 28);
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
+        ctx.fillRect(0, searchY + 27, W, 1);
+        kit.panel(ctx, 8, searchY + 4, 304, 20, 0xffffff, 0xf2f2f2, 0x8a8a8a, 10);
+        kit.text(ctx, "Search", 160, searchY + 7, C.Placeholder, { size: 12, align: "center" });
 
         const rowH = 44;
-        const tableY = 76;
+        const tableY = searchY + 28;
         ctx.fillStyle = kit.hex24(C.White);
         ctx.fillRect(0, tableY, W, H - tableY);
         ctx.fillStyle = "rgba(255,255,255,0.95)";
@@ -605,15 +614,17 @@
         kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
         const draft = Ios6.state.draft;
         const placeholder = serviceLabel(thread);
-        kit.text(ctx, draft || placeholder, 50, 194,
+        kit.text(ctx, draft || placeholder, 54, 194,
             draft ? C.Ink : C.Placeholder, {
                 size: 12,
                 weight: draft ? "500" : "400",
             });
         if (Ios6.state.composerFocus) {
-            const caretX = 50 + (draft ? kit.measureWidth(ctx, draft, { size: 12, weight: "500" }) : 0);
+            const caretX = draft
+                ? 54 + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
+                : 50;
             ctx.fillStyle = kit.hex24(0x1a6adf);
-            ctx.fillRect(Math.min(caretX + 1, 246), 192, 1.5, 16);
+            ctx.fillRect(Math.min(caretX, 246), 192, 1.5, 16);
         }
         const sendTone = !draft ? {
             top: 0xa8b0b8,
