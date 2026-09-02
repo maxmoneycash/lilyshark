@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 11,
+  "pass": 12,
   "stop_after_pass": 16,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
@@ -28,7 +28,8 @@
     "nav-hard-glass-equator",
     "silver-camera-disc",
     "send-pill-and-recessed-field",
-    "inbox-search-glyph-and-compose"
+    "inbox-search-glyph-and-compose",
+    "group-imessage-to-bar"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -63,5 +64,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 11: Send is a glass pill, field is more recessed, balloons have a hard equator, inbox Search has a magnifier and a notepad compose. Selftest ok, everyoneBubbles 3."
+  "notes": "Pass 12: Everyone is a group iMessage with a To: Fjell, Hytta / Details bar, no per-bubble names. Selftest ok, everyoneBubbles 3."
 }

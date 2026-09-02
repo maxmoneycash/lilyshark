@@ -519,6 +519,27 @@
             Ios6.redraw();
         });
 
+        const group = Ios6.state.peer === "everyone";
+        const toBarY = L.StatusH + L.NavH;
+        const toBarH = group ? 12 : 0;
+        const transcriptTop = group ? toBarY + toBarH : L.ChatMsgY;
+        if (group) {
+            const toFill = ctx.createLinearGradient(0, toBarY, 0, toBarY + toBarH);
+            toFill.addColorStop(0, "#ffffff");
+            toFill.addColorStop(1, "#ececf0");
+            ctx.fillStyle = toFill;
+            ctx.fillRect(0, toBarY, W, toBarH);
+            ctx.fillStyle = kit.hex24(C.Rule);
+            ctx.fillRect(0, toBarY + toBarH - 1, W, 1);
+            kit.text(ctx, "To:", 8, toBarY + 1, C.Meta, { size: 10, weight: "700" });
+            kit.text(ctx, "Fjell, Hytta", 28, toBarY + 1, C.Ink, { size: 10 });
+            kit.text(ctx, "Details", 312, toBarY + 1, 0x1a6adf, {
+                size: 10,
+                weight: "700",
+                align: "right",
+            });
+        }
+
         const messages = thread.messages.slice();
         const spec = { size: 12, weight: "500" };
         const scroll = Ios6.state.chatScroll || 0;
@@ -529,14 +550,10 @@
         const start = messages.length - 1 - scroll;
         ctx.save();
         ctx.beginPath();
-        ctx.rect(0, L.ChatMsgY, W, L.ChatMetaY - L.ChatMsgY + 10);
+        ctx.rect(0, transcriptTop, W, L.ChatMetaY - transcriptTop + 10);
         ctx.clip();
         for (let index = start; index >= 0; index -= 1) {
             const line = messages[index];
-            const previous = index > 0 ? messages[index - 1] : null;
-            const sameSpeaker = previous && previous.mine === line.mine &&
-                (line.mine || previous.from === line.from);
-            const named = !sameSpeaker && !line.mine && Ios6.state.peer === "everyone";
             const lines = kit.wrapLines(ctx, line.text, 216, spec);
             const textH = lines.length * kit.lineHeight(spec);
             const textW = Math.max.apply(null, lines.map(function (row) {
@@ -544,9 +561,9 @@
             }));
             const width = Math.min(236, Math.max(48, Math.ceil(textW + 20)));
             const bubbleH = textH + L.ChatBubblePad;
-            const header = named ? L.ChatNameH : 0;
+            const header = 0;
             const delivered = line.mine && index === lastAcked ? L.ChatDeliveredH : 0;
-            if (cursor - bubbleH - header - delivered < L.ChatMsgY) break;
+            if (cursor - bubbleH - header - delivered < transcriptTop) break;
             cursor -= delivered;
             const bubbleY = cursor - bubbleH;
             const bubbleX = line.mine ? 310 - width : 10;
@@ -565,13 +582,13 @@
             painted += 1;
         }
         const olderLeft = start - painted + 1;
-        if (olderLeft === 0 && topContentY - L.ChatMsgY >= 28) {
-            kit.messageStamp(ctx, Math.max(L.ChatMsgY + 2, topContentY - 30),
+        if (olderLeft === 0 && topContentY - transcriptTop >= 28) {
+            kit.messageStamp(ctx, Math.max(transcriptTop + 2, topContentY - 30),
                 serviceLabel(thread), stampTime());
         }
         if (olderLeft > 0 || scroll > 0) {
-            const pillY = L.ChatMsgY + 2;
-            if (topContentY - L.ChatMsgY >= L.ChatOlderH + 6) {
+            const pillY = transcriptTop + 2;
+            if (topContentY - transcriptTop >= L.ChatOlderH + 6) {
                 kit.panel(ctx, L.ChatOlderBtnX, pillY, L.ChatOlderBtnW, L.ChatOlderH,
                     C.OlderTop, C.OlderBottom, C.OlderEdge, 9);
                 kit.text(ctx, "Older", L.ChatOlderBtnX + L.ChatOlderBtnW / 2, pillY + 5, C.White, {
@@ -591,13 +608,13 @@
         ctx.restore();
         Ios6.state.messagesVisible = painted;
         if (olderLeft > 0) {
-            kit.hit(0, L.ChatMsgY, W, 18, function () {
+            kit.hit(0, transcriptTop, W, 18, function () {
                 Ios6.state.chatScroll = scroll + 1;
                 Ios6.redraw();
             });
         }
         if (scroll > 0) {
-            kit.hit(L.ChatNewerBtnX, L.ChatMsgY, L.ChatNewerBtnW, L.ChatOlderH, function () {
+            kit.hit(L.ChatNewerBtnX, transcriptTop, L.ChatNewerBtnW, L.ChatOlderH, function () {
                 Ios6.state.chatScroll = Math.max(0, scroll - 1);
                 Ios6.redraw();
             });
