@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 37,
-  "stop_after_pass": 40,
+  "pass": 38,
+  "stop_after_pass": 42,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -63,7 +63,8 @@
     "call-facetime-contact-rounded-rects",
     "inbox-compose-pencil-and-search-well",
     "settings-gear-and-capture-lens",
-    "nav-edit-glass-and-ios6-fin-walls"
+    "nav-edit-glass-and-ios6-fin-walls",
+    "stamped-composer-camera-well"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -98,5 +99,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 37: Edit/Cancel use the same 3-stop candy glass as Messages back. Balloon fins keep a straight outer wall past the bottom, then hook in. Messages icon tail is a hooked fin. Raised stop_after_pass to 40 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
+  "notes": "Pass 38: Composer camera is a stamped dark disc in the metal with a white silhouette, matching Zach/Mamma/New Message. Not a chrome ring. Raised stop_after_pass to 42 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
 }
