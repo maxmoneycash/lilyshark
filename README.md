@@ -424,18 +424,27 @@ The simulator drives these views with deterministic synthetic RF telemetry. A fi
 | `X` from Traffic | Open Traffic Filter; use Up/Down to choose a predicate, Left/Right to change it, `R` to reset, and Enter to apply |
 | `P` | Open the five-preset radio-profile picker with the active preset focused |
 | Trackball on Map | Roll to pan; press to return the view to where you are standing. A fingertip covers about 40 px of a 320 px panel, which at deep zoom is most of the gap between two operators standing together |
-| `+` / `-` on Map | Zoom, from z12 out to z23 |
+| `+` / `-` on Map | Zoom, from z8 (about 150 km across) in to z23 |
 | `I` / `D` / `G` on Map | Satellite imagery, dark road map, or the drawn field chart. The on-screen chip names the layer you are on and moves to the next when tapped |
 | `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
 | `B` | Cycle 62.5, 125, 250, and 500 kHz bandwidths |
 | `F` | Cycle spreading factors 7 through 12 |
 | `R` | Cycle coding rates 4/5 through 4/8 |
 | `C` | Open Chat; from a node's detail screen, open Chat addressed to that node |
+| `E` | Open Messages — the readable text pulled out of captured traffic, including LXMF |
 | `S` | Save a BMP screenshot to microSD |
 | `?` | Open Help without bypassing unfinished onboarding or destructive confirmations |
 | Touch tap | Select the tapped menu/table row or invoke the exact left/right action shown in the footer |
 
 The touchscreen probes the GT911 at both T-Deck addresses and reports absence instead of blocking startup. The trackball and keyboard remain available when touch is missing.
+
+## Pair a phone
+
+The deck advertises Meshtastic's client Bluetooth service, so the official Meshtastic app (iOS or Android) finds it in a scan as **Lilyshark** followed by the deck's short name. Pairing gets the app the real conversation, not a shim: the deck answers the app's configuration handshake with its node identity, hardware model, the node list as currently heard (live SNR included), the primary LongFast channel, and the LoRa region settings, then keeps the picture current — a node heard for the first time after pairing is pushed to the phone the same moment the deck itself raises its new-node banner.
+
+Texts flow both ways. A message the deck hears on the air appears in the app's conversation view; a message typed in the app goes out through the same transmit path as one typed on the deck's own keyboard — same packet ids, same want-ack request on direct messages, and it lands in the deck's chat log alongside everything else, where the peer's acknowledgement marks it DELIVERED.
+
+What pairing does not yet do, so nobody discovers it the hard way: node positions are not forwarded, so the app's map stays empty even when the deck's map is placing nodes; and settings changed in the app are read back but not applied — the deck's own Settings screen remains the way to change the radio.
 
 ## Protocol coverage
 
@@ -833,6 +842,9 @@ The standalone C++ tests compile with warnings as errors and run under AddressSa
 - [x] Boot the factory image on a physical T-Deck and verify the display, input, GPS, battery, and radio services.
 - [x] Pass live traffic between two T-Decks and decode it, including direct messages.
 - [x] Read LXMF messages out of Reticulum payloads.
+- [x] Advertise Meshtastic's client BLE service and answer the app's configuration handshake with identity, node list, channel, and LoRa config.
+- [x] Bridge texts both ways between a paired phone and the mesh, through the same transmit path as the deck's own keyboard.
+- [ ] Forward node positions to the paired phone and apply settings the app writes back.
 - [ ] Capture known MeshCore and RNode fixtures over the air and compare bytes with desktop captures.
 - [ ] Calibrate touch orientation, battery voltage, and spectral power against known references.
 - [ ] Exercise scan cancellation, SD removal, CRC bursts, missing peripherals, and radio recovery.

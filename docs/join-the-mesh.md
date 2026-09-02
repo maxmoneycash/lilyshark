@@ -75,7 +75,17 @@ To bake imagery into the firmware itself instead (works with no card), fetch
 tiles for each zoom with `scripts/fetch_satellite_map.py`, run
 `scripts/embed_map_tiles.py --centre-lat … --centre-lon …`, and rebuild.
 
-## 4. What you will and won't see of each other
+## 4. Pair your phone (optional)
+
+The deck advertises Meshtastic's client Bluetooth service. Open the official
+Meshtastic app, scan, and connect to **Lilyshark <shortname>** — the app gets
+your node identity, the node list the deck can currently hear, the LongFast
+channel, and the radio settings, and then texts flow both ways: what the deck
+hears shows up in the app, and what you type in the app goes out over the
+deck's radio and into its chat log. Positions are not forwarded yet, so use
+the deck's own map for who-is-where.
+
+## 5. What you will and won't see of each other
 
 - **In LoRa range** (same neighbourhood, line of sight — hundreds of metres
   urban, kilometres open): each deck appears in the other's NODES list with
