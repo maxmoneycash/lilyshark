@@ -373,7 +373,7 @@
         // Visible stripes read as Settings.
         ctx.fillStyle = hex24(C.Backdrop);
         ctx.fillRect(0, 0, W, H);
-        applyGrain(ctx, 0, 0, W, H, 0.14);
+        applyGrain(ctx, 0, 0, W, H, 0.06);
     }
 
     function signalBars(ctx, x, y, filled, color) {
