@@ -1034,25 +1034,61 @@
         ctx.stroke();
     }
 
-    function composerMetal(ctx) {
-        panel(ctx, -1, 180, 322, 62, C.BarTop, C.BarBottom, C.BarEdge, 0);
-        const metal = ctx.createLinearGradient(0, 180, 0, H);
+    // iOS 6 Messages composer is a ~44pt metal bar. Field and Send are
+    // the same 28pt capsule. Palette ChatSend* stays frozen for tests.
+    function composerLayout() {
+        const barH = 44;
+        const barY = H - barH;
+        const controlH = 28;
+        const controlY = barY + Math.round((barH - controlH) / 2);
+        const camera = 28;
+        const sendW = 54;
+        const sendX = W - sendW - 6;
+        const fieldX = 38;
+        const fieldW = sendX - fieldX - 4;
+        return {
+            barY: barY,
+            barH: barH,
+            cameraX: 6,
+            cameraY: controlY,
+            cameraSize: camera,
+            fieldX: fieldX,
+            fieldY: controlY,
+            fieldW: fieldW,
+            fieldH: controlH,
+            sendX: sendX,
+            sendY: controlY,
+            sendW: sendW,
+            sendH: controlH,
+            textX: fieldX + 12,
+            textY: controlY + 7,
+            caretEmptyX: fieldX + 10,
+            caretY: controlY + 6,
+            caretH: 16,
+            caretMaxX: fieldX + fieldW - 10,
+        };
+    }
+
+    function composerMetal(ctx, barY) {
+        const top = barY === undefined ? composerLayout().barY : barY;
+        panel(ctx, -1, top, 322, H - top + 2, C.BarTop, C.BarBottom, C.BarEdge, 0);
+        const metal = ctx.createLinearGradient(0, top, 0, H);
         metal.addColorStop(0, "rgba(255,255,255,0.36)");
         metal.addColorStop(0.16, "rgba(255,255,255,0.10)");
         metal.addColorStop(1, "rgba(0,0,0,0.10)");
         ctx.fillStyle = metal;
-        ctx.fillRect(0, 180, W, H - 180);
+        ctx.fillRect(0, top, W, H - top);
         ctx.save();
         ctx.globalAlpha = 0.05;
-        for (let row = 182; row < H; row += 2) {
+        for (let row = top + 2; row < H; row += 2) {
             ctx.fillStyle = row % 4 === 0 ? "#ffffff" : "#202428";
             ctx.fillRect(0, row, W, 1);
         }
         ctx.restore();
         ctx.fillStyle = "rgba(255,255,255,0.44)";
-        ctx.fillRect(0, 180, W, 1);
+        ctx.fillRect(0, top, W, 1);
         ctx.fillStyle = "rgba(0,0,0,0.34)";
-        ctx.fillRect(0, 181, W, 1);
+        ctx.fillRect(0, top + 1, W, 1);
     }
 
     function tableGroup(ctx, x, y, width, rows, options) {
@@ -1265,6 +1301,7 @@
         messageStamp: messageStamp,
         cameraWell: cameraWell,
         composerField: composerField,
+        composerLayout: composerLayout,
         composeButton: composeButton,
         searchGlyph: searchGlyph,
         chevron: chevron,

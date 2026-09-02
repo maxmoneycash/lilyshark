@@ -518,6 +518,43 @@
         return thread.service === "sms" ? "Text Message" : "iMessage";
     }
 
+    function paintMessagesComposer(ctx, thread, onSend) {
+        const kit = K();
+        const row = kit.composerLayout();
+        const sms = thread.service === "sms";
+        kit.composerMetal(ctx, row.barY);
+        kit.cameraWell(ctx, row.cameraX, row.cameraY, go("settings"));
+        kit.composerField(ctx, row.fieldX, row.fieldY, row.fieldW, row.fieldH);
+        const draft = Ios6.state.draft;
+        const placeholder = serviceLabel(thread);
+        kit.text(ctx, draft || placeholder, row.textX, row.textY,
+            draft ? C.Ink : C.Placeholder, {
+                size: 12,
+                weight: draft ? "500" : "400",
+            });
+        if (Ios6.state.composerFocus) {
+            const caretX = draft
+                ? row.textX + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
+                : row.caretEmptyX;
+            ctx.fillStyle = kit.hex24(0x1478e6);
+            ctx.fillRect(Math.min(caretX, row.caretMaxX), row.caretY, 1.4, row.caretH);
+        }
+        const sendTone = !draft ? { idle: true } : (sms ? {
+            top: C.SmsTop,
+            bottom: C.SmsBottom,
+            edge: C.SmsEdge,
+        } : {
+            top: C.SendTop,
+            bottom: C.SendBottom,
+            edge: C.SendEdge,
+        });
+        kit.sendButton(ctx, row.sendX, row.sendY, row.sendW, row.sendH, "Send", onSend, sendTone);
+        kit.hit(row.fieldX, row.fieldY, row.fieldW, row.fieldH, function () {
+            Ios6.state.composerFocus = true;
+        });
+        return row;
+    }
+
     function threadVia(thread, line) {
         if (line.viaNet) return line.viaNet;
         return thread.service === "sms" ? "sms" : "imessage";
@@ -655,39 +692,9 @@
         });
 
         const thread = token || THREADS.everyone;
-        const sms = thread.service === "sms";
-        kit.composerMetal(ctx);
-        kit.cameraWell(ctx, 6, 188, go("settings"));
-        kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
-        const draft = Ios6.state.draft;
-        const placeholder = serviceLabel(thread);
-        kit.text(ctx, draft || placeholder, 48, 194,
-            draft ? C.Ink : C.Placeholder, {
-                size: 12,
-                weight: draft ? "500" : "400",
-            });
-        if (Ios6.state.composerFocus) {
-            const caretX = draft
-                ? 48 + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
-                : 46;
-            ctx.fillStyle = kit.hex24(0x1478e6);
-            ctx.fillRect(Math.min(caretX, 246), 192, 1.4, 16);
-        }
-        const sendTone = !draft ? { idle: true } : (sms ? {
-            top: C.SmsTop,
-            bottom: C.SmsBottom,
-            edge: C.SmsEdge,
-        } : {
-            top: C.SendTop,
-            bottom: C.SendBottom,
-            edge: C.SendEdge,
-        });
-        kit.sendButton(ctx, L.ChatSendX, L.ChatSendY, L.ChatSendW, L.ChatSendH, "Send", function () {
+        paintMessagesComposer(ctx, thread, function () {
             if (tokenKey) Ios6.state.peer = tokenKey;
             Ios6.sendDraft();
-        }, sendTone);
-        kit.hit(36, L.ChatSendY, 220, L.ChatSendH, function () {
-            Ios6.state.composerFocus = true;
         });
         Ios6.state.messagesVisible = 0;
     }
@@ -706,7 +713,6 @@
         const kit = K();
         kit.messagePaper(ctx);
         const thread = activeThread();
-        const sms = thread.service === "sms";
         kit.statusBar(ctx, clockText(true), { light: true, carrier: "LilyGO" });
         kit.navBar(ctx, L.StatusH, thread.name);
         kit.backButton(ctx, 4, L.StatusH + 5, "Messages", function () {
@@ -874,37 +880,8 @@
             kit.text(ctx, "TX FAILED", 10, L.ChatMetaY, C.Fault, { size: 8, weight: "700" });
         }
 
-        kit.composerMetal(ctx);
-        kit.cameraWell(ctx, 6, 188, go("settings"));
-        kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
-        const draft = Ios6.state.draft;
-        const placeholder = serviceLabel(thread);
-        kit.text(ctx, draft || placeholder, 48, 194,
-            draft ? C.Ink : C.Placeholder, {
-                size: 12,
-                weight: draft ? "500" : "400",
-            });
-        if (Ios6.state.composerFocus) {
-            const caretX = draft
-                ? 48 + kit.measureWidth(ctx, draft, { size: 12, weight: "500" })
-                : 46;
-            ctx.fillStyle = kit.hex24(0x1478e6);
-            ctx.fillRect(Math.min(caretX, 246), 192, 1.4, 16);
-        }
-        const sendTone = !draft ? { idle: true } : (sms ? {
-            top: C.SmsTop,
-            bottom: C.SmsBottom,
-            edge: C.SmsEdge,
-        } : {
-            top: C.SendTop,
-            bottom: C.SendBottom,
-            edge: C.SendEdge,
-        });
-        kit.sendButton(ctx, L.ChatSendX, L.ChatSendY, L.ChatSendW, L.ChatSendH, "Send", function () {
+        paintMessagesComposer(ctx, thread, function () {
             Ios6.sendDraft();
-        }, sendTone);
-        kit.hit(36, L.ChatSendY, 220, L.ChatSendH, function () {
-            Ios6.state.composerFocus = true;
         });
     }
 
