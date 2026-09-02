@@ -548,6 +548,7 @@ MapPopup map_popup{};
 double map_pan_east_m = 0.0;
 double map_pan_north_m = 0.0;
 bool map_panned = false;
+std::uint32_t map_drag_build_ms = 0;
 
 // The origin the last map render projected from. The popup reuses it so its
 // range and bearing describe the same geometry the dots were drawn with.
@@ -13735,11 +13736,28 @@ void poll_touch()
             const int ady = dy < 0 ? -dy : dy;
             if(adx + ady >= 3) touch_dragged = true;
             map_popup.open = false;
-            build_current_screen();
+            // Touch samples arrive every 16 ms and a rebuild is the whole
+            // screen: every LVGL object torn down, the imagery cache missed
+            // (its key moves with the pan), and the covering tile magnified
+            // pixel by pixel. Sixty of those a second is more work than the
+            // chip has, and the freeze the operator felt was the loop losing
+            // that race. Ten a second pans smoothly and leaves the loop air;
+            // release settles the final position exactly.
+            const std::uint32_t drag_now = millis();
+            if(static_cast<std::uint32_t>(drag_now - map_drag_build_ms) >= 100U) {
+                map_drag_build_ms = drag_now;
+                build_current_screen();
+            }
         }
         return;
     }
     if(was_pressed && !point.pressed) {
+        // The throttled drag above may be up to one interval behind the
+        // finger; the release draws the view where the finger actually let go.
+        if(touch_dragged && current_screen == Screen::map &&
+           app_shell.route() == ShellRoute::Analyzer) {
+            build_current_screen();
+        }
         const int delta_x = static_cast<int>(touch_last_point.x) -
                             static_cast<int>(touch_start_point.x);
         const int delta_y = static_cast<int>(touch_last_point.y) -

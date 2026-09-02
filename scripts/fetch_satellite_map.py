@@ -35,13 +35,20 @@ SOURCES = {
         "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/%d/%d/%d.png",
         "osm",
     ),
+    # Esri's dark canvas, like their imagery, needs no key. CARTO's
+    # basemaps started stamping API KEY REQUIRED across every tile, and a
+    # watermark burned into baked pixels ships to the device as "the map".
+    # Esri serves this canvas to z16; deeper dark zooms magnify the z16
+    # tile on-device, which is blurrier and never a demand for payment.
     "dark": (
-        "https://basemaps.cartocdn.com/dark_all/%d/%d/%d.png",
-        "osm",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/"
+        "Canvas/World_Dark_Gray_Base/MapServer/tile/%d/%d/%d",
+        "esri",
     ),
     "labels": (
-        "https://basemaps.cartocdn.com/dark_only_labels/%d/%d/%d.png",
-        "osm",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/"
+        "Canvas/World_Dark_Gray_Reference/MapServer/tile/%d/%d/%d",
+        "esri",
     ),
 }
 
