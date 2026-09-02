@@ -767,23 +767,25 @@
                 { label: "FaceTime", chevron: false },
                 { label: "Contact", chevron: true },
             ];
-            const btnW = 100;
+            const pad = 5;
+            const gap = 4;
             const btnH = 20;
             const btnY = toBarY + 3;
+            const btnW = Math.floor((W - pad * 2 - gap * 2) / 3);
             for (let index = 0; index < actions.length; index += 1) {
                 const action = actions[index];
-                const x = 6 + index * (btnW + 4);
+                const x = pad + index * (btnW + gap);
                 kit.whitePill(ctx, x, btnY, btnW, btnH);
-                const labelX = action.chevron ? x + btnW / 2 - 4 : x + btnW / 2;
+                const labelX = action.chevron ? x + btnW / 2 - 5 : x + btnW / 2;
                 kit.text(ctx, action.label, labelX, btnY + 5, C.ButtonInk, {
                     size: 11,
                     weight: "700",
                     align: "center",
                 });
                 if (action.chevron) {
-                    const chevronX = x + btnW - 11;
+                    const chevronX = x + btnW - 12;
                     const chevronY = btnY + 6;
-                    ctx.strokeStyle = kit.hex24(C.Chevron);
+                    ctx.strokeStyle = kit.hex24(C.ButtonInk);
                     ctx.lineWidth = 1.5;
                     ctx.lineCap = "round";
                     ctx.lineJoin = "round";
