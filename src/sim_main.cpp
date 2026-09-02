@@ -14424,6 +14424,23 @@ std::uint32_t ble_config_id = 0;
 
 void service_ble_api() noexcept
 {
+    // A phone connecting is an event on par with a node appearing, and it
+    // was invisible: the deck paired silently and the operator learned it
+    // only from the phone's side of the conversation.
+    static bool phone_was_connected = false;
+    const bool phone_connected = tdeckBleStatus().connected;
+    if (phone_connected != phone_was_connected) {
+        phone_was_connected = phone_connected;
+        std::snprintf(shell_notice, sizeof(shell_notice),
+                      phone_connected ? "PHONE CONNECTED OVER BLUETOOTH"
+                                      : "PHONE DISCONNECTED");
+        chat_notice_until_ms = millis() + 12000U;
+        if (phone_connected) ::lilyshark::playNodeChime();
+        record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
+                             phone_connected ? "Phone connected over Bluetooth"
+                                             : "Phone disconnected");
+    }
+
     std::uint8_t buffer[512]{};
     std::size_t length = 0;
     while ((length = takeBleToRadio(buffer, sizeof(buffer))) > 0U) {
@@ -14437,8 +14454,18 @@ void service_ble_api() noexcept
             // The phone is a second keyboard for the same radio: the message
             // goes on the air, into the deck's own chat log, and earns
             // DELIVERED the same way a message typed on this keyboard does.
-            (void)transmit_meshtastic(MeshtasticPort::TextMessage, message.text,
-                                      message.to_node);
+            const bool sent = transmit_meshtastic(MeshtasticPort::TextMessage,
+                                                  message.text, message.to_node);
+            // The app shows "Sending..." until a Routing result names its
+            // packet id; the radio, not the phone, decides when a message has
+            // left. 4 is NO_INTERFACE -- the radio refused or is not there.
+            if (message.packet_id != 0U) {
+                std::uint8_t ack_frame[96]{};
+                const std::size_t ack_length = encodeApiRoutingAck(
+                    localMeshtasticNodeNum(), message.packet_id,
+                    sent ? 0U : 4U, ack_frame, sizeof(ack_frame));
+                if (ack_length > 0U) (void)queueBleFromRadio(ack_frame, ack_length);
+            }
         }
     }
     if (!ble_config_active) return;

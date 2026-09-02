@@ -49,6 +49,9 @@ struct ApiToRadio {
     } kind = Kind::None;
     std::uint32_t want_config_id = 0;
     std::uint32_t to_node = 0xffffffffU;
+    /// The id the phone stamped on its own packet. The app shows "Sending..."
+    /// until a Routing result names this id, so it must survive the parse.
+    std::uint32_t packet_id = 0;
     bool want_ack = false;
     /// Meshtastic texts are at most 237 bytes on the wire; NUL-terminated.
     char text[238]{};
@@ -77,6 +80,15 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
 /// this is how it learns about everyone who arrives afterwards.
 std::size_t encodeApiNodeInfo(const ApiNodeEntry &node, std::uint8_t *out,
                               std::size_t capacity) noexcept;
+
+/// Encode the Routing result the app waits for after writing a packet: an
+/// empty error (0) marks its message sent, anything else marks it failed.
+/// Without this the app shows "Sending..." forever, because that is the
+/// contract -- the radio, not the phone, decides when a message has left.
+std::size_t encodeApiRoutingAck(std::uint32_t local_node,
+                                std::uint32_t acked_packet_id,
+                                std::uint8_t error_reason,
+                                std::uint8_t *out, std::size_t capacity) noexcept;
 
 /// Encode FromRadio{packet} carrying a position heard on the mesh, so the
 /// phone's map places the node. Coordinates in 1e-7 degrees.

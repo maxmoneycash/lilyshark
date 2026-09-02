@@ -237,6 +237,54 @@ void testNodeInfoCarriesPosition()
     assert(with_length == without_length + 12U);
 }
 
+void testRoutingAckNamesThePhonesPacket()
+{
+    // The app matches on Data.request_id, and NONE (0) must be written out:
+    // the field is in a oneof, where absence means "no result", not success.
+    std::uint8_t out[96]{};
+    const std::size_t length =
+        encodeApiRoutingAck(0xcda172e0U, 0x11223344U, 0, out, sizeof(out));
+    assert(length > 0);
+    const std::uint8_t routing_payload[] = {0x12, 0x02, 0x18, 0x00};
+    const std::uint8_t request_id[] = {0x35, 0x44, 0x33, 0x22, 0x11};
+    bool found_payload = false;
+    bool found_request = false;
+    for (std::size_t index = 0; index < length; ++index) {
+        if (index + sizeof(routing_payload) <= length &&
+            std::memcmp(out + index, routing_payload, sizeof(routing_payload)) == 0) {
+            found_payload = true;
+        }
+        if (index + sizeof(request_id) <= length &&
+            std::memcmp(out + index, request_id, sizeof(request_id)) == 0) {
+            found_request = true;
+        }
+    }
+    assert(found_payload);
+    assert(found_request);
+    // A failure reason changes the payload byte and nothing else structural.
+    const std::size_t fail_length =
+        encodeApiRoutingAck(0xcda172e0U, 0x11223344U, 4, out, sizeof(out));
+    assert(fail_length == length);
+    // An ack for packet id 0 is refused: that id means "the phone sent none".
+    assert(encodeApiRoutingAck(1, 0, 0, out, sizeof(out)) == 0);
+}
+
+void testPhonePacketIdSurvivesTheParse()
+{
+    const std::uint8_t bytes[] = {
+        0x0a, 0x14,                          // ToRadio.packet, 20 bytes
+        0x15, 0x44, 0x33, 0x22, 0x11,        // MeshPacket.to fixed32
+        0x35, 0x99, 0x88, 0x77, 0x66,        // MeshPacket.id fixed32
+        0x22, 0x06,                          // MeshPacket.decoded
+        0x08, 0x01, 0x12, 0x02, 'h', 'i',
+        0x50, 0x01,                          // want_ack
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::Text);
+    assert(message.packet_id == 0x66778899U);
+}
+
 void testEncodeRefusesTinyBuffers()
 {
     std::uint8_t out[4]{};
@@ -259,6 +307,8 @@ int main()
     testLiveNodeInfoMatchesTheDump();
     testPositionExactBytes();
     testNodeInfoCarriesPosition();
+    testRoutingAckNamesThePhonesPacket();
+    testPhonePacketIdSurvivesTheParse();
     testEncodeRefusesTinyBuffers();
     std::printf("meshtastic_api: all assertions passed\n");
     return 0;

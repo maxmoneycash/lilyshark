@@ -171,6 +171,7 @@ struct Reader {
 // mesh.proto PortNum.
 constexpr std::uint64_t kPortText = 1;
 constexpr std::uint64_t kPortPosition = 3;
+constexpr std::uint64_t kPortRouting = 5;
 
 void parseDataForText(const std::uint8_t *bytes, std::size_t length,
                       ApiToRadio &out) noexcept
@@ -209,6 +210,9 @@ void parseMeshPacket(const std::uint8_t *bytes, std::size_t length,
             break;
         case 4U:  // decoded Data
             if (wire == kWireLen) parseDataForText(sub, sub_length, out);
+            break;
+        case 6U:  // the phone's own packet id, fixed32
+            if (wire == kWireFixed32) out.packet_id = static_cast<std::uint32_t>(sub_length);
             break;
         case 10U:  // want_ack
             if (wire == kWireVarint) out.want_ack = sub_length != 0U;
@@ -359,6 +363,37 @@ std::size_t encodeApiNodeInfo(const ApiNodeEntry &node, std::uint8_t *out,
     if (out == nullptr || capacity == 0U || node.num == 0U) return 0;
     Writer from_radio{out, capacity};
     writeNodeInfoMessage(from_radio, node);
+    return from_radio.ok ? from_radio.length : 0;
+}
+
+std::size_t encodeApiRoutingAck(std::uint32_t local_node,
+                                std::uint32_t acked_packet_id,
+                                std::uint8_t error_reason,
+                                std::uint8_t *out, std::size_t capacity) noexcept
+{
+    if (out == nullptr || capacity == 0U || acked_packet_id == 0U) return 0;
+    // Routing{error_reason}: the field lives in a oneof, so even NONE (0)
+    // must be written -- an absent field is "no result", not "no error".
+    std::uint8_t routing_scratch[4]{};
+    Writer routing{routing_scratch, sizeof(routing_scratch)};
+    routing.tag(3, kWireVarint);
+    routing.varint(error_reason);
+
+    std::uint8_t data_scratch[32]{};
+    Writer data{data_scratch, sizeof(data_scratch)};
+    data.field_uint(1, kPortRouting);
+    data.field_bytes(2, routing.out, routing.length);
+    data.field_fixed32(6, acked_packet_id);  // Data.request_id
+
+    std::uint8_t packet_scratch[64]{};
+    Writer packet{packet_scratch, sizeof(packet_scratch)};
+    packet.field_fixed32(1, local_node);
+    packet.field_fixed32(2, local_node);
+    packet.field_message(4, data);
+    packet.field_uint(11, 120);  // Priority.ACK
+
+    Writer from_radio{out, capacity};
+    from_radio.field_message(2, packet);
     return from_radio.ok ? from_radio.length : 0;
 }
 
