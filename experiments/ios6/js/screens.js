@@ -222,11 +222,11 @@
         ]);
         ctx.fillStyle = "rgba(255,255,255,0.7)";
         ctx.beginPath();
-        ctx.arc(154, 182, 2.4, 0, Math.PI * 2);
+        ctx.arc(154, 154, 2.4, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = "rgba(255,255,255,0.28)";
         ctx.beginPath();
-        ctx.arc(166, 182, 2.4, 0, Math.PI * 2);
+        ctx.arc(166, 154, 2.4, 0, Math.PI * 2);
         ctx.fill();
     }
 

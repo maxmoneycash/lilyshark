@@ -176,6 +176,11 @@ class Ios6LabTests(unittest.TestCase):
             painted += 1
         self.assertGreaterEqual(painted, 3)
 
+    def test_dock_paints_icon_reflections(self):
+        self.assertIn("function dock", self.kit)
+        self.assertIn("scale(1, -0.55)", self.kit)
+        self.assertIn("iconLift", self.kit)
+
     def test_lock_has_a_camera_well(self):
         self.assertIn("cameraX", self.screens)
         self.assertIn('go("settings")', self.screens)

@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 4,
+  "pass": 5,
   "stop_after_pass": 8,
   "goal": "Make the 320x240 iOS 6 lab match the kit, then port winners to agent/ios6-chat-ui. Main stays the terminal chat.",
   "done_when": "experiments/ios6/reference/chat.png exists and Messages RGB565 mismatch is under 8%, or the queue is empty.",
@@ -14,10 +14,10 @@
     "grouped-table-inner-highlight",
     "section-headers",
     "messages-fit-three-bubbles",
-    "lock-camera-grip"
+    "lock-camera-grip",
+    "icon-reflections-in-dock"
   ],
   "queue": [
-    "icon-reflections-in-dock",
     "messages-full-ios6-status-chrome-toggle"
   ],
   "skipped": [
@@ -41,13 +41,11 @@
   ],
   "how_to_auto": [
     "Read this file first. Take queue[0]. Increment pass at the start of the pass.",
-    "lock-camera-grip: iOS 6 lock had a camera grab on the right of slide-to-unlock. Keep the wallpaper abstract. Do not copy Apple art.",
-    "icon-reflections-in-dock: a faint inverted reflection of each dock icon in the glass shelf.",
-    "messages-full-ios6-status-chrome-toggle: optional status-bar + carrier chrome on Messages that still keeps the kit title/OLDER/NEWER row.",
+    "messages-full-ios6-status-chrome-toggle: optional status-bar + carrier chrome on Messages that still keeps the kit title/OLDER/NEWER row. Do not steal the 3 px OLDER band (ChatOlderY=3).",
     "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down.",
     "After the item: move it to completed or skipped, write notes, run test/ios6_lab, commit, push, update PR 15, re-subscribe, end the turn.",
     "cursor-subscriptions subscribe_timer name ios6-lab-loop delaySeconds 180 recurring. Prompt: read experiments/ios6/LOOP.json and do the next queue item with no user input.",
     "Also subscribe_github_ci on cursor/ios6-ui-lab-240f with notifyOnSuccess true, and subscribe_github_pr on PR 15."
   ],
-  "notes": "Pass 3-4: PlatformIO missing, firmware PPM skipped. Messages pack like 2ae8e70 and EVERYONE shows three content-sized bubbles plus OLDER/NEWER. Lock has a camera well to the right of slide-to-unlock. Next: icon-reflections-in-dock."
+  "notes": "Pass 5: Home dock icons sit on the glass shelf with a squashed inverted reflection that fades into the dock. Page dots moved to y=154 so they sit between the grid and the lifted dock icons. Next: messages-full-ios6-status-chrome-toggle."
 }

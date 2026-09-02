@@ -524,14 +524,36 @@
     }
 
     function dock(ctx, y, icons) {
-        panel(ctx, 6, y, 308, 46, 0x6a737c, 0x2a3036, 0x1a1e22, 8);
-        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        const dockH = 46;
+        const iconLift = 24;
+        panel(ctx, 6, y, 308, dockH, 0x6a737c, 0x2a3036, 0x1a1e22, 8);
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
         ctx.fillRect(8, y + 1, 304, 1);
         const slot = 308 / icons.length;
         for (let index = 0; index < icons.length; index += 1) {
             const icon = icons[index];
             const x = 6 + Math.round(slot * index + (slot - 48) / 2);
-            appIcon(ctx, x, y - 6, icon.top, icon.bottom, icon.edge, icon.glyph, "", icon.action, icon.unread);
+            const iconY = y - iconLift;
+            ctx.save();
+            roundRectPath(ctx, 6, y, 308, dockH, 8);
+            ctx.clip();
+            ctx.translate(x, iconY + 48);
+            ctx.scale(1, -0.55);
+            ctx.globalAlpha = 0.34;
+            panel(ctx, 0, 0, 48, 48, icon.bottom, icon.top, icon.edge, 10);
+            if (icon.glyph) icon.glyph(ctx, 0, 0);
+            ctx.restore();
+            ctx.save();
+            roundRectPath(ctx, 6, y, 308, dockH, 8);
+            ctx.clip();
+            const fade = ctx.createLinearGradient(0, iconY + 48, 0, y + dockH);
+            fade.addColorStop(0, "rgba(24,28,32,0.08)");
+            fade.addColorStop(0.4, "rgba(24,28,32,0.38)");
+            fade.addColorStop(1, "rgba(24,28,32,0.82)");
+            ctx.fillStyle = fade;
+            ctx.fillRect(x - 2, iconY + 46, 52, y + dockH - (iconY + 46));
+            ctx.restore();
+            appIcon(ctx, x, iconY, icon.top, icon.bottom, icon.edge, icon.glyph, "", icon.action, icon.unread);
         }
     }
 
