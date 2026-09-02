@@ -6,12 +6,14 @@
     const W = Ios6.SCREEN_WIDTH;
     const H = Ios6.SCREEN_HEIGHT;
 
-    function clockText() {
+    function clockText(withMeridiem) {
         const now = Ios6.state.now;
         const hours = now.getHours();
         const minutes = String(now.getMinutes()).padStart(2, "0");
         const twelve = hours % 12 || 12;
-        return twelve + ":" + minutes;
+        const clock = twelve + ":" + minutes;
+        if (!withMeridiem) return clock;
+        return clock + (hours >= 12 ? " PM" : " AM");
     }
 
     function dateText() {
@@ -25,6 +27,22 @@
     function go(name) {
         return function () {
             Ios6.open(name);
+        };
+    }
+
+    function openInbox() {
+        return function () {
+            Ios6.state.messagesInbox = true;
+            Ios6.open("messages");
+        };
+    }
+
+    function openThread(peer) {
+        return function () {
+            Ios6.state.peer = peer;
+            Ios6.state.messagesInbox = false;
+            Ios6.state.chatScroll = 0;
+            Ios6.open("messages");
         };
     }
 
@@ -287,7 +305,7 @@
         K().wallpaper(ctx);
         K().statusBar(ctx, clockText(), { clear: true });
         const apps = [
-            { label: "Messages", top: 0x6ee66a, bottom: 0x169a22, edge: 0x0c6a14, glyph: glyphMessage, go: "messages", unread: 2 },
+            { label: "Messages", top: 0x6ee66a, bottom: 0x169a22, edge: 0x0c6a14, glyph: glyphMessage, go: "messages", unread: 2, inbox: true },
             { label: "Nodes", top: 0xf8b44a, bottom: 0xc46a10, edge: 0x8a4a0c, glyph: glyphNodes, go: "nodes" },
             { label: "Field", top: 0xff86b8, bottom: 0xc01860, edge: 0x8a1048, glyph: glyphField, go: "field" },
             { label: "Traffic", top: 0x6ad8e0, bottom: 0x1a6a88, edge: 0x0e4058, glyph: glyphTraffic, go: "kit" },
@@ -300,7 +318,7 @@
             const cell = iconCell(index % 4, Math.floor(index / 4));
             const app = apps[index];
             K().appIcon(ctx, cell.x, cell.y, app.top, app.bottom, app.edge, app.glyph, app.label,
-                go(app.go), app.unread);
+                app.inbox ? openInbox() : go(app.go), app.unread);
         }
         ctx.fillStyle = "rgba(255,255,255,0.85)";
         ctx.beginPath();
@@ -311,7 +329,7 @@
         ctx.arc(166, 158, 2.4, 0, Math.PI * 2);
         ctx.fill();
         K().dock(ctx, 190, [
-            { top: 0x6ee66a, bottom: 0x169a22, edge: 0x0c6a14, glyph: glyphMessage, action: go("messages"), unread: 2 },
+            { top: 0x6ee66a, bottom: 0x169a22, edge: 0x0c6a14, glyph: glyphMessage, action: openInbox(), unread: 2 },
             { top: 0xf8b44a, bottom: 0xc46a10, edge: 0x8a4a0c, glyph: glyphNodes, action: go("nodes") },
             { top: 0x88c868, bottom: 0x2a6820, edge: 0x184818, glyph: glyphMap, action: go("field") },
             { top: 0x9aa2aa, bottom: 0x3a4248, edge: 0x22262c, glyph: glyphRadio, action: go("radio") },
@@ -356,6 +374,8 @@
     const THREADS = {
         everyone: {
             name: "Everyone",
+            service: "imessage",
+            when: "Now",
             messages: [
                 { from: "FJELL", text: "anyone on LongFast", mine: false },
                 { from: "ME", text: "here. walnut creek", mine: true },
@@ -366,6 +386,8 @@
         },
         fjell: {
             name: "Fjell",
+            service: "sms",
+            when: "4:20 PM",
             messages: [
                 { from: "FJELL", text: "trailhead in 10", mine: false },
                 { from: "ME", text: "COPY, TEN MINUTES", mine: true, acked: true },
@@ -373,7 +395,9 @@
         },
         hytta: {
             name: "Hytta",
+            service: "imessage",
             unread: 1,
+            when: "Yesterday",
             messages: [
                 { from: "HYTTA", text: "bring water", mine: false },
             ],
@@ -383,67 +407,120 @@
     const PEERS = ["everyone", "fjell", "hytta"];
 
     function activeThread() {
-        return THREADS[Ios6.state.peer];
+        return THREADS[Ios6.state.peer] || THREADS.everyone;
+    }
+
+    function serviceLabel(thread) {
+        return thread.service === "sms" ? "Text Message" : "iMessage";
+    }
+
+    function threadVia(thread, line) {
+        if (line.viaNet) return line.viaNet;
+        return thread.service === "sms" ? "sms" : "imessage";
+    }
+
+    function lastAckedMineIndex(messages) {
+        for (let index = messages.length - 1; index >= 0; index -= 1) {
+            if (messages[index].mine && messages[index].acked) return index;
+        }
+        return -1;
+    }
+
+    function stampTime() {
+        return Ios6.state.now.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    }
+
+    function drawMessagesInbox(ctx) {
+        const kit = K();
+        kit.pinstripe(ctx, 0, 0, W, H);
+        kit.statusBar(ctx, clockText(true), { light: true, carrier: "LilyGO" });
+        kit.navBar(ctx, L.StatusH, "Messages");
+        kit.navButton(ctx, 6, L.StatusH + 5, 44, 18, "Edit");
+        kit.composeButton(ctx, 284, L.StatusH + 5, function () {
+            Ios6.state.peer = "everyone";
+            Ios6.state.messagesInbox = false;
+            Ios6.state.composerFocus = true;
+            Ios6.redraw();
+        });
+        kit.panel(ctx, 8, 48, 304, 22, 0xe8e8e8, 0xffffff, 0x8a8a8a, 11);
+        kit.text(ctx, "Search", 160, 53, C.Placeholder, { size: 12, align: "center" });
+
+        const rowH = 44;
+        const tableY = 76;
+        ctx.fillStyle = kit.hex24(C.White);
+        ctx.fillRect(0, tableY, W, H - tableY);
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.fillRect(0, tableY, W, 1);
+        for (let index = 0; index < PEERS.length; index += 1) {
+            const key = PEERS[index];
+            const thread = THREADS[key];
+            const last = thread.messages[thread.messages.length - 1];
+            const top = tableY + index * rowH;
+            ctx.fillStyle = kit.hex24(C.Rule);
+            ctx.fillRect(18, top + rowH - 1, W - 18, 1);
+            if (thread.unread) {
+                ctx.fillStyle = kit.hex24(0x1a6adf);
+                ctx.beginPath();
+                ctx.arc(10, top + 22, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            kit.text(ctx, thread.name, 22, top + 7, C.Ink, { size: 14, weight: "700" });
+            kit.text(ctx, last ? last.text : "", 22, top + 25, C.Meta, {
+                size: 11,
+                maxWidth: 230,
+            });
+            kit.text(ctx, thread.when, 292, top + 9, C.Meta, { size: 11, align: "right" });
+            kit.chevron(ctx, 300, top + 17);
+            kit.hit(0, top, W, rowH, openThread(key));
+        }
     }
 
     function drawMessages(ctx) {
+        if (Ios6.state.messagesInbox) {
+            drawMessagesInbox(ctx);
+            Ios6.state.messagesVisible = 0;
+            return;
+        }
+
         const kit = K();
         kit.messagePaper(ctx);
         const thread = activeThread();
-        kit.navBar(ctx, -2, thread.name, { height: 26, titleSize: 13 });
+        const sms = thread.service === "sms";
+        kit.statusBar(ctx, clockText(true), { light: true, carrier: "LilyGO" });
+        kit.navBar(ctx, L.StatusH, thread.name);
+        kit.backButton(ctx, 4, L.StatusH + 5, "Messages", function () {
+            Ios6.state.messagesInbox = true;
+            Ios6.redraw();
+        });
+        kit.navButton(ctx, 268, L.StatusH + 5, 48, 18, "Edit");
         if (Ios6.state.messagesStatusChrome) {
             kit.navStatusChrome(ctx, { carrier: "LilyGO" });
         }
-        kit.hit(100, 0, 120, 22, function () {
+        kit.hit(100, L.StatusH, 120, L.NavH, function () {
             Ios6.state.messagesStatusChrome = !Ios6.state.messagesStatusChrome;
             const box = document.getElementById("messages-chrome");
             if (box) box.checked = Ios6.state.messagesStatusChrome;
             Ios6.redraw();
         });
 
-        const shown = PEERS.length;
-        const tabW = (W - 16) / shown;
-        kit.panel(ctx, 8, L.ChatTabY, W - 16, L.ChatTabH, C.ButtonTop, C.ButtonBottom, C.ButtonEdge, 5);
-        for (let index = 0; index < shown; index += 1) {
-            const key = PEERS[index];
-            const peer = THREADS[key];
-            const selected = key === Ios6.state.peer;
-            const x = 8 + index * tabW;
-            if (selected) {
-                kit.panel(ctx, x, L.ChatTabY, tabW, L.ChatTabH,
-                    C.SendTop, C.SendBottom, C.SendEdge,
-                    { tl: index === 0 ? 5 : 0, bl: index === 0 ? 5 : 0,
-                      tr: index === shown - 1 ? 5 : 0, br: index === shown - 1 ? 5 : 0 });
-            } else if (index > 0) {
-                ctx.fillStyle = kit.hex24(C.ButtonEdge);
-                ctx.fillRect(x, L.ChatTabY + 2, 1, L.ChatTabH - 4);
-            }
-            kit.text(ctx, peer.name, x + tabW / 2, L.ChatTabY + 4,
-                selected ? C.White : C.ButtonInk, {
-                    size: 9,
-                    weight: "700",
-                    align: "center",
-                });
-            if (peer.unread && !selected) {
-                kit.badge(ctx, x + tabW - 16, L.ChatTabY + 2, peer.unread);
-            }
-            kit.hit(x, L.ChatTabY, tabW, L.ChatTabH, function () {
-                Ios6.state.peer = key;
-                Ios6.redraw();
-            });
-        }
-        ctx.fillStyle = kit.hex24(C.Rule);
-        ctx.fillRect(0, L.ChatRuleY, W, 1);
-
-        const link = Ios6.state.peer === "everyone" ? "SNR −8.6" : "SNR −12.7";
-        kit.text(ctx, link, 312, L.ChatMetaY, C.Meta, { size: 10, align: "right" });
-
         const messages = thread.messages.slice();
         const spec = { size: 12, weight: "500" };
         const scroll = Ios6.state.chatScroll || 0;
+        const lastAcked = lastAckedMineIndex(messages);
         let cursor = L.ChatMetaY - 6;
         let painted = 0;
+        let topContentY = cursor;
         const start = messages.length - 1 - scroll;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, L.ChatMsgY, W, L.ChatMetaY - L.ChatMsgY + 10);
+        ctx.clip();
         for (let index = start; index >= 0; index -= 1) {
             const line = messages[index];
             const previous = index > 0 ? messages[index - 1] : null;
@@ -458,12 +535,12 @@
             const width = Math.min(236, Math.max(48, Math.ceil(textW + 20)));
             const bubbleH = textH + L.ChatBubblePad;
             const header = named ? L.ChatNameH : 0;
-            const delivered = line.mine && line.acked ? L.ChatDeliveredH : 0;
+            const delivered = line.mine && index === lastAcked ? L.ChatDeliveredH : 0;
             if (cursor - bubbleH - header - delivered < L.ChatMsgY) break;
             cursor -= delivered;
             const bubbleY = cursor - bubbleH;
             const bubbleX = line.mine ? 310 - width : 10;
-            kit.bubble(ctx, bubbleX, bubbleY, width, bubbleH, line.mine, line.viaNet);
+            kit.bubble(ctx, bubbleX, bubbleY, width, bubbleH, line.mine, threadVia(thread, line));
             for (let row = 0; row < lines.length; row += 1) {
                 kit.text(ctx, lines[row], bubbleX + 10, bubbleY + 6 + row * kit.lineHeight(spec), C.Ink, spec);
             }
@@ -474,62 +551,87 @@
                 kit.text(ctx, titleCase(line.from), 12, bubbleY - 10, C.Meta, { size: 10 });
             }
             cursor = bubbleY - header - L.ChatBubbleGap;
+            topContentY = bubbleY - header;
             painted += 1;
         }
-        Ios6.state.messagesVisible = painted;
         const olderLeft = start - painted + 1;
+        if (olderLeft === 0 && topContentY - L.ChatMsgY >= 28) {
+            kit.messageStamp(ctx, Math.max(L.ChatMsgY + 2, topContentY - 30),
+                serviceLabel(thread), stampTime());
+        }
         if (olderLeft > 0 || scroll > 0) {
-            kit.panel(ctx, L.ChatOlderBtnX, L.ChatOlderY, L.ChatOlderBtnW, L.ChatOlderH,
-                C.OlderTop, C.OlderBottom, C.OlderEdge, 5);
-            kit.text(ctx, "Older", L.ChatOlderBtnX + L.ChatOlderBtnW / 2, L.ChatOlderY + 5, C.White, {
-                size: 8,
-                weight: "700",
-                align: "center",
-            });
-            kit.panel(ctx, L.ChatNewerBtnX, L.ChatOlderY, L.ChatNewerBtnW, L.ChatOlderH,
-                C.OlderTop, C.OlderBottom, C.OlderEdge, 5);
-            kit.text(ctx, "Newer", L.ChatNewerBtnX + L.ChatNewerBtnW / 2, L.ChatOlderY + 5, C.White, {
-                size: 8,
-                weight: "700",
-                align: "center",
-            });
-            if (olderLeft > 0) {
-                kit.hit(L.ChatOlderBtnX, L.ChatOlderY, L.ChatOlderBtnW, L.ChatOlderH, function () {
-                    Ios6.state.chatScroll = scroll + 1;
-                    Ios6.redraw();
+            const pillY = L.ChatMsgY + 2;
+            if (topContentY - L.ChatMsgY >= L.ChatOlderH + 6) {
+                kit.panel(ctx, L.ChatOlderBtnX, pillY, L.ChatOlderBtnW, L.ChatOlderH,
+                    C.OlderTop, C.OlderBottom, C.OlderEdge, 9);
+                kit.text(ctx, "Older", L.ChatOlderBtnX + L.ChatOlderBtnW / 2, pillY + 5, C.White, {
+                    size: 8,
+                    weight: "700",
+                    align: "center",
+                });
+                kit.panel(ctx, L.ChatNewerBtnX, pillY, L.ChatNewerBtnW, L.ChatOlderH,
+                    C.OlderTop, C.OlderBottom, C.OlderEdge, 9);
+                kit.text(ctx, "Newer", L.ChatNewerBtnX + L.ChatNewerBtnW / 2, pillY + 5, C.White, {
+                    size: 8,
+                    weight: "700",
+                    align: "center",
                 });
             }
-            if (scroll > 0) {
-                kit.hit(L.ChatNewerBtnX, L.ChatOlderY, L.ChatNewerBtnW, L.ChatOlderH, function () {
-                    Ios6.state.chatScroll = Math.max(0, scroll - 1);
-                    Ios6.redraw();
-                });
-            }
+        }
+        ctx.restore();
+        Ios6.state.messagesVisible = painted;
+        if (olderLeft > 0) {
+            kit.hit(0, L.ChatMsgY, W, 18, function () {
+                Ios6.state.chatScroll = scroll + 1;
+                Ios6.redraw();
+            });
+        }
+        if (scroll > 0) {
+            kit.hit(L.ChatNewerBtnX, L.ChatMsgY, L.ChatNewerBtnW, L.ChatOlderH, function () {
+                Ios6.state.chatScroll = Math.max(0, scroll - 1);
+                Ios6.redraw();
+            });
         }
 
         if (Ios6.state.txFailed) {
             kit.text(ctx, "TX FAILED", 10, L.ChatMetaY, C.Fault, { size: 8, weight: "700" });
         }
 
-        kit.panel(ctx, -1, 180, 322, 44, C.BarTop, C.BarBottom, C.BarEdge, 0);
-        kit.panel(ctx, 6, 186, 250, 30, C.InputTop, C.InputBottom, C.InputEdge, 15);
+        kit.panel(ctx, -1, 180, 322, 62, C.BarTop, C.BarBottom, C.BarEdge, 0);
+        kit.gloss(ctx, 0, 180, W, 22, 0, 0.40);
+        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        ctx.fillRect(0, 180, W, 1);
+        kit.cameraWell(ctx, 6, 188, go("settings"));
+        kit.composerField(ctx, 36, L.ChatSendY, 220, L.ChatSendH);
         const draft = Ios6.state.draft;
-        kit.text(ctx, draft || "Text Message", 18, 194,
+        const placeholder = serviceLabel(thread);
+        kit.text(ctx, draft || placeholder, 50, 194,
             draft ? C.Ink : C.Placeholder, {
                 size: 12,
                 weight: draft ? "500" : "400",
             });
-        if (draft) {
-            const left = Math.max(0, 39 - draft.length);
-            kit.text(ctx, String(left), 248, 196, left < 10 ? C.Fault : 0x8a8a8a, {
-                size: 8,
-                align: "right",
-            });
+        if (Ios6.state.composerFocus) {
+            const caretX = 50 + (draft ? kit.measureWidth(ctx, draft, { size: 12, weight: "500" }) : 0);
+            ctx.fillStyle = kit.hex24(0x1a6adf);
+            ctx.fillRect(Math.min(caretX + 1, 246), 192, 1.5, 16);
         }
+        const sendTone = !draft ? {
+            top: 0xa8b0b8,
+            bottom: 0x6a727a,
+            edge: 0x4a525a,
+        } : (sms ? {
+            top: C.SmsTop,
+            bottom: C.SmsBottom,
+            edge: C.SmsEdge,
+        } : {
+            top: C.SendTop,
+            bottom: C.SendBottom,
+            edge: C.SendEdge,
+        });
         kit.sendButton(ctx, L.ChatSendX, L.ChatSendY, L.ChatSendW, L.ChatSendH, "Send", function () {
             Ios6.sendDraft();
-        });
-        kit.hit(6, 186, 250, 30, function () {
+        }, sendTone);
+        kit.hit(36, L.ChatSendY, 220, L.ChatSendH, function () {
             Ios6.state.composerFocus = true;
         });
     }
@@ -539,7 +641,7 @@
         K().statusBar(ctx, clockText());
         K().navBar(ctx, L.StatusH, "Nodes");
         K().backButton(ctx, 4, L.StatusH + 5, "Home", go("home"));
-        K().navButton(ctx, 252, L.StatusH + 5, 62, 18, "Chat", go("messages"));
+        K().navButton(ctx, 252, L.StatusH + 5, 62, 18, "Chat", openInbox());
 
         const rows = [
             { name: "RIDGE", snr: "−8.2", age: "2m", tone: C.Lime },
@@ -557,6 +659,7 @@
                     Ios6.state.nodeIndex = index;
                     if (row.name === "FJELL") Ios6.state.peer = "fjell";
                     if (row.name === "HYTTA") Ios6.state.peer = "hytta";
+                    Ios6.state.messagesInbox = false;
                     Ios6.open("messages");
                 },
             };
@@ -572,6 +675,7 @@
         K().tableGroup(ctx, 10, 204, 300, [
             { label: "Everyone", value: "broadcast", disclosure: true, action: function () {
                 Ios6.state.peer = "everyone";
+                Ios6.state.messagesInbox = false;
                 Ios6.open("messages");
             } },
         ], { rowH: 28 });
@@ -687,7 +791,7 @@
         lock: { id: "lock", title: "Lock", hint: "Drag the slider. The camera well on the right opens Capture.", draw: drawLock },
         home: { id: "home", title: "Home", hint: "SpringBoard icons open the other drafts.", draw: drawHome },
         field: { id: "field", title: "Field", hint: "HOME’s radio facts, in grouped iOS 6 chrome.", draw: drawField },
-        messages: { id: "messages", title: "Messages", hint: "The agent/ios6-chat-ui layout. Type, then SEND. Tap the title or the sidebar box for status chrome — OLDER/NEWER stay at y=3.", draw: drawMessages },
+        messages: { id: "messages", title: "Messages", hint: "iOS 6 iMessage. Home opens the inbox. Type, then Send. Blue is iMessage, green is SMS. The camera well opens Capture. Tap the title for status chrome.", draw: drawMessages },
         nodes: { id: "nodes", title: "Nodes", hint: "A row opens that conversation.", draw: drawNodes },
         radio: { id: "radio", title: "Radio", hint: "LISTEN toggles the receiver caption.", draw: drawRadio },
         settings: { id: "settings", title: "Settings", hint: "The switch mirrors the RGB565 checkbox.", draw: drawSettings },

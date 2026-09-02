@@ -12,6 +12,7 @@
         chatScroll: 0,
         messagesVisible: 0,
         messagesStatusChrome: false,
+        messagesInbox: false,
         draft: "",
         composerFocus: false,
         txFailed: false,
@@ -117,7 +118,13 @@
         if (!draft) return;
         const thread = Ios6.threads[Ios6.state.peer];
         if (!thread) return;
-        thread.messages.push({ from: "ME", text: draft, mine: true, acked: true });
+        thread.messages.push({
+            from: "ME",
+            text: draft,
+            mine: true,
+            acked: true,
+            viaNet: thread.service === "sms" ? "sms" : "imessage",
+        });
         Ios6.state.chatScroll = 0;
         Ios6.state.draft = "";
         Ios6.redraw();
@@ -252,13 +259,18 @@
         }
         if (event.key === "Tab") {
             const order = ["everyone", "fjell", "hytta"];
-            const index = order.indexOf(Ios6.state.peer);
-            Ios6.state.peer = order[(index + 1) % order.length];
+            if (Ios6.state.messagesInbox) {
+                Ios6.state.messagesInbox = false;
+            } else {
+                const index = order.indexOf(Ios6.state.peer);
+                Ios6.state.peer = order[(index + 1) % order.length];
+            }
             Ios6.redraw();
             event.preventDefault();
             return;
         }
         if (event.key.length === 1 && Ios6.state.draft.length < 39) {
+            Ios6.state.messagesInbox = false;
             Ios6.state.draft += event.key;
             Ios6.redraw();
             event.preventDefault();
@@ -333,6 +345,18 @@
         node.addEventListener("pointermove", onPointerMove);
         node.addEventListener("pointerup", onPointerUp);
         node.addEventListener("pointercancel", onPointerUp);
+        node.addEventListener("wheel", function (event) {
+            if (Ios6.state.screen !== "messages" || Ios6.state.messagesInbox) return;
+            const thread = Ios6.threads[Ios6.state.peer];
+            const maxScroll = thread ? Math.max(0, thread.messages.length - 1) : 0;
+            if (event.deltaY < 0) {
+                Ios6.state.chatScroll = Math.min(maxScroll, (Ios6.state.chatScroll || 0) + 1);
+            } else if (event.deltaY > 0) {
+                Ios6.state.chatScroll = Math.max(0, (Ios6.state.chatScroll || 0) - 1);
+            }
+            Ios6.redraw();
+            event.preventDefault();
+        }, { passive: false });
         window.addEventListener("keydown", onKeyDown);
         window.addEventListener("hashchange", function () {
             const id = location.hash.replace("#", "");
@@ -359,6 +383,7 @@
         });
         Ios6.state.peer = "everyone";
         Ios6.state.chatScroll = 0;
+        Ios6.state.messagesInbox = false;
         Ios6.state.screen = "messages";
         Ios6.redraw();
         report.everyoneBubbles = Ios6.state.messagesVisible;

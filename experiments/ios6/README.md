@@ -35,7 +35,7 @@ lab still runs on Helvetica / Arial.
 | Lock | Wallpaper, clock, slide to unlock |
 | Home | SpringBoard icon grid + dock |
 | Field | HOME’s radio facts in grouped iOS 6 chrome |
-| Messages | The `agent/ios6-chat-ui` CHAT layout, same `kIos6*` / `kChat*` numbers |
+| Messages | iOS 6 iMessage: light status, Messages/Edit nav, blue/green balloons, camera composer |
 | Nodes | Heard roster as a grouped table |
 | Radio | Felt face, LCD readout, LISTEN |
 | Settings | Grouped tables + the RGB565 switch |

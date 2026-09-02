@@ -369,29 +369,34 @@
     }
 
     function messagePaper(ctx) {
+        // iOS 6 Messages paper: pale blue-grey, almost flat, faint textile.
         ctx.fillStyle = hex24(C.Backdrop);
         ctx.fillRect(0, 0, W, H);
-        for (let column = 0; column < W; column += 7) {
-            ctx.fillStyle = "rgba(255,255,255,0.38)";
-            ctx.fillRect(column, 0, 3, H);
-            ctx.fillStyle = "rgba(70,90,120,0.07)";
-            ctx.fillRect(column + 4, 0, 1, H);
+        ctx.save();
+        ctx.globalAlpha = 0.10;
+        for (let column = 0; column < W; column += 2) {
+            ctx.fillStyle = column % 4 === 0 ? "#ffffff" : "#5a6e8c";
+            ctx.fillRect(column, 0, 1, H);
         }
+        ctx.restore();
     }
 
-    function signalBars(ctx, x, y, filled) {
+    function signalBars(ctx, x, y, filled, color) {
         // iOS 6 used five rising bars. Dots are iOS 7.
         const count = filled === undefined ? 4 : filled;
+        const on = color === undefined ? C.White : color;
+        const off = color === undefined ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.18)";
         for (let bar = 0; bar < 5; bar += 1) {
             const height = 4 + bar;
-            ctx.fillStyle = bar < count ? hex24(C.White) : "rgba(255,255,255,0.28)";
-            fillRound(ctx, x + bar * 4, y - height, 3, height, 0.6, ctx.fillStyle);
+            fillRound(ctx, x + bar * 4, y - height, 3, height, 0.6,
+                bar < count ? hex24(on) : off);
         }
     }
 
-    function wifi(ctx, x, y) {
+    function wifi(ctx, x, y, color) {
+        const tone = color === undefined ? C.White : color;
         ctx.save();
-        ctx.strokeStyle = hex24(C.White);
+        ctx.strokeStyle = hex24(tone);
         ctx.lineWidth = 1.2;
         ctx.lineCap = "round";
         for (let ring = 0; ring < 3; ring += 1) {
@@ -399,7 +404,7 @@
             ctx.arc(x, y + 7, 2 + ring * 2.3, Math.PI * 1.22, Math.PI * 1.78);
             ctx.stroke();
         }
-        ctx.fillStyle = hex24(C.White);
+        ctx.fillStyle = hex24(tone);
         ctx.beginPath();
         ctx.arc(x, y + 7, 0.8, 0, Math.PI * 2);
         ctx.fill();
@@ -409,13 +414,15 @@
     function battery(ctx, x, y, options) {
         const spec = options || {};
         const level = spec.level === undefined ? 0.72 : spec.level;
-        ctx.strokeStyle = hex24(C.White);
+        const stroke = spec.color === undefined ? C.White : spec.color;
+        const fill = spec.fill === undefined ? stroke : spec.fill;
+        ctx.strokeStyle = hex24(stroke);
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 0.5, y + 0.5, 20, 9, 2);
         ctx.stroke();
-        ctx.fillStyle = hex24(C.White);
+        ctx.fillStyle = hex24(stroke);
         ctx.fillRect(x + 21, y + 3, 2, 4);
-        fillRound(ctx, x + 2, y + 2, Math.max(2, Math.round(16 * level)), 6, 1, hex24(C.White));
+        fillRound(ctx, x + 2, y + 2, Math.max(2, Math.round(16 * level)), 6, 1, hex24(fill));
     }
 
     function padlock(ctx, x, y) {
@@ -433,11 +440,32 @@
     function statusBar(ctx, clock, opts) {
         const options = opts || {};
         const height = Ios6.layout.StatusH;
+        const filled = options.bars === undefined ? 5 : options.bars;
+        if (options.light) {
+            // iOS 6 Messages used the default light status bar, not black.
+            const silver = ctx.createLinearGradient(0, 0, 0, height);
+            silver.addColorStop(0, "#f3f3f5");
+            silver.addColorStop(1, "#b4b4ba");
+            ctx.fillStyle = silver;
+            ctx.fillRect(0, 0, W, height);
+            ctx.fillStyle = "rgba(255,255,255,0.75)";
+            ctx.fillRect(0, 0, W, 1);
+            ctx.fillStyle = "rgba(0,0,0,0.28)";
+            ctx.fillRect(0, height - 1, W, 1);
+            const ink = 0x101418;
+            const accent = 0x1a6adf;
+            signalBars(ctx, 4, 13, filled, accent);
+            wifi(ctx, 26, 3, accent);
+            text(ctx, options.carrier || "LilyGO", 38, 3, ink, { size: 10, weight: "700" });
+            text(ctx, clock, 160, 3, ink, { size: 10, weight: "700", align: "center" });
+            text(ctx, "72%", 290, 3, ink, { size: 10, weight: "700", align: "right" });
+            battery(ctx, 294, 3, { color: ink, fill: 0x4cb050 });
+            return;
+        }
         ctx.fillStyle = options.clear ? "rgba(0,0,0,0.48)" : hex24(C.Status);
         ctx.fillRect(0, 0, W, height);
         ctx.fillStyle = options.clear ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.10)";
         ctx.fillRect(0, height - 1, W, 1);
-        const filled = options.bars === undefined ? 5 : options.bars;
         signalBars(ctx, 4, 13, filled);
         wifi(ctx, 26, 3);
         text(ctx, options.carrier || "LilyGO", 38, 3, C.White, { size: 10, weight: "700" });
@@ -553,13 +581,18 @@
         if (action) hit(x, y, width, height, action);
     }
 
-    function sendButton(ctx, x, y, width, height, label, action) {
-        panel(ctx, x, y, width, height, C.SendTop, C.SendBottom, C.SendEdge, 15);
-        gloss(ctx, x, y, width, height, 15, 0.5);
+    function sendButton(ctx, x, y, width, height, label, action, colors) {
+        const tone = colors || {};
+        const top = tone.top === undefined ? C.SendTop : tone.top;
+        const bottom = tone.bottom === undefined ? C.SendBottom : tone.bottom;
+        const edge = tone.edge === undefined ? C.SendEdge : tone.edge;
+        panel(ctx, x, y, width, height, top, bottom, edge, 6);
+        gloss(ctx, x, y, width, height, 6, 0.5);
         text(ctx, label, x + width / 2, y + Math.round((height - 8) / 2), C.White, {
             size: 10,
             weight: "700",
             align: "center",
+            shadow: "rgba(0,0,0,0.35)",
         });
         if (action) hit(x, y, width, height, action);
     }
@@ -570,23 +603,111 @@
         text(ctx, String(value), x + 8, y + 3, C.White, { size: 8, weight: "700", align: "center" });
     }
 
-    function bubbleTail(ctx, x, y, mine) {
-        const body = hex24(mine ? C.BlueBottom : C.GrayBottom);
-        ctx.fillStyle = body;
-        for (let step = 0; step < 5; step += 1) {
-            const width = 5 - step;
-            const left = mine ? x : x + step;
-            ctx.fillRect(left, y + step, width, 1);
+    function bubbleTail(ctx, x, y, mine, fill) {
+        ctx.fillStyle = hex24(fill);
+        ctx.beginPath();
+        if (mine) {
+            ctx.moveTo(x - 5, y);
+            ctx.lineTo(x + 6, y + 7);
+            ctx.lineTo(x, y + 2);
+        } else {
+            ctx.moveTo(x + 5, y);
+            ctx.lineTo(x - 6, y + 7);
+            ctx.lineTo(x, y + 2);
         }
+        ctx.closePath();
+        ctx.fill();
     }
 
     function bubble(ctx, x, y, width, height, mine, viaNet) {
-        const top = mine ? C.BlueTop : (viaNet ? C.NetTop : C.GrayTop);
-        const bottom = mine ? C.BlueBottom : (viaNet ? C.NetBottom : C.GrayBottom);
-        const edge = mine ? C.BlueEdge : (viaNet ? C.NetEdge : C.GrayEdge);
-        panel(ctx, x, y, width, height, top, bottom, edge, 11);
-        gloss(ctx, x, y, width, height, 11, 0.48);
-        bubbleTail(ctx, mine ? x + width - 3 : x - 2, y + height - 5, mine);
+        // Incoming is always grey glass. Outgoing iMessage is blue; SMS is green.
+        // White-on-blue is iOS 7. Mesh yellow is not iOS 6 Messages.
+        const sms = viaNet === "sms";
+        const top = mine ? (sms ? C.SmsTop : C.BlueTop) : C.GrayTop;
+        const bottom = mine ? (sms ? C.SmsBottom : C.BlueBottom) : C.GrayBottom;
+        const edge = mine ? (sms ? C.SmsEdge : C.BlueEdge) : C.GrayEdge;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.22)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
+        panel(ctx, x, y, width, height, top, bottom, edge, 13);
+        ctx.restore();
+        gloss(ctx, x, y, width, height, 13, 0.50);
+        ctx.save();
+        roundRectPath(ctx, x, y, width, height, 13);
+        ctx.clip();
+        fillRound(ctx, x + 10, y + 2, width - 20, Math.max(5, Math.round(height * 0.20)), 6,
+            "rgba(255,255,255,0.48)");
+        ctx.restore();
+        bubbleTail(ctx, mine ? x + width : x, y + height - 7, mine, bottom);
+    }
+
+    function messageStamp(ctx, y, label, when) {
+        ctx.save();
+        ctx.strokeStyle = hex24(C.Meta);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([1, 2]);
+        ctx.beginPath();
+        ctx.moveTo(16, y + 6);
+        ctx.lineTo(W - 16, y + 6);
+        ctx.stroke();
+        ctx.restore();
+        const spec = { size: 10, weight: "700" };
+        const labelW = measureWidth(ctx, label, spec);
+        ctx.fillStyle = hex24(C.Backdrop);
+        ctx.fillRect(160 - labelW / 2 - 7, y, labelW + 14, 13);
+        text(ctx, label, 160, y, C.Meta, { size: 10, weight: "700", align: "center" });
+        if (when) {
+            text(ctx, when, 160, y + 14, C.Meta, { size: 10, weight: "500", align: "center" });
+        }
+        return when ? 28 : 14;
+    }
+
+    function cameraWell(ctx, x, y, action) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x + 12, y + 13, 12, 0, Math.PI * 2);
+        const well = ctx.createRadialGradient(x + 10, y + 10, 2, x + 12, y + 13, 12);
+        well.addColorStop(0, hex24(0x6a7380));
+        well.addColorStop(1, hex24(0x2a323c));
+        ctx.fillStyle = well;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.28)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+        panel(ctx, x + 5, y + 10, 14, 9, 0xd8dee4, 0x8a929a, 0x5a626a, 2);
+        fillRound(ctx, x + 9, y + 8, 6, 3, 1, hex24(0xc8ced4));
+        ctx.beginPath();
+        ctx.arc(x + 12, y + 15, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = hex24(0x2a3038);
+        ctx.fill();
+        if (action) hit(x, y, 24, 26, action);
+    }
+
+    function composerField(ctx, x, y, width, height) {
+        panel(ctx, x, y, width, height, C.InputTop, C.InputBottom, C.InputEdge, height / 2);
+        ctx.save();
+        roundRectPath(ctx, x, y, width, height, height / 2);
+        ctx.clip();
+        const inset = ctx.createLinearGradient(x, y, x, y + 12);
+        inset.addColorStop(0, "rgba(0,0,0,0.28)");
+        inset.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = inset;
+        ctx.fillRect(x, y, width, 12);
+        ctx.restore();
+    }
+
+    function composeButton(ctx, x, y, action) {
+        navButton(ctx, x, y, 30, 18, "", action);
+        panel(ctx, x + 8, y + 4, 10, 10, C.White, 0xe8e8e8, C.NavEdge, 1);
+        ctx.strokeStyle = hex24(C.White);
+        ctx.lineWidth = 1.6;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x + 16, y + 13);
+        ctx.lineTo(x + 22, y + 5);
+        ctx.stroke();
     }
 
     function chevron(ctx, x, y) {
@@ -795,6 +916,11 @@
         sendButton: sendButton,
         badge: badge,
         bubble: bubble,
+        messageStamp: messageStamp,
+        cameraWell: cameraWell,
+        composerField: composerField,
+        composeButton: composeButton,
+        chevron: chevron,
         tableGroup: tableGroup,
         iosSwitch: iosSwitch,
         appIcon: appIcon,
