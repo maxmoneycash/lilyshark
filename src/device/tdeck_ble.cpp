@@ -10,6 +10,8 @@
 
 #include <cstring>
 
+#include <freertos/FreeRTOS.h>
+
 namespace lilyshark {
 namespace {
 
@@ -55,6 +57,11 @@ struct Queue {
 BleStatus status{};
 Queue to_phone{};
 Queue from_phone{};
+// Each queue is written on one task and read on another -- the BLE host task
+// on its side, the main loop on ours -- so every touch happens inside this
+// lock. It was originally bare, which was survivable only while nothing ever
+// wrote to ToRadio.
+portMUX_TYPE queue_lock = portMUX_INITIALIZER_UNLOCKED;
 BLECharacteristic *from_radio = nullptr;
 BLECharacteristic *from_num = nullptr;
 std::uint32_t from_num_value = 0;
@@ -77,9 +84,12 @@ class ToRadioEvents final : public BLECharacteristicCallbacks {
     {
         const std::string value = characteristic->getValue();
         if (value.empty()) return;
-        if (from_phone.push(reinterpret_cast<const std::uint8_t *>(value.data()), value.size())) {
-            ++status.writes;
-        }
+        portENTER_CRITICAL(&queue_lock);
+        const bool queued =
+            from_phone.push(reinterpret_cast<const std::uint8_t *>(value.data()),
+                            value.size());
+        portEXIT_CRITICAL(&queue_lock);
+        if (queued) ++status.writes;
     }
 };
 
@@ -90,7 +100,9 @@ class FromRadioEvents final : public BLECharacteristicCallbacks {
     void onRead(BLECharacteristic *characteristic) override
     {
         std::uint8_t buffer[kMaxMessage]{};
+        portENTER_CRITICAL(&queue_lock);
         const std::size_t length = to_phone.pop(buffer, sizeof(buffer));
+        portEXIT_CRITICAL(&queue_lock);
         if (length == 0) {
             characteristic->setValue(static_cast<std::uint8_t *>(nullptr), 0);
             return;
@@ -148,7 +160,10 @@ bool startTDeckBle(const char *name) noexcept
 bool queueBleFromRadio(const std::uint8_t *bytes, std::size_t length) noexcept
 {
     if (!status.started || bytes == nullptr) return false;
-    if (!to_phone.push(bytes, length)) return false;
+    portENTER_CRITICAL(&queue_lock);
+    const bool queued = to_phone.push(bytes, length);
+    portEXIT_CRITICAL(&queue_lock);
+    if (!queued) return false;
     if (from_num != nullptr && status.connected) {
         ++from_num_value;
         from_num->setValue(reinterpret_cast<std::uint8_t *>(&from_num_value),
@@ -161,7 +176,10 @@ bool queueBleFromRadio(const std::uint8_t *bytes, std::size_t length) noexcept
 std::size_t takeBleToRadio(std::uint8_t *out, std::size_t capacity) noexcept
 {
     if (!status.started || out == nullptr) return 0;
-    return from_phone.pop(out, capacity);
+    portENTER_CRITICAL(&queue_lock);
+    const std::size_t length = from_phone.pop(out, capacity);
+    portEXIT_CRITICAL(&queue_lock);
+    return length;
 }
 
 const BleStatus &tdeckBleStatus() noexcept { return status; }

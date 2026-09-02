@@ -60,6 +60,7 @@
 #include "lilyshark/device/hardware_status.h"
 #include "lilyshark/device/tdeck_chime.h"
 #include "lilyshark/device/tdeck_ble.h"
+#include "lilyshark/protocols/meshtastic_api.h"
 #include "lilyshark/device/radio_service.h"
 #include "lilyshark/device/screenshot.h"
 #include "lilyshark/device/tdeck_display_init.h"
@@ -8941,6 +8942,21 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                     chat_push(from, chat_payload.text, false, peer, nullptr, 0U,
                               stored->raw.rf.origin == FrameOrigin::Net);
                     chat_remember_peer(stored->decoded.source, from);
+#if defined(ESP_PLATFORM)
+                    // A paired phone holds this same conversation, so a text
+                    // the deck hears is handed over as FromRadio{packet} and
+                    // FromNum tells the app to come read it.
+                    if (tdeckBleStatus().connected) {
+                        std::uint8_t ble_frame[512]{};
+                        const std::size_t ble_length = encodeApiTextPacket(
+                            stored->decoded.source, dest, stored->decoded.packet_id,
+                            chat_payload.text, stored->raw.rf.rssi_dbm_x10,
+                            stored->raw.rf.snr_db_x10, ble_frame, sizeof(ble_frame));
+                        if (ble_length > 0U) {
+                            (void)queueBleFromRadio(ble_frame, ble_length);
+                        }
+                    }
+#endif
                     // Announce it. An unread badge on a screen the operator is
                     // not looking at is not a notification; this banner shows
                     // wherever they are, and the next screen build picks it up.
@@ -14353,6 +14369,74 @@ void handle_analyzer_link_command(const char *line) noexcept
     }
 }
 
+#if defined(ESP_PLATFORM)
+// The config-dump position survives across loop passes because the BLE queue
+// is eight messages deep and the dump can be longer; encodeApiConfigMessage
+// is a pure function of the index, so stalling on a full queue costs nothing.
+bool ble_config_active = false;
+std::size_t ble_config_index = 0;
+std::uint32_t ble_config_id = 0;
+
+void service_ble_api() noexcept
+{
+    std::uint8_t buffer[512]{};
+    std::size_t length = 0;
+    while ((length = takeBleToRadio(buffer, sizeof(buffer))) > 0U) {
+        ApiToRadio message{};
+        if (!parseApiToRadio(buffer, length, message)) continue;
+        if (message.kind == ApiToRadio::Kind::WantConfig) {
+            ble_config_active = true;
+            ble_config_index = 0;
+            ble_config_id = message.want_config_id;
+        } else if (message.kind == ApiToRadio::Kind::Text) {
+            // The phone is a second keyboard for the same radio: the message
+            // goes on the air, into the deck's own chat log, and earns
+            // DELIVERED the same way a message typed on this keyboard does.
+            (void)transmit_meshtastic(MeshtasticPort::TextMessage, message.text,
+                                      message.to_node);
+        }
+    }
+    if (!ble_config_active) return;
+
+    std::array<LiveNodeSummary, 8> heard{};
+    const std::size_t heard_count = collect_live_nodes(heard);
+    ApiNodeEntry nodes[9]{};
+    std::size_t node_count = 0;
+    nodes[node_count].num = localMeshtasticNodeNum();
+    formatLocalMeshtasticShortName(nodes[node_count].label,
+                                   sizeof(nodes[node_count].label));
+    nodes[node_count].is_self = true;
+    ++node_count;
+    for (std::size_t index = 0; index < heard_count && node_count < 9U; ++index) {
+        const LiveNodeSummary &summary = heard[index];
+        // The phone speaks Meshtastic; nodes heard on other protocols would
+        // be nonsense entries in its node list.
+        if (summary.protocol != ProtocolId::Meshtastic) continue;
+        if (summary.id == localMeshtasticNodeNum()) continue;
+        ApiNodeEntry &entry = nodes[node_count++];
+        entry.num = summary.id;
+        std::snprintf(entry.label, sizeof(entry.label), "%s", summary.label);
+        entry.has_snr = summary.frames > 0U;
+        entry.snr_x10 = summary.latest_snr_x10;
+    }
+
+    std::uint8_t frame[512]{};
+    while (ble_config_active) {
+        // The version gates app features, so the leading 2.6.0 keeps a stock
+        // app from refusing us; the suffix is what this firmware really is.
+        const std::size_t frame_length = encodeApiConfigMessage(
+            ble_config_index, ble_config_id, "2.6.0-lilyshark.8", nodes, node_count,
+            frame, sizeof(frame));
+        if (frame_length == 0U) {
+            ble_config_active = false;
+            break;
+        }
+        if (!queueBleFromRadio(frame, frame_length)) break;
+        ++ble_config_index;
+    }
+}
+#endif
+
 void loop()
 {
     poll_trackball();
@@ -14374,6 +14458,10 @@ void loop()
             analyzer_link_line_length = 0;
         }
     }
+
+#if defined(ESP_PLATFORM)
+    service_ble_api();
+#endif
 
     if(chat_log_dirty && static_cast<std::int32_t>(millis() - chat_log_save_due_ms) >= 0) {
         (void)write_chat_log();

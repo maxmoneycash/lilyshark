@@ -91,6 +91,11 @@ build_and_run decoder_stress \
   src/core/reticulum_decoder.cpp \
   test/decoder_stress/test_decoder_stress.cpp
 
+build_and_run meshtastic_api \
+  src/core/meshtastic_api.cpp \
+  src/core/mesh_identity.cpp \
+  test/meshtastic_api/test_meshtastic_api.cpp
+
 python3 scripts/check_baked_tile_fallbacks.py
 
 build_and_run lxmf \

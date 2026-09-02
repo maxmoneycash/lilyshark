@@ -1,0 +1,182 @@
+// The BLE protobuf conversation, checked against the wire format itself.
+//
+// The encode side is compared to byte vectors computed by hand from the
+// protobuf encoding rules and the field numbers in meshtastic/protobufs, so
+// a mistake shared between our writer and our reader cannot pass unnoticed.
+// The parse side is fed hand-assembled ToRadio bytes for the same reason.
+
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "lilyshark/core/mesh_identity.h"
+#include "lilyshark/protocols/meshtastic_api.h"
+
+using namespace lilyshark;
+
+namespace {
+
+void testMyInfoExactBytes()
+{
+    setLocalMeshtasticNodeNum(1);
+    std::uint8_t out[64]{};
+    const std::size_t length = encodeApiConfigMessage(0, 0x42, "2.6.0", nullptr, 0,
+                                                      out, sizeof(out));
+    // FromRadio.my_info (field 3, len-delimited): tag 0x1a, length 6.
+    // MyNodeInfo.my_node_num (field 1 varint) = 1: 0x08 0x01.
+    // MyNodeInfo.min_app_version (field 11 varint) = 30200: 0x58 0xf8 0xeb 0x01.
+    const std::uint8_t expected[] = {0x1a, 0x06, 0x08, 0x01, 0x58, 0xf8, 0xeb, 0x01};
+    assert(length == sizeof(expected));
+    assert(std::memcmp(out, expected, length) == 0);
+}
+
+void testConfigCompleteEchoesNonce()
+{
+    std::uint8_t out[16]{};
+    // With no nodes the sequence is my_info, metadata, channel, lora, complete.
+    const std::size_t length = encodeApiConfigMessage(4, 0xa5, "2.6.0", nullptr, 0,
+                                                      out, sizeof(out));
+    // FromRadio.config_complete_id (field 7 varint) = 0xa5: 0x38 0xa5 0x01.
+    const std::uint8_t expected[] = {0x38, 0xa5, 0x01};
+    assert(length == sizeof(expected));
+    assert(std::memcmp(out, expected, length) == 0);
+    // A zero nonce must still be echoed, or the app waits forever.
+    const std::size_t zero_length = encodeApiConfigMessage(4, 0, "2.6.0", nullptr, 0,
+                                                           out, sizeof(out));
+    const std::uint8_t zero_expected[] = {0x38, 0x00};
+    assert(zero_length == sizeof(zero_expected));
+    assert(std::memcmp(out, zero_expected, zero_length) == 0);
+}
+
+void testSequenceShapeAndTermination()
+{
+    setLocalMeshtasticNodeNum(0xcda172e0U);
+    ApiNodeEntry nodes[2]{};
+    nodes[0].num = 0xcda172e0U;
+    std::snprintf(nodes[0].label, sizeof(nodes[0].label), "1B99");
+    nodes[0].is_self = true;
+    nodes[1].num = 0x96f61b44U;
+    std::snprintf(nodes[1].label, sizeof(nodes[1].label), "96F61B44");
+    nodes[1].has_snr = true;
+    nodes[1].snr_x10 = -85;
+
+    std::uint8_t out[512]{};
+    // my_info, metadata, two node_info, channel, lora, complete = 7 messages.
+    for (std::size_t index = 0; index < 7U; ++index) {
+        const std::size_t length = encodeApiConfigMessage(index, 7, "2.6.0-lilyshark",
+                                                          nodes, 2, out, sizeof(out));
+        assert(length > 0);
+        assert(length <= sizeof(out));
+    }
+    assert(encodeApiConfigMessage(7, 7, "2.6.0-lilyshark", nodes, 2, out,
+                                  sizeof(out)) == 0);
+
+    // The self node_info carries the user id string "!cda172e0" and T_DECK.
+    const std::size_t self_length =
+        encodeApiConfigMessage(2, 7, "2.6.0-lilyshark", nodes, 2, out, sizeof(out));
+    assert(self_length > 0);
+    assert(std::memcmp(out, "\x22", 1) == 0);  // FromRadio.node_info tag
+    bool found_id = false;
+    for (std::size_t index = 0; index + 9U <= self_length; ++index) {
+        if (std::memcmp(out + index, "!cda172e0", 9) == 0) found_id = true;
+    }
+    assert(found_id);
+}
+
+void testWantConfigParses()
+{
+    // ToRadio.want_config_id (field 3 varint) = 42: 0x18 0x2a.
+    const std::uint8_t bytes[] = {0x18, 0x2a};
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::WantConfig);
+    assert(message.want_config_id == 42);
+}
+
+void testPhoneTextParses()
+{
+    // ToRadio.packet{ to=0x11223344, want_ack=1, decoded{ portnum=1,
+    // payload="hi" } }, assembled by hand:
+    const std::uint8_t bytes[] = {
+        0x0a, 0x0f,                          // ToRadio.packet, 15 bytes
+        0x15, 0x44, 0x33, 0x22, 0x11,        // MeshPacket.to fixed32
+        0x22, 0x06,                          // MeshPacket.decoded, 6 bytes
+        0x08, 0x01,                          // Data.portnum = TEXT
+        0x12, 0x02, 'h', 'i',                // Data.payload
+        0x50, 0x01,                          // MeshPacket.want_ack
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::Text);
+    assert(message.to_node == 0x11223344U);
+    assert(message.want_ack);
+    assert(std::strcmp(message.text, "hi") == 0);
+}
+
+void testNonTextPortIsIgnoredButValid()
+{
+    // Same shape, portnum = 3 (POSITION): parses fine, acts on nothing.
+    const std::uint8_t bytes[] = {
+        0x0a, 0x0b, 0x15, 0x44, 0x33, 0x22, 0x11,
+        0x22, 0x04, 0x08, 0x03, 0x12, 0x00,
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::None);
+}
+
+void testMalformedBytesRefuse()
+{
+    // A length-delimited field promising more bytes than exist.
+    const std::uint8_t truncated[] = {0x0a, 0x7f, 0x15, 0x44};
+    ApiToRadio message{};
+    assert(!parseApiToRadio(truncated, sizeof(truncated), message));
+    assert(!parseApiToRadio(nullptr, 4, message));
+    assert(!parseApiToRadio(truncated, 0, message));
+}
+
+void testHeardTextRoundTripsThroughParse()
+{
+    // What we hand the phone must itself be a well-formed FromRadio whose
+    // packet our own ToRadio MeshPacket parser can walk -- same message type,
+    // so the parser doubles as an independent check on the encoder.
+    std::uint8_t out[512]{};
+    const std::size_t length = encodeApiTextPacket(
+        0x96f61b44U, 0xffffffffU, 77, "TRACK IS WASHED OUT", -651, -85, out,
+        sizeof(out));
+    assert(length > 0);
+    // FromRadio.packet is field 2; reuse the ToRadio parser on its payload by
+    // rewriting the outer tag from field 2 to field 1 (both len-delimited).
+    assert(out[0] == 0x12);
+    out[0] = 0x0a;
+    ApiToRadio message{};
+    assert(parseApiToRadio(out, length, message));
+    assert(message.kind == ApiToRadio::Kind::Text);
+    assert(message.to_node == 0xffffffffU);
+    assert(std::strcmp(message.text, "TRACK IS WASHED OUT") == 0);
+}
+
+void testEncodeRefusesTinyBuffers()
+{
+    std::uint8_t out[4]{};
+    assert(encodeApiConfigMessage(0, 1, "2.6.0", nullptr, 0, out, sizeof(out)) == 0);
+    assert(encodeApiTextPacket(1, 2, 3, "hello", 0, 0, out, sizeof(out)) == 0);
+}
+
+} // namespace
+
+int main()
+{
+    testMyInfoExactBytes();
+    testConfigCompleteEchoesNonce();
+    testSequenceShapeAndTermination();
+    testWantConfigParses();
+    testPhoneTextParses();
+    testNonTextPortIsIgnoredButValid();
+    testMalformedBytesRefuse();
+    testHeardTextRoundTripsThroughParse();
+    testEncodeRefusesTinyBuffers();
+    std::printf("meshtastic_api: all assertions passed\n");
+    return 0;
+}
