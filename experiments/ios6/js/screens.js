@@ -458,7 +458,8 @@
         ctx.fillStyle = "rgba(0,0,0,0.18)";
         ctx.fillRect(0, searchY + 27, W, 1);
         kit.panel(ctx, 8, searchY + 4, 304, 20, 0xffffff, 0xf2f2f2, 0x8a8a8a, 10);
-        kit.text(ctx, "Search", 160, searchY + 7, C.Placeholder, { size: 12, align: "center" });
+        kit.searchGlyph(ctx, 22, searchY + 14, C.Placeholder);
+        kit.text(ctx, "Search", 32, searchY + 7, C.Placeholder, { size: 12 });
 
         const rowH = 44;
         const tableY = searchY + 28;

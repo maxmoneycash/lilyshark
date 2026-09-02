@@ -593,8 +593,8 @@
         const top = tone.top === undefined ? C.SendTop : tone.top;
         const bottom = tone.bottom === undefined ? C.SendBottom : tone.bottom;
         const edge = tone.edge === undefined ? C.SendEdge : tone.edge;
-        panel(ctx, x, y, width, height, top, bottom, edge, 6);
-        gloss(ctx, x, y, width, height, 6, 0.5);
+        panel(ctx, x, y, width, height, top, bottom, edge, 10);
+        gloss(ctx, x, y, width, height, 10, 0.5);
         text(ctx, label, x + width / 2, y + Math.round((height - 8) / 2), C.White, {
             size: 10,
             weight: "700",
@@ -667,12 +667,15 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.clip();
-        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.52);
-        shine.addColorStop(0, "rgba(255,255,255,0.72)");
-        shine.addColorStop(0.46, "rgba(255,255,255,0.18)");
-        shine.addColorStop(0.50, "rgba(255,255,255,0)");
+        const equator = y + Math.round(height * 0.48);
+        const shine = ctx.createLinearGradient(x, y, x, equator);
+        shine.addColorStop(0, "rgba(255,255,255,0.78)");
+        shine.addColorStop(0.72, "rgba(255,255,255,0.16)");
+        shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
-        ctx.fillRect(x - 8, y, width + 16, height * 0.52);
+        ctx.fillRect(x - 8, y, width + 16, equator - y);
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
+        ctx.fillRect(x + 4, equator, width - 8, 1);
         fillRound(ctx, x + 12, y + 2, width - 24, Math.max(4, Math.round(height * 0.16)), 5,
             "rgba(255,255,255,0.40)");
         ctx.fillStyle = "rgba(255,255,255,0.35)";
@@ -746,24 +749,60 @@
         ctx.save();
         roundRectPath(ctx, x, y, width, height, height / 2);
         ctx.clip();
-        const inset = ctx.createLinearGradient(x, y, x, y + 12);
-        inset.addColorStop(0, "rgba(0,0,0,0.28)");
+        const inset = ctx.createLinearGradient(x, y, x, y + 14);
+        inset.addColorStop(0, "rgba(0,0,0,0.38)");
+        inset.addColorStop(0.55, "rgba(0,0,0,0.06)");
         inset.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = inset;
-        ctx.fillRect(x, y, width, 12);
+        ctx.fillRect(x, y, width, 14);
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.fillRect(x + 8, y + height - 2, width - 16, 1);
         ctx.restore();
+        ctx.strokeStyle = "rgba(0,0,0,0.28)";
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, x + 0.5, y + 0.5, width - 1, height - 1, height / 2);
+        ctx.stroke();
     }
 
     function composeButton(ctx, x, y, action) {
         navButton(ctx, x, y, 30, 18, "", action);
-        panel(ctx, x + 8, y + 4, 10, 10, C.White, 0xe8e8e8, C.NavEdge, 1);
+        panel(ctx, x + 7, y + 3, 11, 12, C.White, 0xe8e8e8, 0x2b486b, 1);
+        ctx.strokeStyle = hex24(0x3a5a86);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 9, y + 6);
+        ctx.lineTo(x + 16, y + 6);
+        ctx.moveTo(x + 9, y + 9);
+        ctx.lineTo(x + 15, y + 9);
+        ctx.stroke();
         ctx.strokeStyle = hex24(C.White);
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = 1.8;
         ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.moveTo(x + 16, y + 13);
-        ctx.lineTo(x + 22, y + 5);
+        ctx.moveTo(x + 18, y + 13);
+        ctx.lineTo(x + 24, y + 5);
         ctx.stroke();
+        ctx.fillStyle = hex24(0xf2c14a);
+        ctx.beginPath();
+        ctx.moveTo(x + 23, y + 4);
+        ctx.lineTo(x + 26, y + 6);
+        ctx.lineTo(x + 24, y + 7);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    function searchGlyph(ctx, x, y, color) {
+        ctx.save();
+        ctx.strokeStyle = hex24(color);
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x + 3, y + 3);
+        ctx.lineTo(x + 7, y + 7);
+        ctx.stroke();
+        ctx.restore();
     }
 
     function chevron(ctx, x, y) {
@@ -976,6 +1015,7 @@
         cameraWell: cameraWell,
         composerField: composerField,
         composeButton: composeButton,
+        searchGlyph: searchGlyph,
         chevron: chevron,
         tableGroup: tableGroup,
         iosSwitch: iosSwitch,
