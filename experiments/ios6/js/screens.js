@@ -521,16 +521,16 @@
 
         const group = Ios6.state.peer === "everyone";
         const toBarY = L.StatusH + L.NavH;
-        const toBarH = group ? 12 : 0;
-        const transcriptTop = group ? toBarY + toBarH : L.ChatMsgY;
+        const stripH = group ? 12 : 22;
+        const transcriptTop = toBarY + stripH;
         if (group) {
-            const toFill = ctx.createLinearGradient(0, toBarY, 0, toBarY + toBarH);
+            const toFill = ctx.createLinearGradient(0, toBarY, 0, toBarY + stripH);
             toFill.addColorStop(0, "#ffffff");
             toFill.addColorStop(1, "#ececf0");
             ctx.fillStyle = toFill;
-            ctx.fillRect(0, toBarY, W, toBarH);
+            ctx.fillRect(0, toBarY, W, stripH);
             ctx.fillStyle = kit.hex24(C.Rule);
-            ctx.fillRect(0, toBarY + toBarH - 1, W, 1);
+            ctx.fillRect(0, toBarY + stripH - 1, W, 1);
             kit.text(ctx, "To:", 8, toBarY + 1, C.Meta, { size: 10, weight: "700" });
             kit.text(ctx, "Fjell, Hytta", 28, toBarY + 1, C.Ink, { size: 10 });
             kit.text(ctx, "Details", 312, toBarY + 1, 0x1a6adf, {
@@ -538,6 +538,51 @@
                 weight: "700",
                 align: "right",
             });
+        } else {
+            const stripFill = ctx.createLinearGradient(0, toBarY, 0, toBarY + stripH);
+            stripFill.addColorStop(0, "#f4f4f6");
+            stripFill.addColorStop(1, "#c8c8ce");
+            ctx.fillStyle = stripFill;
+            ctx.fillRect(0, toBarY, W, stripH);
+            ctx.fillStyle = "rgba(255,255,255,0.75)";
+            ctx.fillRect(0, toBarY, W, 1);
+            ctx.fillStyle = kit.hex24(C.Rule);
+            ctx.fillRect(0, toBarY + stripH - 1, W, 1);
+            const actions = [
+                { label: "Call", chevron: false },
+                { label: "FaceTime", chevron: false },
+                { label: "Contact", chevron: true },
+            ];
+            const btnW = 100;
+            const btnH = 16;
+            const btnY = toBarY + 3;
+            for (let index = 0; index < actions.length; index += 1) {
+                const action = actions[index];
+                const x = 6 + index * (btnW + 4);
+                kit.panel(ctx, x, btnY, btnW, btnH, C.ButtonTop, C.ButtonBottom, C.ButtonEdge, 4);
+                kit.gloss(ctx, x, btnY, btnW, btnH, 4, 0.55);
+                ctx.fillStyle = "rgba(255,255,255,0.55)";
+                ctx.fillRect(x + 3, btnY + 1, btnW - 6, 1);
+                const labelX = action.chevron ? x + btnW / 2 - 4 : x + btnW / 2;
+                kit.text(ctx, action.label, labelX, btnY + 3, 0x1a6adf, {
+                    size: 10,
+                    weight: "700",
+                    align: "center",
+                });
+                if (action.chevron) {
+                    const chevronX = x + btnW - 11;
+                    const chevronY = btnY + 4;
+                    ctx.strokeStyle = kit.hex24(C.Chevron);
+                    ctx.lineWidth = 1.5;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    ctx.beginPath();
+                    ctx.moveTo(chevronX, chevronY);
+                    ctx.lineTo(chevronX + 3.5, chevronY + 4);
+                    ctx.lineTo(chevronX, chevronY + 8);
+                    ctx.stroke();
+                }
+            }
         }
 
         const messages = thread.messages.slice();
