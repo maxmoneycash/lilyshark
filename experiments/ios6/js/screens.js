@@ -47,14 +47,49 @@
     }
 
     function glyphMessage(ctx, x, y) {
-        K().fillRound(ctx, x + 8, y + 12, 32, 20, 8, K().hex24(C.White));
+        ctx.save();
+        K().roundRectPath(ctx, x, y, 48, 48, 10);
+        ctx.clip();
+        ctx.save();
+        ctx.translate(x + 24, y + 24);
+        ctx.rotate(-Math.PI / 4);
+        for (let stripe = -52; stripe < 52; stripe += 4) {
+            ctx.fillStyle = (stripe / 4) % 2 === 0
+                ? "rgba(12, 72, 20, 0.22)"
+                : "rgba(255, 255, 255, 0.08)";
+            ctx.fillRect(-40, stripe, 80, 2.2);
+        }
+        ctx.restore();
+        ctx.restore();
+
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.28)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
         ctx.beginPath();
-        ctx.moveTo(x + 14, y + 31);
-        ctx.lineTo(x + 14, y + 40);
-        ctx.lineTo(x + 24, y + 31);
-        ctx.closePath();
-        ctx.fillStyle = K().hex24(C.White);
+        ctx.ellipse(x + 24, y + 21, 15, 10.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
         ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + 14, y + 29);
+        ctx.lineTo(x + 10, y + 38);
+        ctx.lineTo(x + 21, y + 30);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(x + 24, y + 21, 15, 10.5, 0, 0, Math.PI * 2);
+        ctx.clip();
+        const bubbleGlass = ctx.createLinearGradient(x, y + 10, x, y + 32);
+        bubbleGlass.addColorStop(0, "rgba(255,255,255,0.95)");
+        bubbleGlass.addColorStop(0.46, "rgba(255,255,255,0.08)");
+        bubbleGlass.addColorStop(0.50, "rgba(190,200,210,0.22)");
+        bubbleGlass.addColorStop(1, "rgba(190,200,210,0.35)");
+        ctx.fillStyle = bubbleGlass;
+        ctx.fillRect(x + 8, y + 10, 32, 22);
+        ctx.restore();
     }
 
     function glyphNodes(ctx, x, y) {
@@ -540,11 +575,11 @@
             });
         } else {
             const stripFill = ctx.createLinearGradient(0, toBarY, 0, toBarY + stripH);
-            stripFill.addColorStop(0, "#f4f4f6");
+            stripFill.addColorStop(0, "#f7f7f9");
             stripFill.addColorStop(1, "#c8c8ce");
             ctx.fillStyle = stripFill;
             ctx.fillRect(0, toBarY, W, stripH);
-            ctx.fillStyle = "rgba(255,255,255,0.75)";
+            ctx.fillStyle = "rgba(255,255,255,0.80)";
             ctx.fillRect(0, toBarY, W, 1);
             ctx.fillStyle = kit.hex24(C.Rule);
             ctx.fillRect(0, toBarY + stripH - 1, W, 1);
@@ -559,9 +594,9 @@
             for (let index = 0; index < actions.length; index += 1) {
                 const action = actions[index];
                 const x = 6 + index * (btnW + 4);
-                kit.panel(ctx, x, btnY, btnW, btnH, C.ButtonTop, C.ButtonBottom, C.ButtonEdge, 4);
-                kit.gloss(ctx, x, btnY, btnW, btnH, 4, 0.55);
-                ctx.fillStyle = "rgba(255,255,255,0.55)";
+                kit.panel(ctx, x, btnY, btnW, btnH, C.White, C.ButtonBottom, C.ButtonEdge, 4);
+                kit.gloss(ctx, x, btnY, btnW, btnH, 4, 0.58);
+                ctx.fillStyle = "rgba(255,255,255,0.70)";
                 ctx.fillRect(x + 3, btnY + 1, btnW - 6, 1);
                 const labelX = action.chevron ? x + btnW / 2 - 4 : x + btnW / 2;
                 kit.text(ctx, action.label, labelX, btnY + 3, 0x1a6adf, {

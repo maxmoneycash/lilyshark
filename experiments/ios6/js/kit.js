@@ -667,19 +667,15 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.clip();
-        const equator = y + Math.round(height * 0.46);
-        const shine = ctx.createLinearGradient(x, y, x, equator);
-        shine.addColorStop(0, "rgba(255,255,255,0.82)");
-        shine.addColorStop(0.62, "rgba(255,255,255,0.22)");
+        // iOS 6 wet glass lives in the crown. A mid-bubble equator
+        // reads as a strike through the type.
+        const crown = y + Math.max(5, Math.round(height * 0.30));
+        const shine = ctx.createLinearGradient(x, y, x, crown);
+        shine.addColorStop(0, "rgba(255,255,255,0.78)");
+        shine.addColorStop(0.70, "rgba(255,255,255,0.16)");
         shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
-        ctx.fillRect(x - 8, y, width + 16, equator - y);
-        ctx.fillStyle = "rgba(0,0,0,0.08)";
-        ctx.fillRect(x - 8, equator, width + 16, height + 8);
-        ctx.fillStyle = "rgba(255,255,255,0.42)";
-        ctx.fillRect(x + 2, equator, width - 4, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.10)";
-        ctx.fillRect(x + 2, equator + 1, width - 4, 1);
+        ctx.fillRect(x - 8, y, width + 16, crown - y);
         ctx.fillStyle = "rgba(255,255,255,0.50)";
         ctx.fillRect(x + 7, y + 1, width - 14, 1);
         ctx.restore();
