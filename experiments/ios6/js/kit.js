@@ -706,6 +706,15 @@
         panel(ctx, x, y, width, height, top, bottom, edge, radius);
         ctx.restore();
         candyGlass(ctx, x, y, width, height, idle ? 0.78 : 0.92);
+        ctx.save();
+        roundRectPath(ctx, x, y, width, height, radius);
+        ctx.clip();
+        const equator = y + Math.round(height * 0.46);
+        ctx.fillStyle = "rgba(255,255,255," + (idle ? "0.30" : "0.42") + ")";
+        ctx.fillRect(x, equator, width, 1);
+        ctx.fillStyle = "rgba(0,0,0," + (idle ? "0.10" : "0.16") + ")";
+        ctx.fillRect(x, equator + 1, width, 1);
+        ctx.restore();
         ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.42" : "0.50") + ")";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1.1, y + 1.1, width - 2.2, height - 2.2, Math.max(1, radius - 1.1));
@@ -768,21 +777,39 @@
     }
 
     function badge(ctx, x, y, value) {
+        // iOS 6 SpringBoard badge: thick white rim, circular candy glass.
+        const width = 18;
+        const height = 18;
+        const radius = height / 2;
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.42)";
-        ctx.shadowBlur = 3;
-        ctx.shadowOffsetY = 1;
-        fillRound(ctx, x - 2, y - 2, 20, 18, 9, hex24(C.White));
-        panel(ctx, x, y, 16, 14, C.BadgeTop, C.BadgeBottom, C.BadgeEdge, 7);
+        ctx.shadowColor = "rgba(0,0,0,0.46)";
+        ctx.shadowBlur = 3.2;
+        ctx.shadowOffsetY = 1.2;
+        fillRound(ctx, x - 3, y - 3, width + 6, height + 6, radius + 3, hex24(C.White));
+        panel(ctx, x, y, width, height, C.BadgeTop, C.BadgeBottom, C.BadgeEdge, radius);
         ctx.restore();
-        hardGlass(ctx, function () {
-            roundRectPath(ctx, x, y, 16, 14, 7);
-        }, x, y, 16, 14, 0.58);
-        ctx.fillStyle = "rgba(255,255,255,0.50)";
+        ctx.save();
+        roundRectPath(ctx, x, y, width, height, radius);
+        ctx.clip();
         ctx.beginPath();
-        ctx.ellipse(x + 8, y + 4, 5, 2.4, 0, 0, Math.PI * 2);
+        ctx.moveTo(x - 1, y - 1);
+        ctx.lineTo(x + width + 1, y - 1);
+        ctx.lineTo(x + width + 1, y + height * 0.34);
+        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.70, x - 1, y + height * 0.34);
+        ctx.closePath();
+        const glass = ctx.createLinearGradient(x, y, x, y + height * 0.58);
+        glass.addColorStop(0, "rgba(255,255,255,0.78)");
+        glass.addColorStop(0.52, "rgba(255,255,255,0.22)");
+        glass.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = glass;
         ctx.fill();
-        text(ctx, String(value), x + 8, y + 3, C.White, { size: 8, weight: "700", align: "center" });
+        ctx.restore();
+        text(ctx, String(value), x + width / 2, y + 4, C.White, {
+            size: 9,
+            weight: "700",
+            align: "center",
+            shadow: "rgba(0,0,0,0.35)",
+        });
     }
 
     function balloonPath(ctx, x, y, width, height, mine, radius) {
