@@ -9,6 +9,8 @@
         font: "helvetica",
         rgb565: true,
         peer: "everyone",
+        chatScroll: 0,
+        messagesVisible: 0,
         draft: "",
         composerFocus: false,
         txFailed: false,
@@ -78,6 +80,7 @@
         const thread = Ios6.threads[Ios6.state.peer];
         if (!thread) return;
         thread.messages.push({ from: "ME", text: draft, mine: true, acked: true });
+        Ios6.state.chatScroll = 0;
         Ios6.state.draft = "";
         Ios6.redraw();
     };
@@ -296,8 +299,12 @@
                 blank: ink < 200,
             };
         });
-        const before = Ios6.threads.everyone.messages.length;
         Ios6.state.peer = "everyone";
+        Ios6.state.chatScroll = 0;
+        Ios6.state.screen = "messages";
+        Ios6.redraw();
+        report.everyoneBubbles = Ios6.state.messagesVisible;
+        const before = Ios6.threads.everyone.messages.length;
         Ios6.state.draft = "hello ridge";
         Ios6.sendDraft();
         const last = Ios6.threads.everyone.messages[Ios6.threads.everyone.messages.length - 1];
@@ -312,7 +319,8 @@
         report.home565 = Ios6.state.colorCount;
         report.ok = !Ios6.SCREEN_ORDER.some(function (id) {
             return report.screens[id].blank;
-        }) && report.send && report.home565 > 200 && report.homeFull >= report.home565;
+        }) && report.send && report.everyoneBubbles >= 3 &&
+            report.home565 > 200 && report.homeFull >= report.home565;
         return report;
     };
 

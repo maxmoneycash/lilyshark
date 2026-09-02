@@ -61,6 +61,10 @@ KIT_LAYOUT = {
     "ChatSendY": 186,
     "ChatSendW": 52,
     "ChatSendH": 30,
+    "ChatBubblePad": 13,
+    "ChatBubbleGap": 3,
+    "ChatNameH": 11,
+    "ChatDeliveredH": 10,
 }
 
 JS_COLOR = re.compile(r"(\w+):\s*0x([0-9a-fA-F]+)")
@@ -149,6 +153,33 @@ class Ios6LabTests(unittest.TestCase):
         self.assertIn("function navButton", self.kit)
         self.assertIn("0xa9c4e0", self.kit)
         self.assertIn("function sectionHeader", self.kit)
+
+    def test_messages_fit_three_content_sized_bubbles(self):
+        self.assertIn("ChatBubbleGap", self.palette)
+        self.assertIn("measureWidth", self.kit)
+        self.assertIn("messagesVisible", self.lab)
+        self.assertIn("everyoneBubbles", self.lab)
+        self.assertIn('"OLDER"', self.screens)
+        self.assertIn("anyone on LongFast", self.screens)
+        self.assertGreaterEqual(self.screens.count("mine:"), 2)
+        bubble = KIT_LAYOUT["ChatBubblePad"] + 12
+        cursor = KIT_LAYOUT["ChatMetaY"] - 6
+        painted = 0
+        for header, delivered in (
+            (0, KIT_LAYOUT["ChatDeliveredH"]),
+            (KIT_LAYOUT["ChatNameH"], 0),
+            (KIT_LAYOUT["ChatNameH"], 0),
+        ):
+            if cursor - bubble - header - delivered < KIT_LAYOUT["ChatMsgY"]:
+                break
+            cursor = cursor - delivered - bubble - header - KIT_LAYOUT["ChatBubbleGap"]
+            painted += 1
+        self.assertGreaterEqual(painted, 3)
+
+    def test_lock_has_a_camera_well(self):
+        self.assertIn("cameraX", self.screens)
+        self.assertIn('go("settings")', self.screens)
+        self.assertIn("The camera well on the right opens Capture.", self.screens)
 
     def test_loop_file_keeps_the_agent_running(self):
         loop_path = REPO / "experiments/ios6/LOOP.json"

@@ -142,7 +142,7 @@
 
         const trackX = 10;
         const trackY = 198;
-        const trackW = 300;
+        const trackW = 248;
         const trackH = 32;
         K().panel(ctx, trackX, trackY, trackW, trackH, 0x5a6168, 0x2c3136, 0x1a1d20, 16);
         const slide = Ios6.state.unlockSlide;
@@ -174,6 +174,18 @@
         ctx.lineTo(knobX + 18, trackY + 22);
         ctx.fill();
         Ios6.state.unlockTrack = { x: trackX, y: trackY, w: trackW, h: trackH, knobW: knobW };
+
+        const cameraX = 266;
+        K().panel(ctx, cameraX, trackY, 44, trackH, 0x3a4048, 0x1c2024, 0x0e1012, 10);
+        K().gloss(ctx, cameraX, trackY, 44, trackH, 10, 0.28);
+        K().panel(ctx, cameraX + 10, trackY + 8, 24, 16, C.ButtonTop, C.ButtonBottom, C.ButtonEdge, 3);
+        ctx.fillStyle = K().hex24(C.ButtonTop);
+        ctx.fillRect(cameraX + 18, trackY + 6, 8, 3);
+        ctx.fillStyle = K().hex24(C.BadgeBottom);
+        ctx.beginPath();
+        ctx.arc(cameraX + 22, trackY + 16, 4, 0, Math.PI * 2);
+        ctx.fill();
+        K().hit(cameraX, trackY, 44, trackH, go("settings"));
     }
 
     function iconCell(column, row) {
@@ -327,20 +339,25 @@
 
         const messages = thread.messages.slice();
         const spec = { size: 12, weight: "500" };
+        const scroll = Ios6.state.chatScroll || 0;
         let cursor = L.ChatMetaY - 6;
-        for (let back = 0; back < messages.length; back += 1) {
-            const line = messages[messages.length - 1 - back];
-            const previous = messages[messages.length - 2 - back];
-            const named = !line.mine && Ios6.state.peer === "everyone" &&
-                (!previous || previous.from !== line.from);
+        let painted = 0;
+        const start = messages.length - 1 - scroll;
+        for (let index = start; index >= 0; index -= 1) {
+            const line = messages[index];
+            const previous = index > 0 ? messages[index - 1] : null;
+            const sameSpeaker = previous && previous.mine === line.mine &&
+                (line.mine || previous.from === line.from);
+            const named = !sameSpeaker && !line.mine && Ios6.state.peer === "everyone";
             const lines = kit.wrapLines(ctx, line.text, 216, spec);
             const textH = lines.length * kit.lineHeight(spec);
-            const width = Math.min(236, Math.max(64, 20 + Math.max.apply(null, lines.map(function (row) {
-                return Ios6.state.font === "pixel" ? row.length * 6 : row.length * 6.2;
-            }))));
-            const bubbleH = textH + 13;
-            const header = named && Ios6.state.peer === "everyone" ? 11 : 0;
-            const delivered = line.mine && line.acked ? 10 : 0;
+            const textW = Math.max.apply(null, lines.map(function (row) {
+                return kit.measureWidth(ctx, row, spec);
+            }));
+            const width = Math.min(236, Math.max(48, Math.ceil(textW + 20)));
+            const bubbleH = textH + L.ChatBubblePad;
+            const header = named ? L.ChatNameH : 0;
+            const delivered = line.mine && line.acked ? L.ChatDeliveredH : 0;
             if (cursor - bubbleH - header - delivered < L.ChatMsgY) break;
             cursor -= delivered;
             const bubbleY = cursor - bubbleH;
@@ -355,7 +372,38 @@
             if (header) {
                 kit.text(ctx, line.from, 12, bubbleY - 10, C.Meta, { size: 8 });
             }
-            cursor = bubbleY - header - 4;
+            cursor = bubbleY - header - L.ChatBubbleGap;
+            painted += 1;
+        }
+        Ios6.state.messagesVisible = painted;
+        const olderLeft = start - painted + 1;
+        if (olderLeft > 0 || scroll > 0) {
+            kit.panel(ctx, L.ChatOlderBtnX, L.ChatOlderY, L.ChatOlderBtnW, L.ChatOlderH,
+                C.OlderTop, C.OlderBottom, C.OlderEdge, 5);
+            kit.text(ctx, "OLDER", L.ChatOlderBtnX + L.ChatOlderBtnW / 2, L.ChatOlderY + 5, C.White, {
+                size: 8,
+                weight: "700",
+                align: "center",
+            });
+            kit.panel(ctx, L.ChatNewerBtnX, L.ChatOlderY, L.ChatNewerBtnW, L.ChatOlderH,
+                C.OlderTop, C.OlderBottom, C.OlderEdge, 5);
+            kit.text(ctx, "NEWER", L.ChatNewerBtnX + L.ChatNewerBtnW / 2, L.ChatOlderY + 5, C.White, {
+                size: 8,
+                weight: "700",
+                align: "center",
+            });
+            if (olderLeft > 0) {
+                kit.hit(L.ChatOlderBtnX, L.ChatOlderY, L.ChatOlderBtnW, L.ChatOlderH, function () {
+                    Ios6.state.chatScroll = scroll + 1;
+                    Ios6.redraw();
+                });
+            }
+            if (scroll > 0) {
+                kit.hit(L.ChatNewerBtnX, L.ChatOlderY, L.ChatNewerBtnW, L.ChatOlderH, function () {
+                    Ios6.state.chatScroll = Math.max(0, scroll - 1);
+                    Ios6.redraw();
+                });
+            }
         }
 
         if (Ios6.state.txFailed) {
@@ -534,7 +582,7 @@
     }
 
     Ios6.screens = {
-        lock: { id: "lock", title: "Lock", hint: "Drag the slider, or click the knob’s right half.", draw: drawLock },
+        lock: { id: "lock", title: "Lock", hint: "Drag the slider. The camera well on the right opens Capture.", draw: drawLock },
         home: { id: "home", title: "Home", hint: "SpringBoard icons open the other drafts.", draw: drawHome },
         field: { id: "field", title: "Field", hint: "HOME’s radio facts, in grouped iOS 6 chrome.", draw: drawField },
         messages: { id: "messages", title: "Messages", hint: "The agent/ios6-chat-ui layout. Type, then SEND.", draw: drawMessages },

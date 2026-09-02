@@ -1,6 +1,6 @@
 {
   "active": true,
-  "pass": 2,
+  "pass": 4,
   "stop_after_pass": 8,
   "goal": "Make the 320x240 iOS 6 lab match the kit, then port winners to agent/ios6-chat-ui. Main stays the terminal chat.",
   "done_when": "experiments/ios6/reference/chat.png exists and Messages RGB565 mismatch is under 8%, or the queue is empty.",
@@ -12,14 +12,19 @@
     "blue-glass-nav-buttons",
     "status-bar-signal-pips",
     "grouped-table-inner-highlight",
-    "section-headers"
+    "section-headers",
+    "messages-fit-three-bubbles",
+    "lock-camera-grip"
   ],
   "queue": [
-    "firmware-ppm-reference-from-agent-ios6-chat-ui",
-    "messages-fit-three-bubbles",
-    "lock-camera-grip",
     "icon-reflections-in-dock",
     "messages-full-ios6-status-chrome-toggle"
+  ],
+  "skipped": [
+    {
+      "id": "firmware-ppm-reference-from-agent-ios6-chat-ui",
+      "reason": "PlatformIO is not installed in this VM. Worktree of origin/agent/ios6-chat-ui is at /tmp/ios6-chat-ui @ 2ae8e70. When pio exists: LILYSHARK_RENDER_DIR=<dir> .pio/build/simulator/program --render-test and copy chat-01.ppm into experiments/ios6/reference/."
+    }
   ],
   "branch": "cursor/ios6-ui-lab-240f",
   "pr": "https://github.com/maxmoneycash/lilyshark/pull/15",
@@ -36,13 +41,13 @@
   ],
   "how_to_auto": [
     "Read this file first. Take queue[0]. Increment pass at the start of the pass.",
-    "firmware-ppm-reference-from-agent-ios6-chat-ui: git fetch origin agent/ios6-chat-ui and worktree it. Do not checkout that branch onto this worktree. If PlatformIO can build -e simulator, run LILYSHARK_RENDER_DIR and copy chat-01.ppm (or a PNG conversion) into experiments/ios6/reference/. If the build is missing, skip and move the item to skipped.",
-    "messages-fit-three-bubbles: EVERYONE thread must show three content-sized bubbles on 320x240 without becoming single-line strips. Tight named headers and padding. Firmware condensed_12 already fits three.",
+    "lock-camera-grip: iOS 6 lock had a camera grab on the right of slide-to-unlock. Keep the wallpaper abstract. Do not copy Apple art.",
+    "icon-reflections-in-dock: a faint inverted reflection of each dock icon in the glass shelf.",
+    "messages-full-ios6-status-chrome-toggle: optional status-bar + carrier chrome on Messages that still keeps the kit title/OLDER/NEWER row.",
     "If reference/chat.png appears, open Messages, onion-skin, and drive RGB565 mismatch down.",
     "After the item: move it to completed or skipped, write notes, run test/ios6_lab, commit, push, update PR 15, re-subscribe, end the turn.",
     "cursor-subscriptions subscribe_timer name ios6-lab-loop delaySeconds 180 recurring. Prompt: read experiments/ios6/LOOP.json and do the next queue item with no user input.",
     "Also subscribe_github_ci on cursor/ios6-ui-lab-240f with notifyOnSuccess true, and subscribe_github_pr on PR 15."
   ],
-  "skipped": [],
-  "notes": "Pass 2: blue-glass nav controls, 5-pip signal, grouped-table inner highlight, section headers on Field/Settings, icon specular, kit catalog Nav on the same row as the other samples. Next autonomous pass: firmware PPM from a worktree of agent/ios6-chat-ui, or skip to messages-fit-three-bubbles if pio is missing."
+  "notes": "Pass 3-4: PlatformIO missing, firmware PPM skipped. Messages pack like 2ae8e70 and EVERYONE shows three content-sized bubbles plus OLDER/NEWER. Lock has a camera well to the right of slide-to-unlock. Next: icon-reflections-in-dock."
 }

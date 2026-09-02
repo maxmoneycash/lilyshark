@@ -205,6 +205,19 @@
         return width;
     }
 
+    function measureWidth(ctx, value, spec) {
+        const options = spec || {};
+        const size = options.size || 12;
+        if (Ios6.state.font === "pixel") {
+            return pixelWidth(value, pixelScale(size));
+        }
+        ctx.save();
+        ctx.font = (options.weight || "500") + " " + size + "px " + family();
+        const width = ctx.measureText(value).width;
+        ctx.restore();
+        return width;
+    }
+
     function wrapLines(ctx, value, maxWidth, spec) {
         const options = spec || {};
         if (Ios6.state.font === "pixel") {
@@ -531,6 +544,7 @@
         panel: panel,
         gloss: gloss,
         text: text,
+        measureWidth: measureWidth,
         wrapLines: wrapLines,
         lineHeight: lineHeight,
         hit: hit,
