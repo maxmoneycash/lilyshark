@@ -708,43 +708,26 @@
     }
 
     function cameraWell(ctx, x, y, action) {
-        // iOS 6: silver disc in a shallow well, black camera glyph.
-        const cx = x + 13;
-        const cy = y + 15;
-        ctx.save();
+        // iOS 6 Messages: rounded-rect silver well, camera silhouette.
+        const width = 26;
+        const height = 28;
+        panel(ctx, x, y, width, height, 0xd8dee4, 0x8a929a, 0x4a5258, 5);
+        gloss(ctx, x, y, width, height, 5, 0.5);
+        fillRound(ctx, x + 3, y + 4, width - 6, height - 8, 3, "rgba(0,0,0,0.22)");
+        panel(ctx, x + 4, y + 5, width - 8, height - 10, 0xf2f4f6, 0xb4bac0, 0x6a7278, 3);
+        const cx = x + width / 2;
+        const cy = y + height / 2 + 1;
+        fillRound(ctx, cx - 6, cy - 2, 12, 8, 1.6, "#2a3036");
+        fillRound(ctx, cx - 3, cy - 5, 6, 3.2, 1, "#2a3036");
         ctx.beginPath();
-        ctx.arc(cx, cy, 13, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(12,16,20,0.45)";
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(cx, cy, 11.2, 0, Math.PI * 2);
-        const disc = ctx.createLinearGradient(cx, cy - 12, cx, cy + 12);
-        disc.addColorStop(0, "#f2f4f6");
-        disc.addColorStop(0.48, "#c8ced4");
-        disc.addColorStop(0.52, "#9aa2aa");
-        disc.addColorStop(1, "#6a727a");
-        ctx.fillStyle = disc;
-        ctx.fill();
-        ctx.strokeStyle = "#3a4248";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(cx, cy, 10.2, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(255,255,255,0.55)";
-        ctx.stroke();
-        ctx.restore();
-        ctx.fillStyle = "#2a3036";
-        fillRound(ctx, cx - 6, cy - 2, 12, 7, 1.6, ctx.fillStyle);
-        fillRound(ctx, cx - 2.5, cy - 5, 5, 3, 1, ctx.fillStyle);
-        ctx.beginPath();
-        ctx.arc(cx, cy + 1.4, 2.2, 0, Math.PI * 2);
+        ctx.arc(cx, cy + 1.6, 2.4, 0, Math.PI * 2);
         ctx.fillStyle = "#0a0e12";
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx, cy + 1.4, 1.1, 0, Math.PI * 2);
-        ctx.fillStyle = "#4a606c";
+        ctx.arc(cx - 0.6, cy + 1.0, 1.0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
         ctx.fill();
-        if (action) hit(x, y, 26, 30, action);
+        if (action) hit(x, y, width, height, action);
     }
 
     function composerField(ctx, x, y, width, height) {
