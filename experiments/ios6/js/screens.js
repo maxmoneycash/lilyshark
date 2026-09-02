@@ -54,50 +54,56 @@
         ctx.save();
         ctx.translate(x + 24, y + 24);
         ctx.rotate(Math.PI / 4);
-        for (let stripe = -56; stripe < 56; stripe += 6) {
-            ctx.fillStyle = Math.round(stripe / 6) % 2 === 0
-                ? "rgba(8, 56, 16, 0.22)"
-                : "rgba(230, 255, 190, 0.12)";
-            ctx.fillRect(-50, stripe, 100, 3);
+        for (let stripe = -56; stripe < 56; stripe += 5) {
+            ctx.fillStyle = Math.round(stripe / 5) % 2 === 0
+                ? "rgba(6, 48, 12, 0.28)"
+                : "rgba(236, 255, 196, 0.14)";
+            ctx.fillRect(-52, stripe, 104, 2.4);
         }
         ctx.restore();
         ctx.restore();
 
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.28)";
+        ctx.shadowColor = "rgba(0,0,0,0.30)";
         ctx.shadowBlur = 2;
         ctx.shadowOffsetY = 1;
         ctx.beginPath();
-        ctx.ellipse(x + 24, y + 20.5, 16.2, 11, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24.5, y + 21, 17.4, 10.6, 0, 0, Math.PI * 2);
         const body = ctx.createLinearGradient(x, y + 10, x, y + 34);
         body.addColorStop(0, "#ffffff");
-        body.addColorStop(0.58, "#f4f4f6");
-        body.addColorStop(1, "#d4d6dc");
+        body.addColorStop(0.52, "#f2f3f6");
+        body.addColorStop(1, "#c8ced6");
         ctx.fillStyle = body;
         ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(x + 14.5, y + 29.2);
-        ctx.lineTo(x + 9.2, y + 38.8);
-        ctx.lineTo(x + 21.8, y + 30.6);
+        ctx.moveTo(x + 15.2, y + 29.6);
+        ctx.quadraticCurveTo(x + 12.4, y + 34.2, x + 8.6, y + 39.4);
+        ctx.quadraticCurveTo(x + 16.8, y + 34.0, x + 22.6, y + 30.8);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+        ctx.strokeStyle = "rgba(36,44,52,0.28)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(x + 24.5, y + 21, 17.4, 10.6, 0, 0, Math.PI * 2);
+        ctx.stroke();
 
         ctx.save();
         ctx.beginPath();
-        ctx.ellipse(x + 24, y + 20.5, 16.2, 11, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24.5, y + 21, 17.4, 10.6, 0, 0, Math.PI * 2);
         ctx.clip();
-        const bubbleGlass = ctx.createLinearGradient(x, y + 9, x, y + 24);
-        bubbleGlass.addColorStop(0, "rgba(255,255,255,0.95)");
+        ctx.beginPath();
+        ctx.moveTo(x + 6, y + 8);
+        ctx.lineTo(x + 43, y + 8);
+        ctx.lineTo(x + 43, y + 18);
+        ctx.quadraticCurveTo(x + 24.5, y + 26, x + 6, y + 18);
+        ctx.closePath();
+        const bubbleGlass = ctx.createLinearGradient(x, y + 9, x, y + 26);
+        bubbleGlass.addColorStop(0, "rgba(255,255,255,0.96)");
+        bubbleGlass.addColorStop(0.55, "rgba(255,255,255,0.28)");
         bubbleGlass.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = bubbleGlass;
-        ctx.fillRect(x + 8, y + 9, 32, 14);
-        ctx.beginPath();
-        ctx.moveTo(x + 10, y + 16.5);
-        ctx.quadraticCurveTo(x + 24, y + 20.5, x + 38, y + 16.5);
-        ctx.strokeStyle = "rgba(176,184,192,0.55)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        ctx.fill();
         ctx.restore();
     }
 

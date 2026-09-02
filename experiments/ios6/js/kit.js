@@ -765,9 +765,9 @@
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + width - r, y);
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-            ctx.lineTo(x + width, y + height - 4);
-            ctx.quadraticCurveTo(x + width + 6.5, y + height + 1.2, x + width + 7, y + height + 4);
-            ctx.quadraticCurveTo(x + width + 1.5, y + height + 1.2, x + width - 10, y + height);
+            ctx.lineTo(x + width, y + height - 5);
+            ctx.lineTo(x + width + 6.2, y + height + 3.2);
+            ctx.quadraticCurveTo(x + width + 1.4, y + height + 1.4, x + width - 8, y + height);
             ctx.lineTo(x + r, y + height);
             ctx.quadraticCurveTo(x, y + height, x, y + height - r);
             ctx.lineTo(x, y + r);
@@ -778,9 +778,9 @@
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
             ctx.lineTo(x + width, y + height - r);
             ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-            ctx.lineTo(x + 10, y + height);
-            ctx.quadraticCurveTo(x - 1.5, y + height + 1.2, x - 7, y + height + 4);
-            ctx.quadraticCurveTo(x - 6.5, y + height + 1.2, x, y + height - 4);
+            ctx.lineTo(x + 8, y + height);
+            ctx.quadraticCurveTo(x - 1.4, y + height + 1.4, x - 6.2, y + height + 3.2);
+            ctx.lineTo(x, y + height - 5);
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
         }
@@ -813,17 +813,20 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.clip();
-        // Wet glass lives in the crown only. A mid-bubble equator
-        // reads as a strike through the type.
-        const crown = y + Math.max(6, Math.round(height * 0.40));
-        const shine = ctx.createLinearGradient(x, y, x, crown);
-        shine.addColorStop(0, "rgba(255,255,255,0.90)");
-        shine.addColorStop(0.52, "rgba(255,255,255,0.32)");
-        shine.addColorStop(0.88, "rgba(255,255,255,0.06)");
-        shine.addColorStop(1, "rgba(255,255,255,0)");
+        // Curved candy crown only. A mid-bubble equator strikes the type.
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y - 1);
+        ctx.lineTo(x + width + 4, y - 1);
+        ctx.lineTo(x + width + 4, y + height * 0.30);
+        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.58, x - 4, y + height * 0.30);
+        ctx.closePath();
+        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.52);
+        shine.addColorStop(0, "rgba(255,255,255,0.88)");
+        shine.addColorStop(0.48, "rgba(255,255,255,0.28)");
+        shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
-        ctx.fillRect(x - 10, y, width + 20, crown - y);
-        ctx.fillStyle = "rgba(255,255,255,0.70)";
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.72)";
         ctx.fillRect(x + 8, y + 1, width - 16, 1);
         const shade = ctx.createLinearGradient(x, y + height * 0.72, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");
