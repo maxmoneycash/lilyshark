@@ -31,7 +31,11 @@ test("profileProtocolHint mirrors the builtin profile table", () => {
 	assert.equal(profileProtocolHint(1), "meshtastic");
 	assert.equal(profileProtocolHint(2), "meshcore");
 	assert.equal(profileProtocolHint(3), "meshcore");
-	assert.equal(profileProtocolHint(4), "reticulum");
+	// Profile 4 is MESHTASTIC BAY MF on this firmware, not the EU RNode
+	// example it was upstream. This assertion is what makes the table's
+	// meaning checkable against src/core/builtin_profiles.cpp.
+	assert.equal(profileProtocolHint(4), "meshtastic");
+	assert.equal(profileProtocolHint(5), "reticulum");
 	assert.equal(profileProtocolHint(5), "reticulum");
 	assert.equal(profileProtocolHint(6), "custom");
 	assert.equal(profileProtocolHint(250), "custom");
@@ -196,7 +200,8 @@ test("frameProtocolHint takes the profile whenever the device named one", () => 
 	// A named profile decides, even when the protocol name disagrees with it.
 	assert.equal(frameProtocolHint(1, "MeshCore"), "meshtastic");
 	assert.equal(frameProtocolHint(3, "Unknown"), "meshcore");
-	assert.equal(frameProtocolHint(4, ""), "reticulum");
+	assert.equal(frameProtocolHint(4, ""), "meshtastic");
+	assert.equal(frameProtocolHint(5, ""), "reticulum");
 	assert.equal(frameProtocolHint(200, "Meshtastic"), "custom");
 });
 

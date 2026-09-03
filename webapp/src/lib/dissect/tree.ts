@@ -33,6 +33,12 @@ export function profileProtocolHint(profileId: number | null): ProtocolHint {
 		case 3:
 			return "meshcore";
 		case 4:
+			// Profile 4 was the EU RNode example when this table was written
+			// upstream. It is MESHTASTIC BAY MF now -- the Bay Area
+			// community's Medium Range Fast slot -- and calling it Reticulum
+			// made the dissector invent Reticulum addresses out of Meshtastic
+			// headers, which is worse than refusing to dissect at all.
+			return "meshtastic";
 		case 5:
 			return "reticulum";
 		default:
