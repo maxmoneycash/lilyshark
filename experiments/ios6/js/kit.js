@@ -876,9 +876,10 @@
         const edge = mine ? (sms ? C.SmsEdge : C.BlueEdge) : C.GrayEdge;
         const radius = 14;
         ctx.save();
-        ctx.shadowColor = "rgba(40,48,58,0.28)";
-        ctx.shadowBlur = 3.5;
-        ctx.shadowOffsetY = 1.6;
+        ctx.shadowColor = "rgba(40,48,58,0.38)";
+        ctx.shadowBlur = 4.4;
+        ctx.shadowOffsetX = 0.8;
+        ctx.shadowOffsetY = 2.1;
         balloonPath(ctx, x, y, width, height, mine, radius);
         const fill = ctx.createLinearGradient(x, y, x, y + height);
         fill.addColorStop(0, hex24(top));
@@ -898,33 +899,33 @@
         const incoming = !mine;
         if (incoming) {
             const silver = ctx.createLinearGradient(x, y, x, y + height);
-            silver.addColorStop(0, "rgba(200,210,220,0.10)");
-            silver.addColorStop(0.55, "rgba(176,184,192,0.18)");
-            silver.addColorStop(1, "rgba(148,156,164,0.30)");
+            silver.addColorStop(0, "rgba(255,255,255,0.10)");
+            silver.addColorStop(0.55, "rgba(210,214,218,0.10)");
+            silver.addColorStop(1, "rgba(176,180,184,0.16)");
             ctx.fillStyle = silver;
             ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
         }
         ctx.beginPath();
         ctx.moveTo(x - 4, y - 1);
         ctx.lineTo(x + width + 4, y - 1);
-        ctx.lineTo(x + width + 4, y + height * 0.30);
-        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.58, x - 4, y + height * 0.30);
+        ctx.lineTo(x + width + 4, y + height * 0.34);
+        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.66, x - 4, y + height * 0.34);
         ctx.closePath();
-        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.50);
-        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.99)" : "rgba(255,255,255,0.98)");
-        shine.addColorStop(0.46, incoming ? "rgba(255,255,255,0.50)" : "rgba(255,255,255,0.44)");
+        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.54);
+        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.99)" : "rgba(255,255,255,0.94)");
+        shine.addColorStop(0.42, incoming ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.52)");
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
-        ctx.fillStyle = incoming ? "rgba(255,255,255,0.98)" : "rgba(214,238,255,0.90)";
-        ctx.fillRect(x + 8, y + 1, width - 16, 1.15);
-        ctx.fillStyle = incoming ? "rgba(255,255,255,0.58)" : "rgba(255,255,255,0.52)";
-        ctx.fillRect(x + 10, y + 2.15, width - 20, 1);
-        const shade = ctx.createLinearGradient(x, y + height * 0.70, x, y + height);
+        ctx.fillStyle = incoming ? "rgba(255,255,255,0.98)" : "rgba(230,244,255,0.92)";
+        ctx.fillRect(x + 8, y + 1, width - 16, 1.2);
+        ctx.fillStyle = incoming ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.58)";
+        ctx.fillRect(x + 10, y + 2.2, width - 20, 1);
+        const shade = ctx.createLinearGradient(x, y + height * 0.68, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");
-        shade.addColorStop(1, incoming ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.16)");
+        shade.addColorStop(1, incoming ? "rgba(0,0,0,0.14)" : "rgba(20,40,80,0.18)");
         ctx.fillStyle = shade;
-        ctx.fillRect(x - 10, y + height * 0.72, width + 20, height * 0.28);
+        ctx.fillRect(x - 10, y + height * 0.70, width + 20, height * 0.30);
         ctx.restore();
     }
 
@@ -951,58 +952,62 @@
     }
 
     function cameraWell(ctx, x, y, action) {
-        // iOS 6 Messages: stamped gunmetal disc, compact white camera.
-        // Viewfinder sits on the top-right; flash pip is left of it.
+        // Zach/Mamma: slate disc (not near-black), silver bezel, white
+        // camera with a centered viewfinder bump and a lens hole.
         const size = 28;
         const cx = x + size / 2;
         const cy = y + size / 2;
-        const outer = size / 2 - 0.70;
+        const outer = size / 2 - 0.80;
+        ctx.beginPath();
+        ctx.arc(cx, cy + 0.7, outer + 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(20,24,28,0.20)";
+        ctx.fill();
         ctx.beginPath();
         ctx.arc(cx, cy, outer + 0.95, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(226,232,238,0.96)";
+        ctx.strokeStyle = "rgba(236,240,244,0.96)";
         ctx.lineWidth = 1.55;
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
         const well = ctx.createLinearGradient(cx, cy - outer, cx, cy + outer);
-        well.addColorStop(0, "#3a424a");
-        well.addColorStop(0.42, "#24282e");
-        well.addColorStop(1, "#12161a");
+        well.addColorStop(0, "#6a727c");
+        well.addColorStop(0.40, "#4a525c");
+        well.addColorStop(1, "#2c3238");
         ctx.fillStyle = well;
         ctx.fill();
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, outer - 0.35, 0, Math.PI * 2);
         ctx.clip();
-        const inset = ctx.createLinearGradient(cx, cy - outer, cx, cy + 3);
-        inset.addColorStop(0, "rgba(0,0,0,0.50)");
-        inset.addColorStop(1, "rgba(0,0,0,0)");
+        const inset = ctx.createLinearGradient(cx, cy - outer, cx, cy + 4);
+        inset.addColorStop(0, "rgba(0,0,0,0.36)");
+        inset.addColorStop(0.48, "rgba(0,0,0,0)");
         ctx.fillStyle = inset;
-        ctx.fillRect(cx - outer, cy - outer, outer * 2, outer + 3);
-        ctx.strokeStyle = "rgba(255,255,255,0.32)";
-        ctx.lineWidth = 1;
+        ctx.fillRect(cx - outer, cy - outer, outer * 2, outer + 4);
+        ctx.strokeStyle = "rgba(230,236,242,0.58)";
+        ctx.lineWidth = 1.15;
         ctx.beginPath();
-        ctx.arc(cx, cy + 0.4, outer - 1.25, 0.10 * Math.PI, 0.90 * Math.PI);
+        ctx.arc(cx, cy - 0.15, outer - 1.15, 1.12 * Math.PI, 1.88 * Math.PI);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(0,0,0,0.32)";
+        ctx.beginPath();
+        ctx.arc(cx, cy + 0.35, outer - 1.15, 0.10 * Math.PI, 0.90 * Math.PI);
         ctx.stroke();
         ctx.restore();
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(20,24,28,0.58)";
-        ctx.lineWidth = 1.1;
+        ctx.strokeStyle = "rgba(28,32,38,0.52)";
+        ctx.lineWidth = 1.05;
         ctx.stroke();
-        fillRound(ctx, cx - 6.5, cy - 1.2, 13.0, 8.0, 1.55, "#ffffff");
-        fillRound(ctx, cx + 0.6, cy - 4.6, 4.4, 3.6, 0.80, "#ffffff");
+        fillRound(ctx, cx - 6.8, cy - 1.35, 13.6, 8.4, 1.6, "#ffffff");
+        fillRound(ctx, cx - 2.2, cy - 4.85, 4.4, 3.6, 0.75, "#ffffff");
         ctx.beginPath();
-        ctx.arc(cx - 3.6, cy - 2.8, 1.15, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffffff";
+        ctx.arc(cx + 0.1, cy + 2.55, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = "#2a3036";
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx + 0.15, cy + 2.6, 2.15, 0, Math.PI * 2);
-        ctx.fillStyle = "#161a1e";
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(cx + 0.15, cy + 2.6, 0.75, 0, Math.PI * 2);
-        ctx.fillStyle = "#0c0e10";
+        ctx.arc(cx + 0.1, cy + 2.55, 0.85, 0, Math.PI * 2);
+        ctx.fillStyle = "#1a1e22";
         ctx.fill();
         if (action) hit(x, y, size, size, action);
     }
