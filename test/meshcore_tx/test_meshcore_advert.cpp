@@ -136,6 +136,180 @@ void expectDecodesAsAdvert(const std::uint8_t *frame,
     assert(crypto::ed25519Verify(signature, message, message_length, public_key));
 }
 
+/// What a receiver recovers from an advert's app data.
+///
+/// Parsed here from the flags byte upwards instead of by calling back into the
+/// encoder. A round trip that re-used the encoder's own view of the layout
+/// could only ever prove the encoder agrees with itself; this one is an
+/// independent reading of §3.2 of the participation plan, so a field written
+/// in the wrong order or the wrong endianness has somewhere to fail.
+struct AdvertFields {
+    std::uint8_t node_type = 0;
+    bool has_location = false;
+    std::int32_t latitude_micros = 0;
+    std::int32_t longitude_micros = 0;
+    std::uint16_t feature_one = 0;
+    std::uint16_t feature_two = 0;
+    char name[kMeshCoreMaxAdvertAppDataBytes + 1]{};
+};
+
+std::int32_t readLittleEndian32(const std::uint8_t *bytes)
+{
+    const std::uint32_t value = static_cast<std::uint32_t>(bytes[0]) |
+                                (static_cast<std::uint32_t>(bytes[1]) << 8U) |
+                                (static_cast<std::uint32_t>(bytes[2]) << 16U) |
+                                (static_cast<std::uint32_t>(bytes[3]) << 24U);
+    return static_cast<std::int32_t>(value);
+}
+
+AdvertFields parseAdvertAppData(const std::uint8_t *bytes, std::size_t length)
+{
+    assert(length >= 1);
+    AdvertFields fields{};
+    const std::uint8_t flags = bytes[0];
+    fields.node_type = static_cast<std::uint8_t>(flags & 0x0fU);
+    std::size_t offset = 1;
+    if ((flags & 0x10U) != 0U) {
+        assert(offset + 8 <= length);
+        fields.has_location = true;
+        fields.latitude_micros = readLittleEndian32(bytes + offset);
+        fields.longitude_micros = readLittleEndian32(bytes + offset + 4);
+        offset += 8;
+    }
+    if ((flags & 0x20U) != 0U) {
+        assert(offset + 2 <= length);
+        fields.feature_one = static_cast<std::uint16_t>(
+            static_cast<std::uint16_t>(bytes[offset]) |
+            static_cast<std::uint16_t>(static_cast<std::uint16_t>(bytes[offset + 1]) << 8U));
+        offset += 2;
+    }
+    if ((flags & 0x40U) != 0U) {
+        assert(offset + 2 <= length);
+        fields.feature_two = static_cast<std::uint16_t>(
+            static_cast<std::uint16_t>(bytes[offset]) |
+            static_cast<std::uint16_t>(static_cast<std::uint16_t>(bytes[offset + 1]) << 8U));
+        offset += 2;
+    }
+    if ((flags & 0x80U) != 0U) {
+        // The name is not NUL-terminated on the wire; it runs to the end of
+        // the app data, which is how a receiver has to read it too.
+        const std::size_t name_length = length - offset;
+        assert(name_length <= kMeshCoreMaxAdvertAppDataBytes);
+        std::memcpy(fields.name, bytes + offset, name_length);
+        fields.name[name_length] = '\0';
+    }
+    return fields;
+}
+
+/// Encode an advert, push it through our own MeshCoreDecoder, and check that
+/// every field a stock node would file us under came back intact.
+///
+/// This is the strongest correctness evidence available without a second
+/// radio. It does not prove a stock MeshCore receiver demodulates these bytes;
+/// it proves that what the encoder claims to have said is what an independent
+/// reading of the frame recovers.
+void testFieldsSurviveTheRoundTrip()
+{
+    const TestClientIdentity identity = deckIdentity();
+    MeshCoreAdvertAppData sent{};
+    sent.node_type = MeshCoreNodeType::Chat;
+    sent.name = "Lilyshark-4D2A";
+    sent.has_location = true;
+    sent.latitude_micros = meshCoreDegreesToMicros(37.911);
+    sent.longitude_micros = meshCoreDegreesToMicros(-122.018);
+
+    std::uint8_t frame[kMeshCoreMaxFrameBytes];
+    const std::size_t length =
+        encodeMeshCoreAdvert(sent, 1788220801U, MeshCoreAdvertReach::ZeroHop,
+                             identity.public_key, identity.private_key, frame, sizeof(frame));
+    assert(length != 0);
+
+    MeshCoreDecoder decoder{};
+    RadioProfile profile{};
+    profile.protocol_hint = ProtocolId::MeshCore;
+    RawFrame raw{};
+    assert(raw.assignPayload(frame, length));
+    DecodedPacket decoded{};
+    assert(decoder.decode(raw, profile, decoded) == DecodeResult::Matched);
+    assert(decoded.kind == PacketKind::Advertisement);
+    assert(MeshCoreDecoder::routeType(decoded) == MeshCoreRouteType::Direct);
+    assert(MeshCoreDecoder::pathHashCount(decoded) == 0);
+
+    const std::uint8_t *payload = raw.bytes + decoded.payload_offset;
+    assert(decoded.payload_length > kMeshCoreAdvertFixedPayloadBytes);
+    const std::size_t app_data_length =
+        decoded.payload_length - kMeshCoreAdvertFixedPayloadBytes;
+
+    // The public key is the address, and its first byte is the path hash every
+    // peer files us under, so a key that did not survive is a node nobody can
+    // reach.
+    assert(std::memcmp(payload, identity.public_key, crypto::kEd25519PublicKeySize) == 0);
+
+    const std::uint8_t *timestamp_bytes = payload + crypto::kEd25519PublicKeySize;
+    const std::uint32_t timestamp =
+        static_cast<std::uint32_t>(readLittleEndian32(timestamp_bytes));
+    assert(timestamp == 1788220801U);
+
+    const std::uint8_t *signature = timestamp_bytes + 4;
+    const std::uint8_t *app_data = signature + crypto::kEd25519SignatureSize;
+    const AdvertFields received = parseAdvertAppData(app_data, app_data_length);
+    assert(received.node_type == static_cast<std::uint8_t>(MeshCoreNodeType::Chat));
+    assert(received.has_location);
+    assert(received.latitude_micros == 37911000);
+    assert(received.longitude_micros == -122018000);
+    assert(received.feature_one == 0 && received.feature_two == 0);
+    assert(std::strcmp(received.name, "Lilyshark-4D2A") == 0);
+
+    // And the signature has to verify over the message rebuilt from those
+    // decoded bytes, not from anything the encoder still held.
+    std::uint8_t message[kMeshCoreAdvertSignedMessageBytes];
+    const std::size_t message_length = encodeMeshCoreAdvertSignedMessage(
+        payload, timestamp, app_data, app_data_length, message, sizeof(message));
+    assert(message_length == crypto::kEd25519PublicKeySize + 4 + app_data_length);
+    assert(crypto::ed25519Verify(signature, message, message_length, payload));
+
+    // A deck with no fix advertises without a position rather than with a
+    // wrong one, and that has to survive the round trip as an absent field.
+    MeshCoreAdvertAppData unlocated{};
+    unlocated.name = "Lilyshark-4D2A";
+    const std::size_t unlocated_length =
+        encodeMeshCoreAdvert(unlocated, 1788220802U, MeshCoreAdvertReach::ZeroHop,
+                             identity.public_key, identity.private_key, frame, sizeof(frame));
+    assert(unlocated_length != 0);
+    RawFrame unlocated_raw{};
+    assert(unlocated_raw.assignPayload(frame, unlocated_length));
+    DecodedPacket unlocated_decoded{};
+    assert(decoder.decode(unlocated_raw, profile, unlocated_decoded) == DecodeResult::Matched);
+    const AdvertFields without_position = parseAdvertAppData(
+        unlocated_raw.bytes + unlocated_decoded.payload_offset +
+            kMeshCoreAdvertFixedPayloadBytes,
+        unlocated_decoded.payload_length - kMeshCoreAdvertFixedPayloadBytes);
+    assert(!without_position.has_location);
+    assert(std::strcmp(without_position.name, "Lilyshark-4D2A") == 0);
+}
+
+void testAdvertClockOnlyEverMovesForward()
+{
+    // The plain case: the persisted floor plus however long this boot has been
+    // running.
+    assert(meshCoreNextAdvertTimestamp(1000U, 30U, 0U) == 1030U);
+
+    // A deck that has just booted has an elapsed time of zero, so the floor it
+    // loaded is also the newest timestamp it has emitted, and repeating that
+    // value is exactly what a receiver treats as a replay.
+    assert(meshCoreNextAdvertTimestamp(1000U, 0U, 1000U) == 1001U);
+
+    // Adverts inside the same second must still differ.
+    assert(meshCoreNextAdvertTimestamp(1000U, 5U, 1005U) == 1006U);
+    assert(meshCoreNextAdvertTimestamp(1000U, 5U, 1200U) == 1201U);
+
+    // Saturation rather than wraparound. Going backwards is the one outcome
+    // this function exists to prevent, so the end of the epoch stops the
+    // clock instead of restarting it.
+    assert(meshCoreNextAdvertTimestamp(0xfffffff0U, 0x100U, 0U) == 0xffffffffU);
+    assert(meshCoreNextAdvertTimestamp(0U, 0U, 0xffffffffU) == 0xffffffffU);
+}
+
 void testGoldenFloodAdvert()
 {
     const TestClientIdentity identity = meshCoreTestClient();
@@ -470,14 +644,18 @@ void testDegreesToMicros()
     assert(meshCoreDegreesToMicros(-180.0) == -180000000);
 }
 
-void testTransmitStillDisconnected()
+void testTransmitPathIsWired()
 {
-    // The encoder is finished and tested; nothing transmits it yet. This flag
-    // is what the rest of the firmware reads, and flipping it is a deliberate
-    // act that belongs with the radio wiring, not with this file.
-    static_assert(!kMeshCoreTransmitReady,
-                  "MeshCore adverts must not go on the air until the TX path is wired and "
-                  "verified against a stock node");
+    // The firmware now mints an Ed25519 identity, keeps a monotonic advert
+    // clock, and hands these frames to the radio while a MeshCore profile is
+    // tuned, so the flag the rest of the tree reads is true.
+    //
+    // It says the path exists, not that it works over the air. No stock
+    // MeshCore node has confirmed receiving one of these frames; what is
+    // proven here is that the bytes match two independent implementations and
+    // survive a round trip through our own decoder.
+    static_assert(kMeshCoreTransmitReady,
+                  "the MeshCore transmit path is wired: identity, clock, and a caller");
 }
 
 } // namespace
@@ -493,7 +671,9 @@ int main()
     testSignatureCoversTimestampAndAppData();
     testRejectsBadArgumentsAndTightBuffers();
     testDegreesToMicros();
-    testTransmitStillDisconnected();
+    testFieldsSurviveTheRoundTrip();
+    testAdvertClockOnlyEverMovesForward();
+    testTransmitPathIsWired();
     std::printf("meshcore advert tests passed\n");
     return 0;
 }

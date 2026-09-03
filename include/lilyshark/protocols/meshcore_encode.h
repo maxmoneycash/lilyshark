@@ -21,15 +21,18 @@
 
 namespace lilyshark {
 
-/// MeshCore on-air frames need an Ed25519 node identity. The SX1262 transmit
-/// path is shared with Meshtastic; this encoder is the next join target.
+/// Whether the firmware has a wired MeshCore transmit path: an Ed25519
+/// identity minted from the hardware RNG and persisted, a monotonic advert
+/// clock, and a caller that hands encodeMeshCoreAdvert()'s bytes to the radio
+/// while a MeshCore profile is tuned. All three landed together, so this is
+/// now true.
 ///
-/// Still false: encodeMeshCoreAdvert() below is tested against stock-node
-/// vectors, but nothing in the firmware calls it yet. Advertising on a
-/// protocol we have not yet confirmed over the air would put unverified
-/// traffic on a live band, so the wiring is a deliberate separate step —
-/// see "Wiring stage 1 into the firmware" in the plan document.
-inline constexpr bool kMeshCoreTransmitReady = false;
+/// What it deliberately does NOT claim is that a stock MeshCore node has
+/// listed this deck as a contact. That milestone is still open: the frames are
+/// pinned byte-for-byte against two independent implementations and survive a
+/// round trip through our own decoder, which is evidence about bytes, not
+/// about RF. See "Wiring stage 1 into the firmware" in the plan document.
+inline constexpr bool kMeshCoreTransmitReady = true;
 
 inline std::size_t encodeMeshCoreText(const char *, std::uint8_t *, std::size_t) noexcept
 {
@@ -102,6 +105,26 @@ struct MeshCoreAdvertAppData {
     std::uint16_t feature_one = 0;
     std::uint16_t feature_two = 0;
 };
+
+/// The timestamp the next advert from this identity must carry.
+///
+/// `clock_floor` is the epoch second persisted for this identity,
+/// `seconds_since_boot` is how long this power cycle has been running, and
+/// `last_emitted` is the newest timestamp already put on the air.
+///
+/// This is a correctness rule, not a convenience. A MeshCore receiver drops an
+/// advert whose timestamp is not strictly greater than the last one it stored
+/// for that key, and it drops it silently — a deck whose clock restarts lower
+/// advertises perfectly and is invisible, with no error anywhere to notice.
+/// The result therefore only has to increase, forever, which is what lets a
+/// deck with no real-time clock participate at all.
+///
+/// Saturates at 2106 rather than wrapping: going backwards is the one outcome
+/// this exists to prevent, so an identity that reaches the end of the epoch
+/// stops being rediscoverable instead of silently replaying itself.
+std::uint32_t meshCoreNextAdvertTimestamp(std::uint32_t clock_floor,
+                                          std::uint32_t seconds_since_boot,
+                                          std::uint32_t last_emitted) noexcept;
 
 /// Convert decimal degrees to the int32 micro-degrees adverts carry.
 /// Returns 0 for anything that is not a finite coordinate, because an advert

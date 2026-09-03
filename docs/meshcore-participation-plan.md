@@ -298,14 +298,19 @@ Missing, in dependency order:
      they both inherited from TweetNaCl, because they landed under separate
      ownership. Folding them together is a cleanup for whoever holds both
      files next, and the natural place to add the key exchange above.
-4. **Epoch clock** (small but load-bearing). Frames carry epoch seconds and
-   peers enforce per-identity monotonicity. The firmware currently keeps
-   only monotonic microseconds. Sources in priority order: GPS UTC (already
-   parsing NMEA via TinyGPSPlus), user/webapp-set time over the serial link,
-   and a persisted floor. Persist the last timestamp we transmitted and
-   always send `max(now, last + 1)` (MeshCore's `getCurrentTimeUnique` does
-   the same) so a cold deck with no fix cannot brick its own advert stream.
-5. **MeshCore node state**: identity (96 B) in NVS; contact table (pub key,
+4. **Epoch clock** — *the advert half landed with the stage 1 wiring.* Frames
+   carry epoch seconds and peers enforce per-identity monotonicity.
+   `meshCoreNextAdvertTimestamp()` plus the reserved NVS floor described in
+   §8 item 2 give adverts a value that only ever increases, which is all a
+   receiver's replay check tests. What is still missing is a real wall clock:
+   the firmware otherwise keeps only monotonic microseconds, so an advert's
+   timestamp is a plausible-looking counter, not the time. Sources in priority
+   order when that matters — inbound DM timestamps in stage 3 are read by
+   humans — are GPS UTC (already parsing NMEA via TinyGPSPlus, but
+   `hardware_status` does not expose the time field yet) and a user or
+   webapp-set time over the serial link, both feeding the same persisted floor.
+5. **MeshCore node state**: identity (64 B expanded private key) in NVS;
+   contact table (pub key,
    cached shared secret, out-path, name, last-advert timestamp ≈ 176 B per
    contact, 32 contacts ≈ 5.6 KB); seen-packet ring (~2 KB); outstanding-ack
    list; a small delayed-TX queue (MeshCore staggers replies: ACKs +200 ms,
@@ -314,10 +319,11 @@ Missing, in dependency order:
    `meshtastic_encode`'s shape: pure functions, fixed buffers, no
    allocation, host-testable. The advert builder
    (`encodeMeshCoreAdvert`, `encodeMeshCoreAdvertAppData`,
-   `encodeMeshCoreAdvertSignedMessage`, `meshCoreDegreesToMicros`) landed
-   with stage 1; §3.4 text messages, §3.5 ACKs, §3.6 path returns and §3.7
-   channel messages are still to write, and each of them needs the crypto
-   from item 1 to 3 above that has not landed yet.
+   `encodeMeshCoreAdvertSignedMessage`, `meshCoreDegreesToMicros`,
+   `meshCoreNextAdvertTimestamp`) landed with stage 1; §3.4 text messages,
+   §3.5 ACKs, §3.6 path returns and §3.7 channel messages are still to write,
+   and each of them needs the crypto from item 1 to 3 above that has not
+   landed yet.
 
 ## 5. Staged build plan
 
@@ -346,16 +352,28 @@ round-trip through our own `MeshCoreDecoder`; timestamp-floor persistence.
 device, or a phone running the MeshCore app near the deck) shows
 "Lilyshark-XXXX" as a new contact with a valid signature.*
 
-*Status: the library half is done and green; nothing transmits yet.*
+*Status: wired and transmitting; no stock node has confirmed reception.*
 `src/crypto/ed25519.cpp` and `src/core/meshcore_encode.cpp` build a complete
 signed advert, and `test/meshcore_tx` pins the golden vector byte-for-byte
 along with a located variant, the 32-byte maximum app data, UTF-8 name
-truncation, and a round trip back through `MeshCoreDecoder` that re-verifies
-the signature from the decoded fields. What is deliberately absent is
-everything that touches the radio or persistent state: no keypair generation,
-no NVS identity, no epoch clock, no ABOUT surface, and no caller anywhere in
-the firmware. `kMeshCoreTransmitReady` is still false, and a test asserts it.
-Section 8 is the remaining work.
+truncation, the advert-clock rule, and a round trip back through
+`MeshCoreDecoder` that re-reads every field from the decoded frame and
+re-verifies the signature.
+
+`src/sim_main.cpp` now mints an Ed25519 identity from `esp_random` on first
+boot and persists it, keeps the monotonic advert clock of §8 item 2, advertises
+zero-hop on arriving at a MeshCore profile and every fifteen minutes after
+that, and answers `LSK TX meshcore advert` (`... advert flood` for the explicit
+flooded form) over USB. `kMeshCoreTransmitReady` is now true, and it means the
+path is wired — not that anything on the far side has heard it.
+
+Still absent from stage 1 as written: the ABOUT surface for the key prefix, and
+the pre-TX channel-activity check of §2, which needs an `isReceiving()` on
+`TDeckRadioService` that does not exist yet. At one 0.42 s advert per fifteen
+minutes the deck is at 0.05 % duty, so the missing check costs the band very
+little, but it is the difference between polite and provably polite and it
+should land before the advert interval is ever shortened. The open milestone is
+the one below: a stock node listing this deck.
 
 **Stage 2 — advert RX → contact table.**
 Verify inbound advert signatures (ed25519_verify), enforce the replay rule,
@@ -417,6 +435,22 @@ The first two rows are measured against the built objects; the rest are still
 estimates. Dropping orlp for TweetNaCl (§4 item 3) is what took this from the
 ~83 KB this table originally carried down to ~21 KB.
 
+**What stage 1's wiring actually cost**, measured by building this branch and
+its parent commit back to back with the same pinned toolchain (`platformio run
+-e t-deck`, no baked tiles in either):
+
+| | Flash | Static RAM |
+| --- | --- | --- |
+| parent commit | 1,596,685 B (24.4 %) | 253,780 B (77.4 %) |
+| with the advert wiring | 1,604,629 B (24.5 %) | 253,900 B (77.5 %) |
+| delta | **+7,944 B** | **+120 B** |
+
+The flash delta is almost entirely the two objects the first two rows measured:
+until something called them the linker was dropping them from the image, which
+is what that note predicted. The RAM delta is the identity (96 B) plus the
+clock and pacing counters, and nothing else — the advert frame is a stack
+buffer in the sender.
+
 Flash lands well under 69 % (under 77 % even on a full-tile build) — comfortable.
 Static DRAM goes from 77.1 % to ~80 % against ~75 KB of headroom — tight but
 workable; if the contact table grows past 32 entries it moves to PSRAM
@@ -468,56 +502,86 @@ worker task.
 ## 8. Wiring stage 1 into the firmware
 
 `encodeMeshCoreAdvert()` is a pure function over a caller-owned buffer. Five
-things have to exist around it before a deck can advertise, and none of them
-are in the tree yet. They are listed in dependency order; the flag flip is
-last on purpose.
+things had to exist around it before a deck could advertise. Four of them are
+now in `src/sim_main.cpp`; this section records what each one turned into,
+because the reasoning is what a reviewer needs and the code cannot show it.
 
-**1. An identity in NVS.** Draw 32 random bytes (`esp_fill_random`) on first
-boot and call `crypto::ed25519CreateKeypair(pub, prv, seed)`. Persist the
-64-byte expanded private key, which is what MeshCore itself stores
-(`LocalIdentity::writeTo` writes `prv_key` then `pub_key`), following the
-existing NVS blob pattern in `src/core/app_settings.cpp`. On load,
-`ed25519DerivePublicKey()` recovers the public key from the private key alone,
-so the public half is a cache and not a second source of truth — the same
-fallback `LocalIdentity::readFrom` has. Regenerate if the derived public key
-starts with `0x00` or `0xFF`: MeshCore's `validatePrivateKey` rejects those
-prefixes because the first byte is the node's path hash and both values are
-reserved. Keep the seed out of NVS; the expanded key is the only thing needed
-to sign or, later, to derive shared secrets.
+**1. An identity in NVS — landed.** `load_or_create_meshcore_identity()` draws
+32 bytes from `esp_random` on first boot and calls
+`crypto::ed25519CreateKeypair(pub, prv, seed)`. Only the 64-byte expanded
+private key is persisted, under the NVS key `mcid`, following the same blob
+pattern and the same all-or-nothing rule as `load_or_create_pkc_identity()`
+directly above it: an identity that cannot be stored is zeroed and refused,
+because peers file us under the key they first heard and a key this deck
+forgets at the next power cycle makes every reconnection a new stranger.
+`ed25519DerivePublicKey()` recovers the public key on load, so the public half
+is a cache and not a second source of truth — the same fallback
+`LocalIdentity::readFrom` has, and one fewer stored fact to go stale. A derived
+public key starting `0x00` or `0xFF` is refused and regenerated, because
+MeshCore's `validatePrivateKey` rejects those prefixes: the first byte is the
+node's path hash and both values are reserved. The seed is never stored; the
+expanded key is all that signing or, later, key exchange needs.
 
-**2. A strictly increasing epoch clock.** §4 item 4 and §7's first risk are
-the same problem, and it is the one most likely to waste a field session.
-Persist the last timestamp this identity emitted and always send
-`max(now, last + 1)`, which is what MeshCore's `getCurrentTimeUnique()` does.
-A receiver drops an advert whose timestamp is not greater than the one it
-already holds for that key, and it drops it silently — a deck whose clock
-restarts at zero will advertise perfectly and be invisible, with no error
-anywhere to notice.
+**2. A strictly increasing epoch clock — landed, as a reservation.** §4 item 4
+and §7's first risk are the same problem, and it is the one most likely to
+waste a field session. `meshCoreNextAdvertTimestamp()` in `meshcore_encode.cpp`
+is MeshCore's `getCurrentTimeUnique()` rule — the persisted floor plus seconds
+since boot, never less than one more than the last value emitted — as a pure
+function with its own host tests, saturating at 2106 rather than wrapping.
 
-**3. A caller.** Fill a `MeshCoreAdvertAppData`: `node_type` `Chat`, `name`
-from settings, and `has_location` with `meshCoreDegreesToMicros()` on the GPS
-fix only when there is one *and* position sharing is enabled. Encode into a
-255-byte buffer with `MeshCoreAdvertReach::ZeroHop`, which is what stock
-companion firmware sends by default; reserve `Flood` for an explicit user
-action, because a flooded advert costs the whole mesh airtime. Hand the bytes
-to `TDeckRadioService::transmit()`. The frame is only meaningful while
-profile 2 (MESHCORE US, 910.525 MHz, 62.5 kHz, SF7, CR5) is the active
-profile — sending it under any other profile puts a well-formed MeshCore
-packet on a band where no MeshCore node is listening, so gate the action on
-the active profile rather than trusting the operator.
+What sits around it is a *reservation*, not a record: `sim_main.cpp` writes
+`candidate + 3600` to the NVS key `mcclock` before the advert goes out, and
+only writes again once an hour of advert clock has been consumed. So every
+timestamp that reaches the air is strictly below the stored floor, and a power
+cycle at any moment resumes above everything already transmitted. Persisting
+*after* transmitting would have left exactly the gap this rule exists to close:
+a write that fails after a send makes the deck replay a timestamp it has
+already used, and every future advert from that key is then dropped in silence.
+An advert whose reservation cannot be written is not sent.
 
-**4. Politeness and honest capture.** Poll the SX1262 for channel activity
-before keying up and back off with a bounded retry, mirroring §2. Ingest our
-own transmission as a `FrameDirection::Transmit` frame the way the Meshtastic
-path already does, so captures stay truthful about what this deck put on the
-air. Once flood adverts are enabled, mark the packet hash seen first, so our
-own flood coming back through a repeater is dropped rather than re-processed.
+**3. A caller — landed.** `transmit_meshcore_advert()` fills a
+`MeshCoreAdvertAppData` with `node_type` `Chat`, the deck's own long name, and
+`has_location` from `meshCoreDegreesToMicros()` on the GPS fix only when there
+is a valid one and GPS is enabled. It is gated on
+`activeProfile().protocol_hint == ProtocolId::MeshCore` rather than on the
+operator remembering, because the frame under any other profile is a
+well-formed MeshCore packet on a band where no MeshCore node is listening.
+`MeshCoreAdvertReach::ZeroHop` is what both the automatic advert and the plain
+serial command send, matching stock companion defaults; `Flood` is reachable
+only through the explicit `LSK TX meshcore advert flood`, because a flooded
+advert spends the whole mesh's airtime.
 
-**5. Flip `kMeshCoreTransmitReady`.** It is `false` in
-`include/lilyshark/protocols/meshcore_encode.h` and `test/meshcore_tx`
-static-asserts that it stays false. It should become true only after a stock
-MeshCore node has actually listed this deck as a contact with a valid
-signature — the stage 1 milestone. Byte-level agreement with two independent
-implementations is real evidence, but it is evidence about bytes; nothing in
-this repository has yet proved that the deck's radio settings put those bytes
-on the air in a form a stock receiver demodulates.
+Pacing lives in `loop()` beside the Meshtastic beacons: an advert on arriving
+at a MeshCore profile, then one every `kMeshCoreAdvertMs` (fifteen minutes).
+A 107-byte advert at SF7/62.5 kHz is 0.42 s of airtime, so that is 0.05 % duty
+— fifteen times more sparing than the position beacon, and an advert is
+discovery rather than telemetry, so a node that has heard us once keeps the
+contact and repeating faster buys nothing. The same change stopped the
+Meshtastic beacons firing under a MeshCore profile, where NodeInfo was noise
+no listener could read.
+
+**4. Politeness and honest capture — half landed.** Our own transmission is
+ingested as a `FrameDirection::Transmit` frame through
+`ingest_own_transmission()`, which the Meshtastic path now shares, so captures
+stay truthful about what this deck put on the air. The pre-TX channel-activity
+poll of §2 did **not** land: it needs an `isReceiving()`-shaped accessor on
+`TDeckRadioService`, which does not exist, and the advert rate makes it cheap
+to defer — but it stops being cheap the moment the interval shortens or DMs
+arrive, so it belongs with stage 3 at the latest. The seen-packet marking for
+our own floods belongs with the dedup table in stage 2, which is also where
+inbound adverts start being processed at all.
+
+**5. `kMeshCoreTransmitReady` is now true — and it changed meaning.** This plan
+originally tied the flip to a stock MeshCore node listing the deck. That made
+the flag unreadable once the wiring landed: its own comment said "nothing in
+the firmware calls it yet", and leaving it false with a live transmit path
+would have been a false statement in the code that everything else reads. It
+now means what its name says — the firmware has an identity, a clock and a
+caller — and the stock-node confirmation is tracked as the stage 1 milestone
+instead, where a milestone belongs.
+
+That milestone is still open. Byte-level agreement with two independent
+implementations and a full round trip through `MeshCoreDecoder` are real
+evidence, but they are evidence about bytes; nothing in this repository has yet
+proved that the deck's radio settings put those bytes on the air in a form a
+stock receiver demodulates.
