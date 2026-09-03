@@ -581,8 +581,10 @@
             ctx.fillStyle = kit.hex24(0x1478e6);
             ctx.fillRect(Math.min(caretX, row.caretMaxX), row.caretY, 1.4, row.caretH);
         }
-        // iOS 6 idle Send is dusty service candy, not flat silver.
-        const sendTone = !draft ? (sms ? {
+        // Zach/Mamma: focused conversation Send is full service candy.
+        // Empty New Message stays dusty. Draft always uses frozen Send*/Sms*.
+        const candy = !!draft || (Ios6.state.composerFocus && !Ios6.state.messagesCompose);
+        const sendTone = !candy ? (sms ? {
             idle: true,
             top: 0xb4c898,
             bottom: 0x6a8a4c,
