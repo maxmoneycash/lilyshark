@@ -1330,6 +1330,72 @@
         }
     }
 
+    function unlockTrack(ctx, x, y, width, height) {
+        const radius = height / 2;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.55)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
+        fillRound(ctx, x, y, width, height, radius, "#050608");
+        ctx.restore();
+        ctx.save();
+        roundRectPath(ctx, x, y, width, height, radius);
+        ctx.clip();
+        const well = ctx.createLinearGradient(x, y, x, y + height);
+        well.addColorStop(0, "#0a0c10");
+        well.addColorStop(0.20, "#181c22");
+        well.addColorStop(1, "#2a3038");
+        ctx.fillStyle = well;
+        ctx.fillRect(x, y, width, height);
+        const inset = ctx.createLinearGradient(x, y, x, y + 13);
+        inset.addColorStop(0, "rgba(0,0,0,0.74)");
+        inset.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = inset;
+        ctx.fillRect(x, y, width, 13);
+        ctx.fillStyle = "rgba(255,255,255,0.10)";
+        ctx.fillRect(x + 16, y + height - 2, width - 32, 1);
+        ctx.restore();
+        ctx.strokeStyle = "rgba(0,0,0,0.72)";
+        ctx.lineWidth = 1.2;
+        roundRectPath(ctx, x + 0.5, y + 0.5, width - 1, height - 1, radius);
+        ctx.stroke();
+    }
+
+    function unlockKnob(ctx, x, y, width, height) {
+        const radius = 7;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.40)";
+        ctx.shadowBlur = 2.4;
+        ctx.shadowOffsetY = 1;
+        panel(ctx, x, y, width, height, 0xffffff, 0xb8c0c8, 0x6a727a, radius);
+        ctx.restore();
+        hardGlass(ctx, function () {
+            roundRectPath(ctx, x, y, width, height, radius);
+        }, x, y, width, height, 0.72);
+        ctx.strokeStyle = "rgba(255,255,255,0.72)";
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, x + 1.2, y + 1.2, width - 2.4, height - 2.4, Math.max(1, radius - 1.2));
+        ctx.stroke();
+        const cx = x + width * 0.54;
+        const cy = y + height / 2;
+        ctx.strokeStyle = "#5a626a";
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(cx - 6, cy - 7);
+        ctx.lineTo(cx + 5, cy);
+        ctx.lineTo(cx - 6, cy + 7);
+        ctx.stroke();
+        ctx.strokeStyle = "#e4e8ec";
+        ctx.lineWidth = 1.35;
+        ctx.beginPath();
+        ctx.moveTo(cx - 6, cy - 6);
+        ctx.lineTo(cx + 3.4, cy);
+        ctx.lineTo(cx - 6, cy + 6);
+        ctx.stroke();
+    }
+
     Ios6.kit = {
         hex24: hex24,
         rgb565: rgb565,
@@ -1338,6 +1404,7 @@
         countColors: countColors,
         panel: panel,
         gloss: gloss,
+        hardGlass: hardGlass,
         text: text,
         measureWidth: measureWidth,
         wrapLines: wrapLines,
@@ -1371,6 +1438,8 @@
         chevron: chevron,
         whitePill: whitePill,
         composerMetal: composerMetal,
+        unlockTrack: unlockTrack,
+        unlockKnob: unlockKnob,
         tableGroup: tableGroup,
         iosSwitch: iosSwitch,
         appIcon: appIcon,

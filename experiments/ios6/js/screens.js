@@ -377,21 +377,21 @@
         });
 
         const glass = ctx.createLinearGradient(0, 184, 0, H);
-        glass.addColorStop(0, "rgba(18,22,28,0.55)");
-        glass.addColorStop(0.35, "rgba(8,10,14,0.82)");
-        glass.addColorStop(1, "rgba(0,0,0,0.92)");
+        glass.addColorStop(0, "rgba(28,34,42,0.62)");
+        glass.addColorStop(0.22, "rgba(10,12,16,0.88)");
+        glass.addColorStop(1, "rgba(0,0,0,0.94)");
         ctx.fillStyle = glass;
         ctx.fillRect(0, 184, W, H - 184);
-        ctx.fillStyle = "rgba(255,255,255,0.16)";
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
         ctx.fillRect(0, 184, W, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.40)";
+        ctx.fillRect(0, 185, W, 1);
 
         const trackX = 8;
         const trackY = 198;
         const trackW = 250;
         const trackH = 30;
-        K().panel(ctx, trackX, trackY, trackW, trackH, 0x1c2228, 0x07090c, 0x000000, 15);
-        ctx.fillStyle = "rgba(255,255,255,0.10)";
-        ctx.fillRect(trackX + 14, trackY + 1, trackW - 28, 1);
+        K().unlockTrack(ctx, trackX, trackY, trackW, trackH);
         const slide = Ios6.state.unlockSlide;
         const knobW = 48;
         const knobX = trackX + 2 + slide;
@@ -407,45 +407,35 @@
         const shimmer = Ios6.state.shimmer;
         const shine = ctx.createLinearGradient(trackX + shimmer - 36, 0, trackX + shimmer + 36, 0);
         shine.addColorStop(0, "rgba(255,255,255,0)");
-        shine.addColorStop(0.5, "rgba(255,255,255,0.70)");
+        shine.addColorStop(0.5, "rgba(255,255,255,0.78)");
         shine.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = shine;
         ctx.fillRect(trackX, trackY, trackW, trackH);
         ctx.restore();
 
-        K().panel(ctx, knobX, trackY + 2, knobW, trackH - 4, 0xffffff, 0xc5ccd4, 0x8a929a, 7);
-        K().gloss(ctx, knobX, trackY + 2, knobW, trackH - 4, 7, 0.55);
-        ctx.fillStyle = "#5a626a";
-        ctx.beginPath();
-        ctx.moveTo(knobX + 18, trackY + 9);
-        ctx.lineTo(knobX + 30, trackY + 15);
-        ctx.lineTo(knobX + 18, trackY + 21);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = "#d8dee4";
-        ctx.beginPath();
-        ctx.moveTo(knobX + 18, trackY + 10);
-        ctx.lineTo(knobX + 27, trackY + 15);
-        ctx.lineTo(knobX + 18, trackY + 20);
-        ctx.closePath();
-        ctx.fill();
+        K().unlockKnob(ctx, knobX, trackY + 2, knobW, trackH - 4);
         Ios6.state.unlockTrack = { x: trackX, y: trackY, w: trackW, h: trackH, knobW: knobW };
 
         const cameraX = 266;
-        K().panel(ctx, cameraX, trackY, 46, trackH, 0x3a424c, 0x14181c, 0x080a0c, 8);
-        K().gloss(ctx, cameraX, trackY, 46, trackH, 8, 0.30);
-        K().panel(ctx, cameraX + 11, trackY + 7, 24, 16, 0xf0f2f4, 0xc8ccd0, 0x9aa0a6, 3);
-        ctx.fillStyle = K().hex24(0xf0f2f4);
-        ctx.fillRect(cameraX + 19, trackY + 5, 8, 3);
+        const kit = K();
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.35)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
+        kit.panel(ctx, cameraX, trackY, 46, trackH, 0x4a525c, 0x181c22, 0x080a0c, 8);
+        ctx.restore();
+        kit.hardGlass(function () {
+            kit.roundRectPath(ctx, cameraX, trackY, 46, trackH, 8);
+        }, cameraX, trackY, 46, trackH, 0.28, { hairline: false });
+        const cx = cameraX + 23;
+        const cy = trackY + 15;
+        kit.fillRound(ctx, cx - 9, cy - 4, 18, 12, 2.2, "#f4f6f8");
+        kit.fillRound(ctx, cx - 4, cy - 8, 8, 5, 1.2, "#f4f6f8");
         ctx.beginPath();
-        ctx.arc(cameraX + 23, trackY + 15, 4.5, 0, Math.PI * 2);
-        ctx.fillStyle = K().hex24(0x2a3038);
+        ctx.arc(cx, cy + 1.4, 3.4, 0, Math.PI * 2);
+        ctx.fillStyle = "#1a1e24";
         ctx.fill();
-        ctx.beginPath();
-        ctx.arc(cameraX + 23, trackY + 15, 2.4, 0, Math.PI * 2);
-        ctx.fillStyle = K().hex24(0x68a8d0);
-        ctx.fill();
-        K().hit(cameraX, trackY, 46, trackH, go("settings"));
+        kit.hit(cameraX, trackY, 46, trackH, go("settings"));
     }
 
     function iconCell(column, row) {
