@@ -922,49 +922,53 @@
     }
 
     function cameraWell(ctx, x, y, action) {
-        // iOS 6 Messages: stamped dark disc in the metal, white camera.
+        // iOS 6 Messages: stamped gunmetal disc, compact white camera.
         const size = 28;
         const cx = x + size / 2;
         const cy = y + size / 2;
-        const outer = size / 2 - 0.45;
+        const outer = size / 2 - 0.70;
         ctx.beginPath();
-        ctx.arc(cx, cy, outer + 0.55, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(255,255,255,0.28)";
-        ctx.lineWidth = 1;
+        ctx.arc(cx, cy, outer + 0.85, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(236,240,244,0.55)";
+        ctx.lineWidth = 1.25;
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
         const well = ctx.createLinearGradient(cx, cy - outer, cx, cy + outer);
-        well.addColorStop(0, "#2c3238");
-        well.addColorStop(0.40, "#1a1e22");
-        well.addColorStop(1, "#0a0c0e");
+        well.addColorStop(0, "#3a424a");
+        well.addColorStop(0.42, "#24282e");
+        well.addColorStop(1, "#12161a");
         ctx.fillStyle = well;
         ctx.fill();
         ctx.save();
         ctx.beginPath();
-        ctx.arc(cx, cy, outer - 0.4, 0, Math.PI * 2);
+        ctx.arc(cx, cy, outer - 0.35, 0, Math.PI * 2);
         ctx.clip();
-        const inset = ctx.createLinearGradient(cx, cy - outer, cx, cy + 2);
-        inset.addColorStop(0, "rgba(0,0,0,0.50)");
+        const inset = ctx.createLinearGradient(cx, cy - outer, cx, cy + 3);
+        inset.addColorStop(0, "rgba(0,0,0,0.46)");
         inset.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = inset;
-        ctx.fillRect(cx - outer, cy - outer, outer * 2, outer + 2);
-        ctx.strokeStyle = "rgba(255,255,255,0.20)";
+        ctx.fillRect(cx - outer, cy - outer, outer * 2, outer + 3);
+        ctx.strokeStyle = "rgba(255,255,255,0.28)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(cx, cy + 0.3, outer - 1.15, 0.12 * Math.PI, 0.88 * Math.PI);
+        ctx.arc(cx, cy + 0.4, outer - 1.25, 0.10 * Math.PI, 0.90 * Math.PI);
         ctx.stroke();
         ctx.restore();
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(16,20,24,0.62)";
-        ctx.lineWidth = 1.15;
+        ctx.strokeStyle = "rgba(20,24,28,0.58)";
+        ctx.lineWidth = 1.1;
         ctx.stroke();
-        fillRound(ctx, cx - 7.5, cy - 2.5, 15.0, 9.4, 1.9, "#ffffff");
-        fillRound(ctx, cx - 3.3, cy - 6.2, 6.6, 3.8, 1.15, "#ffffff");
+        fillRound(ctx, cx - 6.6, cy - 2.0, 13.2, 8.2, 1.7, "#ffffff");
+        fillRound(ctx, cx - 2.6, cy - 5.2, 5.2, 3.0, 0.95, "#ffffff");
         ctx.beginPath();
-        ctx.arc(cx + 0.15, cy + 2.0, 2.45, 0, Math.PI * 2);
-        ctx.fillStyle = "#12161a";
+        ctx.arc(cx - 4.4, cy + 0.6, 1.05, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx + 0.85, cy + 2.0, 2.05, 0, Math.PI * 2);
+        ctx.fillStyle = "#161a1e";
         ctx.fill();
         if (action) hit(x, y, size, size, action);
     }
