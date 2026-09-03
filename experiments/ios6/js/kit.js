@@ -712,19 +712,19 @@
         ctx.shadowOffsetY = idle ? 0.8 : 1.4;
         panel(ctx, x, y, width, height, top, bottom, edge, radius);
         ctx.restore();
-        candyGlass(ctx, x, y, width, height, idle ? 0.52 : 0.92);
+        candyGlass(ctx, x, y, width, height, idle ? 0.52 : 0.98);
         if (!idle) {
             ctx.save();
             roundRectPath(ctx, x, y, width, height, radius);
             ctx.clip();
-            const equator = y + Math.round(height * 0.46);
-            ctx.fillStyle = "rgba(255,255,255,0.42)";
+            const equator = y + Math.round(height * 0.40);
+            ctx.fillStyle = "rgba(255,255,255,0.52)";
             ctx.fillRect(x, equator, width, 1);
-            ctx.fillStyle = "rgba(0,0,0,0.16)";
+            ctx.fillStyle = "rgba(0,0,0,0.18)";
             ctx.fillRect(x, equator + 1, width, 1);
             ctx.restore();
         }
-        ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.28" : "0.50") + ")";
+        ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.28" : "0.68") + ")";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1.1, y + 1.1, width - 2.2, height - 2.2, Math.max(1, radius - 1.1));
         ctx.stroke();
@@ -736,7 +736,7 @@
             size: 11,
             weight: "700",
             align: "center",
-            shadow: idle ? "rgba(0,0,0,0.28)" : "rgba(0,0,0,0.50)",
+            shadow: idle ? "rgba(0,0,0,0.28)" : "rgba(0,0,0,0.62)",
             shadowY: 1,
         });
         if (action) hit(x, y, width, height, action);
