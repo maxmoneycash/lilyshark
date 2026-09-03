@@ -818,17 +818,17 @@
     }
 
     function balloonPath(ctx, x, y, width, height, mine, radius) {
-        // iOS 6 fin: straight outer wall past the bottom, then a short
-        // outward point and a concave hook back into the body.
+        // iOS 6 fin: a short corner triangle that hooks back into the
+        // bottom, not a drip past the side wall.
         const r = Math.min(radius, width / 2, height / 2);
         ctx.beginPath();
         if (mine) {
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + width - r, y);
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-            ctx.lineTo(x + width, y + height + 2.8);
-            ctx.lineTo(x + width + 4.2, y + height + 4.4);
-            ctx.quadraticCurveTo(x + width + 0.2, y + height + 1.5, x + width - 6.2, y + height);
+            ctx.lineTo(x + width, y + height - 2.0);
+            ctx.lineTo(x + width + 5.2, y + height + 3.4);
+            ctx.quadraticCurveTo(x + width + 0.6, y + height + 1.0, x + width - 5.0, y + height);
             ctx.lineTo(x + r, y + height);
             ctx.quadraticCurveTo(x, y + height, x, y + height - r);
             ctx.lineTo(x, y + r);
@@ -839,9 +839,9 @@
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
             ctx.lineTo(x + width, y + height - r);
             ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-            ctx.lineTo(x + 6.2, y + height);
-            ctx.quadraticCurveTo(x - 0.2, y + height + 1.5, x - 4.2, y + height + 4.4);
-            ctx.lineTo(x, y + height + 2.8);
+            ctx.lineTo(x + 5.0, y + height);
+            ctx.quadraticCurveTo(x - 0.6, y + height + 1.0, x - 5.2, y + height + 3.4);
+            ctx.lineTo(x, y + height - 2.0);
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
         }
@@ -878,17 +878,17 @@
         ctx.beginPath();
         ctx.moveTo(x - 4, y - 1);
         ctx.lineTo(x + width + 4, y - 1);
-        ctx.lineTo(x + width + 4, y + height * 0.36);
-        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.68, x - 4, y + height * 0.36);
+        ctx.lineTo(x + width + 4, y + height * 0.30);
+        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.58, x - 4, y + height * 0.30);
         ctx.closePath();
-        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.58);
-        shine.addColorStop(0, "rgba(255,255,255,0.94)");
-        shine.addColorStop(0.50, "rgba(255,255,255,0.32)");
+        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.50);
+        shine.addColorStop(0, "rgba(255,255,255,0.96)");
+        shine.addColorStop(0.46, "rgba(255,255,255,0.36)");
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.78)";
-        ctx.fillRect(x + 8, y + 1, width - 16, 1);
+        ctx.fillStyle = "rgba(255,255,255,0.88)";
+        ctx.fillRect(x + 7, y + 1, width - 14, 1.15);
         const shade = ctx.createLinearGradient(x, y + height * 0.72, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");
         shade.addColorStop(1, "rgba(0,0,0,0.10)");
