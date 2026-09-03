@@ -53,8 +53,10 @@ import {
   reticulumDestinationHashHex,
 } from '../lib/conversation';
 import { FILTER_FIELDS, parseFrameFilter, protoOfProfile } from '../lib/frameFilter';
-import { frameTimeS } from '../lib/trafficView';
+import { buildIoGraph, type IoSplit } from '../lib/ioGraph';
+import { applyBrush, type BrushRange, brushLabel, frameTimeS } from '../lib/trafficView';
 import { CaptureDiffPanel } from './CaptureDiffPanel';
+import { IoGraphPanel } from './IoGraphPanel';
 
 /** The live table stops growing here; old frames age out on the left. */
 const LIVE_CAP = 250;
@@ -90,6 +92,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   // followed conversation is nothing but one particular expression in this
   // box, so following, editing and clearing are all the same control.
   const [filterText, setFilterText] = useState('');
+  // The IO graph's time brush: a second, independent predicate over the same
+  // frames. It survives edits to the filter box, because narrowing the text
+  // filter inside a time range is exactly what the two are for together.
+  const [brush, setBrush] = useState<BrushRange | null>(null);
+  const [split, setSplit] = useState<IoSplit>('protocol');
   const [diffOpen, setDiffOpen] = useState(false);
   // Live demo mode adds synthetic frames at a configured cadence. It is
   // available only while TerminalApp is showing the demo mesh. Opening a file
@@ -111,6 +118,10 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
       const c = parseLscap(buf);
       setCapture(c);
       setName(from);
+      // A brush is a range on the previous capture's clock; carried over it
+      // would silently hide frames of this one. Only opening a capture clears
+      // it — the live demo replaces `capture` every few seconds and must not.
+      setBrush(null);
       // Land on the most interesting frame: the first one carrying a Shelby
       // pointer, so the decoded pointer detail is on screen from the start.
       const ptrIdx = c.frames.findIndex((fr) => findShelbyPointer(fr.bytes));
@@ -500,7 +511,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   // Indices into `frames`, not a new frame list: the selection, the pointer
   // scan and the diff all address frames by their position in the capture,
   // and a filtered view must not renumber them.
-  const shown = useMemo(() => {
+  const filtered = useMemo(() => {
     if (!filter.ok || filter.empty) return frames.map((_, i) => i);
     const predicate = filter.predicate;
     const kept: number[] = [];
@@ -510,6 +521,29 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
     });
     return kept;
   }, [filter, frames, pointers, destHashes, addressings]);
+  // What the table shows: the text filter, then the IO graph's time brush.
+  // Two predicates over one index set, each reporting its own effect, so an
+  // operator can always tell which of the two is hiding a frame.
+  const shown = useMemo(
+    () => applyBrush(filtered, frames, t0, brush),
+    [filtered, frames, t0, brush],
+  );
+
+  // ── IO graph ──────────────────────────────────────────────────────────
+  // Built from the WHOLE capture, not from `shown`: the strip's job is to
+  // show the bursts and silences the current view sits inside, and one that
+  // shrank with the filter could not.
+  //
+  // A frame is attributed to a node only where its own protocol named a
+  // SOURCE. Meshtastic's outer header does; Reticulum names a destination
+  // and no sender; MeshCore names neither. `frameAddressing` has already
+  // decided that per frame, and a null src stays null here — the node graph
+  // must never invent a talker the wire did not prove.
+  const sources = useMemo(() => addressings.map((a) => a.src), [addressings]);
+  const graph = useMemo(
+    () => buildIoGraph({ frames, t0Us: t0, sources }),
+    [frames, t0, sources],
+  );
 
   // A conversation is an ordinary filter expression, so "am I following one"
   // is a question about the text in the box — edit it and it stops being a
@@ -791,6 +825,19 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               ))}
             </div>
 
+            {/* The whole capture on one clock, above the controls that narrow
+                it: bursts, silences, and who was talking when. Brushing it
+                filters the table below to a time range. */}
+            <IoGraphPanel
+              graph={graph}
+              split={split}
+              onSplitChange={setSplit}
+              brush={brush}
+              onBrush={setBrush}
+              shownFrames={shown.length}
+              filteredFrames={filtered.length}
+            />
+
             {/* The display filter. A conversation is one expression in this
                 same box, so following one and typing one are the same act —
                 and CLEAR is the single way back to the whole capture. */}
@@ -820,14 +867,22 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 </span>
               ) : following ? (
                 <span className="ok">
-                  FOLLOWING {conversationLabel(following)} · {shown.length} OF{' '}
+                  FOLLOWING {conversationLabel(following)} · {filtered.length} OF{' '}
                   {frames.length} FRAMES
                 </span>
               ) : filter.empty ? (
                 <span className="dim">no filter — every frame in the capture</span>
               ) : (
                 <span>
-                  {shown.length} OF {frames.length} FRAMES MATCH
+                  {filtered.length} OF {frames.length} FRAMES MATCH
+                </span>
+              )}
+              {/* Each control reports its own effect: this line counts what
+                  the expression leaves, the graph's line counts what the
+                  brush leaves of that. */}
+              {brush && (
+                <span className="dim">
+                  · a time range is also brushed on the IO graph
                 </span>
               )}
             </div>
@@ -900,17 +955,29 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               </div>
             </div>
 
-            {shown.length === 0 && filter.ok && !filter.empty && (
+            {filtered.length === 0 && filter.ok && !filter.empty && (
               <div className="panel-foot dim" style={{ display: 'block' }}>
                 No frame in this capture matches the filter. The expression is
                 valid — these {frames.length} frames simply do not satisfy it.
               </div>
             )}
 
+            {/* Which of the two narrowed the table to nothing, said plainly:
+                an empty table with two controls above it explains nothing. */}
+            {shown.length === 0 && filtered.length > 0 && brush && (
+              <div className="panel-foot dim" style={{ display: 'block' }}>
+                Nothing was heard in {brushLabel(brush)}. That silence is the
+                reading — {filtered.length} frame(s) match the filter outside this
+                range.{' '}
+                <button onClick={() => setBrush(null)}>⟲ WHOLE CAPTURE</button>
+              </div>
+            )}
+
             <div className="panel-foot">
               {shown.length === frames.length
                 ? `${frames.length} FRAMES`
-                : `${shown.length} OF ${frames.length} FRAMES SHOWN`}{' '}
+                : `${shown.length} OF ${frames.length} FRAMES SHOWN`}
+              {brush && <span className="ok"> · BRUSHED {brushLabel(brush)}</span>}{' '}
               · {pointers.filter(Boolean).length} SHELBY POINTER(S)
               {frames.some((fr) => fr.synthetic) && (
                 <span className="warn">
