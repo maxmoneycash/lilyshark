@@ -875,10 +875,12 @@
         const bottom = mine ? (sms ? C.SmsBottom : C.BlueBottom) : C.GrayBottom;
         const edge = mine ? (sms ? C.SmsEdge : C.BlueEdge) : C.GrayEdge;
         const radius = 14;
+        const incoming = !mine;
         ctx.save();
         ctx.shadowColor = "rgba(40,48,58,0.38)";
         ctx.shadowBlur = 4.4;
-        ctx.shadowOffsetX = 0.8;
+        // Zach/Mamma: outgoing shadow falls right, incoming falls left.
+        ctx.shadowOffsetX = incoming ? -0.8 : 0.8;
         ctx.shadowOffsetY = 2.1;
         balloonPath(ctx, x, y, width, height, mine, radius);
         const fill = ctx.createLinearGradient(x, y, x, y + height);
@@ -896,13 +898,20 @@
         ctx.clip();
         // Curved candy crown only. A mid-bubble equator strikes the type.
         // Incoming grey needs a cooler silver wash so it does not read as paper.
-        const incoming = !mine;
         if (incoming) {
             const silver = ctx.createLinearGradient(x, y, x, y + height);
-            silver.addColorStop(0, "rgba(255,255,255,0.10)");
-            silver.addColorStop(0.55, "rgba(210,214,218,0.10)");
-            silver.addColorStop(1, "rgba(176,180,184,0.16)");
+            silver.addColorStop(0, "rgba(236,236,238,0.10)");
+            silver.addColorStop(0.38, "rgba(214,214,216,0.16)");
+            silver.addColorStop(0.72, "rgba(196,196,198,0.22)");
+            silver.addColorStop(1, "rgba(168,168,172,0.26)");
             ctx.fillStyle = silver;
+            ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
+            const wall = ctx.createLinearGradient(x, y, x + width, y);
+            wall.addColorStop(0, "rgba(148,150,154,0.14)");
+            wall.addColorStop(0.14, "rgba(148,150,154,0)");
+            wall.addColorStop(0.86, "rgba(148,150,154,0)");
+            wall.addColorStop(1, "rgba(148,150,154,0.12)");
+            ctx.fillStyle = wall;
             ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
         }
         ctx.beginPath();
@@ -912,18 +921,18 @@
         ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.66, x - 4, y + height * 0.34);
         ctx.closePath();
         const shine = ctx.createLinearGradient(x, y, x, y + height * 0.54);
-        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.99)" : "rgba(255,255,255,0.94)");
-        shine.addColorStop(0.42, incoming ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.52)");
+        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.94)");
+        shine.addColorStop(0.42, incoming ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.52)");
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
-        ctx.fillStyle = incoming ? "rgba(255,255,255,0.98)" : "rgba(230,244,255,0.92)";
+        ctx.fillStyle = incoming ? "rgba(255,255,255,0.78)" : "rgba(230,244,255,0.92)";
         ctx.fillRect(x + 8, y + 1, width - 16, 1.2);
-        ctx.fillStyle = incoming ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.58)";
+        ctx.fillStyle = incoming ? "rgba(228,228,230,0.48)" : "rgba(255,255,255,0.58)";
         ctx.fillRect(x + 10, y + 2.2, width - 20, 1);
         const shade = ctx.createLinearGradient(x, y + height * 0.68, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");
-        shade.addColorStop(1, incoming ? "rgba(0,0,0,0.14)" : "rgba(20,40,80,0.18)");
+        shade.addColorStop(1, incoming ? "rgba(48,48,52,0.22)" : "rgba(20,40,80,0.18)");
         ctx.fillStyle = shade;
         ctx.fillRect(x - 10, y + height * 0.70, width + 20, height * 0.30);
         ctx.restore();
