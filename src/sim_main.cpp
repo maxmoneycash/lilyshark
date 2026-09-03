@@ -319,6 +319,16 @@ bool first_frame_event_recorded = false;
 // Defined with the ingest path below; the packet inspector renders with them.
 void format_unix_date(std::uint32_t unix_seconds, char *out, std::size_t capacity) noexcept;
 bool decode_frame_shelby_pointer(const FrameRecord &record, ShelbyPointer &out) noexcept;
+// Defined with the channel-key store below, and declared here because the node
+// summary and the packet inspector are built above it. Every screen that shows
+// a decoded Meshtastic payload reads it through this pair, so the rule that a
+// borrowed key never looks like the public one holds in one place rather than
+// having to be remembered at each call site.
+bool read_frame_payload(const FrameRecord &record, MeshtasticPayload &payload,
+                        MeshtasticKeyState &key_state) noexcept;
+const char *stored_key_name(const MeshtasticKeyState &key_state) noexcept;
+void format_key_provenance(char *out, std::size_t capacity,
+                           const MeshtasticKeyState &key_state) noexcept;
 
 // Web-analyzer USB link: lilyshark.com handshakes over the CDC serial with
 // "LSK HELLO"; while linked, the device loop streams newline-delimited
@@ -510,6 +520,13 @@ struct ChatLine {
     /// the line, because a message that did not cross the radio must never
     /// read like one that did.
     bool via_net = false;
+    /// Name of the operator's stored channel key that opened this message, and
+    /// empty for the ordinary case of the key every radio ships with. The name
+    /// is copied rather than referenced by slot because the line outlives the
+    /// key list: a key can be renamed, removed, or reordered afterwards, and a
+    /// line that then pointed at a different key would be worse than one that
+    /// records what actually opened it.
+    char key_name[kChannelKeyNameCapacity]{};
 };
 struct ChatPeer {
     std::uint32_t node = 0xffffffffU;
@@ -847,7 +864,10 @@ constexpr std::uint32_t kChatArchiveMagic = 0x4C534348UL;  // "LSCH"
 // v3: ChatLine records whether a message arrived over the air or over the
 // internet bridge. A v2 archive has a different record size and is refused,
 // which costs one saved conversation once.
-constexpr std::uint16_t kChatArchiveVersion = 3U;
+// v4: ChatLine records which stored channel key opened the message. A v3
+// archive has a different record size and is refused, which costs one saved
+// conversation once.
+constexpr std::uint16_t kChatArchiveVersion = 4U;
 constexpr std::size_t kChatArchiveSize = sizeof(ChatArchiveHeader) + sizeof(chat_log);
 
 /// The log as bytes. Kept apart from the NVS call so the round trip can be
@@ -881,7 +901,8 @@ bool decode_chat_archive(const std::uint8_t *bytes, std::size_t size) noexcept
 
 void chat_push(const char *from, const char *text, bool mine,
                std::uint32_t peer = 0xffffffffU, const char *when = nullptr,
-               std::uint32_t pending_id = 0, bool via_net = false) noexcept
+               std::uint32_t pending_id = 0, bool via_net = false,
+               const char *key_name = nullptr) noexcept
 {
     if (from == nullptr || text == nullptr || text[0] == '\0') return;
     const std::size_t slot = (chat_log_start + chat_log_count) % kChatLogCapacity;
@@ -889,6 +910,8 @@ void chat_push(const char *from, const char *text, bool mine,
     line.pending_id = pending_id;
     line.acked = false;
     line.via_net = via_net;
+    std::snprintf(line.key_name, sizeof(line.key_name), "%s",
+                  key_name != nullptr ? key_name : "");
     std::snprintf(line.from, sizeof(line.from), "%.7s", from);
     std::snprintf(line.text, sizeof(line.text), "%s", text);
     if (when != nullptr && when[0] != '\0') {
@@ -3469,17 +3492,13 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
                 summary.hops = static_cast<std::uint8_t>(hops > 3U ? 3U : hops);
             }
             if(summary.frames != UINT16_MAX) ++summary.frames;
-            if (record->decoded.protocol == ProtocolId::Meshtastic &&
-                record->decoded.hasAttribute(AttributeDefaultKeyReadable) &&
-                record->decoded.payload_length > 0U &&
-                record->raw.captured_length >=
-                    static_cast<std::uint16_t>(record->decoded.payload_offset +
-                                               record->decoded.payload_length)) {
+            {
+                // A neighbour on a channel the operator holds the key for is
+                // still a neighbour: its name, battery and position come from
+                // the same read, whichever key opened the frame.
                 MeshtasticPayload payload{};
-                if (readMeshtasticPayload(record->raw.bytes + record->decoded.payload_offset,
-                                          record->decoded.payload_length,
-                                          record->decoded.source, record->decoded.packet_id,
-                                          payload)) {
+                MeshtasticKeyState node_key{};
+                if (read_frame_payload(*record, payload, node_key)) {
                     if (payload.has_battery_level) {
                         summary.battery_level = payload.battery_level;
                         summary.has_battery_level = true;
@@ -5272,6 +5291,26 @@ void build_packet_detail(lv_obj_t * parent)
 
     add_packet_detail_tabs(parent);
 
+    // Read the payload once for the whole screen, under the default key and
+    // then under the operator's keys.
+    MeshtasticPayload readable{};
+    MeshtasticKeyState key_state{};
+    const bool has_readable = read_frame_payload(*record, readable, key_state);
+    const bool opened_by_stored_key = key_state.source == MeshtasticKeySource::StoredKey;
+    // The decoder library only ever tries the published default key, so a
+    // frame one of the operator's own keys opened still arrives from it marked
+    // OPAQUE / HEADER. Printing that above the message this screen is about to
+    // show would be the wrong kind of honest, so the labels state what the
+    // deck as a whole made of the frame and the key line below names what did
+    // it. A frame the default key opened is untouched, so it renders exactly
+    // as it always has.
+    DecodedPacket shown = record->decoded;
+    if(opened_by_stored_key) {
+        shown.kind = PacketKind::Data;
+        shown.state = DecodeState::PayloadDecoded;
+        shown.application_port = readable.portnum;
+    }
+
     char source[12]{};
     char destination[12]{};
     char line[72]{};
@@ -5281,12 +5320,12 @@ void build_packet_detail(lv_obj_t * parent)
     put_label(parent, source, 73, 29, theme::text(), &font_pixel_6x8);
     put_label(parent, "DST", 161, 29, theme::pink(), &font_pixel_6x8);
     put_label(parent, destination, 185, 29, theme::text(), &font_pixel_6x8);
-    std::snprintf(line, sizeof(line), "%s  %s  %s  %u B%s", protocolName(record->decoded.protocol),
-                  packetKindLabel(record->decoded), decodeStateLabel(record->decoded.state),
+    std::snprintf(line, sizeof(line), "%s  %s  %s  %u B%s", protocolName(shown.protocol),
+                  packetKindLabel(shown), decodeStateLabel(shown.state),
                   record->raw.captured_length,
                   record->raw.rf.origin == FrameOrigin::Synthetic ? "  SIM" : "");
     put_label(parent, line, 49, 50,
-              record->decoded.state == DecodeState::Malformed ? theme::fault() : theme::amber(),
+              shown.state == DecodeState::Malformed ? theme::fault() : theme::amber(),
               &font_mono_10);
     if(record->raw.rf.hasField(RfFieldCodingRate)) {
         std::snprintf(line, sizeof(line), "SF%u  BW %.1fk  CR4/%u  0x%04X",
@@ -5399,27 +5438,30 @@ void build_packet_detail(lv_obj_t * parent)
                   49, 196, theme::text_muted(), &font_pixel_6x8);
     } else if(packet_detail_tab == 2U) {
         const lv_color_t state_color =
-            record->decoded.state == DecodeState::Malformed ? theme::fault() : theme::lime();
+            shown.state == DecodeState::Malformed ? theme::fault() :
+            (opened_by_stored_key ? theme::amber() : theme::lime());
         put_label(parent, "STATE", 49, 112, theme::pink(), &font_pixel_6x8);
-        put_label(parent, decodeStateLabel(record->decoded.state), 49, 124,
+        put_label(parent, decodeStateLabel(shown.state), 49, 124,
                   state_color, &font_pixel_18x24);
         put_label(parent, "KIND", 49, 154, theme::pink(), &font_pixel_6x8);
-        put_label(parent, packetKindLabel(record->decoded), 85, 154,
+        put_label(parent, packetKindLabel(shown), 85, 154,
                   theme::text(), &font_pixel_6x8);
-        // A message sent under the published default key gives its rows to the
-        // message: the port it was addressed to, and the text itself. The key
-        // is stated on screen so nobody mistakes this for broken encryption.
-        MeshtasticPayload readable{};
-        const bool has_readable =
-            record->decoded.hasAttribute(AttributeDefaultKeyReadable) &&
-            readMeshtasticPayload(&record->raw.bytes[record->decoded.payload_offset],
-                                  record->decoded.payload_length, record->decoded.source,
-                                  record->decoded.packet_id, readable);
+        // A readable message gives its rows to the message: the port it was
+        // addressed to, the key that opened it, and the text itself. The key is
+        // stated so nobody mistakes a default-key read for broken encryption --
+        // and so nobody mistakes a channel they were given the secret for for
+        // one anybody within earshot could read. The default key stays lime
+        // because it carries the stronger claim, that this traffic was never
+        // private; a stored key gets the amber a via-net frame wears, the shade
+        // this firmware uses for a result with a caveat attached.
         if(has_readable) {
+            char provenance[8 + kChannelKeyNameCapacity]{};
+            format_key_provenance(provenance, sizeof(provenance), key_state);
             put_label(parent, "PORT", 49, 168, theme::pink(), &font_pixel_6x8);
-            std::snprintf(line, sizeof(line), "%s  DEFAULT KEY",
-                          meshtasticPortLabel(readable.portnum));
-            put_label(parent, line, 85, 168, theme::lime(), &font_pixel_6x8);
+            std::snprintf(line, sizeof(line), "%s  %s",
+                          meshtasticPortLabel(readable.portnum), provenance);
+            put_label(parent, line, 85, 168,
+                      opened_by_stored_key ? theme::amber() : theme::lime(), &font_pixel_6x8);
             if(readable.has_text) {
                 put_label(parent, "MSG", 49, 182, theme::pink(), &font_pixel_6x8);
                 lv_obj_t *message = put_label(parent, readable.text, 85, 182, theme::cyan(),
@@ -6258,6 +6300,9 @@ struct MessageRow {
     char snr[10]{};
     const char *text = nullptr;
     bool mine = false;
+    /// Set when one of the operator's stored channel keys opened this message,
+    /// empty for the key every radio ships with.
+    char key[kChannelKeyNameCapacity]{};
 };
 
 void draw_messages_empty(lv_obj_t *parent) noexcept
@@ -6299,15 +6344,28 @@ void draw_message_rows(lv_obj_t *parent, const MessageRow *rows, std::size_t cou
     for (std::size_t index = 0; index < visible; ++index) {
         const MessageRow &row = rows[index];
         const lv_coord_t y = kMsgFirstY + static_cast<lv_coord_t>(index) * kMsgRowH;
+        const bool keyed = row.key[0] != '\0';
         // The same left/right edge language the chat log uses, so a message
-        // you sent looks the same wherever you meet it.
+        // you sent looks the same wherever you meet it. A message one of the
+        // operator's own keys opened wears the amber a via-net line wears, and
+        // names the key beside the sender, so it can never be mistaken for
+        // traffic anybody within earshot could read.
         theme::rect(parent, row.mine ? 310 : 4, y, 6, 28,
-                    row.mine ? theme::pink() : theme::cyan());
+                    keyed ? theme::amber() : (row.mine ? theme::pink() : theme::cyan()));
         const lv_coord_t text_x = row.mine ? 58 : 14;
-        char header[40]{};
-        std::snprintf(header, sizeof(header), "%s  %s  %s", row.when, row.who, row.route);
-        put_clipped_label(parent, header, text_x, y, 190,
-                          row.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
+        char header[64]{};
+        if(keyed) {
+            std::snprintf(header, sizeof(header), "%s  %s  %s  KEY %s", row.when, row.who,
+                          row.route, row.key);
+        } else {
+            std::snprintf(header, sizeof(header), "%s  %s  %s", row.when, row.who, row.route);
+        }
+        // A received row starts at x=14 and the SNR reading begins at 254, so
+        // the wider clip a named key needs still stops short of it.
+        put_clipped_label(parent, header, text_x, y, row.mine ? 190 : 236,
+                          keyed ? theme::amber()
+                                : (row.mine ? theme::pink() : theme::cyan()),
+                          &font_pixel_6x8);
         if (row.snr[0] != '\0') {
             put_label(parent, row.snr, 254, y, theme::lime(), &font_pixel_6x8);
         }
@@ -6344,21 +6402,17 @@ void build_messages(lv_obj_t * parent)
                                        record->decoded.payload_length)) {
             continue;
         }
-        // Either kind of readable text lands here: a default-key Meshtastic
-        // message, or an unencrypted LXMF message inside a Reticulum frame.
-        // The screen says "every text message heard", and without the second
-        // branch it was quietly Meshtastic-only.
+        // Every kind of readable text lands here: a Meshtastic message under
+        // the default key or under a key the operator stored, or an
+        // unencrypted LXMF message inside a Reticulum frame. The screen says
+        // "every text message heard", and without the other branches it was
+        // quietly default-key Meshtastic only.
         char lxmf_text[kChatTextCapacity]{};
         MeshtasticPayload payload{};
+        MeshtasticKeyState key_state{};
         bool is_lxmf = false;
-        if (record->decoded.protocol == ProtocolId::Meshtastic &&
-            record->decoded.hasAttribute(AttributeDefaultKeyReadable)) {
-            if (!readMeshtasticPayload(record->raw.bytes + record->decoded.payload_offset,
-                                       record->decoded.payload_length,
-                                       record->decoded.source, record->decoded.packet_id,
-                                       payload)) {
-                continue;
-            }
+        if (record->decoded.protocol == ProtocolId::Meshtastic) {
+            if (!read_frame_payload(*record, payload, key_state)) continue;
             if (!payload.has_text) continue;
         } else if (record->decoded.protocol == ProtocolId::Reticulum) {
             LxmfMessage lxmf{};
@@ -6373,6 +6427,8 @@ void build_messages(lv_obj_t * parent)
             continue;
         }
         MessageRow &row = rows[count];
+        const char *key_name = stored_key_name(key_state);
+        if (key_name != nullptr) std::snprintf(row.key, sizeof(row.key), "%s", key_name);
         row.mine = record->decoded.source == localMeshtasticNodeNum();
         if (row.mine) {
             std::snprintf(row.who, sizeof(row.who), "YOU");
@@ -6421,6 +6477,7 @@ void build_messages(lv_obj_t * parent)
         if (line.text[0] == '\0') continue;
         MessageRow &row = rows[count];
         row.mine = line.mine;
+        std::snprintf(row.key, sizeof(row.key), "%s", line.key_name);
         std::snprintf(row.who, sizeof(row.who), "%s", line.mine ? "YOU" : line.from);
         std::snprintf(row.when, sizeof(row.when), "%s",
                       line.when[0] != '\0' ? line.when : "--");
@@ -8089,6 +8146,62 @@ std::size_t channel_key_row_count() noexcept
 }
 
 #if defined(LILYSHARK_DEVICE)
+// ── Reading a frame with the operator's keys ────────────────────────────────
+// The frame store only exists on the device build, so these live behind the
+// same guard as the ingest path they serve.
+
+bool read_frame_payload(const FrameRecord &record, MeshtasticPayload &payload,
+                        MeshtasticKeyState &key_state) noexcept
+{
+    if(record.decoded.protocol != ProtocolId::Meshtastic) return false;
+    if(record.decoded.payload_length == 0U) return false;
+    if(record.raw.captured_length <
+       static_cast<std::uint16_t>(record.decoded.payload_offset +
+                                  record.decoded.payload_length)) {
+        return false;
+    }
+    // The decoder already tried the published default key on this frame, and
+    // AttributeDefaultKeyReadable is the record of what happened. When it
+    // failed and the operator has stored nothing, there is no key left to try,
+    // so the frame stays opaque without spending a second decryption on a key
+    // already known not to fit. With keys stored the answer is recomputed from
+    // the frame every time rather than cached, because it is a function of the
+    // key list and changes the instant a key is added or taken away -- a cache
+    // would be a second copy of that fact, and a stale one.
+    if(!record.decoded.hasAttribute(AttributeDefaultKeyReadable) && channel_keys.empty()) {
+        return false;
+    }
+    return readMeshtasticPayloadWithKeys(
+        record.raw.bytes + record.decoded.payload_offset, record.decoded.payload_length,
+        record.decoded.source, record.decoded.packet_id, &channel_keys, payload, key_state);
+}
+
+/// The operator's name for the key that opened a payload, or nullptr when the
+/// published default key did -- which is the answer every screen needs, since
+/// a decode result carries a slot index and never key material. A slot whose
+/// key has gone reads as REMOVED rather than as no key at all, because the
+/// message did arrive under one.
+const char *stored_key_name(const MeshtasticKeyState &key_state) noexcept
+{
+    if(key_state.source != MeshtasticKeySource::StoredKey) return nullptr;
+    const char *name = channel_keys.name(key_state.slot);
+    return name != nullptr ? name : "REMOVED";
+}
+
+/// The same fact as a phrase, for a screen with room to say it in full.
+void format_key_provenance(char *out, std::size_t capacity,
+                           const MeshtasticKeyState &key_state) noexcept
+{
+    if(out == nullptr || capacity == 0U) return;
+    out[0] = '\0';
+    const char *name = stored_key_name(key_state);
+    if(name != nullptr) {
+        std::snprintf(out, capacity, "KEY %s", name);
+    } else if(key_state.source == MeshtasticKeySource::DefaultKey) {
+        std::snprintf(out, capacity, "DEFAULT KEY");
+    }
+}
+
 bool ensure_preferences_ready() noexcept;
 
 bool write_channel_keys() noexcept
@@ -9179,9 +9292,11 @@ void build_chat(lv_obj_t * parent)
             // hard against the right edge -- exactly where a scrollbar lives --
             // so a run of your own messages read as a scrollbar rather than as
             // you speaking.
+            const bool keyed = line.key_name[0] != '\0';
             theme::rect(parent, line.mine ? 46 : 4, y, 6, 24,
-                        line.mine ? theme::pink()
-                                  : (line.via_net ? theme::amber() : theme::cyan()));
+                        keyed ? theme::amber()
+                              : (line.mine ? theme::pink()
+                                           : (line.via_net ? theme::amber() : theme::cyan())));
             // The destination is already stated once above the log; repeating
             // ALL or PRIVATE on every line was noise, and the operator's own
             // call sign told them nothing they did not know.
@@ -9193,6 +9308,14 @@ void build_chat(lv_obj_t * parent)
             // else heard -- but it never crossed this radio, and the line has
             // to say so where the eye already is.
             const char *route = line.via_net ? "  VIA NET" : "";
+            // A message that arrived under a key somebody had to hand the
+            // operator says so, and says which key. Without it a channel the
+            // operator was let into would read exactly like the one every
+            // radio can already hear.
+            char keyed_tag[8 + kChannelKeyNameCapacity]{};
+            if (keyed) {
+                std::snprintf(keyed_tag, sizeof(keyed_tag), "  KEY %s", line.key_name);
+            }
             // Consecutive messages from one speaker are a single turn, so the
             // name belongs on the first of them only. Five rows each captioned
             // YOU said nothing, five times over, and cost half the log's
@@ -9202,18 +9325,26 @@ void build_chat(lv_obj_t * parent)
             const bool same_speaker =
                 previous != nullptr && previous->mine == line.mine &&
                 (line.mine || std::strcmp(previous->from, line.from) == 0);
-            const bool header = !same_speaker || delivery[0] != '\0' || route[0] != '\0';
+            const bool header = !same_speaker || delivery[0] != '\0' || route[0] != '\0' ||
+                                keyed_tag[0] != '\0';
             if (header) {
-                char who[28]{};
+                char who[64]{};
                 if (line.when[0] != '\0') {
-                    std::snprintf(who, sizeof(who), "%s  %s%s%s", line.when,
-                                  line.mine ? "YOU" : line.from, delivery, route);
+                    std::snprintf(who, sizeof(who), "%s  %s%s%s%s", line.when,
+                                  line.mine ? "YOU" : line.from, delivery, route, keyed_tag);
                 } else {
-                    std::snprintf(who, sizeof(who), "%s%s%s",
-                                  line.mine ? "YOU" : line.from, delivery, route);
+                    std::snprintf(who, sizeof(who), "%s%s%s%s",
+                                  line.mine ? "YOU" : line.from, delivery, route, keyed_tag);
                 }
-                put_label(parent, who, text_x, y,
-                          line.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
+                if (keyed) {
+                    // A named key can outrun the row, so this header clips
+                    // instead of spilling across the message beside it.
+                    put_clipped_label(parent, who, text_x, y, text_w, theme::amber(),
+                                      &font_pixel_6x8);
+                } else {
+                    put_label(parent, who, text_x, y,
+                              line.mine ? theme::pink() : theme::cyan(), &font_pixel_6x8);
+                }
             }
             put_clipped_label(parent, line.text, text_x, header ? y + 11 : y + 5, text_w,
                               theme::text(), &font_mono_semibold_12);
@@ -9450,6 +9581,13 @@ void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
     bool have_pos = false;
     double lat = 0.0;
     double lon = 0.0;
+    // Deliberately the default key alone, not the operator's stored keys. The
+    // link's JSON has no field for which key opened a payload, so a borrowed
+    // key's plaintext sent down it would arrive at lilyshark.com looking
+    // exactly like traffic anybody within earshot could read -- the one thing
+    // this whole feature exists to prevent. The raw frame still goes over the
+    // link in "hex", so nothing is being hidden from the analyzer; it simply
+    // does not get a decode it cannot label.
     if (packet.protocol == ProtocolId::Meshtastic &&
         packet.hasAttribute(AttributeDefaultKeyReadable) && packet.payload_length > 0U &&
         record.raw.captured_length >=
@@ -9604,18 +9742,20 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 &pkc_plain_length);
         }
     }
+    // A channel the operator was given the key for joins the same pipeline as
+    // the default channel: heard, decoded, chimed, chatted, acknowledged. What
+    // does not join it is the anonymity of a public message -- `chat_key` is
+    // carried to the chat line so the screen can say which key opened it.
     if(stored != nullptr && stored->decoded.protocol == ProtocolId::Meshtastic &&
-       (stored->decoded.hasAttribute(AttributeDefaultKeyReadable) || pkc_opened) &&
        stored->raw.rf.direction != FrameDirection::Transmit) {
         MeshtasticPayload chat_payload{};
+        MeshtasticKeyState chat_key{};
         const bool readable =
             pkc_opened
                 ? ::lilyshark::parseMeshtasticData(pkc_plain, pkc_plain_length, chat_payload)
-                : readMeshtasticPayload(stored->raw.bytes + stored->decoded.payload_offset,
-                                        stored->decoded.payload_length,
-                                        stored->decoded.source,
-                                        stored->decoded.packet_id, chat_payload);
+                : read_frame_payload(*stored, chat_payload, chat_key);
         if(readable) {
+            const char *chat_key_name = stored_key_name(chat_key);
             char from[8]{};
             if(chat_payload.has_names && chat_payload.short_name[0] != '\0') {
                 std::snprintf(from, sizeof(from), "%.7s", chat_payload.short_name);
@@ -9737,7 +9877,7 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 if (!from_us && (broadcast || to_us)) {
                     const std::uint32_t peer = broadcast ? 0xffffffffU : stored->decoded.source;
                     chat_push(from, chat_payload.text, false, peer, nullptr, 0U,
-                              stored->raw.rf.origin == FrameOrigin::Net);
+                              stored->raw.rf.origin == FrameOrigin::Net, chat_key_name);
                     chat_remember_peer(stored->decoded.source, from);
 #if defined(ESP_PLATFORM)
                     // A paired phone holds this same conversation, so a text
@@ -13637,6 +13777,47 @@ bool run_simulator_render_test() noexcept
             passed = false;
         }
         open_field_tab(FieldTab::Map);
+        build_current_screen();
+    }
+
+    // The channel key list, holding a key. It is the only screen that draws a
+    // fingerprint, and the one screen where a drawing mistake would put key
+    // material into a screenshot, so it is hashed with a key in it rather than
+    // in the empty state that says nothing about either.
+    {
+        std::uint8_t golden_key[kChannelKeySize]{};
+        (void)parseChannelKeyHex("8a1c0f43d29b57e6104fb8237ce5a90d", golden_key,
+                                 sizeof(golden_key));
+        std::size_t golden_slot = 0U;
+        const bool staged =
+            channel_keys.add("NORTH RIDGE", golden_key, sizeof(golden_key), golden_slot) ==
+            ChannelKeyResult::Ok;
+        (void)app_shell.replace(ShellRoute::Settings);
+        open_channel_keys();
+        build_current_screen();
+        lv_refr_now(display);
+        if (render_directory != nullptr) {
+            (void)write_simulator_frame(render_directory, "channel-keys", 0);
+        }
+        constexpr std::uint64_t kChannelKeysHash = 0x7041927866f86d8aULL;
+        const std::uint64_t keys_hash = hash_simulator_frame();
+        std::size_t keys_ink = 0U;
+        for(const std::uint16_t pixel : simulator_frame_buffer) {
+            if(pixel != background) ++keys_ink;
+        }
+        std::fprintf(stderr, "Lilyshark render CHANNEL KEYS: fnv1a=%016llx foreground=%zu\n",
+                     static_cast<unsigned long long>(keys_hash), keys_ink);
+        if(keys_ink < 1000U) {
+            std::fprintf(stderr, "Simulator render failed: CHANNEL KEYS is nearly blank\n");
+            passed = false;
+        }
+        if(keys_hash != kChannelKeysHash) {
+            std::fprintf(stderr, "Simulator render failed: CHANNEL KEYS expected %016llx\n",
+                         static_cast<unsigned long long>(kChannelKeysHash));
+            passed = false;
+        }
+        close_channel_keys();
+        if(staged) (void)channel_keys.remove(golden_slot);
         build_current_screen();
     }
 

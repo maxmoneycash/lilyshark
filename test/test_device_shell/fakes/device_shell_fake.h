@@ -42,6 +42,11 @@ struct State {
     std::set<std::string> directories{};
     std::vector<std::uint8_t> saved_profile{};
     std::vector<std::uint8_t> saved_app_settings{};
+    /// Every other record in the preferences namespace -- the chat archive,
+    /// the channel key store -- under its own key. A real NVS namespace keys
+    /// records independently, and folding them into one buffer would let
+    /// saving a channel key destroy the saved radio profile.
+    std::map<std::string, std::vector<std::uint8_t>> saved_records{};
     std::size_t app_settings_put_calls = 0;
     std::size_t profile_put_calls = 0;
     std::size_t sd_end_calls = 0;

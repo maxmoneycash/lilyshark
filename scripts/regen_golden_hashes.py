@@ -35,6 +35,7 @@ ARRAYS = [
 NAMED = {
     "MAP NODE CARD": "kMapNodeCardHash",
     "CHAT": "kChatHash",
+    "CHANNEL KEYS": "kChannelKeysHash",
     "SPECTRUM SWEPT": "kSpectrumSweptHash",
 }
 

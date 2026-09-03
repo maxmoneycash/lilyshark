@@ -46,9 +46,13 @@ class Preferences {
   private:
     static std::vector<std::uint8_t> &bytesForKey(const char *key) noexcept
     {
-        if(key != nullptr && std::strcmp(key, "app") == 0) {
+        if(key == nullptr) return device_shell_fake::state().saved_records[""];
+        if(std::strcmp(key, "app") == 0) {
             return device_shell_fake::state().saved_app_settings;
         }
-        return device_shell_fake::state().saved_profile;
+        if(std::strcmp(key, "profile") == 0) {
+            return device_shell_fake::state().saved_profile;
+        }
+        return device_shell_fake::state().saved_records[key];
     }
 };
