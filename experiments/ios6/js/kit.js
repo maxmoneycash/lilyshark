@@ -641,9 +641,9 @@
         ctx.fillRect(x, y, width, equator - y);
         ctx.fillStyle = "rgba(255,255,255,0.22)";
         ctx.fillRect(x, equator, width, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.18)");
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
         ctx.fillRect(x, equator + 1, width, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.22)");
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
         ctx.fillRect(x, y + height - 3, width, 3);
         ctx.fillStyle = hex24(0xa9c4e0);
         ctx.fillRect(x + 4, y + 1, width - 8, 1);
