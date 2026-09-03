@@ -879,9 +879,9 @@
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + width - r, y);
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-            ctx.lineTo(x + width, y + height - 3.2);
-            ctx.quadraticCurveTo(x + width + 1.4, y + height + 0.6, x + width + 5.4, y + height + 4.0);
-            ctx.quadraticCurveTo(x + width + 1.6, y + height + 2.0, x + width - 4.6, y + height);
+            ctx.lineTo(x + width, y + height - 2.8);
+            ctx.quadraticCurveTo(x + width + 1.2, y + height + 0.3, x + width + 4.6, y + height + 2.8);
+            ctx.quadraticCurveTo(x + width + 1.2, y + height + 1.3, x + width - 3.8, y + height);
             ctx.lineTo(x + r, y + height);
             ctx.quadraticCurveTo(x, y + height, x, y + height - r);
             ctx.lineTo(x, y + r);
@@ -892,9 +892,9 @@
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
             ctx.lineTo(x + width, y + height - r);
             ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-            ctx.lineTo(x + 4.6, y + height);
-            ctx.quadraticCurveTo(x - 1.6, y + height + 2.0, x - 5.4, y + height + 4.0);
-            ctx.quadraticCurveTo(x - 1.4, y + height + 0.6, x, y + height - 3.2);
+            ctx.lineTo(x + 3.8, y + height);
+            ctx.quadraticCurveTo(x - 1.2, y + height + 1.3, x - 4.6, y + height + 2.8);
+            ctx.quadraticCurveTo(x - 1.2, y + height + 0.3, x, y + height - 2.8);
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
         }
