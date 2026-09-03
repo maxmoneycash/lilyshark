@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 59,
-  "stop_after_pass": 84,
+  "pass": 60,
+  "stop_after_pass": 86,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -85,7 +85,8 @@
     "ios6-inbox-row-type",
     "ios6-incoming-silver-crown",
     "ios6-pale-token-and-plus-disc",
-    "ios6-compose-notepad-pencil"
+    "ios6-compose-notepad-pencil",
+    "ios6-outgoing-candy-crown"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -120,5 +121,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 59: Inbox compose is a clearer white notepad with lines and a yellow pencil, matching iOS 6 Messages. Raised stop_after_pass to 84 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
+  "notes": "Pass 60: Outgoing blue/green balloons get a brighter candy crown and hairline like Zach/Mamma. Text stays black. Frozen Blue*/Sms* hex unchanged. Raised stop_after_pass to 86 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
 }
