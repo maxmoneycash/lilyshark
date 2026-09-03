@@ -1,0 +1,28 @@
+{
+  "season": "season-0",
+  "source": "docs/protocol/season-0.md",
+  "season_window_utc": {
+    "start": "2026-10-01T00:00:00Z",
+    "end": "2026-12-31T23:59:59Z"
+  },
+  "onchain": {
+    "points_witness_corroboration": 25,
+    "points_late_witness": 5,
+    "late_witness_positions": [3, 8],
+    "max_credited_attesters": 8,
+    "witness_window_secs": 604800,
+    "points_per_anchor": 10
+  },
+  "cells": {
+    "cell_definition": "geohash-5 x band x ISO week",
+    "first_discovery_bonus": 8,
+    "resurvey_decay": "floor(first_discovery_bonus / 2^k), k = number of earlier ISO weeks this season with a verified capture in the same geohash-5 x band",
+    "weekly_cap_credits_per_cell": 1
+  },
+  "clique": {
+    "min_corroborations": 10,
+    "max_partner_set": 3,
+    "concentration_threshold": 0.8,
+    "witness_discount": 0.25
+  }
+}

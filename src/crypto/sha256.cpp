@@ -6,55 +6,96 @@ namespace lilyshark {
 namespace crypto {
 namespace {
 
-// The round constants and initial state are the fractional parts of the cube
-// and square roots of the first primes, straight from FIPS 180-4 section 4.2.2
-// and 5.3.3.
+// First 32 bits of the fractional parts of the cube roots of the first 64
+// primes (FIPS 180-4 section 4.2.2).
 constexpr std::uint32_t kRoundConstants[64] = {
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+    0x428a2f98U, 0x71374491U, 0xb5c0fbcfU, 0xe9b5dba5U, 0x3956c25bU, 0x59f111f1U,
+    0x923f82a4U, 0xab1c5ed5U, 0xd807aa98U, 0x12835b01U, 0x243185beU, 0x550c7dc3U,
+    0x72be5d74U, 0x80deb1feU, 0x9bdc06a7U, 0xc19bf174U, 0xe49b69c1U, 0xefbe4786U,
+    0x0fc19dc6U, 0x240ca1ccU, 0x2de92c6fU, 0x4a7484aaU, 0x5cb0a9dcU, 0x76f988daU,
+    0x983e5152U, 0xa831c66dU, 0xb00327c8U, 0xbf597fc7U, 0xc6e00bf3U, 0xd5a79147U,
+    0x06ca6351U, 0x14292967U, 0x27b70a85U, 0x2e1b2138U, 0x4d2c6dfcU, 0x53380d13U,
+    0x650a7354U, 0x766a0abbU, 0x81c2c92eU, 0x92722c85U, 0xa2bfe8a1U, 0xa81a664bU,
+    0xc24b8b70U, 0xc76c51a3U, 0xd192e819U, 0xd6990624U, 0xf40e3585U, 0x106aa070U,
+    0x19a4c116U, 0x1e376c08U, 0x2748774cU, 0x34b0bcb5U, 0x391c0cb3U, 0x4ed8aa4aU,
+    0x5b9cca4fU, 0x682e6ff3U, 0x748f82eeU, 0x78a5636fU, 0x84c87814U, 0x8cc70208U,
+    0x90befffaU, 0xa4506cebU, 0xbef9a3f7U, 0xc67178f2U,
 };
 
-inline std::uint32_t rotr(std::uint32_t value, unsigned bits) noexcept
+constexpr std::uint32_t rotateRight(std::uint32_t value, unsigned bits) noexcept
 {
     return (value >> bits) | (value << (32U - bits));
 }
 
-/// One 64-byte block through the compression function.
-void compress(std::uint32_t state[8], const std::uint8_t block[64]) noexcept
+std::uint32_t loadBe32(const std::uint8_t *source) noexcept
 {
-    std::uint32_t w[64];
-    for (unsigned t = 0; t < 16; ++t) {
-        w[t] = (std::uint32_t(block[4 * t]) << 24) | (std::uint32_t(block[4 * t + 1]) << 16) |
-               (std::uint32_t(block[4 * t + 2]) << 8) | std::uint32_t(block[4 * t + 3]);
+    return (static_cast<std::uint32_t>(source[0]) << 24U) |
+           (static_cast<std::uint32_t>(source[1]) << 16U) |
+           (static_cast<std::uint32_t>(source[2]) << 8U) |
+           static_cast<std::uint32_t>(source[3]);
+}
+
+void storeBe32(std::uint8_t *destination, std::uint32_t value) noexcept
+{
+    destination[0] = static_cast<std::uint8_t>(value >> 24U);
+    destination[1] = static_cast<std::uint8_t>(value >> 16U);
+    destination[2] = static_cast<std::uint8_t>(value >> 8U);
+    destination[3] = static_cast<std::uint8_t>(value);
+}
+
+} // namespace
+
+void Sha256::reset() noexcept
+{
+    // First 32 bits of the fractional parts of the square roots of the first
+    // eight primes (FIPS 180-4 section 5.3.3).
+    state_[0] = 0x6a09e667U;
+    state_[1] = 0xbb67ae85U;
+    state_[2] = 0x3c6ef372U;
+    state_[3] = 0xa54ff53aU;
+    state_[4] = 0x510e527fU;
+    state_[5] = 0x9b05688cU;
+    state_[6] = 0x1f83d9abU;
+    state_[7] = 0x5be0cd19U;
+    total_bytes_ = 0;
+    buffered_ = 0;
+    finished_ = false;
+}
+
+void Sha256::processBlock(const std::uint8_t block[kSha256BlockSize]) noexcept
+{
+    std::uint32_t schedule[64];
+    for (std::size_t word = 0; word < 16; ++word) {
+        schedule[word] = loadBe32(block + word * 4);
     }
-    for (unsigned t = 16; t < 64; ++t) {
-        const std::uint32_t s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >> 3);
-        const std::uint32_t s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >> 10);
-        w[t] = w[t - 16] + s0 + w[t - 7] + s1;
+    for (std::size_t word = 16; word < 64; ++word) {
+        const std::uint32_t s0 = rotateRight(schedule[word - 15], 7) ^
+                                 rotateRight(schedule[word - 15], 18) ^ (schedule[word - 15] >> 3U);
+        const std::uint32_t s1 = rotateRight(schedule[word - 2], 17) ^
+                                 rotateRight(schedule[word - 2], 19) ^ (schedule[word - 2] >> 10U);
+        schedule[word] = schedule[word - 16] + s0 + schedule[word - 7] + s1;
     }
 
-    std::uint32_t a = state[0];
-    std::uint32_t b = state[1];
-    std::uint32_t c = state[2];
-    std::uint32_t d = state[3];
-    std::uint32_t e = state[4];
-    std::uint32_t f = state[5];
-    std::uint32_t g = state[6];
-    std::uint32_t h = state[7];
+    std::uint32_t a = state_[0];
+    std::uint32_t b = state_[1];
+    std::uint32_t c = state_[2];
+    std::uint32_t d = state_[3];
+    std::uint32_t e = state_[4];
+    std::uint32_t f = state_[5];
+    std::uint32_t g = state_[6];
+    std::uint32_t h = state_[7];
 
-    for (unsigned t = 0; t < 64; ++t) {
-        const std::uint32_t big_s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+    for (std::size_t round = 0; round < 64; ++round) {
+        const std::uint32_t big_sigma1 =
+            rotateRight(e, 6) ^ rotateRight(e, 11) ^ rotateRight(e, 25);
         const std::uint32_t choose = (e & f) ^ (~e & g);
-        const std::uint32_t temp1 = h + big_s1 + choose + kRoundConstants[t] + w[t];
-        const std::uint32_t big_s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+        const std::uint32_t temp1 = h + big_sigma1 + choose + kRoundConstants[round] +
+                                    schedule[round];
+        const std::uint32_t big_sigma0 =
+            rotateRight(a, 2) ^ rotateRight(a, 13) ^ rotateRight(a, 22);
         const std::uint32_t majority = (a & b) ^ (a & c) ^ (b & c);
-        const std::uint32_t temp2 = big_s0 + majority;
+        const std::uint32_t temp2 = big_sigma0 + majority;
+
         h = g;
         g = f;
         f = e;
@@ -65,55 +106,79 @@ void compress(std::uint32_t state[8], const std::uint8_t block[64]) noexcept
         a = temp1 + temp2;
     }
 
-    state[0] += a;
-    state[1] += b;
-    state[2] += c;
-    state[3] += d;
-    state[4] += e;
-    state[5] += f;
-    state[6] += g;
-    state[7] += h;
+    state_[0] += a;
+    state_[1] += b;
+    state_[2] += c;
+    state_[3] += d;
+    state_[4] += e;
+    state_[5] += f;
+    state_[6] += g;
+    state_[7] += h;
 }
 
-} // namespace
+void Sha256::update(const std::uint8_t *data, std::size_t length) noexcept
+{
+    if (finished_ || data == nullptr || length == 0) {
+        return;
+    }
+    total_bytes_ += length;
+
+    if (buffered_ != 0) {
+        const std::size_t space = kSha256BlockSize - buffered_;
+        const std::size_t take = length < space ? length : space;
+        std::memcpy(buffer_ + buffered_, data, take);
+        buffered_ += take;
+        data += take;
+        length -= take;
+        if (buffered_ < kSha256BlockSize) {
+            return;
+        }
+        processBlock(buffer_);
+        buffered_ = 0;
+    }
+
+    while (length >= kSha256BlockSize) {
+        processBlock(data);
+        data += kSha256BlockSize;
+        length -= kSha256BlockSize;
+    }
+
+    if (length != 0) {
+        std::memcpy(buffer_, data, length);
+        buffered_ = length;
+    }
+}
+
+void Sha256::finish(std::uint8_t digest[kSha256DigestSize]) noexcept
+{
+    if (finished_) {
+        return;
+    }
+
+    const std::uint64_t total_bits = total_bytes_ * 8U;
+    buffer_[buffered_++] = 0x80U;
+    if (buffered_ > kSha256BlockSize - 8) {
+        std::memset(buffer_ + buffered_, 0, kSha256BlockSize - buffered_);
+        processBlock(buffer_);
+        buffered_ = 0;
+    }
+    std::memset(buffer_ + buffered_, 0, kSha256BlockSize - 8 - buffered_);
+    storeBe32(buffer_ + kSha256BlockSize - 8, static_cast<std::uint32_t>(total_bits >> 32U));
+    storeBe32(buffer_ + kSha256BlockSize - 4, static_cast<std::uint32_t>(total_bits));
+    processBlock(buffer_);
+
+    for (std::size_t word = 0; word < 8; ++word) {
+        storeBe32(digest + word * 4, state_[word]);
+    }
+    finished_ = true;
+}
 
 void sha256(const std::uint8_t *data, std::size_t length,
             std::uint8_t digest[kSha256DigestSize]) noexcept
 {
-    std::uint32_t state[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                              0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-
-    std::size_t offset = 0;
-    while (length - offset >= 64) {
-        compress(state, data + offset);
-        offset += 64;
-    }
-
-    // The tail plus the mandatory 0x80 marker and 64-bit big-endian bit
-    // length pad out to one or two final blocks.
-    std::uint8_t block[64];
-    const std::size_t remaining = length - offset;
-    if (remaining != 0) std::memcpy(block, data + offset, remaining);
-    block[remaining] = 0x80;
-    if (remaining >= 56) {
-        std::memset(block + remaining + 1, 0, 64 - remaining - 1);
-        compress(state, block);
-        std::memset(block, 0, 56);
-    } else {
-        std::memset(block + remaining + 1, 0, 56 - remaining - 1);
-    }
-    const std::uint64_t bit_length = std::uint64_t(length) * 8U;
-    for (unsigned i = 0; i < 8; ++i) {
-        block[56 + i] = static_cast<std::uint8_t>(bit_length >> (56U - 8U * i));
-    }
-    compress(state, block);
-
-    for (unsigned i = 0; i < 8; ++i) {
-        digest[4 * i] = static_cast<std::uint8_t>(state[i] >> 24);
-        digest[4 * i + 1] = static_cast<std::uint8_t>(state[i] >> 16);
-        digest[4 * i + 2] = static_cast<std::uint8_t>(state[i] >> 8);
-        digest[4 * i + 3] = static_cast<std::uint8_t>(state[i]);
-    }
+    Sha256 hasher{};
+    hasher.update(data, length);
+    hasher.finish(digest);
 }
 
 } // namespace crypto
