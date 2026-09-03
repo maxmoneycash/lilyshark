@@ -36,4 +36,26 @@ public enum MeshtasticBLEConstants {
 
     /// Notifies with a packet counter so the phone knows to drain `fromRadio`.
     public static let fromNumUUID = CBUUID(string: fromNumUUIDString)
+
+    // Operational limits for the BLE link. They live beside the UUIDs
+    // because they describe the same conversation: how much the deck will
+    // accept in one write, how many reads a single drain may make before
+    // yielding, and how many writes may queue before the caller is told the
+    // radio is not keeping up.
+
+    /// Shown when a peripheral advertises no name of its own.
+    public static let defaultDeviceName = "Lilyshark"
+    /// The largest protobuf the firmware's ToRadio queue accepts.
+    public static let maxToRadioPayload = 512
+    /// Bound on queued writes; past this the caller gets an error rather
+    /// than an unbounded backlog aimed at a radio that cannot drain it.
+    public static let maxPendingWrites = 32
+    /// A drain reads until FromRadio answers empty. This caps a single pass
+    /// so a misbehaving peer cannot hold the queue forever.
+    public static let maxReadsPerDrain = 64
+    /// iOS hands a restored central manager back under this identifier when
+    /// it relaunches the app for a Bluetooth event.
+    public static let centralManagerRestoreIdentifier = "com.lilyshark.meshtastic.centralmanager"
+    /// CoreBluetooth callbacks land on this queue, never the main one.
+    public static let bleQueueLabel = "com.lilyshark.meshtastic.ble"
 }

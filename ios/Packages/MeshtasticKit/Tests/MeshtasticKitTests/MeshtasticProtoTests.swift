@@ -206,4 +206,15 @@ final class MeshtasticProtoTests: XCTestCase {
             MeshtasticBLEConstants.serviceUUIDString
         )
     }
+
+    /// A zero nonce must still go on the wire. Proto3 omits zero scalars by
+    /// default, and want_config_id is the one field where that convention is
+    /// wrong: the phone waits for its own nonce to come back, so a dropped
+    /// zero leaves the app configuring forever. A reviewer proved this was
+    /// unpinned by mutating the encoder to the omitting form and watching
+    /// every other test stay green.
+    func testZeroNonceIsStillEncoded() {
+        XCTAssertEqual(Array(MeshtasticProto.encodeWantConfig(nonce: 0)), [0x18, 0x00])
+        XCTAssertEqual(Array(MeshtasticProto.encodeWantConfig(nonce: 42)), [0x18, 0x2a])
+    }
 }
