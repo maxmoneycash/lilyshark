@@ -657,6 +657,31 @@ std::size_t chat_peer_count = 1;
 std::size_t chat_peer_index = 0;
 char chat_draft[kChatTextCapacity]{};
 std::size_t chat_draft_len = 0;
+// Which conversation the draft was typed in. A reviewer proved what its
+// absence cost: type on a keyed thread, press TAB once, press ENTER, and the
+// text goes out sealed under a DIFFERENT channel's key -- a different
+// audience than the one the operator was looking at when they wrote it. And
+// when a key is removed, the tab list rebuilds onto EVERYONE, so the same
+// draft would have gone out under the default key, in public. The draft is
+// discarded whenever the conversation under it changes; losing a half-typed
+// line is a visible, harmless annoyance, and sending it to strangers is not.
+std::uint32_t chat_draft_peer = 0xffffffffU;
+char chat_draft_key_fp[8]{};
+
+void chat_forget_draft_on_thread_change(std::uint32_t peer, const char *key_fp) noexcept
+{
+    const char *fp = key_fp != nullptr ? key_fp : "";
+    if (chat_draft_len == 0U) {
+        chat_draft_peer = peer;
+        std::snprintf(chat_draft_key_fp, sizeof(chat_draft_key_fp), "%s", fp);
+        return;
+    }
+    if (chat_draft_peer == peer && std::strcmp(chat_draft_key_fp, fp) == 0) return;
+    chat_draft[0] = '\0';
+    chat_draft_len = 0;
+    chat_draft_peer = peer;
+    std::snprintf(chat_draft_key_fp, sizeof(chat_draft_key_fp), "%s", fp);
+}
 bool chat_open = false;
 std::uint8_t chat_unread = 0;
 std::size_t chat_scroll_offset = 0;
@@ -876,7 +901,14 @@ const ChatPeer &chat_active_thread() noexcept
     static const ChatPeer everyone{};
     if (chat_peer_count == 0U) return everyone;
     if (chat_peer_index >= chat_peer_count) chat_peer_index = 0;
-    return chat_peers[chat_peer_index];
+    const ChatPeer &thread = chat_peers[chat_peer_index];
+    // Every path that changes conversation -- the TAB key, a tap on the tab
+    // strip, and the rebuild that drops you back to EVERYONE when a key is
+    // removed -- ends up here. Enforcing the draft binding at the accessor
+    // rather than at each of those means a path added later cannot forget it,
+    // and forgetting it means a message going to the wrong audience.
+    chat_forget_draft_on_thread_change(thread.node, thread.key_fp);
+    return thread;
 }
 
 std::uint32_t chat_active_dest() noexcept

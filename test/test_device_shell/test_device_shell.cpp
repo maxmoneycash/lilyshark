@@ -2080,8 +2080,73 @@ int runIsolated(Scenario scenario)
     return WEXITSTATUS(status_code);
 }
 
+/// A draft belongs to the conversation it was typed in.
+///
+/// Both halves of this were proven as live bugs before they were fixed: text
+/// typed on a keyed thread and sent after one TAB went out sealed under a
+/// different channel's key, and text typed on a thread whose key was then
+/// removed went out under the default key, in public. Either sends an
+/// operator's words to an audience they did not choose, which is the worst
+/// thing this firmware can do. Asserted through the screen, because what the
+/// operator can see is the thing that has to be true.
+bool chatDraftIsBoundToItsThreadScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+    if(!require(seedCompletedAppSettings(),
+                "completed app settings could not be encoded")) return false;
+    setup();
+
+    // A second conversation has to exist for switching to mean anything, and
+    // a stored key is how one appears: the key store drives the tab strip.
+    sendKeyboard('8');
+    if(!require(hasLabel(lv_screen_active(), "SETTINGS"),
+                "8 did not open Settings")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "CHANNEL KEYS"),
+                "right on Settings did not open the channel key list")) return false;
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "TYPE THE CHANNEL KEY"),
+                "the ADD A KEY row did not open key entry")) return false;
+    for(const char *digit = "8a1c0f43d29b57e6104fb8237ce5a90d"; *digit != '\0'; ++digit) {
+        sendKeyboard(static_cast<std::uint8_t>(*digit));
+    }
+    sendKeyboard('\r');
+    for(const char *letter = "NORTH RIDGE"; *letter != '\0'; ++letter) {
+        sendKeyboard(static_cast<std::uint8_t>(*letter));
+    }
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "NORTH RIDGE"),
+                "the named key did not appear in the key list")) return false;
+    // Back out of the key screens; they consume letter keys for naming, so
+    // C would never reach the navigation handler from in here.
+    sendKeyboard(0x08U);
+    sendKeyboard(0x08U);
+
+    sendKeyboard('C');
+    if(!require(hasLabel(lv_screen_active(), "TYPE A MESSAGE"),
+                "C did not open Chat")) return false;
+    for(const char *c = "PRIVATE"; *c != '\0'; ++c) {
+        sendKeyboard(static_cast<std::uint32_t>(*c));
+    }
+    if(!require(hasLabel(lv_screen_active(), "PRIVATE"),
+                "the compose box did not show the typed draft")) return false;
+
+    // Changing conversation must discard it rather than carry it across.
+    sendKeyboard('\t');
+    if(!require(!hasLabel(lv_screen_active(), "PRIVATE"),
+                "a draft survived a change of conversation, where sending it "
+                "would address an audience it was never written for")) return false;
+    if(!require(hasLabel(lv_screen_active(), "TYPE A MESSAGE"),
+                "the compose box did not return to its empty state")) return false;
+    return true;
+}
+
 void testDeviceShellEntryPath()
 {
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(chatDraftIsBoundToItsThreadScenario),
+                                  "chat draft binding scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(healthyScenario),
                                   "healthy device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(channelKeyReceiveScenario),
