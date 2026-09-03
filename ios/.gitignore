@@ -1,0 +1,6 @@
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.DS_Store
+*.bak
+build/

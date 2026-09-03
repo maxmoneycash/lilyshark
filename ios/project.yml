@@ -1,0 +1,110 @@
+# This spec is NOT how PommeCore is built. The committed PommeCore.xcodeproj is
+# canonical -- it carries five targets, and `xcodegen generate` here produces only
+# three, silently dropping the Widgets and Watch Complications extensions and the
+# entitlements wiring. Running xcodegen overwrites the canonical project in place,
+# so treat it as a destructive operation and see BUILD.md before you do.
+#
+# It is kept, and kept correct, because a spec that fails validation is worse than
+# no spec at all: the version vendored with the app referenced a watchOS/Views
+# directory that does not exist and declared deployment targets below MeshCoreKit's
+# floors, so it could not generate anything at all.
+
+name: PommeCore
+options:
+  bundleIdPrefix: com.meshcore
+  # These must not drop below the floors in Packages/MeshCoreKit/Package.swift
+  # (.iOS(.v18), .macOS(.v15), .watchOS(.v11)). Xcode resolves the package against
+  # the app's deployment target, so a lower value here fails the package graph
+  # before a single source file is compiled.
+  deploymentTarget:
+    iOS: "18.0"
+    macOS: "15.0"
+    watchOS: "11.0"
+  xcodeVersion: "16.0"
+  groupSortPosition: top
+
+packages:
+  MeshCoreKit:
+    path: Packages/MeshCoreKit
+
+targets:
+  PommeCore:
+    type: application
+    platform: iOS
+    # WidgetState is the payload the app writes and the widget extension reads, so
+    # it lives beside the widget but compiles into the app too. Shared/App/
+    # WidgetStateWriter.swift will not compile without it.
+    sources:
+      - path: Shared
+      - path: PommeCore Widgets/WidgetState.swift
+    dependencies:
+      - package: MeshCoreKit
+    info:
+      path: iOS/Info.plist
+      properties:
+        UILaunchScreen: {}
+        CFBundleDisplayName: PommeCore
+        UIBackgroundModes:
+          - bluetooth-central
+          - remote-notification
+        NSBluetoothAlwaysUsageDescription: "PommeCore needs Bluetooth to communicate with your LoRa radio device."
+        NSBluetoothPeripheralUsageDescription: "PommeCore needs Bluetooth to communicate with your LoRa radio device."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.meshcore.app
+        PRODUCT_NAME: PommeCore
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  PommeCore-macOS:
+    type: application
+    platform: macOS
+    sources:
+      - path: Shared
+      - path: PommeCore Widgets/WidgetState.swift
+    dependencies:
+      - package: MeshCoreKit
+    info:
+      path: macOS/Info.plist
+      properties:
+        CFBundleDisplayName: PommeCore
+        NSBluetoothAlwaysUsageDescription: "PommeCore needs Bluetooth to communicate with your LoRa radio device."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.meshcore.app
+        PRODUCT_NAME: PommeCore
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.9"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  PommeCore-watchOS:
+    type: application
+    platform: watchOS
+    # The watch app draws from Shared alone. An earlier spec also listed
+    # watchOS/Views, which does not exist in this tree and failed spec validation.
+    sources:
+      - path: Shared
+      - path: PommeCore Widgets/WidgetState.swift
+    dependencies:
+      - package: MeshCoreKit
+    info:
+      path: watchOS/Info.plist
+      properties:
+        CFBundleDisplayName: PommeCore
+        UIBackgroundModes:
+          - bluetooth-central
+        NSBluetoothAlwaysUsageDescription: "PommeCore needs Bluetooth to communicate with your LoRa radio device."
+        WKApplication: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.meshcore.app.watchos
+        PRODUCT_NAME: PommeCore Watch
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.9"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

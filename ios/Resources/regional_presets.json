@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "name": "WestCoastMesh",
+      "region": "North America",
+      "frequencyKHz": 910525.244,
+      "bandwidth": 62.5,
+      "spreadingFactor": 7,
+      "codingRate": 5,
+      "contributor": "WestCoastMesh community",
+      "url": "https://westcoastmesh.com"
+    },
+    {
+      "name": "SoCalORA",
+      "region": "North America",
+      "frequencyKHz": 927875.0,
+      "bandwidth": 62.5,
+      "spreadingFactor": 7,
+      "codingRate": 8,
+      "contributor": "SoCalORA community",
+      "url": null
+    },
+    {
+      "name": "Bay Area Mesh",
+      "region": "North America",
+      "frequencyKHz": 915000.0,
+      "bandwidth": 250.0,
+      "spreadingFactor": 9,
+      "codingRate": 5,
+      "contributor": "Bay Area MeshCore community",
+      "url": null
+    },
+    {
+      "name": "Texas Mesh",
+      "region": "North America",
+      "frequencyKHz": 903500.0,
+      "bandwidth": 62.5,
+      "spreadingFactor": 7,
+      "codingRate": 5,
+      "contributor": "Texas MeshCore community",
+      "url": null
+    },
+    {
+      "name": "EU MeshCore",
+      "region": "Europe",
+      "frequencyKHz": 869525.0,
+      "bandwidth": 62.5,
+      "spreadingFactor": 9,
+      "codingRate": 5,
+      "contributor": "European MeshCore community",
+      "url": null
+    }
+  ]
+}
