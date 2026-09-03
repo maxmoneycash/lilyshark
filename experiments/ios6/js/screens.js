@@ -790,7 +790,7 @@
             const toTextY = toBarY + 4;
             kit.text(ctx, "To:", 8, toTextY, C.Meta, { size: 11, weight: "700" });
             kit.text(ctx, "Fjell, Hytta", 30, toTextY, C.Ink, { size: 11 });
-            kit.text(ctx, "Details", 312, toTextY, C.ButtonInk, {
+            kit.text(ctx, "Details", 312, toTextY, 0x1478e6, {
                 size: 11,
                 weight: "700",
                 align: "right",
@@ -820,7 +820,7 @@
                 const x = pad + index * (btnW + gap);
                 kit.whitePill(ctx, x, btnY, btnW, btnH);
                 const labelX = action.chevron ? x + btnW / 2 - 5 : x + btnW / 2;
-                kit.text(ctx, action.label, labelX, btnY + 5, C.ButtonInk, {
+                kit.text(ctx, action.label, labelX, btnY + 5, 0x3a5078, {
                     size: 11,
                     weight: "700",
                     align: "center",
@@ -828,7 +828,7 @@
                 if (action.chevron) {
                     const chevronX = x + btnW - 12;
                     const chevronY = btnY + 6;
-                    ctx.strokeStyle = kit.hex24(C.ButtonInk);
+                    ctx.strokeStyle = kit.hex24(0x3a5078);
                     ctx.lineWidth = 1.5;
                     ctx.lineCap = "round";
                     ctx.lineJoin = "round";
