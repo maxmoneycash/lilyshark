@@ -342,13 +342,23 @@ std::uint32_t analyzer_link_last_position_ms = 0;
 // Mesh beacons run off the radio, independent of any USB link.
 std::uint32_t mesh_beacon_last_position_ms = 0;
 std::uint32_t mesh_beacon_last_nodeinfo_ms = 0;
-// A LongFast position is well under a second of airtime, so a minute between
-// them keeps peers' dots fresh at a negligible duty cycle. NodeInfo carries
-// the name a peer is listed under, and waiting five minutes to appear in
-// someone's node list reads as "it is not working" — ninety seconds is still
-// almost no airtime and a device shows up while you are still looking at it.
-constexpr std::uint32_t kPositionBeaconMs = 60000U;
-constexpr std::uint32_t kNodeInfoBeaconMs = 90000U;
+// Meshtastic's own defaults, and they are defaults for a reason.
+//
+// These were 60 s and 90 s, chosen when two decks on a private LongFast
+// channel were the entire mesh and the only cost of chattiness was to each
+// other. Measured on the Bay Area community slot they came to 42
+// transmissions in 24 minutes -- one every 34 seconds, 15x stock for position
+// and 120x for NodeInfo -- into a channel shared with everyone else in the
+// region. On a slow LoRa channel airtime is the one resource nobody can make
+// more of, and a node that takes an unfair share of it is not a bug the
+// operator sees; it is a bug everybody else sees.
+//
+// At SF9/250 kHz a position is 144 ms and a NodeInfo 185 ms, so the old
+// spacing spent 0.24% and 0.21% duty. These spacings spend 0.016% and
+// 0.0017%. Peers' dots go stale more slowly than they used to, which is the
+// trade every other radio on the channel has already made.
+constexpr std::uint32_t kPositionBeaconMs = 900000U;
+constexpr std::uint32_t kNodeInfoBeaconMs = 10800000U;
 
 // Our MeshCore identity. The public key IS the address on that network, so
 // this has the same all-or-nothing rule as the Curve25519 keypair above: a
