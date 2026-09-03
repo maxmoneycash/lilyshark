@@ -916,27 +916,25 @@
     }
 
     function messageStamp(ctx, y, label, when) {
-        const spec = { size: 10, weight: "700" };
+        const spec = { size: 10, weight: "600" };
         const labelW = measureWidth(ctx, label, spec);
         const left = 160 - labelW / 2 - 8;
         const right = 160 + labelW / 2 + 8;
         ctx.save();
-        ctx.fillStyle = hex24(C.Meta);
-        function stampDots(from, to) {
-            for (let x = from; x < to; x += 4) {
-                ctx.beginPath();
-                ctx.arc(x, y + 6, 0.7, 0, Math.PI * 2);
-                ctx.fill();
+        ctx.fillStyle = hex24(0x8a96a4);
+        function stampDashes(from, to) {
+            for (let x = from; x + 2.2 < to; x += 5) {
+                ctx.fillRect(x, y + 5, 2.2, 1);
             }
         }
-        stampDots(16, left);
-        stampDots(right, W - 16);
+        stampDashes(16, left);
+        stampDashes(right, W - 16);
         ctx.restore();
-        text(ctx, label, 160, y, C.Meta, { size: 10, weight: "700", align: "center" });
+        text(ctx, label, 160, y, 0x8a96a4, { size: 10, weight: "600", align: "center" });
         if (when) {
-            text(ctx, when, 160, y + 14, C.Meta, { size: 10, weight: "500", align: "center" });
+            text(ctx, when, 160, y + 13, 0x8a96a4, { size: 9, weight: "500", align: "center" });
         }
-        return when ? 28 : 14;
+        return when ? 27 : 14;
     }
 
     function cameraWell(ctx, x, y, action) {
