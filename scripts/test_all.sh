@@ -272,6 +272,20 @@ build_and_run meshtastic_pkc \
   src/core/meshtastic_pkc.cpp \
   test/meshtastic_pkc/test_meshtastic_pkc.cpp
 
+build_and_run channel_keys \
+  src/core/channel_keys.cpp \
+  src/core/meshtastic_decoder.cpp \
+  src/core/meshtastic_encode.cpp \
+  src/core/meshtastic_payload.cpp \
+  src/core/meshtastic_pkc.cpp \
+  src/core/mesh_identity.cpp \
+  src/crypto/aes128.cpp \
+  src/crypto/aes_ccm.cpp \
+  src/crypto/curve25519.cpp \
+  src/crypto/sha256.cpp \
+  src/export/lilyshark_capture.cpp \
+  test/channel_keys/test_channel_keys.cpp
+
 echo "Testing lscap_reader"
 python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
 

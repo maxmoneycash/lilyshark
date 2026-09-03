@@ -34,6 +34,7 @@
 
 #include "theme.h"
 #include "lilyshark/core/app_settings.h"
+#include "lilyshark/core/channel_keys.h"
 #include "lilyshark/core/mesh_identity.h"
 #include "lilyshark/core/builtin_profiles.h"
 #include "lilyshark/core/diagnostic_tools.h"
@@ -8014,8 +8015,622 @@ void build_radio_profiles(lv_obj_t * parent)
     draw_back_strip(parent, shell_notice[0] != '\0' ? shell_notice : nullptr);
 }
 
+// ── Channel keys ────────────────────────────────────────────────────────────
+// A channel key is the one thing an operator brings to the deck that the deck
+// cannot work out for itself: the shared secret of a channel somebody let them
+// read. Without one the analyzer sees only the channel every radio ships with.
+//
+// The manager is a second page of the Settings screen rather than a route of
+// its own. ShellRoute and SettingsItem belong to the shell model
+// (include/lilyshark/ui/app_shell.h), and the seven-row menu already runs down
+// to the BACK strip at y=204, so there is neither a spare route nor a spare
+// row. The page is reached by the CHANNEL KEYS chip in that strip, or by
+// pressing right on the menu.
+//
+// Nothing on these pages ever draws key bytes. A stored key is identified by
+// its name and by the one-way fingerprint ChannelKeyStore computes, and the
+// digits being typed are masked, so a screenshot of any of them is safe to
+// hand to somebody. The reasoning is docs/channel-key-security.md.
+
+enum class ChannelKeyPage : std::uint8_t {
+    List,
+    Actions,
+    EnterKey,
+    EnterName,
+    ConfirmRemove,
+};
+
+constexpr lv_coord_t kChannelKeyRowH = 20;
+constexpr lv_coord_t kChannelKeyChipX = 190;
+constexpr lv_coord_t kChannelKeyChipW = 122;
+constexpr lv_coord_t kChannelKeyActionsFirstY = 76;
+constexpr lv_coord_t kChannelKeyConfirmFirstY = 84;
+constexpr lv_coord_t kChannelKeyActionRowH = 26;
+constexpr std::size_t kChannelKeyDigitCount = kChannelKeySize * 2U;
+
+ChannelKeyStore channel_keys{};
+bool channel_keys_open = false;
+/// True once a key record is known to exist in flash, so a setup reset knows
+/// whether there is anything to erase and never writes over a namespace that
+/// has never held keys.
+bool channel_keys_stored = false;
+ChannelKeyPage channel_key_page = ChannelKeyPage::List;
+std::size_t channel_key_selection = 0U;
+std::size_t channel_key_action_slot = 0U;
+std::size_t channel_key_action_selection = 0U;
+bool channel_key_remove_confirmed = false;
+bool channel_key_renaming = false;
+char channel_key_digits[kChannelKeyDigitCount + 1U]{};
+std::size_t channel_key_digit_count = 0U;
+char channel_key_name[kChannelKeyNameCapacity]{};
+std::size_t channel_key_name_length = 0U;
+char channel_key_notice[40]{};
+
+void set_channel_key_notice(const char *text) noexcept
+{
+    std::snprintf(channel_key_notice, sizeof(channel_key_notice), "%s", text);
+}
+
+/// The half-typed key is secret too. A volatile write is used because the
+/// compiler is entitled to drop a plain store to a buffer nothing reads again.
+void wipe_channel_key_digits() noexcept
+{
+    volatile char *target = channel_key_digits;
+    for (std::size_t index = 0; index < sizeof(channel_key_digits); ++index) {
+        target[index] = '\0';
+    }
+    channel_key_digit_count = 0U;
+}
+
+std::size_t channel_key_row_count() noexcept
+{
+    // One row per key, plus the row that adds another.
+    return channel_keys.size() + 1U;
+}
+
+#if defined(LILYSHARK_DEVICE)
+bool ensure_preferences_ready() noexcept;
+
+bool write_channel_keys() noexcept
+{
+    if(!ensure_preferences_ready()) return false;
+    std::uint8_t bytes[kChannelKeyStoreRecordSize]{};
+    if(!channel_keys.encode(bytes, sizeof(bytes))) return false;
+    const bool ok =
+        profile_preferences.putBytes("keys", bytes, sizeof(bytes)) == sizeof(bytes);
+    volatile std::uint8_t *scrub = bytes;
+    for(std::size_t index = 0; index < sizeof(bytes); ++index) scrub[index] = 0U;
+    if(ok) channel_keys_stored = true;
+    return ok;
+}
+
+bool load_channel_keys() noexcept
+{
+    if(!ensure_preferences_ready()) return false;
+    if(profile_preferences.getBytesLength("keys") != kChannelKeyStoreRecordSize) return false;
+    std::uint8_t bytes[kChannelKeyStoreRecordSize]{};
+    if(profile_preferences.getBytes("keys", bytes, sizeof(bytes)) != sizeof(bytes)) return false;
+    const ChannelKeyDecodeResult result = channel_keys.decode(bytes, sizeof(bytes));
+    volatile std::uint8_t *scrub = bytes;
+    for(std::size_t index = 0; index < sizeof(bytes); ++index) scrub[index] = 0U;
+    if(result != ChannelKeyDecodeResult::LoadedV1) {
+        Serial.println("Lilyshark channel key record invalid; stored keys were not loaded");
+        return false;
+    }
+    channel_keys_stored = true;
+    return true;
+}
+#endif
+
+/// Saves the key list. The simulator has no NVS, so it reports success and
+/// keeps the list for the session -- the same shape the capture and display
+/// settings already take there.
+bool save_channel_keys() noexcept
+{
+#if defined(LILYSHARK_DEVICE)
+    return write_channel_keys();
+#else
+    return true;
+#endif
+}
+
+/// Setup reset. Unlike every other preference this does not roll back: if the
+/// erase fails the in-memory keys stay gone, so nothing on this deck can use
+/// them for the rest of the session, and the event says plainly that a copy
+/// may still be in flash. Putting secrets back because a write failed would be
+/// the wrong way round.
+void reset_channel_keys() noexcept
+{
+    const bool had_keys = !channel_keys.empty() || channel_keys_stored;
+    channel_keys.clear();
+    channel_keys_open = false;
+    channel_key_page = ChannelKeyPage::List;
+    channel_key_selection = 0U;
+    wipe_channel_key_digits();
+    channel_key_notice[0] = '\0';
+    if(!had_keys) return;
+    const bool erased = save_channel_keys();
+    if(erased) channel_keys_stored = false;
+#if defined(LILYSHARK_DEVICE)
+    record_runtime_event(erased ? RuntimeEventSeverity::Info : RuntimeEventSeverity::Error,
+                         RuntimeEventType::System,
+                         erased ? "Stored channel keys erased by setup reset"
+                                : "Channel keys cleared but the erase failed; a copy may "
+                                  "remain in flash");
+#endif
+}
+
+void open_channel_keys() noexcept
+{
+    channel_keys_open = true;
+    channel_key_page = ChannelKeyPage::List;
+    channel_key_selection = 0U;
+    channel_key_renaming = false;
+    wipe_channel_key_digits();
+    channel_key_name[0] = '\0';
+    channel_key_name_length = 0U;
+    channel_key_notice[0] = '\0';
+    build_current_screen();
+}
+
+void close_channel_keys() noexcept
+{
+    channel_keys_open = false;
+    channel_key_page = ChannelKeyPage::List;
+    wipe_channel_key_digits();
+    channel_key_notice[0] = '\0';
+    build_current_screen();
+}
+
+void build_channel_key_list(lv_obj_t *parent)
+{
+    const std::size_t rows = channel_key_row_count();
+    for(std::size_t index = 0; index < rows; ++index) {
+        const lv_coord_t y =
+            kSettingsFirstY + static_cast<lv_coord_t>(index) * kChannelKeyRowH;
+        const bool selected = index == channel_key_selection;
+        if(index < channel_keys.size()) {
+            char print[kChannelKeyFingerprintDigits + 1]{};
+            (void)channel_keys.fingerprint(index, print, sizeof(print));
+            add_pixel_list_row(parent, y, kChannelKeyRowH, channel_keys.name(index), print,
+                               selected, theme::cyan());
+        } else {
+            char held[12]{};
+            std::snprintf(held, sizeof(held), "%u OF %u",
+                          static_cast<unsigned>(channel_keys.size()),
+                          static_cast<unsigned>(channel_keys.capacity()));
+            add_pixel_list_row(parent, y, kChannelKeyRowH,
+                               channel_keys.full() ? "NO ROOM FOR ANOTHER KEY" : "ADD A KEY",
+                               held, selected,
+                               channel_keys.full() ? theme::amber() : theme::lime());
+        }
+    }
+    if(channel_keys.empty()) {
+        put_label(parent, "THE ANALYZER ALWAYS READS THE CHANNEL EVERY", 10, 60,
+                  theme::text_muted(), &font_pixel_6x8);
+        put_label(parent, "RADIO SHIPS WITH. A KEY ADDED HERE LETS IT", 10, 72,
+                  theme::text_muted(), &font_pixel_6x8);
+        put_label(parent, "READ ONE MORE CHANNEL AS WELL.", 10, 84,
+                  theme::text_muted(), &font_pixel_6x8);
+    }
+}
+
+void build_channel_key_actions(lv_obj_t *parent)
+{
+    const char *name = channel_keys.name(channel_key_action_slot);
+    put_clipped_label(parent, name != nullptr ? name : "", 10, 32, 200, theme::pink(),
+                      &font_pixel_6x8);
+    char print[kChannelKeyFingerprintDigits + 1]{};
+    if(channel_keys.fingerprint(channel_key_action_slot, print, sizeof(print))) {
+        char line[32]{};
+        std::snprintf(line, sizeof(line), "FINGERPRINT %s", print);
+        put_label(parent, line, 10, 48, theme::text_muted(), &font_pixel_6x8);
+    }
+    const char *rows[] = {"RENAME THIS KEY", "REMOVE THIS KEY"};
+    for(std::size_t index = 0; index < 2U; ++index) {
+        add_pixel_list_row(parent, kChannelKeyActionsFirstY +
+                                       static_cast<lv_coord_t>(index) * kChannelKeyActionRowH,
+                           kChannelKeyActionRowH, rows[index], "",
+                           index == channel_key_action_selection,
+                           index == 1U ? theme::fault() : theme::cyan());
+    }
+    put_label(parent, "THE KEY BYTES ARE NEVER SHOWN OR WRITTEN TO", 10, 150,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "A CAPTURE. THE FINGERPRINT ABOVE IDENTIFIES", 10, 162,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "THE KEY WITHOUT REVEALING IT.", 10, 174,
+              theme::text_muted(), &font_pixel_6x8);
+}
+
+void build_channel_key_entry(lv_obj_t *parent)
+{
+    put_label(parent, "TYPE THE CHANNEL KEY", 10, 32, theme::pink(), &font_pixel_6x8);
+    put_label(parent, "32 HEX DIGITS, FROM WHOEVER RUNS THE CHANNEL.", 10, 48,
+              theme::text_muted(), &font_pixel_6x8);
+    draw_outline_rect(parent, 10, 72, 300, 28, theme::pink());
+    // Masked: one star per digit entered, an underscore for each still to
+    // come. The length is fixed and public, so showing progress reveals
+    // nothing, and the digits themselves never reach the framebuffer.
+    char masked[kChannelKeyDigitCount + 1U]{};
+    for(std::size_t index = 0; index < kChannelKeyDigitCount; ++index) {
+        masked[index] = index < channel_key_digit_count ? '*' : '_';
+    }
+    masked[kChannelKeyDigitCount] = '\0';
+    put_label(parent, masked, 62, 82, theme::text(), &font_pixel_6x8);
+    char counter[16]{};
+    std::snprintf(counter, sizeof(counter), "%u OF 32",
+                  static_cast<unsigned>(channel_key_digit_count));
+    put_label(parent, counter, 10, 108,
+              channel_key_digit_count == kChannelKeyDigitCount ? theme::lime()
+                                                               : theme::text_muted(),
+              &font_pixel_6x8);
+    put_label(parent, "DIGITS 0 TO 9 AND LETTERS A TO F ONLY.", 10, 132,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "BACK DELETES THE LAST DIGIT.", 10, 144, theme::text_muted(),
+              &font_pixel_6x8);
+    put_label(parent, "ENTER MOVES ON TO NAMING THE KEY.", 10, 156, theme::text_muted(),
+              &font_pixel_6x8);
+}
+
+void build_channel_key_name_entry(lv_obj_t *parent)
+{
+    put_label(parent, channel_key_renaming ? "RENAME THIS KEY" : "NAME THIS KEY", 10, 32,
+              theme::pink(), &font_pixel_6x8);
+    put_label(parent, "SO YOU CAN TELL IT FROM THE OTHERS.", 10, 48, theme::text_muted(),
+              &font_pixel_6x8);
+    draw_outline_rect(parent, 10, 72, 300, 28, theme::pink());
+    char shown[kChannelKeyNameCapacity + 1U]{};
+    std::snprintf(shown, sizeof(shown), "%s_", channel_key_name);
+    put_label(parent, shown, 20, 82, theme::text(), &font_pixel_6x8);
+    put_label(parent, "UP TO 15 LETTERS, DIGITS OR SPACES.", 10, 120, theme::text_muted(),
+              &font_pixel_6x8);
+    put_label(parent, channel_key_renaming ? "ENTER SAVES THE NEW NAME."
+                                           : "ENTER STORES THE KEY UNDER THIS NAME.",
+              10, 132, theme::text_muted(), &font_pixel_6x8);
+}
+
+void build_channel_key_confirm(lv_obj_t *parent)
+{
+    const char *name = channel_keys.name(channel_key_action_slot);
+    char question[48]{};
+    std::snprintf(question, sizeof(question), "REMOVE %s?", name != nullptr ? name : "");
+    put_label(parent, question, 10, 40, theme::pink(), &font_pixel_6x8);
+    const char *rows[] = {"KEEP THIS KEY", "REMOVE THIS KEY"};
+    for(std::size_t index = 0; index < 2U; ++index) {
+        add_pixel_list_row(parent, kChannelKeyConfirmFirstY +
+                                       static_cast<lv_coord_t>(index) * kChannelKeyActionRowH,
+                           kChannelKeyActionRowH, rows[index], "",
+                           channel_key_remove_confirmed == (index == 1U),
+                           index == 1U ? theme::fault() : theme::cyan());
+    }
+    put_label(parent, "THE DECK WILL STOP READING THAT CHANNEL AND", 10, 156,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "THE KEY WILL HAVE TO BE TYPED AGAIN.", 10, 168, theme::text_muted(),
+              &font_pixel_6x8);
+}
+
+void build_channel_keys(lv_obj_t *parent)
+{
+    add_gear_status(parent, "CHANNEL KEYS");
+    switch(channel_key_page) {
+        case ChannelKeyPage::List: build_channel_key_list(parent); break;
+        case ChannelKeyPage::Actions: build_channel_key_actions(parent); break;
+        case ChannelKeyPage::EnterKey: build_channel_key_entry(parent); break;
+        case ChannelKeyPage::EnterName: build_channel_key_name_entry(parent); break;
+        case ChannelKeyPage::ConfirmRemove: build_channel_key_confirm(parent); break;
+    }
+    draw_back_strip(parent, channel_key_notice[0] != '\0' ? channel_key_notice : nullptr);
+}
+
+/// Commits the name being typed: a rename of an existing key, or the new key
+/// whose digits are still held. Either way the store is asked first and the
+/// preference is written second, so a refused mutation never reaches flash.
+void commit_channel_key_name() noexcept
+{
+    if(channel_key_renaming) {
+        char previous[kChannelKeyNameCapacity]{};
+        const char *current = channel_keys.name(channel_key_action_slot);
+        if(current == nullptr) {
+            set_channel_key_notice("NO SUCH KEY");
+            channel_key_page = ChannelKeyPage::List;
+            return;
+        }
+        std::snprintf(previous, sizeof(previous), "%s", current);
+        const ChannelKeyResult result =
+            channel_keys.rename(channel_key_action_slot, channel_key_name);
+        if(result != ChannelKeyResult::Ok) {
+            set_channel_key_notice(channelKeyResultLabel(result));
+            return;
+        }
+        if(!save_channel_keys()) {
+            (void)channel_keys.rename(channel_key_action_slot, previous);
+            set_channel_key_notice("NAME NOT SAVED; UNCHANGED");
+            return;
+        }
+        set_channel_key_notice("NAME SAVED");
+        channel_key_page = ChannelKeyPage::List;
+        return;
+    }
+
+    std::uint8_t key[kChannelKeySize]{};
+    if(!parseChannelKeyHex(channel_key_digits, key, sizeof(key))) {
+        set_channel_key_notice("KEY MUST BE 32 HEX");
+        channel_key_page = ChannelKeyPage::EnterKey;
+        return;
+    }
+    std::size_t slot = 0U;
+    const ChannelKeyResult result =
+        channel_keys.add(channel_key_name, key, sizeof(key), slot);
+    volatile std::uint8_t *scrub = key;
+    for(std::size_t index = 0; index < sizeof(key); ++index) scrub[index] = 0U;
+    if(result != ChannelKeyResult::Ok) {
+        set_channel_key_notice(channelKeyResultLabel(result));
+        return;
+    }
+    if(!save_channel_keys()) {
+        (void)channel_keys.remove(slot);
+        set_channel_key_notice("KEY NOT SAVED; NOT ADDED");
+        channel_key_page = ChannelKeyPage::List;
+        wipe_channel_key_digits();
+        return;
+    }
+    wipe_channel_key_digits();
+    channel_key_selection = slot;
+    channel_key_page = ChannelKeyPage::List;
+    set_channel_key_notice("KEY STORED");
+}
+
+void remove_selected_channel_key() noexcept
+{
+    const ChannelKeyResult result = channel_keys.remove(channel_key_action_slot);
+    if(result != ChannelKeyResult::Ok) {
+        set_channel_key_notice(channelKeyResultLabel(result));
+    } else if(!save_channel_keys()) {
+        // The key is already gone from memory and it stays gone: a secret the
+        // operator asked to destroy must not come back because a write failed.
+        set_channel_key_notice("KEY REMOVED BUT NOT SAVED");
+    } else {
+        set_channel_key_notice("KEY REMOVED");
+    }
+    channel_key_page = ChannelKeyPage::List;
+    if(channel_key_selection >= channel_key_row_count()) {
+        channel_key_selection = channel_key_row_count() - 1U;
+    }
+}
+
+void begin_channel_key_rename() noexcept
+{
+    const char *current = channel_keys.name(channel_key_action_slot);
+    if(current == nullptr) {
+        channel_key_page = ChannelKeyPage::List;
+        return;
+    }
+    std::snprintf(channel_key_name, sizeof(channel_key_name), "%s", current);
+    channel_key_name_length = std::strlen(channel_key_name);
+    channel_key_renaming = true;
+    channel_key_page = ChannelKeyPage::EnterName;
+    channel_key_notice[0] = '\0';
+}
+
+bool handle_channel_keys_key(std::uint32_t key) noexcept
+{
+    const bool escape = key == LV_KEY_ESC;
+    const bool back = key == LV_KEY_BACKSPACE || key == 0x08U;
+    const bool enter = key == LV_KEY_ENTER || key == '\r';
+
+    switch(channel_key_page) {
+    case ChannelKeyPage::List:
+        if(escape || back || key == LV_KEY_LEFT || key == LV_KEY_PREV) {
+            close_channel_keys();
+            return true;
+        }
+        if(key == LV_KEY_UP || key == LV_KEY_DOWN) {
+            const std::size_t rows = channel_key_row_count();
+            channel_key_selection = key == LV_KEY_DOWN
+                ? (channel_key_selection + 1U) % rows
+                : (channel_key_selection + rows - 1U) % rows;
+            channel_key_notice[0] = '\0';
+            build_current_screen();
+            return true;
+        }
+        if(enter) {
+            if(channel_key_selection < channel_keys.size()) {
+                channel_key_action_slot = channel_key_selection;
+                channel_key_action_selection = 0U;
+                channel_key_page = ChannelKeyPage::Actions;
+                channel_key_notice[0] = '\0';
+            } else if(channel_keys.full()) {
+                set_channel_key_notice(channelKeyResultLabel(ChannelKeyResult::StoreFull));
+            } else {
+                channel_key_renaming = false;
+                channel_key_name[0] = '\0';
+                channel_key_name_length = 0U;
+                wipe_channel_key_digits();
+                channel_key_page = ChannelKeyPage::EnterKey;
+                channel_key_notice[0] = '\0';
+            }
+            build_current_screen();
+            return true;
+        }
+        return true;
+
+    case ChannelKeyPage::Actions:
+        if(escape || back) {
+            channel_key_page = ChannelKeyPage::List;
+            channel_key_notice[0] = '\0';
+            build_current_screen();
+            return true;
+        }
+        if(key == LV_KEY_UP || key == LV_KEY_DOWN) {
+            channel_key_action_selection = channel_key_action_selection == 0U ? 1U : 0U;
+            build_current_screen();
+            return true;
+        }
+        if(enter) {
+            if(channel_key_action_selection == 0U) {
+                begin_channel_key_rename();
+            } else {
+                channel_key_remove_confirmed = false;
+                channel_key_page = ChannelKeyPage::ConfirmRemove;
+            }
+            build_current_screen();
+            return true;
+        }
+        return true;
+
+    case ChannelKeyPage::ConfirmRemove:
+        if(escape || back) {
+            channel_key_page = ChannelKeyPage::Actions;
+            build_current_screen();
+            return true;
+        }
+        if(key == LV_KEY_UP || key == LV_KEY_DOWN) {
+            channel_key_remove_confirmed = !channel_key_remove_confirmed;
+            build_current_screen();
+            return true;
+        }
+        if(enter) {
+            if(channel_key_remove_confirmed) {
+                remove_selected_channel_key();
+            } else {
+                channel_key_page = ChannelKeyPage::Actions;
+            }
+            channel_key_remove_confirmed = false;
+            build_current_screen();
+            return true;
+        }
+        return true;
+
+    case ChannelKeyPage::EnterKey:
+        if(escape) {
+            wipe_channel_key_digits();
+            channel_key_page = ChannelKeyPage::List;
+            channel_key_notice[0] = '\0';
+            build_current_screen();
+            return true;
+        }
+        if(back) {
+            if(channel_key_digit_count == 0U) {
+                channel_key_page = ChannelKeyPage::List;
+            } else {
+                channel_key_digits[--channel_key_digit_count] = '\0';
+            }
+            channel_key_notice[0] = '\0';
+            build_current_screen();
+            return true;
+        }
+        if(enter) {
+            if(channel_key_digit_count != kChannelKeyDigitCount) {
+                set_channel_key_notice("THE KEY NEEDS ALL 32 DIGITS");
+            } else {
+                channel_key_renaming = false;
+                channel_key_name[0] = '\0';
+                channel_key_name_length = 0U;
+                channel_key_page = ChannelKeyPage::EnterName;
+                channel_key_notice[0] = '\0';
+            }
+            build_current_screen();
+            return true;
+        }
+        if(key >= 32U && key < 127U) {
+            const char typed = static_cast<char>(key);
+            const bool hex = (typed >= '0' && typed <= '9') ||
+                             (typed >= 'a' && typed <= 'f') ||
+                             (typed >= 'A' && typed <= 'F');
+            if(!hex) {
+                set_channel_key_notice("DIGITS 0 TO 9 AND A TO F ONLY");
+            } else if(channel_key_digit_count == kChannelKeyDigitCount) {
+                set_channel_key_notice("THAT IS ALL 32 DIGITS");
+            } else {
+                channel_key_digits[channel_key_digit_count++] = typed;
+                channel_key_digits[channel_key_digit_count] = '\0';
+                channel_key_notice[0] = '\0';
+            }
+            build_current_screen();
+            return true;
+        }
+        return true;
+
+    case ChannelKeyPage::EnterName:
+        if(escape) {
+            // Cancelling a name must not throw away digits that were typed
+            // correctly, so a new key goes back to its entry step.
+            channel_key_page = channel_key_renaming ? ChannelKeyPage::Actions
+                                                    : ChannelKeyPage::EnterKey;
+            channel_key_notice[0] = '\0';
+            build_current_screen();
+            return true;
+        }
+        if(back) {
+            if(channel_key_name_length == 0U) {
+                channel_key_page = channel_key_renaming ? ChannelKeyPage::Actions
+                                                        : ChannelKeyPage::EnterKey;
+            } else {
+                channel_key_name[--channel_key_name_length] = '\0';
+            }
+            channel_key_notice[0] = '\0';
+            build_current_screen();
+            return true;
+        }
+        if(enter) {
+            commit_channel_key_name();
+            build_current_screen();
+            return true;
+        }
+        if(key >= 32U && key < 127U) {
+            if(channel_key_name_length + 1U < sizeof(channel_key_name)) {
+                channel_key_name[channel_key_name_length++] = static_cast<char>(key);
+                channel_key_name[channel_key_name_length] = '\0';
+                channel_key_notice[0] = '\0';
+            } else {
+                set_channel_key_notice("NAMES STOP AT 15 CHARACTERS");
+            }
+            build_current_screen();
+            return true;
+        }
+        return true;
+    }
+    return true;
+}
+
+void handle_channel_keys_touch(std::uint16_t x, std::uint16_t y) noexcept
+{
+    (void)x;
+    if(channel_key_page == ChannelKeyPage::List) {
+        if(y < static_cast<std::uint16_t>(kSettingsFirstY)) return;
+        const std::size_t row = (y - static_cast<std::uint16_t>(kSettingsFirstY)) /
+                                static_cast<std::uint16_t>(kChannelKeyRowH);
+        if(row >= channel_key_row_count()) return;
+        channel_key_selection = row;
+        (void)handle_channel_keys_key(LV_KEY_ENTER);
+        return;
+    }
+    if(channel_key_page == ChannelKeyPage::Actions ||
+       channel_key_page == ChannelKeyPage::ConfirmRemove) {
+        const lv_coord_t first = channel_key_page == ChannelKeyPage::Actions
+            ? kChannelKeyActionsFirstY : kChannelKeyConfirmFirstY;
+        if(y < static_cast<std::uint16_t>(first)) return;
+        const std::size_t row = (y - static_cast<std::uint16_t>(first)) /
+                                static_cast<std::uint16_t>(kChannelKeyActionRowH);
+        if(row > 1U) return;
+        if(channel_key_page == ChannelKeyPage::Actions) {
+            channel_key_action_selection = row;
+        } else {
+            channel_key_remove_confirmed = row == 1U;
+        }
+        (void)handle_channel_keys_key(LV_KEY_ENTER);
+        return;
+    }
+    // The entry pages are typed, not tapped; a stray touch must not commit a
+    // half-entered key.
+}
+
 void build_settings(lv_obj_t * parent)
 {
+    if(channel_keys_open) {
+        build_channel_keys(parent);
+        return;
+    }
 #if defined(LILYSHARK_DEVICE)
     add_status_bar(parent, "SETTINGS");
 #else
@@ -8056,6 +8671,21 @@ void build_settings(lv_obj_t * parent)
         theme::rule_line(parent, 6, y + kSettingsRowH - 1, 308, 1, theme::grid());
     }
     draw_back_strip(parent);
+    // The seven rows above run to the BACK strip, so the way into the channel
+    // keys is a chip beside it rather than an eighth row. It carries the count
+    // so the menu says how many keys the deck is holding without opening.
+    char chip[24]{};
+    if(channel_keys.empty()) {
+        std::snprintf(chip, sizeof(chip), "CHANNEL KEYS");
+    } else {
+        std::snprintf(chip, sizeof(chip), "CHANNEL KEYS %u",
+                      static_cast<unsigned>(channel_keys.size()));
+    }
+    draw_outline_rect(parent, kChannelKeyChipX, kEventBackY, kChannelKeyChipW, kEventBackH,
+                      theme::pink());
+    const lv_coord_t chip_width = static_cast<lv_coord_t>(std::strlen(chip) * 6);
+    put_label(parent, chip, kChannelKeyChipX + (kChannelKeyChipW - chip_width) / 2,
+              kEventBackY + 5, theme::pink(), &font_pixel_6x8);
 }
 
 void build_storage(lv_obj_t * parent)
@@ -9946,6 +10576,9 @@ bool handle_shell_navigation_key(std::uint32_t key)
                     onboarding_complete = false;
                     onboarding_save_failed = false;
                     reset_save_failed = false;
+                    // A deck being handed back or reset is a deck that must
+                    // stop holding somebody else's channel secrets.
+                    reset_channel_keys();
 #if defined(LILYSHARK_DEVICE)
                     set_backlight(app_settings.display_brightness);
                     keyboard_ready = set_keyboard_brightness(app_settings.keyboard_brightness);
@@ -10087,6 +10720,11 @@ bool handle_shell_navigation_key(std::uint32_t key)
                                 static_cast<int>(FieldTab::Count);
             open_field_tab(static_cast<FieldTab>(wrapped));
             return true;
+        } else if(route == ShellRoute::Settings) {
+            // Right is the way onto the channel key page the CHANNEL KEYS chip
+            // names; left is how the trackball comes back off it.
+            if(next) open_channel_keys();
+            return true;
         } else if(route == ShellRoute::OnboardingProfile) {
             const std::size_t count = onboarding_profile_count();
             onboarding_profile_selection = next
@@ -10207,6 +10845,12 @@ void handle_touch_tap(std::uint16_t x, std::uint16_t y)
             handle_navigation_key(LV_KEY_RIGHT);
         } else if(route == ShellRoute::About) {
             handle_navigation_key(LV_KEY_LEFT);
+        } else if(route == ShellRoute::Settings) {
+            // Only the CHANNEL KEYS chip does anything down here. The rest of
+            // the strip stays inert rather than being an invisible ENTER.
+            if(!channel_keys_open && x >= static_cast<std::uint16_t>(kChannelKeyChipX)) {
+                open_channel_keys();
+            }
         } else if(route != ShellRoute::DisplayInput) {
             handle_navigation_key(LV_KEY_ENTER);
         }
@@ -10304,6 +10948,9 @@ void handle_touch_tap(std::uint16_t x, std::uint16_t y)
             static_cast<std::uint16_t>(kSettingsRowH),
             builtinProfileCount());
         handle_navigation_key(LV_KEY_ENTER);
+        return;
+    } else if(route == ShellRoute::Settings && channel_keys_open) {
+        handle_channel_keys_touch(x, y);
         return;
     } else if(route == ShellRoute::Settings &&
               y >= static_cast<std::uint16_t>(kSettingsFirstY) &&
@@ -10883,6 +11530,12 @@ void handle_navigation_key(uint32_t key)
 {
     if (chat_open) {
         (void)handle_chat_key(key);
+        return;
+    }
+    // The channel key manager types names and 32-digit keys, so like Chat it
+    // takes the whole keyboard while it is open and hands it back on Back.
+    if (channel_keys_open && app_shell.route() == ShellRoute::Settings) {
+        (void)handle_channel_keys_key(key);
         return;
     }
     if ((key == 'c' || key == 'C' || key == 'm' || key == 'M') &&
@@ -11708,6 +12361,115 @@ bool run_simulator_interaction_test() noexcept
     handle_touch_tap(20, static_cast<std::uint16_t>(kEventBackY) + 8U);
     if(!expect_simulator_state(app_shell.route() == ShellRoute::Settings,
                                "Display BACK ESC chip must return to Settings")) return false;
+
+    // Channel keys: the whole point is that a key an operator was handed can be
+    // typed in, named, found again and taken away, without the key itself ever
+    // being readable back off the deck.
+    handle_touch_tap(static_cast<std::uint16_t>(kChannelKeyChipX + 8),
+                     static_cast<std::uint16_t>(kEventBackY) + 8U);
+    if(!expect_simulator_state(channel_keys_open && channel_keys.empty(),
+                               "the CHANNEL KEYS chip must open an empty key list")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::EnterKey,
+                               "the ADD A KEY row must open key entry")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::EnterKey &&
+                               channel_key_notice[0] != '\0',
+                               "an empty key must be refused with a reason")) return false;
+    handle_navigation_key('z');
+    if(!expect_simulator_state(channel_key_digit_count == 0U,
+                               "key entry must refuse anything that is not a hex digit")) return false;
+    const char *typed_key = "0123456789abcdeffedcba9876543210";
+    for(std::size_t index = 0; typed_key[index] != '\0'; ++index) {
+        handle_navigation_key(static_cast<std::uint32_t>(typed_key[index]));
+    }
+    if(!expect_simulator_state(channel_key_digit_count == 32U,
+                               "key entry must accept a full 32 digit key")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::EnterName,
+                               "a complete key must lead to naming it")) return false;
+    const char *typed_name = "FIELD TEAM";
+    for(std::size_t index = 0; typed_name[index] != '\0'; ++index) {
+        handle_navigation_key(static_cast<std::uint32_t>(typed_name[index]));
+    }
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::List &&
+                               channel_keys.size() == 1U &&
+                               channel_keys.name(0U) != nullptr &&
+                               std::strcmp(channel_keys.name(0U), "FIELD TEAM") == 0 &&
+                               channel_key_digit_count == 0U,
+                               "naming a key must store it and clear the typed digits")) {
+        return false;
+    }
+    {
+        // The stored key must be the bytes that were typed, and the payload
+        // reader must be able to open a channel sealed with it.
+        const std::uint8_t *stored = channel_keys.channelKeyBytes(0U);
+        std::uint8_t expected[kChannelKeySize]{};
+        if(!expect_simulator_state(stored != nullptr &&
+                                   parseChannelKeyHex(typed_key, expected, sizeof(expected)) &&
+                                   std::memcmp(stored, expected, sizeof(expected)) == 0,
+                                   "a stored key must be exactly the digits typed")) {
+            return false;
+        }
+    }
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::Actions,
+                               "a stored key row must offer rename and remove")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::EnterName &&
+                               channel_key_renaming &&
+                               std::strcmp(channel_key_name, "FIELD TEAM") == 0,
+                               "rename must start from the existing name")) return false;
+    handle_navigation_key(0x08U);
+    handle_navigation_key(0x08U);
+    handle_navigation_key(0x08U);
+    handle_navigation_key(0x08U);
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::EnterName &&
+                               channel_key_notice[0] != '\0' &&
+                               std::strcmp(channel_keys.name(0U), "FIELD TEAM") == 0,
+                               "a name ending in a space must be refused and change nothing")) {
+        return false;
+    }
+    handle_navigation_key(0x08U);
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::List &&
+                               channel_keys.name(0U) != nullptr &&
+                               std::strcmp(channel_keys.name(0U), "FIELD") == 0,
+                               "an accepted rename must replace the stored name")) {
+        return false;
+    }
+    handle_navigation_key(LV_KEY_ENTER);
+    handle_navigation_key(LV_KEY_DOWN);
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::ConfirmRemove &&
+                               !channel_key_remove_confirmed,
+                               "removing a key must ask, and must default to keeping it")) {
+        return false;
+    }
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::Actions &&
+                               channel_keys.size() == 1U,
+                               "the safe removal default must keep the key")) return false;
+    handle_navigation_key(LV_KEY_ENTER);
+    handle_navigation_key(LV_KEY_DOWN);
+    handle_navigation_key(LV_KEY_ENTER);
+    if(!expect_simulator_state(channel_key_page == ChannelKeyPage::List &&
+                               channel_keys.empty(),
+                               "a confirmed removal must take the key away")) return false;
+    handle_navigation_key(LV_KEY_ESC);
+    if(!expect_simulator_state(!channel_keys_open &&
+                               app_shell.route() == ShellRoute::Settings,
+                               "Back from the key list must return to the Settings menu")) {
+        return false;
+    }
+    handle_navigation_key(LV_KEY_RIGHT);
+    if(!expect_simulator_state(channel_keys_open,
+                               "right on the Settings menu must open the key list")) return false;
+    handle_navigation_key(LV_KEY_LEFT);
+    if(!expect_simulator_state(!channel_keys_open,
+                               "left must come back off the key list")) return false;
 
     app_shell.setSettingsSelection(static_cast<std::size_t>(SettingsItem::ResetSetup));
     handle_navigation_key(LV_KEY_ENTER);
@@ -12631,7 +13393,7 @@ bool run_simulator_render_test() noexcept
         0xa066240e572f0e6aULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
         0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0xadef2eb28eb36c85ULL,
-        0x7e1363de7108f530ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
+        0x88a5b508b56dff44ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
         0xde0a7b1d16ecf53aULL, 0x7ed210334475e24aULL, 0x14f80c364b5d4568ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
     }};
@@ -14190,6 +14952,9 @@ void setup()
     // Conversations survive a power cycle; losing them on every reboot made the
     // chat feel like a toy rather than a log of what was said in the field.
     (void)load_chat_log();
+    // Channel keys the operator typed survive a power cycle too; a key that
+    // had to be re-entered after every reboot would not be worth entering.
+    (void)load_channel_keys();
     // Minted once and kept: this key is how peers address us privately.
     Serial.printf("Lilyshark identity: %s\n",
                   load_or_create_pkc_identity() ? "public key ready" : "channel key only");
