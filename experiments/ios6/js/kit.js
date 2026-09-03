@@ -880,7 +880,7 @@
         ctx.shadowColor = "rgba(40,48,58,0.38)";
         ctx.shadowBlur = 4.4;
         // Zach/Mamma: outgoing shadow falls right, incoming falls left.
-        ctx.shadowOffsetX = incoming ? -0.8 : 0.8;
+        ctx.shadowOffsetX = incoming ? -1.4 : 0.8;
         ctx.shadowOffsetY = 2.1;
         balloonPath(ctx, x, y, width, height, mine, radius);
         const fill = ctx.createLinearGradient(x, y, x, y + height);
@@ -900,17 +900,17 @@
         // Incoming grey needs a cooler silver wash so it does not read as paper.
         if (incoming) {
             const silver = ctx.createLinearGradient(x, y, x, y + height);
-            silver.addColorStop(0, "rgba(236,236,238,0.10)");
-            silver.addColorStop(0.38, "rgba(214,214,216,0.16)");
-            silver.addColorStop(0.72, "rgba(196,196,198,0.22)");
-            silver.addColorStop(1, "rgba(168,168,172,0.26)");
+            silver.addColorStop(0, "rgba(236,236,238,0.08)");
+            silver.addColorStop(0.38, "rgba(220,220,222,0.12)");
+            silver.addColorStop(0.72, "rgba(204,204,206,0.16)");
+            silver.addColorStop(1, "rgba(180,180,184,0.18)");
             ctx.fillStyle = silver;
             ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
             const wall = ctx.createLinearGradient(x, y, x + width, y);
-            wall.addColorStop(0, "rgba(148,150,154,0.14)");
+            wall.addColorStop(0, "rgba(148,150,154,0.10)");
             wall.addColorStop(0.14, "rgba(148,150,154,0)");
             wall.addColorStop(0.86, "rgba(148,150,154,0)");
-            wall.addColorStop(1, "rgba(148,150,154,0.12)");
+            wall.addColorStop(1, "rgba(148,150,154,0.08)");
             ctx.fillStyle = wall;
             ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
         }
@@ -932,7 +932,7 @@
         ctx.fillRect(x + 10, y + 2.2, width - 20, 1);
         const shade = ctx.createLinearGradient(x, y + height * 0.68, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");
-        shade.addColorStop(1, incoming ? "rgba(48,48,52,0.22)" : "rgba(20,40,80,0.18)");
+        shade.addColorStop(1, incoming ? "rgba(48,48,52,0.16)" : "rgba(20,40,80,0.18)");
         ctx.fillStyle = shade;
         ctx.fillRect(x - 10, y + height * 0.70, width + 20, height * 0.30);
         ctx.restore();
