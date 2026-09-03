@@ -620,8 +620,19 @@ function App() {
         </button>
         <span className="spacer" />
         {connected ? (
-          <button className="primary" onClick={stopAndForget}>
-            {t("DISCONNECT")}
+          <button
+            className="primary"
+            title={t("Open this device's telemetry — disconnect from the status pill")}
+            onClick={() => {
+              setNodeFocus(undefined);
+              setMapFocus(undefined);
+              setMenuOpen(false);
+              setTab("TELEMETRY");
+            }}
+          >
+            {s.myNodeNum !== undefined
+              ? `!${s.myNodeNum.toString(16).padStart(8, "0")} · ${/t-deck/i.test(s.deviceInfo?.model ?? "") ? "T-DECK" : (s.deviceInfo?.model?.split(" ")[0]?.toUpperCase() ?? "RADIO")}`
+              : t("LINKED")}
           </button>
         ) : lilyLinked ? (
           <button className="primary" onClick={() => void onLilyDisconnect()}>
@@ -640,18 +651,22 @@ function App() {
         ) : (
           <button
             className="primary"
-            onClick={() => {
-              landOnLilyRef.current = true;
-              void connectDeviceLink();
-            }}
+            onClick={() => setConnectOpen(true)}
           >
             {t("CONNECT")}
           </button>
         )}
-        {!connected && !lilyLinked && !connecting && !lilyConnecting && (
-          <button onClick={() => setConnectOpen(true)}>OTHER RADIO</button>
-        )}
-        <div className="conn-pill">
+        <div
+          className="conn-pill"
+          role="button"
+          tabIndex={0}
+          style={{ cursor: "pointer" }}
+          title={t("Connection details")}
+          onClick={() => setConnectOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") setConnectOpen(true);
+          }}
+        >
           <span className={`led ${ledClass}`} />
           <span
             className={
@@ -703,6 +718,18 @@ function App() {
             </div>
           </div>
           <div className="sheet-actions">
+            {(connected || lilyLinked) && (
+              <button
+                className="primary"
+                onClick={() => {
+                  setConnectOpen(false);
+                  if (connected) stopAndForget();
+                  else void onLilyDisconnect();
+                }}
+              >
+                {t("DISCONNECT")}
+              </button>
+            )}
             <button
               className="primary"
               disabled={!hasSerial}

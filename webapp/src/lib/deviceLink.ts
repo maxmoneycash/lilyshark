@@ -662,14 +662,20 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'connection failed';
+    // Closing the picker without choosing is a decision, not a failure --
+    // recording it as an error left "no device chosen" pinned under the
+    // header for the rest of the session, including after a different
+    // transport connected fine.
+    if (/No port selected/i.test(message)) {
+      set({ status: 'off', canPick: true, error: undefined });
+      return;
+    }
     set({
       status: 'error',
       canPick: true,
-      error: /No port selected/i.test(message)
-        ? 'no device chosen'
-        : /Failed to open/i.test(message)
-          ? 'port is busy — close other lilyshark.com tabs or serial monitors, then retry'
-          : message,
+      error: /Failed to open/i.test(message)
+        ? 'port is busy — close other lilyshark.com tabs or serial monitors, then retry'
+        : message,
     });
   }
 }
