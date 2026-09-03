@@ -930,17 +930,17 @@
         // Incoming grey needs a cooler silver wash so it does not read as paper.
         if (incoming) {
             const silver = ctx.createLinearGradient(x, y, x, y + height);
-            silver.addColorStop(0, "rgba(236,236,238,0.08)");
-            silver.addColorStop(0.38, "rgba(220,220,222,0.12)");
-            silver.addColorStop(0.72, "rgba(204,204,206,0.16)");
-            silver.addColorStop(1, "rgba(180,180,184,0.18)");
+            silver.addColorStop(0, "rgba(224,224,226,0.12)");
+            silver.addColorStop(0.38, "rgba(208,208,210,0.16)");
+            silver.addColorStop(0.72, "rgba(188,188,190,0.20)");
+            silver.addColorStop(1, "rgba(168,168,172,0.22)");
             ctx.fillStyle = silver;
             ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
             const wall = ctx.createLinearGradient(x, y, x + width, y);
-            wall.addColorStop(0, "rgba(148,150,154,0.10)");
+            wall.addColorStop(0, "rgba(148,150,154,0.12)");
             wall.addColorStop(0.14, "rgba(148,150,154,0)");
             wall.addColorStop(0.86, "rgba(148,150,154,0)");
-            wall.addColorStop(1, "rgba(148,150,154,0.08)");
+            wall.addColorStop(1, "rgba(148,150,154,0.10)");
             ctx.fillStyle = wall;
             ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
         } else if (!sms) {
@@ -959,14 +959,14 @@
         ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.66, x - 4, y + height * 0.34);
         ctx.closePath();
         const shine = ctx.createLinearGradient(x, y, x, y + height * 0.54);
-        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.88)");
-        shine.addColorStop(0.42, incoming ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.40)");
+        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.58)" : "rgba(255,255,255,0.88)");
+        shine.addColorStop(0.42, incoming ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.40)");
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
-        ctx.fillStyle = incoming ? "rgba(255,255,255,0.78)" : "rgba(236,240,252,0.70)";
+        ctx.fillStyle = incoming ? "rgba(255,255,255,0.52)" : "rgba(236,240,252,0.70)";
         ctx.fillRect(x + 8, y + 1, width - 16, 1.2);
-        ctx.fillStyle = incoming ? "rgba(228,228,230,0.48)" : "rgba(255,255,255,0.58)";
+        ctx.fillStyle = incoming ? "rgba(228,228,230,0.36)" : "rgba(255,255,255,0.58)";
         ctx.fillRect(x + 10, y + 2.2, width - 20, 1);
         const shade = ctx.createLinearGradient(x, y + height * 0.68, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");

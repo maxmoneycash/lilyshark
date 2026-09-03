@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 87,
-  "stop_after_pass": 140,
+  "pass": 88,
+  "stop_after_pass": 142,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -113,7 +113,8 @@
     "ios6-send-royal-crown",
     "ios6-nav-stamped-inset",
     "ios6-messages-icon-white-oval",
-    "ios6-outgoing-royal-wash"
+    "ios6-outgoing-royal-wash",
+    "ios6-incoming-quieter-crown"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -148,5 +149,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 87: outgoing iMessage balloons get a royal wash so the crown reads closer to Zach #b5cff8, not icy frozen BlueTop. SMS and incoming unchanged. Frozen kIos6*/kChat* unchanged. Bubble text stays black. Raised stop_after_pass to 140 because this pass made visual progress."
+  "notes": "Pass 88: incoming balloon crown shine is quieter so the silver body can read as Zach #e7e7e8/#dbdbdb instead of paper-white. Frozen Gray* stay put. Bubble text stays black. Raised stop_after_pass to 142 because this pass made visual progress."
 }
