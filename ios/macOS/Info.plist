@@ -17,10 +17,29 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.mbedworth.meshcore</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>meshcore</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.social-networking</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>PommeCore needs Bluetooth to communicate with your LoRa radio device.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PommeCore shows your location on the mesh map and can include it in your advertisements.</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Michael Bedworth. All rights reserved.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
