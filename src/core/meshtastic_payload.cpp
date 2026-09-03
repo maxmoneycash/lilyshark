@@ -226,6 +226,9 @@ bool parseUser(const std::uint8_t *bytes, std::size_t length, MeshtasticPayload 
                 (void)copyName(parsed.long_name, sizeof(parsed.long_name), bytes + cursor, size);
             } else if (field == 3U) {
                 (void)copyName(parsed.short_name, sizeof(parsed.short_name), bytes + cursor, size);
+            } else if (field == 8U && size == sizeof(parsed.public_key)) {
+                std::memcpy(parsed.public_key, bytes + cursor, sizeof(parsed.public_key));
+                parsed.has_public_key = true;
             }
             cursor += size;
         } else if (!skipField(bytes, length, cursor, wire)) {
@@ -317,29 +320,14 @@ const char *meshtasticPortLabel(std::uint16_t portnum) noexcept
     return fallback;
 }
 
-bool readMeshtasticPayload(const std::uint8_t *ciphertext,
-                           std::size_t length,
-                           std::uint32_t from_node,
-                           std::uint32_t packet_id,
-                           MeshtasticPayload &out) noexcept
+/// Parse an already-decrypted Data message. Split out of
+/// readMeshtasticPayload so a payload that arrived under a different lock --
+/// a public-key private message, say -- is read by exactly the same strict
+/// parser, and cannot become a second, laxer definition of "a message".
+bool parseMeshtasticData(const std::uint8_t *plain, std::size_t length,
+                         MeshtasticPayload &out) noexcept
 {
-    if (ciphertext == nullptr || length == 0 || length > kMaxCiphertext) return false;
-
-    // CryptoEngine::initNonce — the packet id occupies a 64-bit slot, so the
-    // upper four bytes are zero for every packet a radio actually sends.
-    std::uint8_t nonce[crypto::kAesBlockSize]{};
-    nonce[0] = static_cast<std::uint8_t>(packet_id & 0xffU);
-    nonce[1] = static_cast<std::uint8_t>((packet_id >> 8U) & 0xffU);
-    nonce[2] = static_cast<std::uint8_t>((packet_id >> 16U) & 0xffU);
-    nonce[3] = static_cast<std::uint8_t>((packet_id >> 24U) & 0xffU);
-    nonce[8] = static_cast<std::uint8_t>(from_node & 0xffU);
-    nonce[9] = static_cast<std::uint8_t>((from_node >> 8U) & 0xffU);
-    nonce[10] = static_cast<std::uint8_t>((from_node >> 16U) & 0xffU);
-    nonce[11] = static_cast<std::uint8_t>((from_node >> 24U) & 0xffU);
-
-    std::uint8_t plain[kMaxCiphertext];
-    crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, ciphertext, length, plain);
-
+    if (plain == nullptr || length == 0) return false;
     // Parse the Data message strictly. Anything unexpected means this was not
     // default-key traffic, and the caller must keep treating it as opaque.
     MeshtasticPayload parsed{};
@@ -408,6 +396,32 @@ bool readMeshtasticPayload(const std::uint8_t *ciphertext,
 
     out = parsed;
     return true;
+}
+
+bool readMeshtasticPayload(const std::uint8_t *ciphertext,
+                           std::size_t length,
+                           std::uint32_t from_node,
+                           std::uint32_t packet_id,
+                           MeshtasticPayload &out) noexcept
+{
+    if (ciphertext == nullptr || length == 0 || length > kMaxCiphertext) return false;
+
+    // CryptoEngine::initNonce — the packet id occupies a 64-bit slot, so the
+    // upper four bytes are zero for every packet a radio actually sends.
+    std::uint8_t nonce[crypto::kAesBlockSize]{};
+    nonce[0] = static_cast<std::uint8_t>(packet_id & 0xffU);
+    nonce[1] = static_cast<std::uint8_t>((packet_id >> 8U) & 0xffU);
+    nonce[2] = static_cast<std::uint8_t>((packet_id >> 16U) & 0xffU);
+    nonce[3] = static_cast<std::uint8_t>((packet_id >> 24U) & 0xffU);
+    nonce[8] = static_cast<std::uint8_t>(from_node & 0xffU);
+    nonce[9] = static_cast<std::uint8_t>((from_node >> 8U) & 0xffU);
+    nonce[10] = static_cast<std::uint8_t>((from_node >> 16U) & 0xffU);
+    nonce[11] = static_cast<std::uint8_t>((from_node >> 24U) & 0xffU);
+
+    std::uint8_t plain[kMaxCiphertext];
+    crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, ciphertext, length, plain);
+
+    return parseMeshtasticData(plain, length, out);
 }
 
 } // namespace lilyshark

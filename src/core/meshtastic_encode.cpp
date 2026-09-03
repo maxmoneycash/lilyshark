@@ -80,16 +80,37 @@ bool writePositionPayload(std::uint8_t *out, std::size_t cap, std::size_t &used,
 
 bool writeUserPayload(std::uint8_t *out, std::size_t cap, std::size_t &used,
                       std::uint32_t node_num, const char *long_name,
-                      const char *short_name) noexcept
+                      const char *short_name,
+                      const MeshtasticPkcKeypair *identity) noexcept
 {
     char id[12]{};
     std::snprintf(id, sizeof(id), "!%08x", static_cast<unsigned>(node_num));
-    return writeStringField(out, cap, used, 1, id) &&
-           writeStringField(out, cap, used, 2, long_name) &&
-           writeStringField(out, cap, used, 3, short_name);
+    if (!writeStringField(out, cap, used, 1, id) ||
+        !writeStringField(out, cap, used, 2, long_name) ||
+        !writeStringField(out, cap, used, 3, short_name)) {
+        return false;
+    }
+    // Publishing the public key is what lets anyone reply privately. Without
+    // it in our NodeInfo, every peer can only answer under the channel key.
+    if (identity != nullptr) {
+        return writeBytesField(out, cap, used, 8, identity->public_key,
+                               sizeof(identity->public_key));
+    }
+    return true;
 }
 
 } // namespace
+
+bool meshtasticRequestUsesPkc(const MeshtasticEncodeRequest &request) noexcept
+{
+    // Stock firmware keeps traceroute, nodeinfo, routing and position on the
+    // channel key even for direct messages, because those are how nodes find
+    // and acknowledge each other -- sealing them would hide the mesh from
+    // itself. Text is the message a person actually meant to be private.
+    return request.identity != nullptr && request.peer_public_key != nullptr &&
+           request.port == MeshtasticPort::TextMessage &&
+           request.to_node != 0xffffffffU && request.to_node != 0U;
+}
 
 std::uint8_t meshtasticChannelHash(const char *name, const std::uint8_t *psk,
                                    std::size_t psk_length) noexcept
@@ -130,7 +151,7 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
         std::uint8_t user[96]{};
         std::size_t user_used = 0;
         if (!writeUserPayload(user, sizeof(user), user_used, request.from_node, request.long_name,
-                              request.short_name)) {
+                              request.short_name, request.identity)) {
             return 0;
         }
         if (!writeTag(inner, sizeof(inner), inner_used, 1, 0) ||
@@ -158,7 +179,9 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
         return 0;
     }
 
-    if (kHeader + data_used > out_size) return 0;
+    const bool pkc = meshtasticRequestUsesPkc(request);
+    const std::size_t sealed = data_used + (pkc ? kMeshtasticPkcOverhead : 0U);
+    if (kHeader + sealed > out_size) return 0;
 
     writeLe32(out, request.to_node);
     writeLe32(out + 4, request.from_node);
@@ -166,13 +189,28 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
     const std::uint8_t hop = static_cast<std::uint8_t>(request.hop_limit & 0x07U);
     out[12] = static_cast<std::uint8_t>(hop | (request.want_ack ? 0x08U : 0U) |
                                         static_cast<std::uint8_t>(hop << 5U));
-    out[13] = meshtasticChannelHash(request.channel_name != nullptr
-                                        ? request.channel_name
-                                        : kMeshtasticDefaultChannelName,
-                                    kMeshtasticDefaultPsk,
-                                    sizeof(kMeshtasticDefaultPsk));
+    // A zero channel byte is how a public-key message announces itself: no
+    // channel hash can be zero for a named channel, so stock firmware reads
+    // it as "this one is sealed to a person, not to a channel".
+    out[13] = pkc ? 0U
+                  : meshtasticChannelHash(request.channel_name != nullptr
+                                              ? request.channel_name
+                                              : kMeshtasticDefaultChannelName,
+                                          kMeshtasticDefaultPsk,
+                                          sizeof(kMeshtasticDefaultPsk));
     out[14] = 0;
     out[15] = 0;
+
+    if (pkc) {
+        std::size_t written = 0;
+        if (!meshtasticPkcEncryptDm(*request.identity, request.peer_public_key,
+                                    request.from_node, request.packet_id,
+                                    request.extra_nonce, data, data_used,
+                                    out + kHeader, out_size - kHeader, &written)) {
+            return 0;
+        }
+        return kHeader + written;
+    }
 
     std::uint8_t nonce[crypto::kAesBlockSize]{};
     nonce[0] = static_cast<std::uint8_t>(request.packet_id);

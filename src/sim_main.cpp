@@ -239,6 +239,49 @@ struct NetRumourNode {
     std::uint32_t heard_ms = 0;
 };
 std::array<NetRumourNode, 16> net_rumour_nodes{};
+
+// Our Curve25519 identity, and the public keys peers have published in their
+// NodeInfo. A direct message can only be sealed to someone whose key we hold;
+// everyone else still gets the channel-key message they can read, because a
+// message nobody can open is worse than one the channel can.
+::lilyshark::MeshtasticPkcKeypair pkc_identity{};
+bool pkc_identity_ready = false;
+struct PeerPublicKey {
+    std::uint32_t node = 0;
+    std::uint8_t key[32]{};
+};
+std::array<PeerPublicKey, 12> peer_public_keys{};
+
+/// The key we hold for `node`, or nullptr when we have never heard its
+/// NodeInfo carry one.
+const std::uint8_t *peer_public_key_for(std::uint32_t node) noexcept
+{
+    if (node == 0U || node == 0xffffffffU) return nullptr;
+    for (const PeerPublicKey &entry : peer_public_keys) {
+        if (entry.node == node) return entry.key;
+    }
+    return nullptr;
+}
+
+void remember_peer_public_key(std::uint32_t node, const std::uint8_t *key) noexcept
+{
+    if (node == 0U || node == 0xffffffffU || key == nullptr) return;
+    PeerPublicKey *slot = nullptr;
+    for (PeerPublicKey &entry : peer_public_keys) {
+        if (entry.node == node) { slot = &entry; break; }
+    }
+    if (slot == nullptr) {
+        for (PeerPublicKey &entry : peer_public_keys) {
+            if (entry.node == 0U) { slot = &entry; break; }
+        }
+    }
+    // Full: the first slot goes. Twelve correspondents is far past what one
+    // channel carries, and losing the oldest key only costs a channel-key
+    // message next time.
+    if (slot == nullptr) slot = &peer_public_keys[0];
+    slot->node = node;
+    std::memcpy(slot->key, key, sizeof(slot->key));
+}
 lv_obj_t * root = nullptr;
 #if defined(LILYSHARK_DEVICE)
 static uint8_t * spectrum_buffer = nullptr;
@@ -8908,13 +8951,41 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
     }
     const FrameRecord *stored = capture_runtime.frames().newest();
     if(stored != nullptr) (void)rolling_diagnostics.ingest(*stored);
+    // A message sealed to us alone arrives with a zero channel byte and a
+    // body no channel key opens. If we hold the sender's public key, this is
+    // the only place it can be read -- and once read it joins the same
+    // pipeline as everything else, so being private changes who can see a
+    // message, never how the deck treats it.
+    bool pkc_opened = false;
+    static std::uint8_t pkc_plain[256];
+    std::size_t pkc_plain_length = 0;
     if(stored != nullptr && stored->decoded.protocol == ProtocolId::Meshtastic &&
-       stored->decoded.hasAttribute(AttributeDefaultKeyReadable) &&
+       !stored->decoded.hasAttribute(AttributeDefaultKeyReadable) &&
+       stored->raw.rf.direction != FrameDirection::Transmit &&
+       stored->decoded.channel == 0U && pkc_identity_ready &&
+       stored->decoded.destination == localMeshtasticNodeNum() &&
+       stored->decoded.payload_length > ::lilyshark::kMeshtasticPkcOverhead) {
+        const std::uint8_t *peer = peer_public_key_for(stored->decoded.source);
+        if(peer != nullptr) {
+            pkc_opened = ::lilyshark::meshtasticPkcDecryptDm(
+                pkc_identity, peer, stored->decoded.source, stored->decoded.packet_id,
+                stored->raw.bytes + stored->decoded.payload_offset,
+                stored->decoded.payload_length, pkc_plain, sizeof(pkc_plain),
+                &pkc_plain_length);
+        }
+    }
+    if(stored != nullptr && stored->decoded.protocol == ProtocolId::Meshtastic &&
+       (stored->decoded.hasAttribute(AttributeDefaultKeyReadable) || pkc_opened) &&
        stored->raw.rf.direction != FrameDirection::Transmit) {
         MeshtasticPayload chat_payload{};
-        if(readMeshtasticPayload(stored->raw.bytes + stored->decoded.payload_offset,
-                                 stored->decoded.payload_length, stored->decoded.source,
-                                 stored->decoded.packet_id, chat_payload)) {
+        const bool readable =
+            pkc_opened
+                ? ::lilyshark::parseMeshtasticData(pkc_plain, pkc_plain_length, chat_payload)
+                : readMeshtasticPayload(stored->raw.bytes + stored->decoded.payload_offset,
+                                        stored->decoded.payload_length,
+                                        stored->decoded.source,
+                                        stored->decoded.packet_id, chat_payload);
+        if(readable) {
             char from[8]{};
             if(chat_payload.has_names && chat_payload.short_name[0] != '\0') {
                 std::snprintf(from, sizeof(from), "%.7s", chat_payload.short_name);
@@ -8925,6 +8996,12 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
             if (chat_payload.has_names &&
                 stored->decoded.source != localMeshtasticNodeNum()) {
                 chat_remember_peer(stored->decoded.source, chat_payload.short_name);
+            }
+            // A peer publishing its public key is the moment private replies
+            // to it become possible at all.
+            if (chat_payload.has_public_key &&
+                stored->decoded.source != localMeshtasticNodeNum()) {
+                remember_peer_public_key(stored->decoded.source, chat_payload.public_key);
             }
 #if defined(LILYSHARK_DEVICE)
             if (stored->raw.rf.direction != FrameDirection::Transmit) {
@@ -9250,6 +9327,46 @@ bool ensure_preferences_ready() noexcept
     if(profile_preferences_ready) return true;
     profile_preferences_ready = profile_preferences.begin("lilyshark", false);
     return profile_preferences_ready;
+}
+
+/// Our Curve25519 identity: loaded from NVS, or minted once from hardware
+/// randomness and kept forever after. The key IS the identity -- regenerating
+/// it every boot would mean every peer's stored copy goes stale and private
+/// replies silently stop arriving, so a failure to persist is a failure to
+/// have an identity at all.
+bool load_or_create_pkc_identity() noexcept
+{
+    if(!ensure_preferences_ready()) return false;
+    if(profile_preferences.getBytesLength("pkc") == sizeof(pkc_identity) &&
+       profile_preferences.getBytes("pkc", &pkc_identity, sizeof(pkc_identity)) ==
+           sizeof(pkc_identity)) {
+        pkc_identity_ready = true;
+        return true;
+    }
+    std::uint8_t entropy[32]{};
+#if defined(ESP_PLATFORM)
+    // esp_random is the hardware RNG; it is only properly seeded once the RF
+    // subsystem is up, which it is by the time settings load.
+    for(std::size_t index = 0; index < sizeof(entropy); index += 4U) {
+        const std::uint32_t word = esp_random();
+        entropy[index] = static_cast<std::uint8_t>(word);
+        entropy[index + 1U] = static_cast<std::uint8_t>(word >> 8U);
+        entropy[index + 2U] = static_cast<std::uint8_t>(word >> 16U);
+        entropy[index + 3U] = static_cast<std::uint8_t>(word >> 24U);
+    }
+#else
+    return false;
+#endif
+    if(!::lilyshark::meshtasticPkcGenerateKeypair(entropy, pkc_identity)) return false;
+    if(profile_preferences.putBytes("pkc", &pkc_identity, sizeof(pkc_identity)) !=
+       sizeof(pkc_identity)) {
+        // An identity that cannot be stored must not be used: peers would
+        // cache a key this deck forgets at the next power cycle.
+        pkc_identity = ::lilyshark::MeshtasticPkcKeypair{};
+        return false;
+    }
+    pkc_identity_ready = true;
+    return true;
 }
 
 bool write_app_settings() noexcept
@@ -14073,6 +14190,9 @@ void setup()
     // Conversations survive a power cycle; losing them on every reboot made the
     // chat feel like a toy rather than a log of what was said in the field.
     (void)load_chat_log();
+    // Minted once and kept: this key is how peers address us privately.
+    Serial.printf("Lilyshark identity: %s\n",
+                  load_or_create_pkc_identity() ? "public key ready" : "channel key only");
     onboarding_complete = app_settings_loaded && app_settings.onboarding_complete;
 
     lv_init();
@@ -14301,6 +14421,18 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to
     // node in earshot drop us on arrival.
     request.channel_name = meshtasticDefaultChannelName(
         shell_active_profile().spreading_factor, shell_active_profile().bandwidth_hz);
+    // Seal it to the recipient when both halves exist: our identity, and a
+    // key they published. Otherwise this stays a channel-key message that
+    // everyone on the channel can read -- the honest fallback, and what the
+    // whole mesh did before public keys existed.
+    if (pkc_identity_ready) {
+        request.identity = &pkc_identity;
+        const std::uint8_t *peer = peer_public_key_for(to_node);
+        if (peer != nullptr) {
+            request.peer_public_key = peer;
+            request.extra_nonce = next_meshtastic_packet_id();
+        }
+    }
     // A direct text asks the peer's radio to confirm receipt; official
     // firmware answers a want-ack packet with a Routing acknowledgement, and
     // so do we. Broadcasts stay fire-and-forget like the rest of the channel.

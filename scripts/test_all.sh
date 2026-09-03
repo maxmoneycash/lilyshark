@@ -186,6 +186,10 @@ build_and_run simulate_source \
 
 build_and_run meshtastic_payload \
   src/crypto/aes128.cpp \
+  src/crypto/aes_ccm.cpp \
+  src/crypto/curve25519.cpp \
+  src/crypto/sha256.cpp \
+  src/core/meshtastic_pkc.cpp \
   src/core/meshtastic_payload.cpp \
   src/core/meshtastic_encode.cpp \
   src/core/mesh_identity.cpp \

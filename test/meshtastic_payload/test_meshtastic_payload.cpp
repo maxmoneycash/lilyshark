@@ -14,6 +14,7 @@
 #include "lilyshark/crypto/aes128.h"
 #include "lilyshark/protocols/meshtastic_encode.h"
 #include "lilyshark/protocols/meshtastic_payload.h"
+#include "lilyshark/protocols/meshtastic_pkc.h"
 
 using namespace lilyshark;
 
@@ -436,9 +437,91 @@ void testTruncatedTelemetryIsNeverHalfRead()
     }
 }
 
+void testPrivateMessageIsSealedAndOpensOnlyForItsRecipient()
+{
+    // Two identities, and the message one sends the other must be readable
+    // by that other and by nobody holding only the channel key.
+    std::uint8_t alice_entropy[32];
+    std::uint8_t bob_entropy[32];
+    for (std::size_t i = 0; i < 32; ++i) {
+        alice_entropy[i] = static_cast<std::uint8_t>(0x11 + i);
+        bob_entropy[i] = static_cast<std::uint8_t>(0xa0 + i);
+    }
+    MeshtasticPkcKeypair alice{};
+    MeshtasticPkcKeypair bob{};
+    assert(meshtasticPkcGenerateKeypair(alice_entropy, alice));
+    assert(meshtasticPkcGenerateKeypair(bob_entropy, bob));
+
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0xcda172e0U;
+    request.to_node = 0x96f61b44U;
+    request.packet_id = 0x11223344U;
+    request.port = MeshtasticPort::TextMessage;
+    request.text = "meet at the gate";
+    request.identity = &alice;
+    request.peer_public_key = bob.public_key;
+    request.extra_nonce = 0x55667788U;
+    assert(meshtasticRequestUsesPkc(request));
+
+    std::uint8_t frame[256]{};
+    const std::size_t length = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(length > 16);
+    // The zero channel byte is how the air says "sealed to a person".
+    assert(frame[13] == 0);
+
+    // The channel key must NOT open it: that is the whole point.
+    MeshtasticPayload leaked{};
+    assert(!readMeshtasticPayload(frame + 16, length - 16, request.from_node,
+                                  request.packet_id, leaked));
+
+    // Bob's key does open it, and yields the same strict Data parse.
+    std::uint8_t plain[256]{};
+    std::size_t plain_length = 0;
+    assert(meshtasticPkcDecryptDm(bob, alice.public_key, request.from_node,
+                                  request.packet_id, frame + 16, length - 16,
+                                  plain, sizeof(plain), &plain_length));
+    MeshtasticPayload opened{};
+    assert(parseMeshtasticData(plain, plain_length, opened));
+    assert(opened.has_text);
+    assert(std::strcmp(opened.text, "meet at the gate") == 0);
+
+    // A broadcast is never sealed -- everyone on the channel must read it.
+    MeshtasticEncodeRequest broadcast = request;
+    broadcast.to_node = 0xffffffffU;
+    assert(!meshtasticRequestUsesPkc(broadcast));
+}
+
+void testOurPublicKeyRidesOurNodeInfo()
+{
+    std::uint8_t entropy[32];
+    for (std::size_t i = 0; i < 32; ++i) entropy[i] = static_cast<std::uint8_t>(i + 3);
+    MeshtasticPkcKeypair ours{};
+    assert(meshtasticPkcGenerateKeypair(entropy, ours));
+
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0xcda172e0U;
+    request.packet_id = 7;
+    request.port = MeshtasticPort::NodeInfo;
+    request.long_name = "Lilyshark";
+    request.short_name = "LSK";
+    request.identity = &ours;
+    std::uint8_t frame[256]{};
+    const std::size_t length = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(length > 16);
+
+    MeshtasticPayload parsed{};
+    assert(readMeshtasticPayload(frame + 16, length - 16, request.from_node,
+                                 request.packet_id, parsed));
+    // Without this field in our NodeInfo nobody can ever reply privately.
+    assert(parsed.has_public_key);
+    assert(std::memcmp(parsed.public_key, ours.public_key, 32) == 0);
+}
+
 int main()
 {
     testFips197BlockVector();
+    testPrivateMessageIsSealedAndOpensOnlyForItsRecipient();
+    testOurPublicKeyRidesOurNodeInfo();
     testWantAckBitReachesTheHeader();
     testDeviceTelemetryIsRead();
     testEnvironmentTelemetryIsRead();

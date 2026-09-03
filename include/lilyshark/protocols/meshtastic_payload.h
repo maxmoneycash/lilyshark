@@ -75,6 +75,12 @@ struct MeshtasticPayload {
     bool has_request_id = false;
     std::uint32_t request_id = 0;
     bool has_names = false;
+    /// The sender's Curve25519 public key, when its NodeInfo carried one.
+    /// This is what makes a private reply possible: without it, a direct
+    /// message to this node can only go out under the channel key everybody
+    /// already has.
+    bool has_public_key = false;
+    std::uint8_t public_key[32]{};
     char long_name[40]{};
     char short_name[8]{};
 };
@@ -90,6 +96,11 @@ const char *meshtasticPortLabel(std::uint16_t portnum) noexcept;
 /// the two header fields rather than a nonce. Returns false, leaving `out`
 /// untouched, whenever the plaintext does not parse: a wrong key produces
 /// noise, and noise must never be presented as a message.
+/// Parse an already-decrypted Data message — the same strict parse the
+/// default-key path uses, for a payload that arrived under another lock.
+bool parseMeshtasticData(const std::uint8_t *plain, std::size_t length,
+                         MeshtasticPayload &out) noexcept;
+
 bool readMeshtasticPayload(const std::uint8_t *ciphertext,
                            std::size_t length,
                            std::uint32_t from_node,

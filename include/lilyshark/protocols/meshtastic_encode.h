@@ -2,6 +2,8 @@
 
 #include "lilyshark/protocols/meshtastic_payload.h"
 
+#include "lilyshark/protocols/meshtastic_pkc.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -64,7 +66,22 @@ struct MeshtasticEncodeRequest {
     /// Hashed into the header; stock nodes drop frames whose hash names a
     /// channel they do not have, so this must match the active preset.
     const char *channel_name = kMeshtasticDefaultChannelName;
+    /// Set both of these to send a private message only the destination can
+    /// read. When they are present on a direct text, the payload is sealed
+    /// with the pair's shared secret instead of the channel key everybody
+    /// has, and the header's channel byte goes to zero -- which is exactly
+    /// how stock firmware marks a public-key message on the air.
+    const MeshtasticPkcKeypair *identity = nullptr;
+    const std::uint8_t *peer_public_key = nullptr;
+    /// Fresh randomness per packet, mixed into the nonce so that a repeated
+    /// packet id can never repeat a keystream. Ignored without a peer key.
+    std::uint32_t extra_nonce = 0;
 };
+
+/// True when this request will be sealed to one recipient. Broadcasts and
+/// the protocol's own housekeeping ports stay on the channel key, matching
+/// the exclusions in stock firmware's Router::send.
+bool meshtasticRequestUsesPkc(const MeshtasticEncodeRequest &request) noexcept;
 
 /// Build a native 16-byte header plus default-PSK ciphertext. Returns 0 if
 /// the buffer is too small or the request is empty.
