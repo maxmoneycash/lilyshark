@@ -49,6 +49,8 @@
  */
 
 /** Meshtastic's broadcast destination — NODENUM_BROADCAST. */
+import { profileProtocol } from "./profileProtocol";
+
 export const MESHTASTIC_BROADCAST_HEX = "ffffffff";
 
 /** The Meshtastic outer header, ahead of the encrypted or decoded payload. */
@@ -77,22 +79,10 @@ export type ProtocolHint =
  * its profile; nothing then guesses, matching the firmware's own fallback.
  */
 export function profileProtocolHint(profileId: number | null): ProtocolHint {
-	if (profileId === null) return "unknown";
-	switch (profileId) {
-		case 0:
-			return "unknown";
-		case 1:
-			return "meshtastic";
-		case 2:
-		case 3:
-			return "meshcore";
-		case 4:
-			return "meshtastic";
-		case 5:
-			return "reticulum";
-		default:
-			return "custom";
-	}
+	// One table, in profileProtocol.ts, which cites src/core/builtin_profiles.cpp
+	// as its authority. This was its own copy and said profile 4 was Reticulum;
+	// it is MESHTASTIC BAY MF, and the copy's own tests agreed with the error.
+	return profileProtocol(profileId);
 }
 
 function readLe32(bytes: Uint8Array, offset: number): number {

@@ -109,6 +109,8 @@ build_and_run witness_sidecar \
   src/export/witness_sidecar.cpp \
   test/witness_sidecar/test_witness_sidecar.cpp
 
+python3 scripts/check_ble_uuids.py
+
 python3 scripts/check_baked_tile_fallbacks.py
 
 build_and_run lxmf \

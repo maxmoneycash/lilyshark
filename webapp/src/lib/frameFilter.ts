@@ -43,6 +43,7 @@
 import type { FrameAddressing } from "./conversation";
 import { frameAddressing, reticulumDestinationHashHex } from "./conversation";
 import { findShelbyPointer } from "./lscap";
+import { profileProtocol } from "./profileProtocol";
 
 /** The subset of an LscapFrame a filter can see. Structural, so tests can
  *  build frames without the full 30-field record. */
@@ -101,15 +102,17 @@ export type FilterProto = "meshtastic" | "meshcore" | "rnode" | "unknown";
  * and neither do we: anything else is "unknown".
  */
 export function protoOfProfile(profileId: number): FilterProto {
-	switch (profileId) {
-		case 1:
+	// Derived, not re-tabulated. This filter language calls Reticulum "rnode"
+	// because that is the word an operator types, so the mapping to the
+	// shared table is one line rather than a second list of profile ids to
+	// keep in step. Four hand-written copies of that list once said profile 4
+	// was Reticulum, and each copy's own tests agreed with it.
+	switch (profileProtocol(profileId)) {
+		case "meshtastic":
 			return "meshtastic";
-		case 2:
-		case 3:
+		case "meshcore":
 			return "meshcore";
-		case 4:
-			return "meshtastic";
-		case 5:
+		case "reticulum":
 			return "rnode";
 		default:
 			return "unknown";
