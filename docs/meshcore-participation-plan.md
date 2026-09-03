@@ -117,6 +117,12 @@ meshcore.js `Advert.isVerified()` → true (test-client keypair from
 (The Ed25519 signature is deterministic — RFC 8032, no random nonce — so this
 exact frame must fall out of our implementation given the same inputs.)
 
+Re-confirmed before stage 1 was written, from three directions: the RFC 8032
+appendix reference implementation reproduces these bytes from the test-client
+private key; `Advert.isVerified()` in meshcore.js returns true for the frame,
+which runs `@noble/curves` over it; and `encodeMeshCoreAdvert()` now emits it
+byte-for-byte in `test/meshcore_tx`.
+
 ### 3.3 Crypto primitives for everything below
 
 From `Utils.cpp` and `Identity.cpp` — these are the interop-critical choices
@@ -246,22 +252,52 @@ Missing, in dependency order:
 2. **AES-128 inverse cipher** (~1.5 KB). Add `decryptBlock` to `Aes128`;
    the header's "encryption only" comment gets revised because MeshCore's
    ECB needs the real inverse, unlike Meshtastic's CTR.
-3. **Ed25519 + key exchange** (~70 KB flash, measured). **Vendor
-   `lib/ed25519` from the MeshCore repo** (orlp/ed25519, zlib license, 17
-   files) as `src/crypto/ed25519/`. Rationale: it is the exact code stock
-   nodes run, so key expansion (64-byte expanded private key), signing,
-   verification, and the Edwards→Montgomery exchange match by construction;
-   it is plain C99 that compiles for both the simulator and the ESP32-S3
-   (verified: builds with the pinned Xtensa GCC at -Os, 69,946 bytes text
-   total, zero static RAM); and it is the smallest audited option that
-   provides all four operations. Keep `license.txt`, add attribution to
-   `NOTICE.md`, drop `add_scalar.c`/`seed.c` (unused).
-   - **X25519 overlap**: the parallel Meshtastic-PKC work needs raw X25519.
-     orlp's `fe.c` field arithmetic plus the ladder in `key_exchange.c` are
-     exactly that, minus the Edwards unpack step. The PKC branch should add
-     an `x25519(out, scalar, u_bytes)` entry point over the same `fe.c`
-     rather than vendoring a second curve library — the marginal flash cost
-     is a few hundred bytes because `fe.o`/`ge.o` are already linked.
+3. **Ed25519 signatures** — *landed with stage 1*. `src/crypto/ed25519.cpp`
+   plus `include/lilyshark/crypto/ed25519.h` provide seed expansion,
+   public-key derivation from a stored expanded key, signing and
+   verification. They pass the RFC 8032 section 7.1 vectors and reproduce
+   MeshCore's own known-good test-client keypair from `Identity.cpp`.
+
+   This replaces the plan's original instruction to vendor orlp/ed25519 out
+   of the MeshCore tree. What landed instead is the crypto_sign half of
+   TweetNaCl (public domain, tweetnacl.cr.yp.to), translated into the same
+   house style as the already-vendored `curve25519.cpp`, which is the
+   crypto_scalarmult half of that same library. The two implementations are
+   interchangeable on the wire: both are RFC 8032, both clamp an expanded key
+   to the same bit pattern, and Ed25519 signatures are deterministic, so the
+   golden advert vector in `test/meshcore_tx` — generated with an independent
+   RFC 8032 reference implementation and confirmed by meshcore.js running
+   `@noble/curves` — comes out byte-for-byte identical either way.
+
+   The reason for the swap is size. orlp carries precomputed base-point
+   tables and measured 69,946 bytes of text; TweetNaCl has no tables and
+   compiles to **7,346 bytes of Xtensa `.text`, zero data, zero bss**
+   (`xtensa-esp32s3-elf-size` on `.pio/build/t-deck/src/crypto/ed25519.cpp.o`
+   from the gate's own T-Deck build), on a build that is already two thirds
+   map tiles. `meshcore_encode.cpp.o` is another 899 bytes. Both are object
+   sizes: nothing calls them yet, so the linker may drop them from today's
+   image entirely, and the real image delta arrives with the wiring in §8.
+   The price is speed: without a base-point table,
+   signing is a full 256-bit ladder. That is fine for an advert emitted once
+   a minute at most, and it is *not* obviously fine for verifying a burst of
+   inbound adverts in stage 2 — measure before putting verification on the
+   LVGL loop task, and honour §7's one-advert-per-tick mitigation. TweetNaCl
+   is public domain, which is why neither this file nor `curve25519.cpp`
+   needs a `NOTICE.md` entry.
+
+   - **Still missing: `ed25519_key_exchange`.** Stages 3 to 5 need the
+     Edwards→Montgomery conversion (`u = (1+y)/(1-y)`) followed by the X25519
+     ladder over the clamped low half of the expanded key, producing the raw
+     unhashed x-coordinate (§3.3). Nothing in the tree exposes that yet:
+     `curve25519.cpp` has the ladder but wants a Montgomery u-coordinate, and
+     `ed25519.cpp` has the field arithmetic for the conversion but no entry
+     point. It is a few lines over either file's `Gf` layer, and the §3.3
+     cross-check vector is its acceptance test.
+   - **Known duplication.** `ed25519.cpp` and `curve25519.cpp` each carry
+     their own copy of the roughly hundred lines of GF(2^255-19) arithmetic
+     they both inherited from TweetNaCl, because they landed under separate
+     ownership. Folding them together is a cleanup for whoever holds both
+     files next, and the natural place to add the key exchange above.
 4. **Epoch clock** (small but load-bearing). Frames carry epoch seconds and
    peers enforce per-identity monotonicity. The firmware currently keeps
    only monotonic microseconds. Sources in priority order: GPS UTC (already
@@ -274,10 +310,14 @@ Missing, in dependency order:
    contact, 32 contacts ≈ 5.6 KB); seen-packet ring (~2 KB); outstanding-ack
    list; a small delayed-TX queue (MeshCore staggers replies: ACKs +200 ms,
    flood retransmit jitter — we need the delay slots, not the priorities).
-6. **`meshcore_encode.{h,cpp}`**: replace today's stub (which returns 0 and
-   documents this exact plan as its future) with real builders mirroring
+6. **`meshcore_encode.{h,cpp}`**: real builders mirroring
    `meshtastic_encode`'s shape: pure functions, fixed buffers, no
-   allocation, host-testable.
+   allocation, host-testable. The advert builder
+   (`encodeMeshCoreAdvert`, `encodeMeshCoreAdvertAppData`,
+   `encodeMeshCoreAdvertSignedMessage`, `meshCoreDegreesToMicros`) landed
+   with stage 1; §3.4 text messages, §3.5 ACKs, §3.6 path returns and §3.7
+   channel messages are still to write, and each of them needs the crypto
+   from item 1 to 3 above that has not landed yet.
 
 ## 5. Staged build plan
 
@@ -305,6 +345,17 @@ round-trip through our own `MeshCoreDecoder`; timestamp-floor persistence.
 *Milestone: a stock node (webapp companion attached to a real MeshCore
 device, or a phone running the MeshCore app near the deck) shows
 "Lilyshark-XXXX" as a new contact with a valid signature.*
+
+*Status: the library half is done and green; nothing transmits yet.*
+`src/crypto/ed25519.cpp` and `src/core/meshcore_encode.cpp` build a complete
+signed advert, and `test/meshcore_tx` pins the golden vector byte-for-byte
+along with a located variant, the 32-byte maximum app data, UTF-8 name
+truncation, and a round trip back through `MeshCoreDecoder` that re-verifies
+the signature from the decoded fields. What is deliberately absent is
+everything that touches the radio or persistent state: no keypair generation,
+no NVS identity, no epoch clock, no ABOUT surface, and no caller anywhere in
+the firmware. `kMeshCoreTransmitReady` is still false, and a test asserts it.
+Section 8 is the remaining work.
 
 **Stage 2 — advert RX → contact table.**
 Verify inbound advert signatures (ed25519_verify), enforce the replay rule,
@@ -354,14 +405,19 @@ Additions, worst case:
 
 | Item | Flash | Static RAM |
 | --- | --- | --- |
-| ed25519 (measured, -Os Xtensa: fe 11.0K, ge 34.6K, sc 17.9K, sha512 5.0K, ops 1.2K) | ~70 KB | 0 |
+| ed25519, TweetNaCl (measured: `ed25519.cpp.o` text on Xtensa) | 7.2 KB | 0 |
+| advert encoder (measured: `meshcore_encode.cpp.o` text) | 0.9 KB | 0 |
 | SHA-256 + HMAC | ~3 KB | 0 |
 | AES inverse cipher | ~1.5 KB | ~0 |
-| encoders + node state machine + UI glue | ~8 KB | — |
+| remaining encoders + node state machine + UI glue | ~8 KB | — |
 | contacts (32×176 B) + seen ring + queues + identity | — | ~10 KB |
-| **Total** | **~83 KB (+1.3 % of slot)** | **~10 KB (+3.0 %)** |
+| **Total** | **~21 KB (+0.3 % of slot)** | **~10 KB (+3.0 %)** |
 
-Flash lands at ≤ 69.3 % (≤ 77.1 % even on a full-tile build) — comfortable.
+The first two rows are measured against the built objects; the rest are still
+estimates. Dropping orlp for TweetNaCl (§4 item 3) is what took this from the
+~83 KB this table originally carried down to ~21 KB.
+
+Flash lands well under 69 % (under 77 % even on a full-tile build) — comfortable.
 Static DRAM goes from 77.1 % to ~80 % against ~75 KB of headroom — tight but
 workable; if the contact table grows past 32 entries it moves to PSRAM
 (BOARD_HAS_PSRAM is already on) rather than DRAM. Crypto stack spikes are a
@@ -386,10 +442,14 @@ worker task.
 - **1-byte address hashes collide.** Both DM decrypt (scan all matching
   contacts) and inbound-for-us checks must tolerate collisions; a naive
   first-match implementation works in testing and fails in a real mesh.
-- **Deterministic signature stack/latency on the S3.** ~70 KB of curve code
-  is fine for flash but sign/verify are tens of milliseconds at 240 MHz;
-  doing verify inline for a burst of adverts could stutter the UI loop.
-  Mitigation: verify at most one advert per loop tick from a small queue.
+- **Signature latency on the S3, now the bigger of the two costs.** The
+  TweetNaCl signer that landed trades speed for the 60 KB of flash orlp's
+  precomputed tables would have cost, so a sign is one full 256-bit ladder
+  and a verify is two. Neither has been timed on hardware yet — that
+  measurement is a prerequisite for stage 2, not an afterthought. Doing
+  verify inline for a burst of adverts could stutter the UI loop.
+  Mitigation: verify at most one advert per loop tick from a small queue,
+  and move signing off the render path if a measured sign exceeds a frame.
 - **Airtime etiquette.** Flood adverts are de-prioritised by stock nodes and
   duty budgets exist for a reason; our defaults (zero-hop advert, no
   forwarding, single ACK, jittered reply delays of 200-300 ms per stock
@@ -404,3 +464,60 @@ worker task.
   static buffer (a second 184-byte packet pool, a debug ring) matters.
   Budget review per stage against the `-A` section sizes, and prefer PSRAM
   for anything that grows.
+
+## 8. Wiring stage 1 into the firmware
+
+`encodeMeshCoreAdvert()` is a pure function over a caller-owned buffer. Five
+things have to exist around it before a deck can advertise, and none of them
+are in the tree yet. They are listed in dependency order; the flag flip is
+last on purpose.
+
+**1. An identity in NVS.** Draw 32 random bytes (`esp_fill_random`) on first
+boot and call `crypto::ed25519CreateKeypair(pub, prv, seed)`. Persist the
+64-byte expanded private key, which is what MeshCore itself stores
+(`LocalIdentity::writeTo` writes `prv_key` then `pub_key`), following the
+existing NVS blob pattern in `src/core/app_settings.cpp`. On load,
+`ed25519DerivePublicKey()` recovers the public key from the private key alone,
+so the public half is a cache and not a second source of truth — the same
+fallback `LocalIdentity::readFrom` has. Regenerate if the derived public key
+starts with `0x00` or `0xFF`: MeshCore's `validatePrivateKey` rejects those
+prefixes because the first byte is the node's path hash and both values are
+reserved. Keep the seed out of NVS; the expanded key is the only thing needed
+to sign or, later, to derive shared secrets.
+
+**2. A strictly increasing epoch clock.** §4 item 4 and §7's first risk are
+the same problem, and it is the one most likely to waste a field session.
+Persist the last timestamp this identity emitted and always send
+`max(now, last + 1)`, which is what MeshCore's `getCurrentTimeUnique()` does.
+A receiver drops an advert whose timestamp is not greater than the one it
+already holds for that key, and it drops it silently — a deck whose clock
+restarts at zero will advertise perfectly and be invisible, with no error
+anywhere to notice.
+
+**3. A caller.** Fill a `MeshCoreAdvertAppData`: `node_type` `Chat`, `name`
+from settings, and `has_location` with `meshCoreDegreesToMicros()` on the GPS
+fix only when there is one *and* position sharing is enabled. Encode into a
+255-byte buffer with `MeshCoreAdvertReach::ZeroHop`, which is what stock
+companion firmware sends by default; reserve `Flood` for an explicit user
+action, because a flooded advert costs the whole mesh airtime. Hand the bytes
+to `TDeckRadioService::transmit()`. The frame is only meaningful while
+profile 2 (MESHCORE US, 910.525 MHz, 62.5 kHz, SF7, CR5) is the active
+profile — sending it under any other profile puts a well-formed MeshCore
+packet on a band where no MeshCore node is listening, so gate the action on
+the active profile rather than trusting the operator.
+
+**4. Politeness and honest capture.** Poll the SX1262 for channel activity
+before keying up and back off with a bounded retry, mirroring §2. Ingest our
+own transmission as a `FrameDirection::Transmit` frame the way the Meshtastic
+path already does, so captures stay truthful about what this deck put on the
+air. Once flood adverts are enabled, mark the packet hash seen first, so our
+own flood coming back through a repeater is dropped rather than re-processed.
+
+**5. Flip `kMeshCoreTransmitReady`.** It is `false` in
+`include/lilyshark/protocols/meshcore_encode.h` and `test/meshcore_tx`
+static-asserts that it stays false. It should become true only after a stock
+MeshCore node has actually listed this deck as a contact with a valid
+signature — the stage 1 milestone. Byte-level agreement with two independent
+implementations is real evidence, but it is evidence about bytes; nothing in
+this repository has yet proved that the deck's radio settings put those bytes
+on the air in a form a stock receiver demodulates.

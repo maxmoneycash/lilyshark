@@ -272,6 +272,16 @@ build_and_run meshtastic_pkc \
   src/core/meshtastic_pkc.cpp \
   test/meshtastic_pkc/test_meshtastic_pkc.cpp
 
+build_and_run meshcore_ed25519 \
+  src/crypto/ed25519.cpp \
+  test/meshcore_tx/test_ed25519.cpp
+
+build_and_run meshcore_advert \
+  src/crypto/ed25519.cpp \
+  src/core/meshcore_encode.cpp \
+  src/core/meshcore_decoder.cpp \
+  test/meshcore_tx/test_meshcore_advert.cpp
+
 echo "Testing lscap_reader"
 python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
 
