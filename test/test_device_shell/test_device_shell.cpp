@@ -1096,26 +1096,37 @@ bool channelKeyReceiveScenario()
     device_shell_fake::advance_ms(250U);
     loop();
 
-    // A borrowed-key message must NOT reach Chat. Chat has a Send button and
-    // transmit has no stored-key path, so a reply composed there would go out
-    // under the default PSK -- publicly, into a conversation the operator
-    // believes is private. Reading a channel you were let into must not hand
-    // you a loaded way to answer it.
+    // A borrowed-key message reaches Chat, and reaches exactly one place in
+    // it: a conversation belonging to the channel, titled by the key and
+    // sealed with the key when the operator answers. It was kept out of Chat
+    // entirely while transmit could only seal with the published PSK, because
+    // the Send button beside it would have answered a private channel in
+    // public. Both halves are checked here, and the half that matters is the
+    // negative one.
     sendKeyboard('C');
-    bool leaked_into_chat = false;
-    for(int hop = 0; hop < 5 && !leaked_into_chat; ++hop) {
-        leaked_into_chat = hasLabel(lv_screen_active(), "ridge repeater is up");
-        if(!leaked_into_chat) sendKeyboard('\t');
+    if(!require(hasLabel(lv_screen_active(), "TYPE A MESSAGE"),
+                "C did not open Chat for the keyed conversation check")) return false;
+    if(!require(!hasLabel(lv_screen_active(), "ridge repeater is up"),
+                "a stored-key message appeared in the public EVERYONE conversation, "
+                "where a reply would go out under the key every radio ships with")) {
+        return false;
     }
-    if(!require(!leaked_into_chat,
-                "a stored-key message reached Chat, where replying would "
-                "transmit it publicly")) {
+    if(!require(hasLabel(lv_screen_active(), kKeyName),
+                "a stored key did not get a conversation of its own")) return false;
+    bool found_in_keyed_thread = false;
+    for(int hop = 0; hop < 5 && !found_in_keyed_thread; ++hop) {
+        sendKeyboard('\t');
+        found_in_keyed_thread = hasLabel(lv_screen_active(), "ridge repeater is up");
+    }
+    if(!require(found_in_keyed_thread,
+                "a stored-key message did not reach its channel's conversation")) {
         return false;
     }
     sendKeyboard(0x08U);
 
-    // It belongs on MESSAGES, which is the screen for text pulled off the air
-    // and has no reply affordance to misuse.
+    // It is still on MESSAGES too, which reads the frame store directly:
+    // giving keyed text a conversation took nothing away from the screen that
+    // lists every text pulled off the air.
     sendKeyboard('E');
     if(!require(hasLabel(lv_screen_active(), "ridge repeater is up"),
                 "a frame opened by a stored key did not reach MESSAGES")) {

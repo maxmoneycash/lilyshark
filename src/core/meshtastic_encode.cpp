@@ -103,6 +103,12 @@ bool writeUserPayload(std::uint8_t *out, std::size_t cap, std::size_t &used,
 
 bool meshtasticRequestUsesPkc(const MeshtasticEncodeRequest &request) noexcept
 {
+    // A named channel key wins over the peer's public key, always. Both are
+    // ways of being private, but they are private to different audiences, and
+    // the operator chose one of them by composing in that channel's
+    // conversation. Sealing to the peer instead would deliver the message
+    // somewhere the sender was not looking.
+    if (request.channel_key != nullptr) return false;
     // Stock firmware keeps traceroute, nodeinfo, routing and position on the
     // channel key even for direct messages, because those are how nodes find
     // and acknowledge each other -- sealing them would hide the mesh from
@@ -183,6 +189,17 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
     const std::size_t sealed = data_used + (pkc ? kMeshtasticPkcOverhead : 0U);
     if (kHeader + sealed > out_size) return 0;
 
+    // One key decides both halves of what follows -- the header byte a
+    // listener sorts on, and the keystream the body is sealed with. Deriving
+    // them from one pointer is what makes it impossible to stamp one channel's
+    // hash on another channel's ciphertext.
+    const std::uint8_t *channel_key =
+        request.channel_key != nullptr ? request.channel_key : kMeshtasticDefaultPsk;
+    static_assert(sizeof(kMeshtasticDefaultPsk) == crypto::kAes128KeySize,
+                  "the default PSK must be one AES-128 key, or the header hash "
+                  "over it would cover a different number of bytes than a "
+                  "stored key's");
+
     writeLe32(out, request.to_node);
     writeLe32(out + 4, request.from_node);
     writeLe32(out + 8, request.packet_id);
@@ -196,8 +213,7 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
                   : meshtasticChannelHash(request.channel_name != nullptr
                                               ? request.channel_name
                                               : kMeshtasticDefaultChannelName,
-                                          kMeshtasticDefaultPsk,
-                                          sizeof(kMeshtasticDefaultPsk));
+                                          channel_key, crypto::kAes128KeySize);
     out[14] = 0;
     out[15] = 0;
 
@@ -221,7 +237,7 @@ std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
     nonce[9] = static_cast<std::uint8_t>(request.from_node >> 8U);
     nonce[10] = static_cast<std::uint8_t>(request.from_node >> 16U);
     nonce[11] = static_cast<std::uint8_t>(request.from_node >> 24U);
-    crypto::aesCtrXcrypt(kMeshtasticDefaultPsk, nonce, data, data_used, out + kHeader);
+    crypto::aesCtrXcrypt(channel_key, nonce, data, data_used, out + kHeader);
     return kHeader + data_used;
 }
 

@@ -82,10 +82,32 @@
 #include "lilyshark/ui/packet_presentation.h"
 #endif
 
+/// Which channel a frame goes out on. All-null is the public default channel,
+/// which is what every caller but Chat sends on and what this deck did
+/// exclusively until it learned to answer a keyed one.
+///
+/// The three fields are set together or not at all, because they are three
+/// views of one decision: `key` seals the body and is half of the header
+/// hash, `name` is the other half, and `fingerprint` is the one of the three
+/// that is safe to keep — it is what a chat line records so a sent message
+/// lands in the conversation it was written in instead of beside the public
+/// one. Only `key` is secret; it is handed to AES and never stored.
+///
+/// Declared for both builds, not just the one that owns a radio: the
+/// simulator's Chat has to be able to say which channel a message went out
+/// on, and a screen that models the wrong thing is not a rehearsal.
+struct MeshtasticChannelSeal {
+    const std::uint8_t *key = nullptr;
+    const char *name = nullptr;
+    const char *fingerprint = nullptr;
+};
+
 #if defined(LILYSHARK_DEVICE)
 bool transmit_meshtastic(lilyshark::MeshtasticPort port, const char *text,
-                         std::uint32_t to_node = 0xffffffffU) noexcept;
-void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id) noexcept;
+                         std::uint32_t to_node = 0xffffffffU,
+                         const MeshtasticChannelSeal &seal = MeshtasticChannelSeal{}) noexcept;
+void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id,
+                             const MeshtasticChannelSeal &seal = MeshtasticChannelSeal{}) noexcept;
 void announce_local_mesh_identity() noexcept;
 #endif
 
@@ -450,6 +472,18 @@ static uint8_t spectrum_buffer[LV_CANVAS_BUF_SIZE(306, 145, 16, LV_DRAW_BUF_STRI
 lilyshark::simulator::LiveTelemetry simulator_live_telemetry{};
 #endif
 
+// Defined with the channel-key store below, and declared here because Chat is
+// built above it. These are the whole bridge between the key list and the
+// conversations it implies, and both builds need them: the simulator's Chat
+// has to behave exactly like the deck's, or rehearsing on it proves nothing.
+void chat_sync_key_threads() noexcept;
+/// Looks up the stored key a chat thread's fingerprint names. False when the
+/// key is gone, which is the point of resolving by fingerprint rather than by
+/// slot: a removed key must never be silently replaced by whichever key slid
+/// into its index.
+bool channel_key_for_fingerprint(const char *fingerprint, const std::uint8_t *&key,
+                                 const char *&name) noexcept;
+
 constexpr lv_coord_t kSatelliteWidth = 320;
 constexpr lv_coord_t kSatelliteHeight = 204;
 static bool map_using_imagery = false;
@@ -560,7 +594,11 @@ bool simulator_packet_detail_sample_valid = false;
 
 constexpr std::size_t kChatLogCapacity = 24;
 constexpr std::size_t kChatTextCapacity = 80;
-constexpr std::size_t kChatPeerCapacity = 8;
+// EVERYONE, one thread per stored channel key, and room left for the people
+// this deck is talking to directly. Eight was the whole budget when every
+// thread was a person; with `kChannelKeyCapacity` keys each owning a thread of
+// their own, eight would have meant a stored key evicting a correspondent.
+constexpr std::size_t kChatPeerCapacity = 1U + kChannelKeyCapacity + 7U;
 struct ChatLine {
     char from[8]{};
     char text[kChatTextCapacity]{};
@@ -583,11 +621,27 @@ struct ChatLine {
     /// line that then pointed at a different key would be worse than one that
     /// records what actually opened it.
     char key_name[kChannelKeyNameCapacity]{};
+    /// Fingerprint of that same key, and empty alongside an empty name. This
+    /// is the field that decides which conversation the line belongs to, and
+    /// the name is only what gets drawn, because a name can be typed twice.
+    /// Rename a key and its history follows it; remove a key and add a
+    /// different one under the old name and the old lines stay where they
+    /// were, in a thread the new key does not seal. A message moving between
+    /// threads is the one thing this file must never allow, and a digest of
+    /// the key material is the only handle that cannot be made to move.
+    char key_fp[kChannelKeyFingerprintDigits + 1]{};
 };
 struct ChatPeer {
     std::uint32_t node = 0xffffffffU;
-    char name[12] = "EVERYONE";
+    /// Long enough for a whole key name: a keyed thread is titled by its key,
+    /// and a truncated title would name a channel the operator does not have.
+    char name[kChannelKeyNameCapacity] = "EVERYONE";
     std::uint8_t unread = 0;
+    /// Set for a thread that speaks under one of the operator's stored keys,
+    /// empty for EVERYONE and for a direct message. Matched against
+    /// `ChatLine::key_fp`, so what is drawn in a thread is exactly what that
+    /// thread's key opened.
+    char key_fp[kChannelKeyFingerprintDigits + 1]{};
 };
 // The log lives in RAM, so a power cycle used to wipe the conversation. NVS is
 // flash with a finite write budget, so saving is debounced rather than done on
@@ -815,11 +869,39 @@ std::size_t map_hit_count = 0;
 void open_field_tab(FieldTab tab) noexcept;
 bool field_nav_tap(std::uint16_t x, std::uint16_t y) noexcept;
 
+/// The thread the operator is looking at. EVERYONE stands in for an empty
+/// list, which is the same public thread the deck boots with.
+const ChatPeer &chat_active_thread() noexcept
+{
+    static const ChatPeer everyone{};
+    if (chat_peer_count == 0U) return everyone;
+    if (chat_peer_index >= chat_peer_count) chat_peer_index = 0;
+    return chat_peers[chat_peer_index];
+}
+
 std::uint32_t chat_active_dest() noexcept
 {
-    if (chat_peer_count == 0U) return 0xffffffffU;
-    if (chat_peer_index >= chat_peer_count) chat_peer_index = 0;
-    return chat_peers[chat_peer_index].node;
+    return chat_active_thread().node;
+}
+
+/// A thread's identity is the node it addresses AND the key it is sealed
+/// under, never one without the other. Comparing both is what keeps the
+/// public EVERYONE thread and a keyed broadcast thread apart: they share a
+/// destination and differ only in the key, so a comparison on node alone
+/// would pour a private channel into the public conversation.
+bool chat_line_belongs_to(const ChatLine &line, const ChatPeer &thread) noexcept
+{
+    return line.peer == thread.node && std::strcmp(line.key_fp, thread.key_fp) == 0;
+}
+
+/// Index of the first direct-message thread. EVERYONE holds slot 0 and the
+/// stored keys hold the run of slots after it, which `chat_sync_key_threads`
+/// maintains, so everything from here on is a person.
+std::size_t chat_first_dm_index() noexcept
+{
+    std::size_t index = 1U;
+    while (index < chat_peer_count && chat_peers[index].key_fp[0] != '\0') ++index;
+    return index;
 }
 
 void chat_remember_peer(std::uint32_t node, const char *name) noexcept
@@ -836,13 +918,19 @@ void chat_remember_peer(std::uint32_t node, const char *name) noexcept
         return;
     }
     if (chat_peer_count >= kChatPeerCapacity) {
-        for (std::size_t index = 1; index + 1U < chat_peer_count; ++index) {
+        // Evict the oldest correspondent, never EVERYONE and never a keyed
+        // channel: those two are threads the operator configured, and a
+        // stranger's first packet must not be able to close one.
+        const std::size_t first = chat_first_dm_index();
+        if (first + 1U >= kChatPeerCapacity) return;
+        for (std::size_t index = first; index + 1U < chat_peer_count; ++index) {
             chat_peers[index] = chat_peers[index + 1U];
         }
         chat_peer_count = kChatPeerCapacity - 1U;
         if (chat_peer_index >= chat_peer_count) chat_peer_index = 0;
     }
     ChatPeer &peer = chat_peers[chat_peer_count++];
+    peer = ChatPeer{};
     peer.node = node;
     if (name != nullptr && name[0] != '\0') {
         std::snprintf(peer.name, sizeof(peer.name), "%.7s", name);
@@ -897,13 +985,11 @@ void chat_sync_unread() noexcept
     chat_unread = total > 99U ? 99U : static_cast<std::uint8_t>(total);
 }
 
-void chat_clear_peer_unread(std::uint32_t peer) noexcept
+void chat_clear_active_unread() noexcept
 {
-    for (std::size_t index = 0; index < chat_peer_count; ++index) {
-        if (chat_peers[index].node != peer) continue;
-        chat_peers[index].unread = 0;
-        break;
-    }
+    if (chat_peer_count == 0U) return;
+    if (chat_peer_index >= chat_peer_count) chat_peer_index = 0;
+    chat_peers[chat_peer_index].unread = 0;
     chat_sync_unread();
 }
 
@@ -923,7 +1009,13 @@ constexpr std::uint32_t kChatArchiveMagic = 0x4C534348UL;  // "LSCH"
 // v4: ChatLine records which stored channel key opened the message. A v3
 // archive has a different record size and is refused, which costs one saved
 // conversation once.
-constexpr std::uint16_t kChatArchiveVersion = 4U;
+// v5: ChatLine records that key's fingerprint as well as its name, which is
+// what sorts a restored line into the right conversation. A v4 archive has a
+// different record size and is refused, which costs one saved conversation
+// once. Loading a v4 archive by size alone would be worse than losing it: its
+// lines carry a key name and no fingerprint, so every one of them would land
+// in the public EVERYONE thread.
+constexpr std::uint16_t kChatArchiveVersion = 5U;
 constexpr std::size_t kChatArchiveSize = sizeof(ChatArchiveHeader) + sizeof(chat_log);
 
 /// The log as bytes. Kept apart from the NVS call so the round trip can be
@@ -958,9 +1050,14 @@ bool decode_chat_archive(const std::uint8_t *bytes, std::size_t size) noexcept
 void chat_push(const char *from, const char *text, bool mine,
                std::uint32_t peer = 0xffffffffU, const char *when = nullptr,
                std::uint32_t pending_id = 0, bool via_net = false,
-               const char *key_name = nullptr) noexcept
+               const char *key_name = nullptr,
+               const char *key_fingerprint = nullptr) noexcept
 {
     if (from == nullptr || text == nullptr || text[0] == '\0') return;
+    // The threads have to exist before a line can be filed into one, and a key
+    // added while the operator was on another screen is exactly when a keyed
+    // message arrives.
+    chat_sync_key_threads();
     const std::size_t slot = (chat_log_start + chat_log_count) % kChatLogCapacity;
     ChatLine &line = chat_log[slot];
     line.pending_id = pending_id;
@@ -968,6 +1065,8 @@ void chat_push(const char *from, const char *text, bool mine,
     line.via_net = via_net;
     std::snprintf(line.key_name, sizeof(line.key_name), "%s",
                   key_name != nullptr ? key_name : "");
+    std::snprintf(line.key_fp, sizeof(line.key_fp), "%s",
+                  key_fingerprint != nullptr ? key_fingerprint : "");
     std::snprintf(line.from, sizeof(line.from), "%.7s", from);
     std::snprintf(line.text, sizeof(line.text), "%s", text);
     if (when != nullptr && when[0] != '\0') {
@@ -986,12 +1085,15 @@ void chat_push(const char *from, const char *text, bool mine,
     chat_log_dirty = true;
     chat_log_save_due_ms = millis() + kChatSaveDebounceMs;
 #endif
-    if (!mine && peer != 0U && peer != 0xffffffffU) {
+    // A keyed line is filed under its channel, not under whoever sent it: the
+    // reply to it goes back on that channel, so a per-sender thread would be a
+    // Send button aimed somewhere the message never came from.
+    if (!mine && line.key_fp[0] == '\0' && peer != 0U && peer != 0xffffffffU) {
         chat_remember_peer(peer, from);
     }
-    if (!mine && !(chat_open && chat_active_dest() == peer)) {
+    if (!mine && !(chat_open && chat_line_belongs_to(line, chat_active_thread()))) {
         for (std::size_t index = 0; index < chat_peer_count; ++index) {
-            if (chat_peers[index].node != peer) continue;
+            if (!chat_line_belongs_to(line, chat_peers[index])) continue;
             if (chat_peers[index].unread < 99U) ++chat_peers[index].unread;
             break;
         }
@@ -8387,6 +8489,109 @@ std::size_t channel_key_row_count() noexcept
     return channel_keys.size() + 1U;
 }
 
+// ── The chat threads a key list implies ─────────────────────────────────────
+// A stored key is a channel the operator was let into, and a channel with no
+// conversation attached is a channel you can only overhear. These two calls
+// are the whole bridge between the key store and Chat, and they are the only
+// place either one reads the other.
+
+bool channel_key_for_fingerprint(const char *fingerprint, const std::uint8_t *&key,
+                                 const char *&name) noexcept
+{
+    key = nullptr;
+    name = nullptr;
+    if (fingerprint == nullptr || fingerprint[0] == '\0') return false;
+    for (std::size_t slot = 0; slot < channel_keys.size(); ++slot) {
+        char print[kChannelKeyFingerprintDigits + 1]{};
+        if (!channel_keys.fingerprint(slot, print, sizeof(print))) continue;
+        if (std::strcmp(print, fingerprint) != 0) continue;
+        key = channel_keys.channelKeyBytes(slot);
+        name = channel_keys.name(slot);
+        return key != nullptr && name != nullptr;
+    }
+    return false;
+}
+
+/// Revision of the key list the thread tabs were last built from. Rebuilding
+/// on every redraw would mean eight SHA-256 fingerprints per keystroke while a
+/// message is being typed, and Chat redraws on every keystroke.
+std::uint32_t chat_key_threads_revision = 0U;
+bool chat_key_threads_built = false;
+
+void chat_sync_key_threads() noexcept
+{
+    if (chat_key_threads_built && chat_key_threads_revision == channel_keys.revision()) {
+        return;
+    }
+    chat_key_threads_revision = channel_keys.revision();
+    chat_key_threads_built = true;
+
+    // Remember which thread the operator was reading before the tabs move
+    // under them, by identity rather than by index.
+    const ChatPeer previous = chat_active_thread();
+
+    ChatPeer rebuilt[kChatPeerCapacity]{};
+    std::size_t count = 0U;
+    rebuilt[count] = chat_peer_count > 0U ? chat_peers[0] : ChatPeer{};
+    // Slot zero is EVERYONE and stays the public thread whatever else happens
+    // to the key list. Nothing below can write a fingerprint into it.
+    rebuilt[count].node = 0xffffffffU;
+    rebuilt[count].key_fp[0] = '\0';
+    std::snprintf(rebuilt[count].name, sizeof(rebuilt[count].name), "EVERYONE");
+    ++count;
+
+    for (std::size_t slot = 0; slot < channel_keys.size() && count < kChatPeerCapacity;
+         ++slot) {
+        char print[kChannelKeyFingerprintDigits + 1]{};
+        const char *name = channel_keys.name(slot);
+        if (name == nullptr || !channel_keys.fingerprint(slot, print, sizeof(print))) {
+            continue;
+        }
+        ChatPeer &thread = rebuilt[count];
+        thread = ChatPeer{};
+        // A keyed thread addresses the channel, not a person: everyone holding
+        // the key can already read anything sealed with it, so there is no
+        // narrower audience for the deck to pretend to offer.
+        thread.node = 0xffffffffU;
+        std::snprintf(thread.name, sizeof(thread.name), "%s", name);
+        std::snprintf(thread.key_fp, sizeof(thread.key_fp), "%s", print);
+        // Carry the unread count across a rename or a reorder. Matched on the
+        // fingerprint, so it follows the key material and not the label.
+        for (std::size_t index = 0; index < chat_peer_count; ++index) {
+            if (std::strcmp(chat_peers[index].key_fp, print) != 0) continue;
+            thread.unread = chat_peers[index].unread;
+            break;
+        }
+        ++count;
+    }
+
+    for (std::size_t index = 1; index < chat_peer_count && count < kChatPeerCapacity;
+         ++index) {
+        if (chat_peers[index].key_fp[0] != '\0') continue;
+        rebuilt[count++] = chat_peers[index];
+    }
+
+    for (std::size_t index = 0; index < count; ++index) chat_peers[index] = rebuilt[index];
+    for (std::size_t index = count; index < kChatPeerCapacity; ++index) {
+        chat_peers[index] = ChatPeer{};
+    }
+    chat_peer_count = count;
+
+    // Put the operator back on the thread they were reading, found by
+    // identity. When it is gone -- its key was just removed -- they land on
+    // EVERYONE rather than on whichever thread inherited its index. Landing
+    // silently in a different conversation with a draft already typed is how a
+    // message ends up on the wrong channel.
+    chat_peer_index = 0U;
+    for (std::size_t index = 0; index < chat_peer_count; ++index) {
+        if (chat_peers[index].node != previous.node) continue;
+        if (std::strcmp(chat_peers[index].key_fp, previous.key_fp) != 0) continue;
+        chat_peer_index = index;
+        break;
+    }
+    chat_sync_unread();
+}
+
 #if defined(LILYSHARK_DEVICE)
 // ── Reading a frame with the operator's keys ────────────────────────────────
 // The frame store only exists on the device build, so these live behind the
@@ -8631,7 +8836,7 @@ void build_channel_key_name_entry(lv_obj_t *parent)
 {
     put_label(parent, channel_key_renaming ? "RENAME THIS KEY" : "NAME THIS KEY", 10, 32,
               theme::pink(), &font_pixel_6x8);
-    put_label(parent, "SO YOU CAN TELL IT FROM THE OTHERS.", 10, 48, theme::text_muted(),
+    put_label(parent, "USE THE CHANNEL'S OWN NAME.", 10, 48, theme::amber(),
               &font_pixel_6x8);
     draw_outline_rect(parent, 10, 72, 300, 28, theme::pink());
     char shown[kChannelKeyNameCapacity + 1U]{};
@@ -8642,6 +8847,16 @@ void build_channel_key_name_entry(lv_obj_t *parent)
     put_label(parent, channel_key_renaming ? "ENTER SAVES THE NEW NAME."
                                            : "ENTER STORES THE KEY UNDER THIS NAME.",
               10, 132, theme::text_muted(), &font_pixel_6x8);
+    // Not a preference. Meshtastic hashes the channel's name together with its
+    // key into a byte in every header, and stock radios drop a frame whose
+    // byte does not match a channel they hold. Reading the channel works under
+    // any name; sending on it works only under the right one.
+    put_label(parent, "THE NAME IS HASHED INTO EVERY FRAME YOU SEND", 10, 156,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "ON THIS CHANNEL. A WRONG NAME STILL READS THE", 10, 168,
+              theme::text_muted(), &font_pixel_6x8);
+    put_label(parent, "CHANNEL, BUT NOTHING YOU SEND REACHES IT.", 10, 180,
+              theme::text_muted(), &font_pixel_6x8);
 }
 
 void build_channel_key_confirm(lv_obj_t *parent)
@@ -9381,9 +9596,12 @@ void build_current_screen();
 
 void build_chat(lv_obj_t * parent)
 {
-    const std::uint32_t dest = chat_active_dest();
-    chat_clear_peer_unread(dest);
-    const bool broadcast = dest == 0xffffffffU;
+    chat_sync_key_threads();
+    chat_clear_active_unread();
+    const ChatPeer thread = chat_active_thread();
+    const std::uint32_t dest = thread.node;
+    const bool keyed_thread = thread.key_fp[0] != '\0';
+    const bool broadcast = dest == 0xffffffffU && !keyed_thread;
 #if defined(LILYSHARK_DEVICE)
     add_status_bar(parent, "CHAT");
 #else
@@ -9396,18 +9614,24 @@ void build_chat(lv_obj_t * parent)
         const std::size_t peer = tab0 + index;
         const lv_coord_t x = static_cast<lv_coord_t>(index) * tab_w;
         const bool selected = peer == chat_peer_index;
-        const bool all = chat_peers[peer].node == 0xffffffffU;
+        const bool keyed = chat_peers[peer].key_fp[0] != '\0';
+        const bool all = chat_peers[peer].node == 0xffffffffU && !keyed;
         const std::uint8_t unread = chat_peers[peer].unread;
+        // Amber is this firmware's mark for a result with a caveat attached,
+        // and it is already what a keyed line wears. A keyed thread is drawn
+        // in it too, so the tab strip says which conversations are the public
+        // one and which are channels somebody had to let the operator into.
+        const lv_color_t accent = keyed ? theme::amber() : theme::pink();
         if (selected) {
-            draw_outline_rect(parent, x + 2, kChatTabY, tab_w - 4, kChatTabH, theme::pink());
+            draw_outline_rect(parent, x + 2, kChatTabY, tab_w - 4, kChatTabH, accent);
         }
         const lv_coord_t name_w = (all && unread == 0U) ? tab_w - 12 : tab_w - 28;
         put_clipped_label(parent, chat_peers[peer].name, x + 6, kChatTabY + 4,
                           name_w > 24 ? name_w : 24,
-                          selected ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
+                          selected ? accent : theme::text_muted(), &font_pixel_6x8);
         if (unread > 0U && !selected) {
             const lv_coord_t badge_x = x + tab_w - 16;
-            theme::rect(parent, badge_x, kChatTabY + 3, 12, 10, theme::pink());
+            theme::rect(parent, badge_x, kChatTabY + 3, 12, 10, accent);
             char badge[4]{};
             if (unread < 10U) {
                 std::snprintf(badge, sizeof(badge), "%u", static_cast<unsigned>(unread));
@@ -9416,9 +9640,12 @@ void build_chat(lv_obj_t * parent)
             }
             put_label(parent, badge, badge_x + 3, kChatTabY + 4, theme::on_accent(),
                       &font_pixel_6x8);
+        } else if (keyed) {
+            put_label(parent, "KEY", x + tab_w - 24, kChatTabY + 4,
+                      selected ? accent : theme::text_muted(), &font_pixel_6x8);
         } else if (!all) {
             put_label(parent, "DM", x + tab_w - 20, kChatTabY + 4,
-                      selected ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
+                      selected ? accent : theme::text_muted(), &font_pixel_6x8);
         }
     }
     theme::rule_line(parent, 0, kChatRuleY, 320, 1, theme::pink());
@@ -9427,7 +9654,7 @@ void build_chat(lv_obj_t * parent)
     std::size_t match_count = 0;
     for (std::size_t index = 0; index < chat_log_count; ++index) {
         const std::size_t slot = (chat_log_start + index) % kChatLogCapacity;
-        if (chat_log[slot].peer != dest) continue;
+        if (!chat_line_belongs_to(chat_log[slot], thread)) continue;
         match_slots[match_count++] = slot;
     }
     const std::size_t visible = match_count < kChatVisible ? match_count : kChatVisible;
@@ -9463,7 +9690,17 @@ void build_chat(lv_obj_t * parent)
     // broadcast, a node name means direct. This row now carries the one thing
     // the chat screen could not tell you: how well the last thing from this
     // peer actually arrived. Home earns its density the same way.
+    //
+    // A keyed thread spends the same corner on something its operator needs
+    // more than signal strength: the fingerprint of the key that will seal
+    // what they type. Signal there would be a lie anyway -- the newest frame
+    // the radio heard is almost never one that channel's key opened, and no
+    // cheap walk can tell which were, because the answer costs a decryption
+    // per frame and this screen redraws on every keystroke.
     char link[16]{};
+    if (keyed_thread) {
+        std::snprintf(link, sizeof(link), "KEY %s", thread.key_fp);
+    } else
 #if defined(LILYSHARK_DEVICE)
     {
         // Walked directly rather than through collect_live_nodes, which visits
@@ -9491,23 +9728,39 @@ void build_chat(lv_obj_t * parent)
         }
     }
 #else
-    std::snprintf(link, sizeof(link), "SNR %s", broadcast ? "-8.6" : "-12.7");
+    {
+        std::snprintf(link, sizeof(link), "SNR %s", broadcast ? "-8.6" : "-12.7");
+    }
 #endif
     {
         const lv_coord_t link_w = static_cast<lv_coord_t>(std::strlen(link) * 6);
         put_label(parent, link, 314 - link_w, kChatOlderY + 4,
-                  std::strcmp(link, "NO SIGNAL") == 0 ? theme::text_muted() : theme::lime(),
+                  keyed_thread ? theme::amber()
+                               : (std::strcmp(link, "NO SIGNAL") == 0 ? theme::text_muted()
+                                                                      : theme::lime()),
                   &font_pixel_6x8);
     }
     theme::rule_line(parent, 0, kChatOlderY + kChatOlderH, 320, 1, theme::pink());
 
     if (visible == 0U) {
-        draw_outline_rect(parent, 16, 78, 288, 86, theme::pink());
-        put_label(parent, "NO MESSAGES YET", 28, 94, theme::pink(),
-                  &font_pixel_6x8);
-        put_label(parent, broadcast ? "EVERYONE ON THIS CHANNEL WILL SEE THIS." :
-                                      "ONLY THIS NODE WILL SEE THIS.",
-                  28, 116, theme::text_muted(), &font_pixel_6x8);
+        const lv_color_t accent = keyed_thread ? theme::amber() : theme::pink();
+        draw_outline_rect(parent, 16, 78, 288, 86, accent);
+        put_label(parent, "NO MESSAGES YET", 28, 94, accent, &font_pixel_6x8);
+        // Who will see it, said in full. A keyed channel is private from the
+        // rest of the air and not private within itself, and an operator who
+        // reads "private" as "only this person" would be wrong in the
+        // direction that costs something.
+        char audience[48]{};
+        if (keyed_thread) {
+            std::snprintf(audience, sizeof(audience), "EVERYONE WITH THE %s KEY WILL SEE THIS.",
+                          thread.name);
+        } else {
+            std::snprintf(audience, sizeof(audience), "%s",
+                          broadcast ? "EVERYONE ON THIS CHANNEL WILL SEE THIS."
+                                    : "ONLY THIS NODE WILL SEE THIS.");
+        }
+        put_clipped_label(parent, audience, 28, 116, 268, theme::text_muted(),
+                          &font_pixel_6x8);
         put_label(parent, "TYPE, THEN PRESS ENTER TO SEND.", 28, 132,
                   theme::text_muted(), &font_pixel_6x8);
     } else {
@@ -9534,7 +9787,11 @@ void build_chat(lv_obj_t * parent)
             // hard against the right edge -- exactly where a scrollbar lives --
             // so a run of your own messages read as a scrollbar rather than as
             // you speaking.
-            const bool keyed = line.key_name[0] != '\0';
+            // Equal to keyed_thread for every line drawn here, because a
+            // thread is matched on its key fingerprint -- read it as the
+            // assertion that no unkeyed line can appear inside a keyed
+            // conversation, or the reverse.
+            const bool keyed = line.key_fp[0] != '\0';
             theme::rect(parent, line.mine ? 46 : 4, y, 6, 24,
                         keyed ? theme::amber()
                               : (line.mine ? theme::pink()
@@ -9550,14 +9807,12 @@ void build_chat(lv_obj_t * parent)
             // else heard -- but it never crossed this radio, and the line has
             // to say so where the eye already is.
             const char *route = line.via_net ? "  VIA NET" : "";
-            // A message that arrived under a key somebody had to hand the
-            // operator says so, and says which key. Without it a channel the
-            // operator was let into would read exactly like the one every
-            // radio can already hear.
-            char keyed_tag[8 + kChannelKeyNameCapacity]{};
-            if (keyed) {
-                std::snprintf(keyed_tag, sizeof(keyed_tag), "  KEY %s", line.key_name);
-            }
+            // The key's name used to ride on every line's header, because a
+            // keyed message sat in the public thread and had to disown it
+            // there. It has its own thread now, titled by the key and stamped
+            // with that key's fingerprint above the log, so repeating the name
+            // on every row would cost the width of a message to say what the
+            // tab already says once.
             // Consecutive messages from one speaker are a single turn, so the
             // name belongs on the first of them only. Five rows each captioned
             // YOU said nothing, five times over, and cost half the log's
@@ -9567,16 +9822,15 @@ void build_chat(lv_obj_t * parent)
             const bool same_speaker =
                 previous != nullptr && previous->mine == line.mine &&
                 (line.mine || std::strcmp(previous->from, line.from) == 0);
-            const bool header = !same_speaker || delivery[0] != '\0' || route[0] != '\0' ||
-                                keyed_tag[0] != '\0';
+            const bool header = !same_speaker || delivery[0] != '\0' || route[0] != '\0';
             if (header) {
                 char who[64]{};
                 if (line.when[0] != '\0') {
-                    std::snprintf(who, sizeof(who), "%s  %s%s%s%s", line.when,
-                                  line.mine ? "YOU" : line.from, delivery, route, keyed_tag);
+                    std::snprintf(who, sizeof(who), "%s  %s%s%s", line.when,
+                                  line.mine ? "YOU" : line.from, delivery, route);
                 } else {
-                    std::snprintf(who, sizeof(who), "%s%s%s%s",
-                                  line.mine ? "YOU" : line.from, delivery, route, keyed_tag);
+                    std::snprintf(who, sizeof(who), "%s%s%s",
+                                  line.mine ? "YOU" : line.from, delivery, route);
                 }
                 if (keyed) {
                     // A named key can outrun the row, so this header clips
@@ -9596,8 +9850,12 @@ void build_chat(lv_obj_t * parent)
         theme::rect(parent, 4, 184, 312, 12, lv_color_hex(0x180808));
         put_label(parent, "TX FAILED", 10, 185, theme::fault(), &font_pixel_6x8);
     }
-    draw_outline_rect(parent, 4, 196, 248, 26, theme::pink());
-    put_label(parent, ">", 10, 203, theme::pink(), &font_pixel_6x8);
+    // The compose box wears the thread's colour, so the answer to "what will
+    // this go out under" is visible at the exact place the operator is
+    // looking while typing it.
+    const lv_color_t compose = keyed_thread ? theme::amber() : theme::pink();
+    draw_outline_rect(parent, 4, 196, 248, 26, compose);
+    put_label(parent, ">", 10, 203, compose, &font_pixel_6x8);
     put_clipped_label(parent,
                       chat_draft[0] == '\0' ? "TYPE A MESSAGE" : chat_draft,
                       22, 203, 200,
@@ -9612,24 +9870,40 @@ void build_chat(lv_obj_t * parent)
         put_label(parent, remain, 244 - remain_w, 204,
                   left < 10U ? theme::pink() : theme::text_muted(), &font_pixel_6x8);
     }
-    draw_outline_rect(parent, kChatSendX, kChatSendY, kChatSendW, kChatSendH, theme::pink());
-    put_label(parent, "SEND", kChatSendX + 16, kChatSendY + 9, theme::pink(),
-              &font_pixel_6x8);
+    draw_outline_rect(parent, kChatSendX, kChatSendY, kChatSendW, kChatSendH, compose);
+    put_label(parent, "SEND", kChatSendX + 16, kChatSendY + 9, compose, &font_pixel_6x8);
 }
 
 void send_chat_draft() noexcept
 {
     if (chat_draft_len == 0) return;
-    const std::uint32_t dest = chat_active_dest();
+    chat_sync_key_threads();
+    const ChatPeer thread = chat_active_thread();
+    const std::uint32_t dest = thread.node;
+
+    // Resolve the thread's key before anything is transmitted or logged. A
+    // keyed thread whose key has been removed since it was opened cannot fall
+    // back to the default one: that is precisely the send that would put a
+    // private conversation on the public channel, which is why keyed text was
+    // kept out of Chat until this call existed.
+    MeshtasticChannelSeal seal{};
+    if (thread.key_fp[0] != '\0') {
+        if (!channel_key_for_fingerprint(thread.key_fp, seal.key, seal.name)) {
+            chat_tx_failed = true;
+            std::snprintf(shell_notice, sizeof(shell_notice), "KEY GONE; NOT SENT");
+            return;
+        }
+        seal.fingerprint = thread.key_fp;
+    }
 #if defined(LILYSHARK_DEVICE)
-    const bool ok = ::transmit_meshtastic(MeshtasticPort::TextMessage, chat_draft, dest);
+    const bool ok = ::transmit_meshtastic(MeshtasticPort::TextMessage, chat_draft, dest, seal);
     if (!ok) {
         chat_tx_failed = true;
         std::snprintf(shell_notice, sizeof(shell_notice), "TX FAILED");
         return;
     }
 #else
-    chat_push("ME", chat_draft, true, dest);
+    chat_push("ME", chat_draft, true, dest, nullptr, 0U, false, seal.name, seal.fingerprint);
 #endif
     chat_tx_failed = false;
     if (std::strstr(shell_notice, "TX FAILED") != nullptr) shell_notice[0] = '\0';
@@ -9997,7 +10271,39 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 ? ::lilyshark::parseMeshtasticData(pkc_plain, pkc_plain_length, chat_payload)
                 : read_frame_payload(*stored, chat_payload, chat_key);
         if(readable) {
+            const bool keyed = chat_key.source == MeshtasticKeySource::StoredKey;
             const char *chat_key_name = stored_key_name(chat_key);
+            // Which conversation this belongs to, and -- separately -- whether
+            // this deck can answer in it.
+            //
+            // The fingerprint is the thread's identity and is filled in for
+            // any keyed frame, because a message that was read can always be
+            // shown in the channel it was read on.
+            //
+            // The seal is stricter, and the strictness is the proof requested
+            // of any keyed transmission: it is filled in only when the header
+            // byte this deck WOULD stamp -- the XOR of the operator's name for
+            // the key with the key itself -- equals the header byte the frame
+            // actually carried. That equality is the only evidence available
+            // on the air that the operator's name for this key is the name the
+            // channel goes by. Without it a reply would be sealed correctly
+            // and addressed to a channel hash nobody uses, which is a frame
+            // that announces a keyholder and delivers nothing.
+            char chat_key_fp[kChannelKeyFingerprintDigits + 1]{};
+            MeshtasticChannelSeal reply_seal{};
+            if (keyed) {
+                (void)channel_keys.fingerprint(chat_key.slot, chat_key_fp,
+                                               sizeof(chat_key_fp));
+                const std::uint8_t *key = channel_keys.channelKeyBytes(chat_key.slot);
+                const char *name = channel_keys.name(chat_key.slot);
+                if (key != nullptr && name != nullptr &&
+                    ::lilyshark::meshtasticChannelHash(name, key, kChannelKeySize) ==
+                        stored->decoded.channel) {
+                    reply_seal.key = key;
+                    reply_seal.name = name;
+                    reply_seal.fingerprint = chat_key_fp;
+                }
+            }
             char from[8]{};
             if(chat_payload.has_names && chat_payload.short_name[0] != '\0') {
                 std::snprintf(from, sizeof(from), "%.7s", chat_payload.short_name);
@@ -10005,7 +10311,12 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 std::snprintf(from, sizeof(from), "%04X",
                               static_cast<unsigned>(stored->decoded.source & 0xffffU));
             }
-            if (chat_payload.has_names &&
+            // A node heard only under a borrowed key gets no direct-message
+            // tab. A tab is a Send button, and this one would seal with the
+            // default PSK: it would answer a private-channel node in public,
+            // which is the exact mistake the keyed thread exists to prevent.
+            // Their traffic is reachable in the channel's own conversation.
+            if (chat_payload.has_names && !keyed &&
                 stored->decoded.source != localMeshtasticNodeNum()) {
                 chat_remember_peer(stored->decoded.source, chat_payload.short_name);
             }
@@ -10087,13 +10398,24 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
             // Only for frames that were really on some air (radio or the
             // net bridge), and never for our own or for Routing itself,
             // which would ack acks forever.
-            // Never for a frame a stored key opened. transmit_meshtastic_ack
-            // seals with the default PSK, so acknowledging a private-channel
-            // packet would broadcast, in the clear, both that this deck holds
-            // that channel's key and which packet it just read. Listening to a
-            // channel you were let into is not the same as announcing it to
-            // everyone who is not in it.
-            if (chat_key.source != MeshtasticKeySource::StoredKey &&
+            // For a frame a stored key opened, the acknowledgement goes out
+            // sealed under that same key, or it does not go out at all.
+            //
+            // A default-PSK ack would broadcast in the clear both that this
+            // deck holds that channel's key and which packet it just read;
+            // listening to a channel you were let into is not the same as
+            // announcing it to everyone who is not in it. A keyed ack says
+            // neither of those things to anyone outside the channel: the
+            // request_id is inside the ciphertext, and the header byte is the
+            // channel's own hash, which every member already stamps on every
+            // frame they send.
+            //
+            // `reply_seal` is set only when that header byte was proven to
+            // match the one this frame arrived carrying, so an ack that cannot
+            // be addressed to the channel it answers is simply not sent -- the
+            // withheld behaviour, kept for exactly the case that still cannot
+            // be done honestly.
+            if ((!keyed || reply_seal.key != nullptr) &&
                 stored->decoded.hasAttribute(AttributeAcknowledgementRequested) &&
                 stored->decoded.destination == localMeshtasticNodeNum() &&
                 stored->decoded.source != localMeshtasticNodeNum() &&
@@ -10102,7 +10424,7 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 stored->raw.rf.origin != FrameOrigin::Synthetic &&
                 !app_settings.simulate_mode) {
                 transmit_meshtastic_ack(stored->decoded.source,
-                                        stored->decoded.packet_id);
+                                        stored->decoded.packet_id, reply_seal);
             }
 #endif
 #if defined(ESP_PLATFORM)
@@ -10130,22 +10452,39 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 const bool broadcast = dest == 0xffffffffU;
                 const bool to_us = dest == localMeshtasticNodeNum();
                 const bool from_us = stored->decoded.source == localMeshtasticNodeNum();
-                // A borrowed-key message is readable but not answerable:
-                // transmit has no stored-key path, so anything composed in
-                // reply would go out under the default PSK -- publicly, to a
-                // conversation the operator believes is private. Rather than
-                // print a warning next to a working Send button, keyed text
-                // stays out of Chat entirely and appears on MESSAGES, which
-                // is the screen for text pulled off the air and has no reply
-                // affordance to misuse. It still banners and chimes on
-                // arrival. When transmit learns to seal with a stored key,
-                // this is the line that changes.
-                const bool keyed = chat_key.source == MeshtasticKeySource::StoredKey;
-                if (!from_us && !keyed && (broadcast || to_us)) {
-                    const std::uint32_t peer = broadcast ? 0xffffffffU : stored->decoded.source;
+                // A borrowed-key message used to be readable but not
+                // answerable: transmit had no stored-key path, so anything
+                // composed in reply would have gone out under the default PSK
+                // -- publicly, to a conversation the operator believed was
+                // private -- and keyed text was kept out of Chat entirely
+                // rather than printed beside a Send button that would betray
+                // it. That transmit path exists now, so keyed text comes back
+                // into Chat, into a conversation of its own.
+                //
+                // Its own is the whole of the fix. The thread is identified by
+                // the fingerprint of the key that opened the message, the tab
+                // is titled with that key's name and drawn amber, and Send
+                // seals with that same key. A keyed message therefore cannot
+                // land in EVERYONE, and an EVERYONE message cannot land in a
+                // keyed thread: the two differ in a field that is compared on
+                // every line, in both directions.
+                //
+                // Keyed text stays on MESSAGES as well. That screen reads the
+                // frame store directly, so nothing was taken away from it.
+                //
+                // The thread addresses the channel even when the frame was
+                // addressed to this node alone. A channel key is shared by
+                // everyone holding it, so a direct message sealed with one was
+                // never private to its recipient -- offering a one-to-one
+                // reply thread for it would draw a privacy the key does not
+                // provide. The audience line above the log says so in words.
+                if (!from_us && (broadcast || to_us)) {
+                    const std::uint32_t peer =
+                        (broadcast || keyed) ? 0xffffffffU : stored->decoded.source;
                     chat_push(from, chat_payload.text, false, peer, nullptr, 0U,
-                              stored->raw.rf.origin == FrameOrigin::Net, chat_key_name);
-                    chat_remember_peer(stored->decoded.source, from);
+                              stored->raw.rf.origin == FrameOrigin::Net, chat_key_name,
+                              keyed ? chat_key_fp : nullptr);
+                    if (!keyed) chat_remember_peer(stored->decoded.source, from);
 #if defined(ESP_PLATFORM)
                     // A paired phone holds this same conversation, so a text
                     // the deck hears is handed over as FromRadio{packet} and
@@ -10165,7 +10504,14 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                     // Announce it. An unread badge on a screen the operator is
                     // not looking at is not a notification; this banner shows
                     // wherever they are, and the next screen build picks it up.
-                    if (!(chat_open && chat_active_dest() == peer)) {
+                    // Being on the right tab counts as looking; being on the
+                    // public tab while a keyed message lands does not, which
+                    // is why the key is part of this comparison too.
+                    const ChatPeer &viewing = chat_active_thread();
+                    const bool watched =
+                        chat_open && viewing.node == peer &&
+                        std::strcmp(viewing.key_fp, keyed ? chat_key_fp : "") == 0;
+                    if (!watched) {
                         std::snprintf(shell_notice, sizeof(shell_notice),
                                       "NEW MESSAGE FROM %s", from);
                         chat_notice_until_ms = millis() + 12000U;
@@ -13003,6 +13349,172 @@ bool run_simulator_interaction_test() noexcept
     if(!expect_simulator_state(!channel_keys_open,
                                "left must come back off the key list")) return false;
 
+    // ── Speaking on a channel you were let into ─────────────────────────────
+    // A stored key used to be a decryption and nothing more: keyed text was
+    // kept out of Chat because the only Send button available would have
+    // answered under the public PSK. These steps hold the replacement to the
+    // wall -- a key owns a conversation, that conversation is bound to the key
+    // material rather than to its name or its slot, and nothing crosses
+    // between it and the public thread in either direction.
+    {
+        const std::size_t saved_log_count = chat_log_count;
+        const std::size_t saved_log_start = chat_log_start;
+        chat_log_count = 0U;
+        chat_log_start = 0U;
+
+        std::uint8_t ridge[kChannelKeySize]{};
+        std::uint8_t river[kChannelKeySize]{};
+        std::size_t ridge_slot = 0U;
+        std::size_t river_slot = 0U;
+        char ridge_fp[kChannelKeyFingerprintDigits + 1]{};
+        char river_fp[kChannelKeyFingerprintDigits + 1]{};
+        const bool staged =
+            parseChannelKeyHex("8a1c0f43d29b57e6104fb8237ce5a90d", ridge, sizeof(ridge)) &&
+            parseChannelKeyHex("2f6b90c4137ade58bb0142e79c63f5d1", river, sizeof(river)) &&
+            channel_keys.add("NORTH RIDGE", ridge, sizeof(ridge), ridge_slot) ==
+                ChannelKeyResult::Ok &&
+            channel_keys.add("RIVER", river, sizeof(river), river_slot) ==
+                ChannelKeyResult::Ok &&
+            channel_keys.fingerprint(ridge_slot, ridge_fp, sizeof(ridge_fp)) &&
+            channel_keys.fingerprint(river_slot, river_fp, sizeof(river_fp));
+        if(!expect_simulator_state(staged,
+                                   "two channel keys must stage for the keyed chat test")) {
+            return false;
+        }
+
+        open_field_tab(FieldTab::Chat);
+        if(!expect_simulator_state(chat_peer_count >= 3U &&
+                                   chat_peers[0].key_fp[0] == '\0' &&
+                                   std::strcmp(chat_peers[0].name, "EVERYONE") == 0 &&
+                                   std::strcmp(chat_peers[1].name, "NORTH RIDGE") == 0 &&
+                                   std::strcmp(chat_peers[1].key_fp, ridge_fp) == 0 &&
+                                   std::strcmp(chat_peers[2].name, "RIVER") == 0 &&
+                                   std::strcmp(chat_peers[2].key_fp, river_fp) == 0,
+                                   "each stored key must own a thread, and EVERYONE must keep "
+                                   "the public one")) {
+            return false;
+        }
+
+        // How many lines a given thread would draw. The same predicate the
+        // screen filters on, so the assertions below are about what an
+        // operator can actually see.
+        const auto visible_in = [](std::size_t thread) noexcept {
+            std::size_t count = 0U;
+            for(std::size_t index = 0; index < chat_log_count; ++index) {
+                const std::size_t slot = (chat_log_start + index) % kChatLogCapacity;
+                if(chat_line_belongs_to(chat_log[slot], chat_peers[thread])) ++count;
+            }
+            return count;
+        };
+
+        chat_peer_index = 0U;
+        build_current_screen();
+        handle_navigation_key('\t');
+        if(!expect_simulator_state(chat_peer_index == 1U,
+                                   "TAB must move from EVERYONE onto the first keyed thread")) {
+            return false;
+        }
+        const char *ridge_text = "MOVING TO THE SADDLE";
+        for(std::size_t index = 0; ridge_text[index] != '\0'; ++index) {
+            handle_navigation_key(static_cast<std::uint32_t>(ridge_text[index]));
+        }
+        handle_navigation_key(LV_KEY_ENTER);
+        if(!expect_simulator_state(chat_log_count == 1U && chat_log[0].mine &&
+                                   std::strcmp(chat_log[0].text, ridge_text) == 0 &&
+                                   std::strcmp(chat_log[0].key_name, "NORTH RIDGE") == 0 &&
+                                   std::strcmp(chat_log[0].key_fp, ridge_fp) == 0,
+                                   "a message composed on a keyed thread must be sealed and "
+                                   "stamped with that key")) {
+            return false;
+        }
+        if(!expect_simulator_state(visible_in(0U) == 0U && visible_in(1U) == 1U &&
+                                   visible_in(2U) == 0U,
+                                   "a keyed message must show in its own thread and in no other")) {
+            return false;
+        }
+
+        chat_push("RANGER", "ANYONE ON LONGFAST", false, 0xffffffffU, "09:14");
+        if(!expect_simulator_state(visible_in(0U) == 1U && visible_in(1U) == 1U,
+                                   "a public message must stay in EVERYONE")) return false;
+        chat_push("FJELL", "SADDLE IS CLEAR", false, 0xffffffffU, "09:20", 0U, false,
+                  "NORTH RIDGE", ridge_fp);
+        if(!expect_simulator_state(visible_in(0U) == 1U && visible_in(1U) == 2U &&
+                                   chat_peers[0].unread == 1U && chat_peers[1].unread == 0U,
+                                   "a keyed message must join its channel's thread, and only "
+                                   "the thread nobody is reading must count as unread")) {
+            return false;
+        }
+
+        if(!expect_simulator_state(channel_keys.rename(ridge_slot, "RIDGE") ==
+                                       ChannelKeyResult::Ok,
+                                   "a stored key must be renamable")) return false;
+        build_current_screen();
+        if(!expect_simulator_state(std::strcmp(chat_peers[1].name, "RIDGE") == 0 &&
+                                   std::strcmp(chat_peers[1].key_fp, ridge_fp) == 0 &&
+                                   visible_in(1U) == 2U,
+                                   "a renamed key must keep its conversation, because the "
+                                   "conversation is bound to the key and not to its label")) {
+            return false;
+        }
+
+        if(!expect_simulator_state(channel_keys.remove(ridge_slot) == ChannelKeyResult::Ok,
+                                   "a stored key must be removable")) return false;
+        build_current_screen();
+        if(!expect_simulator_state(chat_peer_index == 0U &&
+                                   std::strcmp(chat_peers[1].name, "RIVER") == 0 &&
+                                   visible_in(0U) == 1U && visible_in(1U) == 0U,
+                                   "removing a key must close its thread and leave the operator "
+                                   "on EVERYONE, not on whichever thread took its place")) {
+            return false;
+        }
+        const std::uint8_t *gone_key = nullptr;
+        const char *gone_name = nullptr;
+        if(!expect_simulator_state(!channel_key_for_fingerprint(ridge_fp, gone_key, gone_name) &&
+                                   gone_key == nullptr && gone_name == nullptr,
+                                   "a removed key's fingerprint must resolve to nothing, so a "
+                                   "send on its thread cannot fall back to the public key")) {
+            return false;
+        }
+
+        std::uint8_t impostor[kChannelKeySize]{};
+        std::size_t impostor_slot = 0U;
+        if(!expect_simulator_state(
+               parseChannelKeyHex("ffeeddccbbaa99887766554433221100", impostor,
+                                  sizeof(impostor)) &&
+                   channel_keys.add("RIDGE", impostor, sizeof(impostor), impostor_slot) ==
+                       ChannelKeyResult::Ok,
+               "a new key may reuse a removed key's name")) {
+            return false;
+        }
+        build_current_screen();
+        std::size_t impostor_thread = 0U;
+        for(std::size_t index = 1; index < chat_peer_count; ++index) {
+            if(std::strcmp(chat_peers[index].name, "RIDGE") != 0) continue;
+            impostor_thread = index;
+            break;
+        }
+        if(!expect_simulator_state(impostor_thread != 0U && visible_in(impostor_thread) == 0U,
+                                   "a different key wearing an old key's name must not inherit "
+                                   "the conversation that old key opened")) {
+            return false;
+        }
+
+        channel_keys.clear();
+        chat_log_count = saved_log_count;
+        chat_log_start = saved_log_start;
+        chat_peer_index = 0U;
+        chat_open = false;
+        field_tab = FieldTab::Lily;
+        (void)app_shell.replace(ShellRoute::Settings);
+        build_current_screen();
+        if(!expect_simulator_state(app_shell.route() == ShellRoute::Settings &&
+                                   channel_keys.empty(),
+                                   "the keyed chat test must leave Settings and an empty key "
+                                   "list behind it")) {
+            return false;
+        }
+    }
+
     app_shell.setSettingsSelection(static_cast<std::size_t>(SettingsItem::ResetSetup));
     handle_navigation_key(LV_KEY_ENTER);
     if(!expect_simulator_state(app_shell.route() == ShellRoute::ResetConfirmation,
@@ -15817,7 +16329,8 @@ const char *transmit_meshcore_advert(MeshCoreAdvertReach reach) noexcept
     return nullptr;
 }
 
-bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to_node) noexcept
+bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to_node,
+                         const MeshtasticChannelSeal &seal) noexcept
 {
     char short_name[8]{};
     char long_name[24]{};
@@ -15836,10 +16349,22 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to
     // node in earshot drop us on arrival.
     request.channel_name = meshtasticDefaultChannelName(
         shell_active_profile().spreading_factor, shell_active_profile().bandwidth_hz);
+    // A stored key replaces both halves of that: the body is sealed with it
+    // instead of the published PSK, and the header hash is taken over the
+    // key's name, because on a keyed channel the name IS the channel's name.
+    // Which is why the naming screen says to type the channel's own name --
+    // a key named anything else still seals correctly and still reaches
+    // nobody, because every stock node drops the frame on the hash.
+    if (seal.key != nullptr && seal.name != nullptr) {
+        request.channel_key = seal.key;
+        request.channel_name = seal.name;
+    }
     // Seal it to the recipient when both halves exist: our identity, and a
     // key they published. Otherwise this stays a channel-key message that
     // everyone on the channel can read -- the honest fallback, and what the
-    // whole mesh did before public keys existed.
+    // whole mesh did before public keys existed. A message written in a keyed
+    // channel's conversation is never redirected this way; the encoder refuses
+    // it, so a channel the operator chose cannot be swapped for a person.
     if (pkc_identity_ready) {
         request.identity = &pkc_identity;
         const std::uint8_t *peer = peer_public_key_for(to_node);
@@ -15865,14 +16390,22 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to
         std::snprintf(event, sizeof(event), "TX %s  %.44s", request.channel_name, text);
         record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Radio, event);
         chat_push("ME", text, true, to_node, nullptr,
-                  request.want_ack ? request.packet_id : 0U);
+                  request.want_ack ? request.packet_id : 0U, false, seal.name,
+                  seal.fingerprint);
     }
     return true;
 }
 
 /// Confirm a received want-ack packet the way official firmware does: an
 /// empty Routing message whose request_id names the packet being confirmed.
-void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id) noexcept
+///
+/// With a seal, the acknowledgement goes out on the same keyed channel the
+/// packet arrived on. The caller is responsible for having checked that the
+/// seal really names that channel -- see the ingest path, which compares the
+/// hash it would stamp against the hash the frame carried and stays silent
+/// when they differ.
+void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id,
+                             const MeshtasticChannelSeal &seal) noexcept
 {
     MeshtasticEncodeRequest request{};
     request.from_node = localMeshtasticNodeNum();
@@ -15882,6 +16415,10 @@ void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id) noe
     request.request_id = packet_id;
     request.channel_name = meshtasticDefaultChannelName(
         shell_active_profile().spreading_factor, shell_active_profile().bandwidth_hz);
+    if (seal.key != nullptr && seal.name != nullptr) {
+        request.channel_key = seal.key;
+        request.channel_name = seal.name;
+    }
     (void)transmit_meshtastic_request(request);
 }
 

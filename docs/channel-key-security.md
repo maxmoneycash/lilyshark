@@ -102,7 +102,9 @@ to update.
   entry is masked, and the key list shows a name and a fingerprint. There is no
   UI path that renders a key, so a screenshot has nothing to capture.
 - `ChannelKeyProvider::channelKeyBytes()` is the one accessor that returns key
-  material. Its only caller is the Meshtastic payload reader. Nothing that
+  material. It has two callers: the Meshtastic payload reader, which opens a
+  keyed frame, and the Meshtastic encoder, which seals a reply on the same
+  channel. Both hand the bytes straight to AES and keep no copy. Nothing that
   writes a file, draws a pixel, or prints a line calls it, and the name is
   greppable so that stays true.
 
@@ -154,10 +156,14 @@ stronger claim that the traffic was never private.
   would be the wrong kind of honest.
 - **Messages** — the key's name follows the sender and the route, and the
   row's edge marker turns amber.
-- **Chat** — the same name follows the sender on the line's header, and the
-  line's edge marker turns amber. A chat line stores the key's *name* rather
-  than its slot, because the line outlives the key list; a line that pointed at
-  a slot would name a different key after a removal.
+- **Chat** — each stored key owns a conversation of its own, titled with the
+  key's name, drawn amber from the tab down to the box you type in, and
+  stamped in the corner with the key's fingerprint. A chat line records the
+  key's *name* for display and its *fingerprint* for identity: the name
+  because the line outlives the key list, and the fingerprint because a name
+  can be typed twice. A line belongs to a thread only when the fingerprints
+  match exactly, which is what keeps a keyed message out of EVERYONE and an
+  EVERYONE message out of a keyed thread — in both directions, on every line.
 
 The name, never the bytes: a decode result carries a slot index and the slot is
 resolved to the name the operator typed.
@@ -168,3 +174,48 @@ field for which key opened it — so a borrowed key's plaintext sent down it
 would arrive looking exactly like traffic anybody within earshot could read.
 The raw frame still goes over the link, so nothing is hidden from the analyzer;
 it simply does not get a decode it cannot label.
+
+## Answering on a keyed channel
+
+Reading a channel and speaking on it are different acts, and for a long time
+this firmware could only do the first. Keyed text was deliberately kept out of
+Chat: Chat has a Send button, and the encoder could only ever seal with the
+published PSK, so a reply composed beside a private message would have gone out
+in public, into a conversation the operator believed was private.
+
+`encodeMeshtasticFrame` now takes the channel key and the channel name, and one
+pointer decides both halves of the frame:
+
+- the body is sealed with that key instead of `kMeshtasticDefaultPsk`;
+- the header's channel byte becomes `meshtasticChannelHash(name, key)`, the XOR
+  of the two, which is the same byte every stock radio on that channel stamps.
+
+A request that names no key is byte-for-byte what it always was. The test
+`testDefaultChannelFramesAreByteForByteUnchanged` holds two frames captured
+from the previous revision of the encoder and compares them to what it produces
+today, so the public channel cannot be broken by a change made for a private
+one.
+
+**The key's name is the channel's name.** The hash covers both, so a key stored
+under any other label still seals correctly, still cannot be read from outside
+the channel, and still reaches nobody: every stock node drops the frame on the
+header byte before decrypting it. Reading works under any name. Sending does
+not. The naming screen says so.
+
+**Acknowledgements.** A want-ack packet opened by a stored key is answered
+under that same key, or not at all. A default-key acknowledgement would
+broadcast in the clear both that this deck holds the channel's key and which
+packet it just read; a keyed one says neither, because the confirmed id is
+inside the ciphertext and the header byte is the channel's own. The ack goes
+out only when the header byte the deck would stamp equals the header byte the
+frame it answers arrived carrying — the only evidence available on the air that
+the operator's name for the key is the name the channel goes by. When they
+differ the deck stays silent, which is what it did before.
+
+**What a keyed conversation is not.** It addresses the channel, never a person,
+even when the frame that started it was addressed to this node alone. A channel
+key is shared by everyone holding it, so such a message was never private to
+its recipient, and offering a one-to-one reply thread for it would draw a
+privacy the key does not provide. A node heard only under a borrowed key gets
+no direct-message tab for the same reason: that tab's Send button would answer
+under the public key.

@@ -64,8 +64,19 @@ struct MeshtasticEncodeRequest {
     const char *long_name = "Lilyshark";
     const char *short_name = "LSK";
     /// Hashed into the header; stock nodes drop frames whose hash names a
-    /// channel they do not have, so this must match the active preset.
+    /// channel they do not have, so this must match the active preset. On a
+    /// keyed channel it must be the channel's own name, because the hash is
+    /// taken over the name and the key together.
     const char *channel_name = kMeshtasticDefaultChannelName;
+    /// The channel key this frame is sealed under, or null for the published
+    /// default PSK. Exactly `crypto::kAes128KeySize` bytes when set; this
+    /// build has no other cipher, and `ChannelKeyStore` refuses to hold a key
+    /// of any other length.
+    ///
+    /// Null is the whole of the old behaviour: the key and the psk half of
+    /// the header hash both come from `kMeshtasticDefaultPsk`, so a request
+    /// that does not set this encodes byte for byte what it always did.
+    const std::uint8_t *channel_key = nullptr;
     /// Set both of these to send a private message only the destination can
     /// read. When they are present on a direct text, the payload is sealed
     /// with the pair's shared secret instead of the channel key everybody
@@ -80,11 +91,15 @@ struct MeshtasticEncodeRequest {
 
 /// True when this request will be sealed to one recipient. Broadcasts and
 /// the protocol's own housekeeping ports stay on the channel key, matching
-/// the exclusions in stock firmware's Router::send.
+/// the exclusions in stock firmware's Router::send. A request naming a stored
+/// channel key is never one of these: the operator picked a channel to speak
+/// on, and quietly sealing that message to a person instead would move it out
+/// of the conversation it was written in.
 bool meshtasticRequestUsesPkc(const MeshtasticEncodeRequest &request) noexcept;
 
-/// Build a native 16-byte header plus default-PSK ciphertext. Returns 0 if
-/// the buffer is too small or the request is empty.
+/// Build a native 16-byte header plus ciphertext, sealed under
+/// `request.channel_key` or the published default PSK when that is null.
+/// Returns 0 if the buffer is too small or the request is empty.
 std::size_t encodeMeshtasticFrame(const MeshtasticEncodeRequest &request,
                                   std::uint8_t *out, std::size_t out_size) noexcept;
 

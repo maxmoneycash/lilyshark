@@ -181,6 +181,7 @@ ChannelKeyResult ChannelKeyStore::add(const char *name, const std::uint8_t *key,
     std::copy(key, key + kChannelKeySize, entry.key);
     slot = size_;
     ++size_;
+    ++revision_;
     return ChannelKeyResult::Ok;
 }
 
@@ -207,6 +208,7 @@ ChannelKeyResult ChannelKeyStore::rename(std::size_t slot, const char *name) noe
     for (std::size_t remaining = index; remaining < kChannelKeyNameCapacity; ++remaining) {
         entry.name[remaining] = '\0';
     }
+    ++revision_;
     return ChannelKeyResult::Ok;
 }
 
@@ -221,6 +223,7 @@ ChannelKeyResult ChannelKeyStore::remove(std::size_t slot) noexcept
     --size_;
     zeroSecret(entries_[size_].key, kChannelKeySize);
     std::fill(std::begin(entries_[size_].name), std::end(entries_[size_].name), '\0');
+    ++revision_;
     return ChannelKeyResult::Ok;
 }
 
@@ -231,6 +234,7 @@ void ChannelKeyStore::clear() noexcept
         std::fill(std::begin(entry.name), std::end(entry.name), '\0');
     }
     size_ = 0U;
+    ++revision_;
 }
 
 const char *ChannelKeyStore::name(std::size_t slot) const noexcept
@@ -336,6 +340,7 @@ ChannelKeyDecodeResult ChannelKeyStore::decode(const std::uint8_t *bytes,
         entries_[index] = candidate.entries_[index];
     }
     size_ = candidate.size_;
+    ++revision_;
     candidate.clear();
     return ChannelKeyDecodeResult::LoadedV1;
 }

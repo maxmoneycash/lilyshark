@@ -517,8 +517,211 @@ void testOurPublicKeyRidesOurNodeInfo()
     assert(std::memcmp(parsed.public_key, ours.public_key, 32) == 0);
 }
 
+// ── Sealing under a channel key the operator stored ─────────────────────────
+
+/// The operator's key throughout the tests below. Not the published PSK, and
+/// not derived from it.
+const std::uint8_t kStoredChannelKey[16] = {
+    0x8a, 0x1c, 0x0f, 0x43, 0xd2, 0x9b, 0x57, 0xe6,
+    0x10, 0x4f, 0xb8, 0x23, 0x7c, 0xe5, 0xa9, 0x0d,
+};
+
+/// The two frames the encoder produced for these exact requests BEFORE it
+/// could take a key, captured from the previous revision of
+/// src/core/meshtastic_encode.cpp and pasted here. They are the whole
+/// assertion that adding a key changed nothing for a caller that does not
+/// pass one: a single altered byte in the header, the nonce, or the keystream
+/// would break traffic every existing Lilyshark and every stock radio can
+/// read today.
+const std::uint8_t kDefaultTextFrame[] = {
+    0xff, 0xff, 0xff, 0xff, 0x01, 0x4b, 0x53, 0x4c,
+    0x4d, 0x3c, 0x2b, 0x1a, 0x63, 0x08, 0x00, 0x00,
+    0x35, 0xd4, 0xe6, 0x66, 0x3a, 0xff, 0x83, 0x55,
+    0xa6, 0x53, 0x67, 0xd3, 0x5b, 0x1d, 0xdb, 0xd0,
+    0x5d, 0xe6, 0x00, 0xf8, 0x46, 0xbd, 0x7c, 0xae,
+    0xa1, 0x86, 0x7e, 0x43, 0x1b, 0xb8,
+};
+
+const std::uint8_t kDefaultAckFrame[] = {
+    0x2c, 0x1b, 0x6a, 0x33, 0x01, 0x4b, 0x53, 0x4c,
+    0xee, 0xff, 0xc0, 0x00, 0x63, 0x08, 0x00, 0x00,
+    0x77, 0x7b, 0x26, 0x61, 0x5d, 0x41, 0x7a, 0xed,
+    0x5f, 0xee,
+};
+
+MeshtasticEncodeRequest defaultTextRequest()
+{
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0x4c534b01U;
+    request.to_node = 0xffffffffU;
+    request.packet_id = 0x1a2b3c4dU;
+    request.hop_limit = 3;
+    request.port = MeshtasticPort::TextMessage;
+    request.text = "default channel, unchanged";
+    request.channel_name = "LongFast";
+    return request;
+}
+
+MeshtasticEncodeRequest defaultAckRequest()
+{
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0x4c534b01U;
+    request.to_node = 0x336a1b2cU;
+    request.packet_id = 0x00c0ffeeU;
+    request.port = MeshtasticPort::Routing;
+    request.request_id = 0x1a2b3c4dU;
+    request.channel_name = "LongFast";
+    return request;
+}
+
+void testDefaultChannelFramesAreByteForByteUnchanged()
+{
+    std::uint8_t frame[256]{};
+    std::size_t length = encodeMeshtasticFrame(defaultTextRequest(), frame, sizeof(frame));
+    assert(length == sizeof(kDefaultTextFrame));
+    assert(std::memcmp(frame, kDefaultTextFrame, length) == 0);
+
+    length = encodeMeshtasticFrame(defaultAckRequest(), frame, sizeof(frame));
+    assert(length == sizeof(kDefaultAckFrame));
+    assert(std::memcmp(frame, kDefaultAckFrame, length) == 0);
+
+    // Naming the published key explicitly must be the same frame as naming no
+    // key at all, or the pointer would be a second switch on top of the key it
+    // points at.
+    MeshtasticEncodeRequest spelled_out = defaultTextRequest();
+    spelled_out.channel_key = kMeshtasticDefaultPsk;
+    length = encodeMeshtasticFrame(spelled_out, frame, sizeof(frame));
+    assert(length == sizeof(kDefaultTextFrame));
+    assert(std::memcmp(frame, kDefaultTextFrame, length) == 0);
+}
+
+void testAKeyedFrameIsSealedAgainstTheDefaultKey()
+{
+    MeshtasticEncodeRequest request = defaultTextRequest();
+    request.text = "north ridge, saddle is clear";
+    request.channel_name = "NORTH RIDGE";
+    request.channel_key = kStoredChannelKey;
+
+    std::uint8_t frame[256]{};
+    const std::size_t length = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(length > 16U);
+
+    // The header byte is the XOR of the channel's name with the channel's key,
+    // which is what a stock radio on that channel sorts on. It is not the
+    // default channel's byte, and it is not zero -- zero is reserved for a
+    // message sealed to a person.
+    assert(frame[13] == meshtasticChannelHash("NORTH RIDGE", kStoredChannelKey,
+                                              sizeof(kStoredChannelKey)));
+    assert(frame[13] != meshtasticChannelHash(kMeshtasticDefaultChannelName,
+                                              kMeshtasticDefaultPsk,
+                                              sizeof(kMeshtasticDefaultPsk)));
+    assert(frame[13] != 0U);
+
+    // The published key does not open it. This is the property the whole
+    // feature rests on: a message written in a keyed conversation is not
+    // readable by everyone in earshot.
+    MeshtasticPayload leaked{};
+    assert(!readMeshtasticPayload(frame + 16, length - 16, request.from_node,
+                                  request.packet_id, leaked));
+    assert(!leaked.readable);
+
+    // The stored key does, and yields the same strict parse.
+    std::uint8_t nonce[crypto::kAesBlockSize]{};
+    nonce[0] = static_cast<std::uint8_t>(request.packet_id);
+    nonce[1] = static_cast<std::uint8_t>(request.packet_id >> 8U);
+    nonce[2] = static_cast<std::uint8_t>(request.packet_id >> 16U);
+    nonce[3] = static_cast<std::uint8_t>(request.packet_id >> 24U);
+    nonce[8] = static_cast<std::uint8_t>(request.from_node);
+    nonce[9] = static_cast<std::uint8_t>(request.from_node >> 8U);
+    nonce[10] = static_cast<std::uint8_t>(request.from_node >> 16U);
+    nonce[11] = static_cast<std::uint8_t>(request.from_node >> 24U);
+    std::uint8_t plain[256]{};
+    crypto::aesCtrXcrypt(kStoredChannelKey, nonce, frame + 16, length - 16, plain);
+    MeshtasticPayload opened{};
+    assert(parseMeshtasticData(plain, length - 16, opened));
+    assert(opened.has_text);
+    assert(std::strcmp(opened.text, "north ridge, saddle is clear") == 0);
+}
+
+void testTheHeaderHashCoversTheKeyAndNotOnlyTheName()
+{
+    // Two channels can share a name and differ in their key, and stock
+    // firmware tells them apart by this byte. A hash taken over the name alone
+    // would put our frames on whichever of them the listener happened to hold.
+    std::uint8_t other[16]{};
+    std::memcpy(other, kStoredChannelKey, sizeof(other));
+    other[0] = static_cast<std::uint8_t>(other[0] ^ 0x5aU);
+    assert(meshtasticChannelHash("NORTH RIDGE", kStoredChannelKey, sizeof(kStoredChannelKey)) !=
+           meshtasticChannelHash("NORTH RIDGE", other, sizeof(other)));
+
+    MeshtasticEncodeRequest request = defaultTextRequest();
+    request.channel_name = "NORTH RIDGE";
+    std::uint8_t first[256]{};
+    std::uint8_t second[256]{};
+    request.channel_key = kStoredChannelKey;
+    const std::size_t first_length = encodeMeshtasticFrame(request, first, sizeof(first));
+    request.channel_key = other;
+    const std::size_t second_length = encodeMeshtasticFrame(request, second, sizeof(second));
+    assert(first_length == second_length && first_length > 16U);
+    assert(first[13] != second[13]);
+    // And the bodies differ too -- the same pointer decides both, so a header
+    // that says one channel can never carry another channel's ciphertext.
+    assert(std::memcmp(first + 16, second + 16, first_length - 16U) != 0);
+}
+
+void testAChosenChannelOutranksAPeerPublicKey()
+{
+    // Composing in a channel's conversation is a choice of audience. Sealing
+    // that message to one person instead would deliver it somewhere the
+    // sender was not looking, so the channel key wins and the frame stays a
+    // channel frame -- non-zero channel byte and all.
+    std::uint8_t alice_entropy[32];
+    std::uint8_t bob_entropy[32];
+    for (std::size_t i = 0; i < 32; ++i) {
+        alice_entropy[i] = static_cast<std::uint8_t>(0x11 + i);
+        bob_entropy[i] = static_cast<std::uint8_t>(0xa0 + i);
+    }
+    MeshtasticPkcKeypair alice{};
+    MeshtasticPkcKeypair bob{};
+    assert(meshtasticPkcGenerateKeypair(alice_entropy, alice));
+    assert(meshtasticPkcGenerateKeypair(bob_entropy, bob));
+
+    MeshtasticEncodeRequest request{};
+    request.from_node = 0xcda172e0U;
+    request.to_node = 0x96f61b44U;
+    request.packet_id = 0x11223344U;
+    request.port = MeshtasticPort::TextMessage;
+    request.text = "on the ridge channel";
+    request.identity = &alice;
+    request.peer_public_key = bob.public_key;
+    request.extra_nonce = 0x55667788U;
+    assert(meshtasticRequestUsesPkc(request));
+
+    request.channel_name = "NORTH RIDGE";
+    request.channel_key = kStoredChannelKey;
+    assert(!meshtasticRequestUsesPkc(request));
+
+    std::uint8_t frame[256]{};
+    const std::size_t length = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    assert(length > 16U);
+    assert(frame[13] == meshtasticChannelHash("NORTH RIDGE", kStoredChannelKey,
+                                              sizeof(kStoredChannelKey)));
+    // Not the zero byte a public-key message wears, and not readable by Bob's
+    // pair either: the channel really is what sealed it.
+    assert(frame[13] != 0U);
+    std::uint8_t plain[256]{};
+    std::size_t plain_length = 0;
+    assert(!meshtasticPkcDecryptDm(bob, alice.public_key, request.from_node,
+                                   request.packet_id, frame + 16, length - 16, plain,
+                                   sizeof(plain), &plain_length));
+}
+
 int main()
 {
+    testDefaultChannelFramesAreByteForByteUnchanged();
+    testAKeyedFrameIsSealedAgainstTheDefaultKey();
+    testTheHeaderHashCoversTheKeyAndNotOnlyTheName();
+    testAChosenChannelOutranksAPeerPublicKey();
     testFips197BlockVector();
     testPrivateMessageIsSealedAndOpensOnlyForItsRecipient();
     testOurPublicKeyRidesOurNodeInfo();
