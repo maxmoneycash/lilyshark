@@ -20,7 +20,7 @@ by requirement. The workflow has two halves that constrain the choice:
 | Anyone can resolve, not just the uploader | ✗ | ✗ IAM/billing walled | ✓ public gateways | ✓ | ✓ public reads |
 | Serving reads is *compensated* — a gateway can earn for resolving | ✗ | ✗ you pay Amazon | ✗ pinning pays for storage, not serving | △ endowment, not per-serve | ✓ measured per-read via `blob_activities` |
 | No keys or account on the capture device | ✓ (nothing to hold) | ✗ credentials required | △ pinning API keys | ✗ wallet to pay | ✓ uploads happen at the gateway |
-| Live network with a metered economy *today* | — | ✓ | ✓ | ✓ | ✓ ([measured](../analysis/results_evidence.md): 393k blobs, 8.09M transactions) |
+| Live network with a metered economy *today* | — | ✓ | ✓ | ✓ | ✓ ([measured](../analysis/results_evidence.md) 2026-08-15: 393k blobs, 8.09M transactions) |
 
 ## The short version of each
 

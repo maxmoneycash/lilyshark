@@ -42,6 +42,19 @@ import {
   stopCapture,
   useCaptureSession,
 } from '../lib/captureSession';
+import {
+  conversationCoverage,
+  conversationExpression,
+  conversationLabel,
+  coverageNote,
+  frameAddressing,
+  isAddressable,
+  parseConversationExpression,
+  reticulumDestinationHashHex,
+} from '../lib/conversation';
+import { FILTER_FIELDS, parseFrameFilter, protoOfProfile } from '../lib/frameFilter';
+import { frameTimeS } from '../lib/trafficView';
+import { CaptureDiffPanel } from './CaptureDiffPanel';
 
 /** The live table stops growing here; old frames age out on the left. */
 const LIVE_CAP = 250;
@@ -73,6 +86,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [blob, setBlob] = useState('');
   const [busy, setBusy] = useState(false);
+  // The display filter is plain text, kept as the operator typed it: a
+  // followed conversation is nothing but one particular expression in this
+  // box, so following, editing and clearing are all the same control.
+  const [filterText, setFilterText] = useState('');
+  const [diffOpen, setDiffOpen] = useState(false);
   // Live demo mode adds synthetic frames at a configured cadence. It is
   // available only while TerminalApp is showing the demo mesh. Opening a file
   // pauses it.
@@ -461,6 +479,49 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const f = frames[selected];
   const ptr = f ? pointers[selected] : null;
 
+  // ── display filter ────────────────────────────────────────────────────
+  // Every frame's addressing and Reticulum destination hash are read once
+  // per capture and handed to the predicate, so typing into the filter box
+  // re-runs comparisons rather than header arithmetic.
+  const addressings = useMemo(
+    () => frames.map((fr) => frameAddressing(fr.bytes, fr.profileId)),
+    [frames],
+  );
+  const destHashes = useMemo(
+    () =>
+      frames.map((fr) =>
+        protoOfProfile(fr.profileId) === 'rnode'
+          ? reticulumDestinationHashHex(fr.bytes)
+          : null,
+      ),
+    [frames],
+  );
+  const filter = useMemo(() => parseFrameFilter(filterText), [filterText]);
+  // Indices into `frames`, not a new frame list: the selection, the pointer
+  // scan and the diff all address frames by their position in the capture,
+  // and a filtered view must not renumber them.
+  const shown = useMemo(() => {
+    if (!filter.ok || filter.empty) return frames.map((_, i) => i);
+    const predicate = filter.predicate;
+    const kept: number[] = [];
+    frames.forEach((fr, i) => {
+      if (predicate(fr, pointers[i] !== null, destHashes[i], addressings[i]))
+        kept.push(i);
+    });
+    return kept;
+  }, [filter, frames, pointers, destHashes, addressings]);
+
+  // A conversation is an ordinary filter expression, so "am I following one"
+  // is a question about the text in the box — edit it and it stops being a
+  // conversation, which is exactly what the operator did.
+  const following = useMemo(() => parseConversationExpression(filterText), [filterText]);
+  const coverage = useMemo(() => conversationCoverage(addressings), [addressings]);
+  const selectedAddress = f ? addressings[selected] : null;
+  const followExpression =
+    selectedAddress && isAddressable(selectedAddress)
+      ? conversationExpression(selectedAddress)
+      : null;
+
   return (
     <main>
       <div className="panel" style={{ flex: 1 }}>
@@ -472,6 +533,14 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
           </button>
           <button onClick={() => void openSample()} disabled={busy}>
             SAMPLE
+          </button>
+          <button
+            className={diffOpen ? 'primary' : ''}
+            disabled={!capture}
+            title="Compare this capture against another .lscap — what only one of the two heard"
+            onClick={() => setDiffOpen((v) => !v)}
+          >
+            ⇄ DIFF
           </button>
           {/* Record what the linked radio hears, then open it right here. */}
           {session.recording ? (
@@ -722,6 +791,53 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               ))}
             </div>
 
+            {/* The display filter. A conversation is one expression in this
+                same box, so following one and typing one are the same act —
+                and CLEAR is the single way back to the whole capture. */}
+            <div
+              className="panel-foot"
+              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}
+            >
+              <span className="k">FILTER</span>
+              <input
+                value={filterText}
+                spellCheck={false}
+                placeholder="proto == meshtastic && snr > -5_"
+                title={`Fields: ${FILTER_FIELDS.join(', ')}. Comparisons == != < <= > >= with k/M/G suffixes on numbers; combine with && || ! (or the words and / or / not).`}
+                style={{
+                  flex: '1 1 260px',
+                  minWidth: 160,
+                  color: filter.ok ? undefined : 'var(--err, #ff6b6b)',
+                }}
+                onChange={(e) => setFilterText(e.target.value)}
+              />
+              <button disabled={filterText === ''} onClick={() => setFilterText('')}>
+                {following ? 'SHOW ALL FRAMES' : 'CLEAR'}
+              </button>
+              {!filter.ok ? (
+                <span className="err">
+                  {filter.error.message} · column {filter.error.start + 1}
+                </span>
+              ) : following ? (
+                <span className="ok">
+                  FOLLOWING {conversationLabel(following)} · {shown.length} OF{' '}
+                  {frames.length} FRAMES
+                </span>
+              ) : filter.empty ? (
+                <span className="dim">no filter — every frame in the capture</span>
+              ) : (
+                <span>
+                  {shown.length} OF {frames.length} FRAMES MATCH
+                </span>
+              )}
+            </div>
+
+            {following && coverage.undecodable > 0 && (
+              <div className="panel-foot dim" style={{ display: 'block' }}>
+                {coverageNote(coverage)}
+              </div>
+            )}
+
             <div className="scroll-y" ref={tableRef}>
               <div className="scroll-x">
               <table className="grid">
@@ -740,7 +856,9 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {frames.map((fr, i) => (
+                  {shown.map((i) => {
+                    const fr = frames[i];
+                    return (
                     <tr
                       key={i}
                       className={i === selected ? 'sel' : undefined}
@@ -756,7 +874,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                           </span>
                         )}
                       </td>
-                      <td>{(Number(fr.timestampUs - t0) / 1e6).toFixed(3)}</td>
+                      <td>{frameTimeS(fr, t0).toFixed(3)}</td>
                       <td>{fr.direction.toUpperCase()}</td>
                       <td>
                         {fr.capturedLength}
@@ -775,14 +893,25 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                       </td>
                       <td className={crcClass(fr.crc)}>{fr.crc}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               </div>
             </div>
 
+            {shown.length === 0 && filter.ok && !filter.empty && (
+              <div className="panel-foot dim" style={{ display: 'block' }}>
+                No frame in this capture matches the filter. The expression is
+                valid — these {frames.length} frames simply do not satisfy it.
+              </div>
+            )}
+
             <div className="panel-foot">
-              {frames.length} FRAMES · {pointers.filter(Boolean).length} SHELBY POINTER(S)
+              {shown.length === frames.length
+                ? `${frames.length} FRAMES`
+                : `${shown.length} OF ${frames.length} FRAMES SHOWN`}{' '}
+              · {pointers.filter(Boolean).length} SHELBY POINTER(S)
               {frames.some((fr) => fr.synthetic) && (
                 <span className="warn">
                   {frames.filter((fr) => fr.synthetic).length} SYNTHETIC · NOT OTA
@@ -798,10 +927,38 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 
       {f && (
         <div className="panel" style={{ width: 360, flexShrink: 0 }}>
-          <div className="panel-title">FRAME {Number(f.sequence)}</div>
+          <div className="panel-title">
+            FRAME {Number(f.sequence)}
+            <span className="spacer" />
+            {followExpression && (
+              <button
+                className={filterText === followExpression ? 'primary' : ''}
+                title={`Filter the capture to everything these endpoints exchanged: ${followExpression}`}
+                onClick={() => setFilterText(followExpression)}
+              >
+                ⇄ FOLLOW
+              </button>
+            )}
+          </div>
 
           <div className="scroll-y">
             <div className="kv">
+              {/* What the frame's own protocol proves about who was talking —
+                  and, when it proves nothing, why, so an absent FOLLOW button
+                  is explained rather than merely missing. */}
+              <span className="k">CONVERSATION</span>
+              {selectedAddress && isAddressable(selectedAddress) ? (
+                <span className="v">
+                  {conversationLabel(selectedAddress)}
+                  {selectedAddress.reason && (
+                    <span className="dim"> · {selectedAddress.reason}</span>
+                  )}
+                </span>
+              ) : (
+                <span className="v dim">
+                  not addressable — {selectedAddress?.reason ?? 'no addressing decoded'}
+                </span>
+              )}
               <span className="k">MODULATION</span>
               <span className="v">{f.modulation.toUpperCase()}</span>
               <span className="k">CAPTURED</span>
@@ -897,6 +1054,15 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {diffOpen && capture && (
+        <CaptureDiffPanel
+          aName={name}
+          aFrames={frames}
+          onSelectA={setSelected}
+          onClose={() => setDiffOpen(false)}
+        />
       )}
     </main>
   );

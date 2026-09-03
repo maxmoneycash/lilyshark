@@ -101,6 +101,15 @@ self.addEventListener('fetch', (event) => {
 
 export default defineConfig({
   plugins: [react(), offlineWorker()],
+  build: {
+    rollupOptions: {
+      // Multi-page: the analyzer at / and the browser flasher at /flash/.
+      input: {
+        main: join(__dirname, 'index.html'),
+        flash: join(__dirname, 'flash', 'index.html'),
+      },
+    },
+  },
   server: {
     port: 3002,
     proxy: {
