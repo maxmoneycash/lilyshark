@@ -768,13 +768,13 @@
         // iOS 6 To: token is a pale sky lozenge, not the Send candy.
         const radius = height / 2;
         ctx.save();
-        ctx.shadowColor = "rgba(20,40,80,0.16)";
-        ctx.shadowBlur = 1.4;
-        ctx.shadowOffsetY = 1;
-        panel(ctx, x, y, width, height, 0xc8e6fa, 0x7ab6ea, 0x4a8ac8, radius);
+        ctx.shadowColor = "rgba(20,40,80,0.12)";
+        ctx.shadowBlur = 1.2;
+        ctx.shadowOffsetY = 0.8;
+        panel(ctx, x, y, width, height, 0xd4eaf8, 0x8ec4ee, 0x5a9ad0, radius);
         ctx.restore();
-        candyGlass(ctx, x, y, width, height, 0.80);
-        ctx.strokeStyle = "rgba(255,255,255,0.62)";
+        candyGlass(ctx, x, y, width, height, 0.46);
+        ctx.strokeStyle = "rgba(255,255,255,0.70)";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1, y + 1, width - 2, height - 2, Math.max(1, radius - 1));
         ctx.stroke();
@@ -782,7 +782,7 @@
             size: 11,
             weight: "700",
             align: "center",
-            shadow: "rgba(20,50,90,0.24)",
+            shadow: "rgba(20,50,90,0.20)",
         });
     }
 
