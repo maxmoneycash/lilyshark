@@ -1,10 +1,21 @@
+import {
+  type NoteBook,
+  type NoteRow,
+  readNoteRows,
+  scopeKey,
+  type NoteScope,
+} from "../lib/annotations";
 import type { Message, NodeEntry, Traceroute, Waypoint } from "./store";
 
 /** Same API as the original SQLite layer, on IndexedDB: the browser has no
  *  SQLite, and everything the app persists is key/range lookups anyway. */
 
 const DB_NAME = "lilyshark";
-const DB_VERSION = 1;
+// Version 2 adds the frame-notes store. Every existing browser holds a
+// version 1 database with real messages in it, so the upgrade only ever adds
+// what is missing -- re-creating a store that is already there both throws and
+// would take the data with it.
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBDatabase> | undefined;
 
@@ -14,28 +25,49 @@ export function openDb(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      const messages = db.createObjectStore("messages", { keyPath: ["id", "ts"] });
-      messages.createIndex("convo", "convo");
-      messages.createIndex("ts", "ts");
-      messages.createIndex("id", "id");
-      const telemetry = db.createObjectStore("telemetry", { autoIncrement: true });
-      telemetry.createIndex("nmt", ["node", "metric", "ts"]);
-      telemetry.createIndex("nm", ["node", "metric"]);
-      telemetry.createIndex("node", "node");
-      telemetry.createIndex("ts", "ts");
-      db.createObjectStore("nodes", { keyPath: "num" });
-      const traceroutes = db.createObjectStore("traceroutes", { keyPath: ["node", "ts"] });
-      traceroutes.createIndex("node", "node");
-      traceroutes.createIndex("ts", "ts");
-      const hops = db.createObjectStore("hops", { keyPath: ["node", "ts"] });
-      hops.createIndex("node", "node");
-      hops.createIndex("ts", "ts");
-      const sightings = db.createObjectStore("sightings", { keyPath: ["node", "hourBucket"] });
-      sightings.createIndex("hourBucket", "hourBucket");
-      const neighbors = db.createObjectStore("neighbors", { keyPath: ["node", "neighbor"] });
-      neighbors.createIndex("node", "node");
-      neighbors.createIndex("ts", "ts");
-      db.createObjectStore("waypoints", { keyPath: "id" });
+      const missing = (name: string) => !db.objectStoreNames.contains(name);
+      if (missing("messages")) {
+        const messages = db.createObjectStore("messages", { keyPath: ["id", "ts"] });
+        messages.createIndex("convo", "convo");
+        messages.createIndex("ts", "ts");
+        messages.createIndex("id", "id");
+      }
+      if (missing("telemetry")) {
+        const telemetry = db.createObjectStore("telemetry", { autoIncrement: true });
+        telemetry.createIndex("nmt", ["node", "metric", "ts"]);
+        telemetry.createIndex("nm", ["node", "metric"]);
+        telemetry.createIndex("node", "node");
+        telemetry.createIndex("ts", "ts");
+      }
+      if (missing("nodes")) db.createObjectStore("nodes", { keyPath: "num" });
+      if (missing("traceroutes")) {
+        const traceroutes = db.createObjectStore("traceroutes", { keyPath: ["node", "ts"] });
+        traceroutes.createIndex("node", "node");
+        traceroutes.createIndex("ts", "ts");
+      }
+      if (missing("hops")) {
+        const hops = db.createObjectStore("hops", { keyPath: ["node", "ts"] });
+        hops.createIndex("node", "node");
+        hops.createIndex("ts", "ts");
+      }
+      if (missing("sightings")) {
+        const sightings = db.createObjectStore("sightings", { keyPath: ["node", "hourBucket"] });
+        sightings.createIndex("hourBucket", "hourBucket");
+      }
+      if (missing("neighbors")) {
+        const neighbors = db.createObjectStore("neighbors", { keyPath: ["node", "neighbor"] });
+        neighbors.createIndex("node", "node");
+        neighbors.createIndex("ts", "ts");
+      }
+      if (missing("waypoints")) db.createObjectStore("waypoints", { keyPath: "id" });
+      if (missing("annotations")) {
+        // The key is the frame's whole address -- capture scope plus sequence
+        // number -- so a note can only ever land on the frame it names. The
+        // scope is indexed as well so one capture's notes can be read without
+        // walking every note in the browser.
+        const annotations = db.createObjectStore("annotations", { keyPath: "key" });
+        annotations.createIndex("scope", "scope");
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -409,6 +441,41 @@ export async function loadWaypoints(): Promise<Waypoint[]> {
   return live;
 }
 
+// ── frame notes ─────────────────────────────────────────────────────────────
+
+/** Writes one note. The row's key is its frame address, so re-noting a frame
+ *  replaces that frame's note instead of piling up a second one. */
+export async function saveFrameNote(row: NoteRow): Promise<void> {
+  const { os, tx } = await store("annotations", "readwrite");
+  os.put(row);
+  await txDone(tx);
+}
+
+/** Removes the note at one frame address; clearing the box is how a note is
+ *  deleted, and the screen calls this with the key setNote reported. */
+export async function deleteFrameNote(key: string): Promise<void> {
+  const { os, tx } = await store("annotations", "readwrite");
+  os.delete(key);
+  await txDone(tx);
+}
+
+/** Every note this browser holds, or one capture's when a scope is given.
+ *
+ *  Rows are validated by readNoteRows rather than trusted: a row written by
+ *  another build, or damaged in the store, is reported in `skipped` and left
+ *  out of the book instead of attaching an operator's words to a frame nobody
+ *  meant. */
+export async function loadFrameNotes(
+  scope?: NoteScope,
+): Promise<{ book: NoteBook; skipped: string[] }> {
+  const { os } = await store("annotations");
+  const rows =
+    scope === undefined
+      ? await collect<unknown>(os)
+      : await collect<unknown>(os.index("scope"), IDBKeyRange.only(scopeKey(scope)));
+  return readNoteRows(rows);
+}
+
 // ── stats / purge ───────────────────────────────────────────────────────────
 
 export async function dbStats(): Promise<{
@@ -443,6 +510,8 @@ export function setAutoPurgeDays(days: number): void {
 // Nodes are left alone: there are few of them and their identity is what makes
 // the remaining history readable. Neighbors do expire: if they aren't renewed
 // the link no longer exists and keeping it would draw ghost edges in the graph.
+// Frame notes are left alone as well: they are the operator's own words rather
+// than traffic the radio piled up, and there are only ever a handful.
 export async function purgeOlderThan(days: number): Promise<number> {
   const cut = Date.now() - days * 86_400_000;
   const db = await openDb();
