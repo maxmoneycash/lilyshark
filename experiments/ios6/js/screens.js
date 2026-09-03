@@ -48,7 +48,8 @@
     }
 
     function glyphMessage(ctx, x, y) {
-        // iOS 6 Messages: lime/forest 45° bands, white oval, short left hook.
+        // iOS 6 Messages: lime/forest 45° bands (top-right to bottom-left),
+        // white oval slightly above center, short hooked left tail.
         ctx.save();
         K().roundRectPath(ctx, x, y, 48, 48, 10);
         ctx.clip();
@@ -56,11 +57,11 @@
         ctx.fillRect(x, y, 48, 48);
         ctx.save();
         ctx.translate(x + 24, y + 24);
-        ctx.rotate(Math.PI / 4);
-        const pitch = 7.4;
+        ctx.rotate(-Math.PI / 4);
+        const pitch = 6.2;
         for (let stripe = -64; stripe < 64; stripe += pitch) {
             ctx.fillStyle = Math.round(stripe / pitch) % 2 === 0 ? "#62c354" : "#2a8f30";
-            ctx.fillRect(-58, stripe, 116, pitch + 0.4);
+            ctx.fillRect(-58, stripe, 116, pitch + 0.35);
         }
         ctx.restore();
         ctx.restore();
@@ -70,39 +71,39 @@
         ctx.shadowBlur = 2.4;
         ctx.shadowOffsetY = 1.2;
         ctx.beginPath();
-        ctx.ellipse(x + 24.6, y + 20.4, 17.8, 10.0, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24.0, y + 20.2, 18.2, 10.2, 0, 0, Math.PI * 2);
         const body = ctx.createLinearGradient(x, y + 9, x, y + 32);
         body.addColorStop(0, "#ffffff");
-        body.addColorStop(0.58, "#f6f7f9");
-        body.addColorStop(1, "#d4d8de");
+        body.addColorStop(0.62, "#f8f9fb");
+        body.addColorStop(1, "#e4e7ec");
         ctx.fillStyle = body;
         ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(x + 16.0, y + 28.0);
-        ctx.lineTo(x + 12.2, y + 33.6);
-        ctx.quadraticCurveTo(x + 18.4, y + 31.0, x + 22.2, y + 29.2);
+        ctx.moveTo(x + 15.4, y + 27.6);
+        ctx.lineTo(x + 11.8, y + 32.4);
+        ctx.quadraticCurveTo(x + 17.6, y + 30.6, x + 21.4, y + 28.8);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-        ctx.strokeStyle = "rgba(36,44,52,0.22)";
+        ctx.strokeStyle = "rgba(36,44,52,0.18)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.ellipse(x + 24.6, y + 20.4, 17.8, 10.0, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24.0, y + 20.2, 18.2, 10.2, 0, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.save();
         ctx.beginPath();
-        ctx.ellipse(x + 24.6, y + 20.4, 17.8, 10.0, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24.0, y + 20.2, 18.2, 10.2, 0, 0, Math.PI * 2);
         ctx.clip();
         ctx.beginPath();
-        ctx.moveTo(x + 6, y + 7);
+        ctx.moveTo(x + 5, y + 7);
         ctx.lineTo(x + 43, y + 7);
-        ctx.lineTo(x + 43, y + 16.5);
-        ctx.quadraticCurveTo(x + 24.6, y + 24.5, x + 6, y + 16.5);
+        ctx.lineTo(x + 43, y + 16.2);
+        ctx.quadraticCurveTo(x + 24.0, y + 24.0, x + 5, y + 16.2);
         ctx.closePath();
         const bubbleGlass = ctx.createLinearGradient(x, y + 8, x, y + 24);
-        bubbleGlass.addColorStop(0, "rgba(255,255,255,0.98)");
-        bubbleGlass.addColorStop(0.50, "rgba(255,255,255,0.34)");
+        bubbleGlass.addColorStop(0, "rgba(255,255,255,0.99)");
+        bubbleGlass.addColorStop(0.50, "rgba(255,255,255,0.38)");
         bubbleGlass.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = bubbleGlass;
         ctx.fill();
