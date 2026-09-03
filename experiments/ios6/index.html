@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lilyshark iOS 6 lab</title>
+    <link rel="stylesheet" href="css/lab.css">
+</head>
+<body>
+    <header class="masthead">
+        <div>
+            <h1>iOS 6 lab</h1>
+            <p>A 320×240 playground. Isolated from firmware — iterate here, then port.</p>
+        </div>
+        <div class="spec">320 × 240 · RGB565 · ST7789 · ~143 PPI</div>
+    </header>
+    <div class="bench">
+        <aside class="rail">
+            <h2>Screens</h2>
+            <div class="screens" id="screen-list"></div>
+            <h2>Panel</h2>
+            <div class="controls">
+                <div class="scale-row" id="scale-row">
+                    <button type="button" data-scale="1">1×</button>
+                    <button type="button" data-scale="2" aria-pressed="true">2×</button>
+                    <button type="button" data-scale="3">3×</button>
+                </div>
+                <label>
+                    Font
+                    <select id="font-face">
+                        <option value="helvetica">Helvetica (iOS 6)</option>
+                        <option value="barlow">Barlow (firmware 4 bpp)</option>
+                        <option value="pixel">Pixel 6×8 (firmware 1 bpp)</option>
+                    </select>
+                </label>
+                <label>
+                    <input type="checkbox" id="rgb565">
+                    Quantize to RGB565
+                </label>
+                <label>
+                    <input type="checkbox" id="messages-chrome">
+                    Messages status chrome
+                </label>
+            </div>
+            <h2>Reference</h2>
+            <div class="controls">
+                <label class="file-label">
+                    Drop kit PNG
+                    <input type="file" id="ref-file" accept="image/png,image/jpeg">
+                </label>
+                <label>
+                    Mode
+                    <select id="compare-mode">
+                        <option value="off">Lab only</option>
+                        <option value="onion">Onion skin</option>
+                        <option value="diff">Pixel diff</option>
+                        <option value="ref">Reference only</option>
+                    </select>
+                </label>
+                <label>
+                    Onion
+                    <input type="range" id="onion" min="0" max="100" value="50">
+                </label>
+                <label>
+                    Crop Y
+                    <input type="range" id="crop-y" min="0" max="240" value="0">
+                </label>
+            </div>
+        </aside>
+        <section class="stage">
+            <div class="bezel">
+                <div class="bezel-caption">
+                    <span>T-Deck panel</span>
+                    <span>rotation 1</span>
+                </div>
+                <canvas id="panel" width="320" height="240" aria-label="320 by 240 device panel"></canvas>
+            </div>
+            <div class="meters">
+                <h2>This frame</h2>
+                <div class="statline">
+                    <span>Distinct colors <strong id="color-count">—</strong></span>
+                    <span>Scale <strong id="scale-readout">2×</strong></span>
+                    <span>Face <strong id="font-readout">Helvetica</strong></span>
+                    <span>Mismatch <strong id="mismatch">—</strong></span>
+                </div>
+                <p class="hint" id="hint"></p>
+                <p class="note">
+                    The iOS 6 CHAT treatment lives on <code>agent/ios6-chat-ui</code>.
+                    Main is the terminal chat. This folder is the sketchbook for the
+                    same 76,800 pixels. The 1-bit HOME face is a choice; this panel
+                    is 16-bit.
+                </p>
+            </div>
+        </section>
+    </div>
+    <script src="js/palette.js"></script>
+    <script src="js/kit.js"></script>
+    <script src="js/compare.js"></script>
+    <script src="js/screens.js"></script>
+    <script src="js/lab.js"></script>
+</body>
+</html>

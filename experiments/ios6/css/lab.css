@@ -1,0 +1,253 @@
+:root {
+    --bg: #07100f;
+    --surface: #0b1716;
+    --ink: #f0f4ef;
+    --muted: #8d9c98;
+    --rule: #29413f;
+    --pink: #ff4f9d;
+    --cyan: #71d8df;
+    --nav: #31537c;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.4 "Barlow Condensed", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+body {
+    padding: 16px 20px 28px;
+}
+
+.masthead {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: baseline;
+    margin-bottom: 14px;
+    max-width: 1100px;
+}
+
+.masthead h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.masthead p {
+    margin: 2px 0 0;
+    color: var(--muted);
+}
+
+.masthead .spec {
+    color: var(--pink);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+}
+
+.bench {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    max-width: 1100px;
+}
+
+.rail {
+    width: 220px;
+    flex: 0 0 220px;
+}
+
+.rail h2,
+.meters h2 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.screens {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+}
+
+.screens button,
+.controls button,
+.controls select {
+    appearance: none;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 6px 8px;
+    text-align: left;
+    font: inherit;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+}
+
+.screens button[aria-current="page"] {
+    border-color: var(--pink);
+    color: var(--pink);
+}
+
+.controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.controls label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+}
+
+.controls input[type="range"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-label {
+    flex-wrap: wrap;
+}
+
+.file-label input[type="file"] {
+    width: 100%;
+    color: var(--ink);
+}
+
+.scale-row {
+    display: flex;
+    gap: 4px;
+}
+
+.scale-row button {
+    flex: 1;
+    text-align: center;
+}
+
+.scale-row button[aria-pressed="true"] {
+    border-color: var(--cyan);
+    color: var(--cyan);
+}
+
+.stage {
+    flex: 1;
+    min-width: 0;
+}
+
+.bezel {
+    display: inline-block;
+    padding: 14px;
+    background: linear-gradient(180deg, #1c2423 0%, #0a1010 100%);
+    border: 1px solid #2a3a38;
+    border-radius: 10px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.bezel-caption {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+#panel {
+    display: block;
+    width: 640px;
+    height: 480px;
+    background: #000;
+    image-rendering: auto;
+    cursor: pointer;
+}
+
+#panel.device-pixels {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.meters {
+    margin-top: 12px;
+    max-width: 640px;
+}
+
+.statline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.statline span strong {
+    color: var(--cyan);
+    font-weight: 600;
+}
+
+.hint {
+    margin: 8px 0 0;
+    color: var(--muted);
+}
+
+.note {
+    margin: 10px 0 0;
+    color: var(--muted);
+    max-width: 52em;
+}
+
+body.snap {
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+}
+
+body.snap .masthead,
+body.snap .rail,
+body.snap .meters,
+body.snap .bezel-caption {
+    display: none;
+}
+
+body.snap .bench,
+body.snap .stage,
+body.snap .bezel {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #000;
+    max-width: none;
+}
+
+@media (max-width: 900px) {
+    .bench {
+        flex-direction: column;
+    }
+
+    .rail {
+        width: 100%;
+        flex-basis: auto;
+    }
+
+    .screens {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+}
