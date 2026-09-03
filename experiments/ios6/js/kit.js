@@ -961,15 +961,15 @@
     }
 
     function cameraWell(ctx, x, y, action) {
-        // Zach/Mamma: slate disc (not near-black), silver bezel, white
-        // camera with a centered viewfinder bump and a lens hole.
+        // Zach/Mamma: mid-slate disc, silver bezel, white camera
+        // with a centered viewfinder bump and a lens hole.
         const size = 28;
         const cx = x + size / 2;
         const cy = y + size / 2;
         const outer = size / 2 - 0.80;
         ctx.beginPath();
         ctx.arc(cx, cy + 0.7, outer + 0.35, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(20,24,28,0.20)";
+        ctx.fillStyle = "rgba(20,24,28,0.16)";
         ctx.fill();
         ctx.beginPath();
         ctx.arc(cx, cy, outer + 0.95, 0, Math.PI * 2);
@@ -979,33 +979,40 @@
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
         const well = ctx.createLinearGradient(cx, cy - outer, cx, cy + outer);
-        well.addColorStop(0, "#8a929c");
-        well.addColorStop(0.40, "#5c646e");
-        well.addColorStop(1, "#3a424a");
+        well.addColorStop(0, "#9aa2aa");
+        well.addColorStop(0.42, "#727a84");
+        well.addColorStop(1, "#5a626c");
         ctx.fillStyle = well;
         ctx.fill();
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, outer - 0.35, 0, Math.PI * 2);
         ctx.clip();
-        const inset = ctx.createLinearGradient(cx, cy - outer, cx, cy + 4);
-        inset.addColorStop(0, "rgba(0,0,0,0.36)");
-        inset.addColorStop(0.48, "rgba(0,0,0,0)");
-        ctx.fillStyle = inset;
+        // Mamma: soft white gloss on the top half, not a black trough.
+        const gloss = ctx.createLinearGradient(cx, cy - outer, cx, cy + 2);
+        gloss.addColorStop(0, "rgba(255,255,255,0.38)");
+        gloss.addColorStop(0.48, "rgba(255,255,255,0.06)");
+        gloss.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = gloss;
         ctx.fillRect(cx - outer, cy - outer, outer * 2, outer + 4);
-        ctx.strokeStyle = "rgba(230,236,242,0.58)";
+        const inset = ctx.createLinearGradient(cx, cy - outer, cx, cy);
+        inset.addColorStop(0, "rgba(0,0,0,0.16)");
+        inset.addColorStop(0.40, "rgba(0,0,0,0)");
+        ctx.fillStyle = inset;
+        ctx.fillRect(cx - outer, cy - outer, outer * 2, outer);
+        ctx.strokeStyle = "rgba(230,236,242,0.70)";
         ctx.lineWidth = 1.15;
         ctx.beginPath();
         ctx.arc(cx, cy - 0.15, outer - 1.15, 1.12 * Math.PI, 1.88 * Math.PI);
         ctx.stroke();
-        ctx.strokeStyle = "rgba(0,0,0,0.32)";
+        ctx.strokeStyle = "rgba(0,0,0,0.22)";
         ctx.beginPath();
         ctx.arc(cx, cy + 0.35, outer - 1.15, 0.10 * Math.PI, 0.90 * Math.PI);
         ctx.stroke();
         ctx.restore();
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(28,32,38,0.52)";
+        ctx.strokeStyle = "rgba(40,46,54,0.36)";
         ctx.lineWidth = 1.05;
         ctx.stroke();
         fillRound(ctx, cx - 6.8, cy - 1.35, 13.6, 8.4, 1.6, "#ffffff");
