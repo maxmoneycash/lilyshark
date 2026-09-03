@@ -6,6 +6,7 @@ import CayenneLpp from "@liamcottle/meshcore.js/src/cayenne_lpp.js";
 import { COOLDOWN_MS, getAlertCfg } from "./alerts";
 import { getDeviceLinkState, sendDeviceLine } from "../lib/deviceLink";
 import { DEMO_NODE_FLOOR, demoSendText, isDemo } from "./demo";
+import { meshtasticBleActive, meshtasticBleSendText } from "./meshtasticBle";
 import { t } from "./i18n";
 import {
   addLog,
@@ -1341,6 +1342,12 @@ export async function sendText(
   convo: string,
   replyId?: number,
 ): Promise<void> {
+  // A Lilyshark T-Deck paired over Web Bluetooth owns the send path while
+  // its link is up: same chat screens, different radio on the other end.
+  if (meshtasticBleActive()) {
+    await meshtasticBleSendText(text, convo);
+    return;
+  }
   // In the demo mesh, sending joins the fiction instead of failing: the
   // message posts locally and a demo node answers. See demoSendText.
   if (!device && isDemo()) {

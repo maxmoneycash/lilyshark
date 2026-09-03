@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { connectMeshtasticBle } from "./meshtasticBle";
 import {
   canReconnect,
   connectBle,
@@ -715,6 +716,17 @@ function App() {
               LILYSHARK T-DECK · USB
             </button>
             <button
+              disabled={!hasBle}
+              title="For a T-Deck running Lilyshark firmware: pair over Bluetooth the way the Meshtastic phone app does — no cable, and it works with no internet at all"
+              onClick={() => {
+                setConnectOpen(false);
+                setError("");
+                void connectMeshtasticBle().catch((e) => setError(String(e)));
+              }}
+            >
+              LILYSHARK T-DECK · BLUETOOTH
+            </button>
+            <button
               disabled={!hasSerial}
               onClick={() => {
                 setMode("serie");
@@ -737,8 +749,9 @@ function App() {
           </div>
           <p className="sheet-note">
             Pick by firmware, not by cable. A T-Deck running Lilyshark links
-            with the first button — the header turns into DISCONNECT, and the
-            live readout opens on TELEMETRY. The MeshCore buttons speak the
+            with either LILYSHARK button — USB carries the full analyzer
+            telemetry, Bluetooth carries the mesh conversation the way the
+            phone app does, cable-free and internet-free. The MeshCore buttons speak the
             companion protocol and will sit at ESTABLISHING LINK forever
             against a Lilyshark radio.
           </p>
