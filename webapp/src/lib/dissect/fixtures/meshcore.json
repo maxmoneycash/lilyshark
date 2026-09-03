@@ -1,0 +1,228 @@
+{
+	"comment": "Byte fixtures for the MeshCore dissector, extracted from the firmware C++ tests. Entries marked 'constructed' were built from the protocol constants in src/core/meshcore_decoder.cpp / meshcore_decoder.h because no C++ test pins those exact bytes. 'expect' keys compare against MeshCoreDissection fields; hex strings compare as numbers.",
+	"fixtures": [
+		{
+			"name": "flood-ack",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreAckAndTransportEnvelope (ack_bytes)",
+			"hex": "0d0078563412",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "control",
+			"expect": {
+				"routeType": 1,
+				"payloadType": 3,
+				"payloadVersion": 0,
+				"pathHashCount": 0,
+				"pathHashSize": 1,
+				"acknowledgementChecksum": "0x12345678",
+				"payloadOffset": 2,
+				"payloadLength": 4
+			}
+		},
+		{
+			"name": "transport-direct-control",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreAckAndTransportEnvelope (transport_bytes)",
+			"hex": "2f3412cdab42aabbccdd80",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "control",
+			"expect": {
+				"routeType": 3,
+				"payloadType": 11,
+				"transportCodeOne": "0x1234",
+				"transportCodeTwo": "0xabcd",
+				"encodedPathLength": "0x42",
+				"pathHashCount": 2,
+				"pathHashSize": 2,
+				"payloadOffset": 10,
+				"payloadLength": 1
+			}
+		},
+		{
+			"name": "flood-group-text",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (group_bytes)",
+			"hex": "150042aabb00000000000000000000000000000000",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "encrypted-payload",
+			"expect": {
+				"routeType": 1,
+				"payloadType": 5,
+				"channelHash": "0x42",
+				"encrypted": true
+			}
+		},
+		{
+			"name": "short-ack",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (short_ack_bytes)",
+			"hex": "0d00010203",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "short-trace",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (short_trace_bytes)",
+			"hex": "2500aa",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "trace",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (trace_bytes)",
+			"hex": "25000102030405060708 09",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "control",
+			"expect": {
+				"routeType": 1,
+				"payloadType": 9,
+				"payloadOffset": 2,
+				"payloadLength": 9
+			}
+		},
+		{
+			"name": "reserved-type-12",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (reserved_bytes)",
+			"hex": "3100aa",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "unknown",
+			"expect": { "payloadType": 12 }
+		},
+		{
+			"name": "empty-raw-custom",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (empty_raw_custom_bytes; MeshCore d9296435 Packet::writeTo permits this)",
+			"hex": "3d00",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"payloadType": 15,
+				"payloadOffset": 2,
+				"payloadLength": 0
+			}
+		},
+		{
+			"name": "empty-multipart",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (empty_payload_types loop, type 10)",
+			"hex": "2900",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "empty-control",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (empty_payload_types loop, type 11)",
+			"hex": "2d00",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "empty-reserved-12",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (empty_payload_types loop, type 12)",
+			"hex": "3100",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "empty-reserved-13",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (empty_payload_types loop, type 13)",
+			"hex": "3500",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "empty-reserved-14",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (empty_payload_types loop, type 14)",
+			"hex": "3900",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "invalid-path-size",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (invalid_path_bytes)",
+			"hex": "01c1aa",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "truncated-transport-codes",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (truncated_transport_bytes)",
+			"hex": "003412",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "future-version",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshCoreProtectedAndMalformedFrames (future_bytes)",
+			"hex": "4d",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "unknown",
+			"expect": { "payloadVersion": 1 }
+		},
+		{
+			"name": "advertisement",
+			"source": "constructed — header per MeshCorePayloadType::Advertisement in meshcore_decoder.h ((4 << 2) | flood), payload of kAdvertMinimumPayloadBytes = 100 bytes; the decode rules are pinned by src/core/meshcore_decoder.cpp",
+			"hex": "1100000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60616263",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "advertisement",
+			"expect": {
+				"routeType": 1,
+				"payloadType": 4,
+				"payloadOffset": 2,
+				"payloadLength": 100
+			}
+		},
+		{
+			"name": "direct-text-message",
+			"source": "constructed — MeshCorePayloadType::TextMessage ((2 << 2) | flood) with the minimum legal 20-byte payload (4 + one AES block), per the isDirectEncryptedType branch of src/core/meshcore_decoder.cpp",
+			"hex": "0900aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "encrypted-payload",
+			"expect": {
+				"payloadType": 2,
+				"payloadLength": 20,
+				"encrypted": true
+			}
+		},
+		{
+			"name": "anonymous-request",
+			"source": "constructed — MeshCorePayloadType::AnonymousRequest ((7 << 2) | flood) with the minimum legal 51-byte payload (35 + one AES block), per src/core/meshcore_decoder.cpp",
+			"hex": "1d00bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "encrypted-payload",
+			"expect": {
+				"payloadType": 7,
+				"payloadLength": 51,
+				"encrypted": true
+			}
+		},
+		{
+			"name": "multipart-one-byte",
+			"source": "constructed — MeshCorePayloadType::Multipart ((10 << 2) | flood) with a 1-byte payload; v1 publishes no structure for it (src/core/meshcore_decoder.cpp falls through to PacketKind::Data)",
+			"hex": "2900aa",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": { "payloadType": 10, "payloadLength": 1 }
+		},
+		{
+			"name": "shelby-pointer-payload",
+			"source": "test/shelby_registry/test_shelby_registry.cpp makeMeshCoreFrameWithPointer / nestedPointerEnrichesMeshCoreAndReticulum",
+			"hex": "3d0053484c420105202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f0010000000b33f7100000100",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "data",
+			"expect": {
+				"payloadType": 15,
+				"payloadOffset": 2,
+				"payloadLength": 82,
+				"encrypted": false
+			},
+			"expectShelby": { "offset": 2, "sizeBytes": 4096, "chunkCount": 1 }
+		}
+	]
+}

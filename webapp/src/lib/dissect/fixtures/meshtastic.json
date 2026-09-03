@@ -1,0 +1,123 @@
+{
+	"comment": "Byte fixtures for the Meshtastic dissector, extracted from the firmware C++ tests. Each entry names the C++ test its bytes come from; entries marked 'constructed' were built from the protocol constants in the C++ source (with the ciphertext produced by an independent AES-CTR implementation, OpenSSL) because the C++ test computes those bytes at runtime. 'expect' keys are compared against MeshtasticDissection fields; hex strings compare as numbers.",
+	"fixtures": [
+		{
+			"name": "outer-header",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshtasticOuterHeader (makeMeshtasticFrame)",
+			"hex": "ffffffff78563412dec0ad0bbb2a5678aabbcc",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "opaque-payload",
+			"expect": {
+				"destination": "0xffffffff",
+				"source": "0x12345678",
+				"packetId": "0x0badc0de",
+				"flags": "0xbb",
+				"channelHash": "0x2a",
+				"hopLimit": 3,
+				"hopStart": 5,
+				"nextHop": "0x56",
+				"relayNode": "0x78",
+				"payloadOffset": 16,
+				"payloadLength": 3,
+				"broadcast": true,
+				"wantAck": true,
+				"viaMqtt": true,
+				"defaultKeyReadable": false
+			}
+		},
+		{
+			"name": "default-key-text",
+			"source": "test/meshtastic_payload/test_meshtastic_payload.cpp kFrame / testReadsTextMessageFromRealFrame",
+			"hex": "ffffffff2c1b6a330100a0516308000057fa914692e8224c0dfedb603e2d33e5b67605643cee9dd0554781d7265a",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "data",
+			"expect": {
+				"destination": "0xffffffff",
+				"source": "0x336a1b2c",
+				"packetId": "0x51a00001",
+				"channelHash": "0x08",
+				"hopLimit": 3,
+				"hopStart": 3,
+				"broadcast": true,
+				"wantAck": false,
+				"viaMqtt": false,
+				"defaultKeyReadable": true
+			},
+			"expectPayload": {
+				"portnum": 1,
+				"portLabel": "TEXT",
+				"text": "radio check from the ridge",
+				"payloadLength": 26
+			}
+		},
+		{
+			"name": "default-key-position",
+			"source": "constructed — test/meshtastic_payload/test_meshtastic_payload.cpp testReadsPositionPayload builds this ciphertext at runtime (lat_i=374419000, lon_i=-1221430000, from=0x11223344, id=0x55667788); ciphertext here was produced with OpenSSL AES-128-CTR under the published default PSK, wrapped in an outer header built per meshtastic_decoder.cpp with the LongFast channel hash 0x08 pinned by testLongFastHashMatchesKnownFrame",
+			"hex": "ffffffff44332211887766550008000019e09e5692b577933d1698176c0c",
+			"result": "matched",
+			"state": "payload-decoded",
+			"kind": "data",
+			"expect": {
+				"source": "0x11223344",
+				"packetId": "0x55667788",
+				"channelHash": "0x08",
+				"defaultKeyReadable": true
+			},
+			"expectPayload": {
+				"portnum": 3,
+				"portLabel": "POSITION"
+			}
+		},
+		{
+			"name": "zero-sender",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshtasticMalformedFramesRemainInspectable (zero_sender)",
+			"hex": "ffffffff00000000dec0ad0bbb2a5678aabbcc",
+			"result": "malformed",
+			"state": "malformed",
+			"expect": {
+				"source": 0,
+				"packetId": "0x0badc0de"
+			}
+		},
+		{
+			"name": "short-frame",
+			"source": "test/core_runtime/test_core_runtime.cpp testMeshtasticMalformedFramesRemainInspectable (short_frame)",
+			"hex": "010203",
+			"result": "malformed",
+			"state": "malformed"
+		},
+		{
+			"name": "shelby-pointer-payload",
+			"source": "test/shelby_registry/test_shelby_registry.cpp makeMeshtasticFrameWithPointer / nestedPointerEnrichesWithoutReplacingMeshtasticDecode (pointer bytes encoded per src/shelby/shelby_pointer.cpp from makePointer())",
+			"hex": "ffffffff78563412dec0ad0ba32a567853484c420105202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f0010000000b33f7100000100",
+			"result": "matched",
+			"state": "header-only",
+			"kind": "opaque-payload",
+			"expect": {
+				"destination": "0xffffffff",
+				"source": "0x12345678",
+				"packetId": "0x0badc0de",
+				"channelHash": "0x2a",
+				"hopLimit": 3,
+				"hopStart": 5,
+				"payloadOffset": 16,
+				"payloadLength": 82,
+				"broadcast": true,
+				"defaultKeyReadable": false
+			},
+			"expectShelby": {
+				"offset": 16,
+				"flags": 5,
+				"encrypted": true,
+				"chunked": false,
+				"capture": true,
+				"sizeBytes": 4096,
+				"expiresAtUnix": 1900000000,
+				"chunkIndex": 0,
+				"chunkCount": 1
+			}
+		}
+	]
+}
