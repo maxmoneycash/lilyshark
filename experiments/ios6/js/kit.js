@@ -542,8 +542,8 @@
             size: spec.titleSize || 14,
             weight: "700",
             align: "center",
-            shadow: "rgba(0,0,0,0.55)",
-            shadowY: 1,
+            shadow: "rgba(0,0,0,0.62)",
+            shadowY: -1,
         });
         return height;
     }

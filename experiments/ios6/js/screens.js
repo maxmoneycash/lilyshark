@@ -54,11 +54,11 @@
         ctx.save();
         ctx.translate(x + 24, y + 24);
         ctx.rotate(Math.PI / 4);
-        for (let stripe = -56; stripe < 56; stripe += 5) {
-            ctx.fillStyle = Math.round(stripe / 5) % 2 === 0
-                ? "rgba(6, 48, 12, 0.28)"
-                : "rgba(236, 255, 196, 0.14)";
-            ctx.fillRect(-52, stripe, 104, 2.4);
+        for (let stripe = -56; stripe < 56; stripe += 6) {
+            ctx.fillStyle = Math.round(stripe / 6) % 2 === 0
+                ? "rgba(8, 72, 16, 0.44)"
+                : "rgba(220, 255, 140, 0.24)";
+            ctx.fillRect(-52, stripe, 104, 3.1);
         }
         ctx.restore();
         ctx.restore();
@@ -68,7 +68,7 @@
         ctx.shadowBlur = 2;
         ctx.shadowOffsetY = 1;
         ctx.beginPath();
-        ctx.ellipse(x + 24.5, y + 21, 17.4, 10.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24.5, y + 21, 18.2, 10.2, 0, 0, Math.PI * 2);
         const body = ctx.createLinearGradient(x, y + 10, x, y + 34);
         body.addColorStop(0, "#ffffff");
         body.addColorStop(0.52, "#f2f3f6");
@@ -86,12 +86,12 @@
         ctx.strokeStyle = "rgba(36,44,52,0.28)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.ellipse(x + 24.5, y + 21, 17.4, 10.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24.5, y + 21, 18.2, 10.2, 0, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.save();
         ctx.beginPath();
-        ctx.ellipse(x + 24.5, y + 21, 17.4, 10.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 24.5, y + 21, 18.2, 10.2, 0, 0, Math.PI * 2);
         ctx.clip();
         ctx.beginPath();
         ctx.moveTo(x + 6, y + 8);
@@ -109,107 +109,131 @@
     }
 
     function glyphNodes(ctx, x, y) {
+        function person(cx, cy, headR, shoulderW, shoulderH) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, headR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + headR + shoulderH * 0.12, shoulderW, shoulderH, 0, Math.PI, 0, true);
+            ctx.fill();
+        }
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.22)";
-        ctx.shadowBlur = 1.5;
+        ctx.shadowColor = "rgba(0,0,0,0.28)";
+        ctx.shadowBlur = 2;
         ctx.shadowOffsetY = 1;
-        ctx.fillStyle = K().hex24(C.White);
-        ctx.beginPath();
-        ctx.arc(x + 18, y + 16, 6.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(x + 18, y + 34, 10, 7, 0, Math.PI, 0, true);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(x + 31, y + 18, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(x + 32, y + 35, 9.2, 6.2, 0, Math.PI, 0, true);
-        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.78)";
+        person(x + 31.6, y + 17.4, 5.2, 9.0, 7.0);
+        ctx.fillStyle = "#ffffff";
+        person(x + 18.4, y + 16.0, 6.4, 10.4, 7.6);
         ctx.restore();
-        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
         ctx.beginPath();
-        ctx.ellipse(x + 16.5, y + 14.2, 2.4, 1.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 16.4, y + 13.8, 2.6, 1.7, 0, 0, Math.PI * 2);
         ctx.fill();
     }
 
     function glyphMap(ctx, x, y) {
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.20)";
+        ctx.shadowColor = "rgba(0,0,0,0.22)";
         ctx.shadowBlur = 2;
         ctx.shadowOffsetY = 1;
-        ctx.fillStyle = K().hex24(0xd8e8c8);
         ctx.beginPath();
-        ctx.moveTo(x + 10, y + 14);
-        ctx.lineTo(x + 22, y + 10);
-        ctx.lineTo(x + 38, y + 15);
-        ctx.lineTo(x + 38, y + 38);
-        ctx.lineTo(x + 22, y + 34);
-        ctx.lineTo(x + 10, y + 38);
+        ctx.moveTo(x + 9, y + 16);
+        ctx.lineTo(x + 19, y + 11);
+        ctx.lineTo(x + 19, y + 36);
+        ctx.lineTo(x + 9, y + 40);
         ctx.closePath();
+        ctx.fillStyle = "#c4d890";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + 19, y + 11);
+        ctx.lineTo(x + 30, y + 15);
+        ctx.lineTo(x + 30, y + 39);
+        ctx.lineTo(x + 19, y + 36);
+        ctx.closePath();
+        ctx.fillStyle = "#e8f2c4";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + 30, y + 15);
+        ctx.lineTo(x + 40, y + 11);
+        ctx.lineTo(x + 40, y + 36);
+        ctx.lineTo(x + 30, y + 39);
+        ctx.closePath();
+        ctx.fillStyle = "#b4cc78";
         ctx.fill();
         ctx.restore();
-        ctx.strokeStyle = "rgba(255,255,255,0.55)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x + 22, y + 10);
-        ctx.lineTo(x + 22, y + 34);
-        ctx.stroke();
-        ctx.strokeStyle = K().hex24(C.White);
+        ctx.fillStyle = "rgba(255,255,255,0.40)";
+        ctx.fillRect(x + 19, y + 12, 1, 24);
+        ctx.fillRect(x + 30, y + 16, 1, 22);
+        ctx.strokeStyle = "rgba(255,255,255,0.88)";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(x + 14, y + 34);
-        ctx.lineTo(x + 24, y + 14);
-        ctx.lineTo(x + 34, y + 30);
+        ctx.moveTo(x + 13, y + 34);
+        ctx.lineTo(x + 24, y + 16);
+        ctx.lineTo(x + 36, y + 32);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(x + 24, y + 14);
-        ctx.lineTo(x + 20, y + 22);
-        ctx.lineTo(x + 28, y + 22);
-        ctx.closePath();
-        ctx.fillStyle = K().hex24(C.White);
+        ctx.arc(x + 24, y + 15, 3.4, 0, Math.PI * 2);
+        ctx.fillStyle = K().hex24(0xe01830);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 13, 2.2, 0, Math.PI * 2);
-        ctx.fillStyle = K().hex24(0xc01830);
+        ctx.moveTo(x + 20.8, y + 16.8);
+        ctx.lineTo(x + 24, y + 24.8);
+        ctx.lineTo(x + 27.2, y + 16.8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 23.2, y + 13.8, 1.15, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.72)";
         ctx.fill();
     }
 
     function glyphTraffic(ctx, x, y) {
-        const bars = [10, 16, 12, 20, 14];
+        const bars = [11, 17, 13, 21, 15];
         for (let index = 0; index < bars.length; index += 1) {
             const bar = bars[index];
             const bx = x + 9 + index * 7;
             const by = y + 36 - bar;
             const fill = ctx.createLinearGradient(bx, by, bx, by + bar);
             fill.addColorStop(0, "#ffffff");
-            fill.addColorStop(1, "#d0d6dc");
-            K().fillRound(ctx, bx, by, 5, bar, 1.2, fill);
+            fill.addColorStop(0.45, "#e8eef2");
+            fill.addColorStop(1, "#9aa2aa");
+            K().fillRound(ctx, bx, by, 5.2, bar, 1.4, fill);
+            ctx.fillStyle = "rgba(255,255,255,0.70)";
+            ctx.fillRect(bx + 1, by + 1, 3.2, 1);
         }
     }
 
     function glyphRadio(ctx, x, y) {
+        const cx = x + 24;
+        const cy = y + 25;
         ctx.save();
         ctx.strokeStyle = K().hex24(C.White);
-        ctx.lineWidth = 2.2;
+        ctx.lineWidth = 2.45;
         ctx.lineCap = "round";
+        ctx.shadowColor = "rgba(0,0,0,0.22)";
+        ctx.shadowBlur = 1.6;
+        ctx.shadowOffsetY = 1;
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 5.2, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 6.0, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 11, -Math.PI * 0.75, -Math.PI * 0.25);
+        ctx.arc(cx, cy, 11.4, -Math.PI * 0.78, -Math.PI * 0.22);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 11, Math.PI * 0.25, Math.PI * 0.75);
+        ctx.arc(cx, cy, 11.4, Math.PI * 0.22, Math.PI * 0.78);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 16.2, -Math.PI * 0.7, -Math.PI * 0.3);
+        ctx.arc(cx, cy, 16.6, -Math.PI * 0.72, -Math.PI * 0.28);
         ctx.stroke();
-        ctx.fillStyle = K().hex24(C.White);
-        ctx.beginPath();
-        ctx.arc(x + 24, y + 26, 2.2, 0, Math.PI * 2);
-        ctx.fill();
         ctx.restore();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2.6, 0, Math.PI * 2);
+        const pip = ctx.createRadialGradient(cx - 0.6, cy - 0.8, 0.2, cx, cy, 2.6);
+        pip.addColorStop(0, "#ffffff");
+        pip.addColorStop(1, "#c8ccd0");
+        ctx.fillStyle = pip;
+        ctx.fill();
     }
 
     function glyphSpectrum(ctx, x, y) {
@@ -292,25 +316,29 @@
     }
 
     function glyphField(ctx, x, y) {
+        const paper = ctx.createLinearGradient(x + 11, y + 10, x + 11, y + 40);
+        paper.addColorStop(0, "#fff6d8");
+        paper.addColorStop(1, "#f0dca0");
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.18)";
+        ctx.shadowColor = "rgba(0,0,0,0.22)";
         ctx.shadowBlur = 2;
         ctx.shadowOffsetY = 1;
-        K().fillRound(ctx, x + 12, y + 10, 24, 28, 3, K().hex24(0xfff8dc));
+        K().fillRound(ctx, x + 11, y + 10, 26, 30, 2.6, paper);
         ctx.restore();
-        ctx.fillStyle = K().hex24(0xf0a0c0);
-        ctx.fillRect(x + 12, y + 10, 24, 7);
-        ctx.fillStyle = "rgba(255,255,255,0.45)";
-        ctx.fillRect(x + 12, y + 10, 24, 2);
-        ctx.strokeStyle = K().hex24(0xd8c070);
+        const binding = ctx.createLinearGradient(x + 11, y + 10, x + 11, y + 18);
+        binding.addColorStop(0, "#f8b0c8");
+        binding.addColorStop(1, "#d05070");
+        ctx.fillStyle = binding;
+        ctx.fillRect(x + 11, y + 10, 26, 7);
+        ctx.fillStyle = "rgba(255,255,255,0.50)";
+        ctx.fillRect(x + 11, y + 10, 26, 2);
+        ctx.strokeStyle = "rgba(180, 140, 40, 0.42)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(x + 16, y + 22);
-        ctx.lineTo(x + 32, y + 22);
-        ctx.moveTo(x + 16, y + 27);
-        ctx.lineTo(x + 32, y + 27);
-        ctx.moveTo(x + 16, y + 32);
-        ctx.lineTo(x + 28, y + 32);
+        for (let row = 0; row < 3; row += 1) {
+            ctx.moveTo(x + 15, y + 22 + row * 5);
+            ctx.lineTo(x + 33, y + 22 + row * 5);
+        }
         ctx.stroke();
     }
 
