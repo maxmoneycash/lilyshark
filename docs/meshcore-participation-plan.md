@@ -369,7 +369,7 @@ path is wired — not that anything on the far side has heard it.
 
 Still absent from stage 1 as written: the ABOUT surface for the key prefix, and
 the pre-TX channel-activity check of §2, which needs an `isReceiving()` on
-`TDeckRadioService` that does not exist yet. At one 0.42 s advert per fifteen
+`TDeckRadioService` that does not exist yet. At one 0.37 s advert per fifteen
 minutes the deck is at 0.05 % duty, so the missing check costs the band very
 little, but it is the difference between polite and provably polite and it
 should land before the advert interval is ever shortened. The open milestone is
@@ -553,7 +553,19 @@ advert spends the whole mesh's airtime.
 
 Pacing lives in `loop()` beside the Meshtastic beacons: an advert on arriving
 at a MeshCore profile, then one every `kMeshCoreAdvertMs` (fifteen minutes).
-A 107-byte advert at SF7/62.5 kHz is 0.42 s of airtime, so that is 0.05 % duty
+A 107-byte advert at SF7/62.5 kHz takes **0.37 s** of airtime, and that
+number is computed rather than asserted, because an earlier draft of this
+document quoted 0.42 s in five places without showing its working.
+
+    Tsym       = 2^SF / BW = 2^7 / 62500          = 2.048 ms
+    payload    = 8 + ceil((8*107 - 4*7 + 28 + 16) / (4*7)) * 5
+               = 8 + 32 * 5                        = 168 symbols
+    preamble   = (8 + 4.25) * 2.048 ms             = 25.1 ms
+    total      = 25.1 + 168 * 2.048                = 369 ms
+
+With MeshCore's 16-symbol preamble instead it is 386 ms; either way the
+figure below is the right order and the conclusion is unchanged. One advert
+per fifteen minutes is 0.04 % duty
 — fifteen times more sparing than the position beacon, and an advert is
 discovery rather than telemetry, so a node that has heard us once keeps the
 contact and repeating faster buys nothing. The same change stopped the

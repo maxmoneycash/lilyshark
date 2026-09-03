@@ -16363,9 +16363,20 @@ void loop()
             // at the screen — and after that only every kMeshCoreAdvertMs.
             // Leaving the profile clears the marker, so coming back is an
             // arrival again.
+            // Arriving on a MeshCore profile used to advertise immediately,
+            // unconditionally. That let the profile picker become a transmit
+            // button: flipping between two MeshCore profiles put an advert on
+            // the air per press, with no floor at all. The spacing is not a
+            // performance tuning knob -- it is this deck's share of a channel
+            // everyone else is also trying to use -- so it now holds whatever
+            // the operator does with the picker. A first advert still goes out
+            // at once, because nothing has been spent yet.
             const bool arrived = meshcore_advert_profile_id != beacon_profile.id;
-            if(arrived || static_cast<std::uint32_t>(now - meshcore_last_advert_ms) >=
-                              kMeshCoreAdvertMs) {
+            const bool never_advertised = meshcore_last_advert_ms == 0U;
+            if(never_advertised ||
+               static_cast<std::uint32_t>(now - meshcore_last_advert_ms) >=
+                   kMeshCoreAdvertMs) {
+                (void)arrived;
                 // The attempt is paced whether or not it succeeded: a deck
                 // that cannot advertise must not spend the loop retrying, and
                 // the reason is already on the event log.
