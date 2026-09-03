@@ -285,6 +285,15 @@ build_and_run channel_keys \
   src/crypto/sha256.cpp \
   src/export/lilyshark_capture.cpp \
   test/channel_keys/test_channel_keys.cpp
+build_and_run meshcore_ed25519 \
+  src/crypto/ed25519.cpp \
+  test/meshcore_tx/test_ed25519.cpp
+
+build_and_run meshcore_advert \
+  src/crypto/ed25519.cpp \
+  src/core/meshcore_encode.cpp \
+  src/core/meshcore_decoder.cpp \
+  test/meshcore_tx/test_meshcore_advert.cpp
 
 echo "Testing lscap_reader"
 python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
