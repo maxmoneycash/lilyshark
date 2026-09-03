@@ -877,6 +877,8 @@
         ctx.stroke();
         ctx.clip();
         // Curved candy crown only. A mid-bubble equator strikes the type.
+        // Incoming grey needs a brighter crown to read as iOS 6 silver glass.
+        const incoming = !mine;
         ctx.beginPath();
         ctx.moveTo(x - 4, y - 1);
         ctx.lineTo(x + width + 4, y - 1);
@@ -884,16 +886,16 @@
         ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.58, x - 4, y + height * 0.30);
         ctx.closePath();
         const shine = ctx.createLinearGradient(x, y, x, y + height * 0.50);
-        shine.addColorStop(0, "rgba(255,255,255,0.96)");
-        shine.addColorStop(0.46, "rgba(255,255,255,0.36)");
+        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.99)" : "rgba(255,255,255,0.96)");
+        shine.addColorStop(0.46, incoming ? "rgba(255,255,255,0.50)" : "rgba(255,255,255,0.36)");
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.88)";
+        ctx.fillStyle = incoming ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.88)";
         ctx.fillRect(x + 7, y + 1, width - 14, 1.15);
         const shade = ctx.createLinearGradient(x, y + height * 0.72, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");
-        shade.addColorStop(1, "rgba(0,0,0,0.10)");
+        shade.addColorStop(1, incoming ? "rgba(0,0,0,0.14)" : "rgba(0,0,0,0.10)");
         ctx.fillStyle = shade;
         ctx.fillRect(x - 10, y + height * 0.72, width + 20, height * 0.28);
         ctx.restore();
