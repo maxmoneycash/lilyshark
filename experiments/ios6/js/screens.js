@@ -424,7 +424,7 @@
         ctx.shadowOffsetY = 1;
         kit.panel(ctx, cameraX, trackY, 46, trackH, 0x4a525c, 0x181c22, 0x080a0c, 8);
         ctx.restore();
-        kit.hardGlass(function () {
+        kit.hardGlass(ctx, function () {
             kit.roundRectPath(ctx, cameraX, trackY, 46, trackH, 8);
         }, cameraX, trackY, 46, trackH, 0.28, { hairline: false });
         const cx = cameraX + 23;
