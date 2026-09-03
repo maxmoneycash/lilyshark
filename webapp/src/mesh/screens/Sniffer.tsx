@@ -1,7 +1,20 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDeviceLink, type HeardFrame } from "../../lib/deviceLink";
+import {
+	buildCsv,
+	buildJson,
+	buildLoraTapPcap,
+	CSV_MIME,
+	downloadFile,
+	JSON_MIME,
+	type LoraTapCounts,
+	PCAP_MIME,
+	sessionFrames,
+	sessionPcapCounts,
+} from "../../lib/export";
 import { hexDump } from "../../lib/hexdump";
 import { buildLscap } from "../../lib/lscapWrite";
+import { permalinkUrl, readFrame, snifferFrameHash } from "../../lib/permalink";
 import {
 	clearSnifferSession,
 	setSnifferPaused,
@@ -17,6 +30,206 @@ function nodeId(num: number): string {
 	return `!${num.toString(16).padStart(8, "0")}`;
 }
 
+/** What the pcap had to leave behind, in words, or "" when it left nothing. */
+function pcapOmissionNote(counts: LoraTapCounts): string {
+	const parts: string[] = [];
+	if (counts.excludedSynthetic > 0) {
+		parts.push(`${counts.excludedSynthetic} SYNTHETIC`);
+	}
+	if (counts.excludedUnencodable > 0) {
+		parts.push(`${counts.excludedUnencodable} THE FORMAT CANNOT CARRY`);
+	}
+	return parts.length === 0 ? "" : `PCAP LEAVES OUT ${parts.join(" AND ")}`;
+}
+
+/**
+ * The three download buttons.
+ *
+ * Each label carries the number of frames that format will actually write.
+ * The pcap's number is the smaller one whenever the session heard something
+ * LoRaTap v0 has no way to describe — a synthetic frame from simulate mode,
+ * or MeshCore's 62.5 kHz bandwidth — and the operator has to see that before
+ * clicking rather than after opening the file in Wireshark.
+ */
+function SnifferExport({
+	frames,
+	onSaved,
+}: {
+	frames: HeardFrame[];
+	onSaved: (message: string) => void;
+}) {
+	// Only frames that arrived with their whole record can be exported at all;
+	// the rest carry a decoded summary and nothing a capture format can hold.
+	const records = useMemo(
+		() => frames.flatMap((f) => (f.raw ? [f.raw] : [])),
+		[frames],
+	);
+	const pcap = useMemo(() => sessionPcapCounts(records), [records]);
+	const omitted = pcapOmissionNote(pcap);
+
+	const save = (format: "pcap" | "csv" | "json") => {
+		const decoded = sessionFrames(records);
+		const name = `lilyshark-sniffer-${stamp()}`;
+		if (format === "pcap") {
+			const built = buildLoraTapPcap({ frames: decoded });
+			downloadFile(`${name}.pcap`, built.bytes, PCAP_MIME);
+			onSaved(`SAVED ${built.written} FRAMES AS ${name}.pcap`);
+			return;
+		}
+		const text =
+			format === "csv"
+				? buildCsv({ frames: decoded })
+				: buildJson({ frames: decoded });
+		downloadFile(
+			`${name}.${format}`,
+			text,
+			format === "csv" ? CSV_MIME : JSON_MIME,
+		);
+		onSaved(`SAVED ${decoded.length} FRAMES AS ${name}.${format}`);
+	};
+
+	return (
+		<>
+			<button
+				disabled={pcap.written === 0}
+				title="Download these frames as a LoRaTap pcap — this is the file Wireshark opens"
+				onClick={() => save("pcap")}
+			>
+				⭳ PCAP ({pcap.written} FRAMES)
+			</button>
+			<button
+				disabled={records.length === 0}
+				title="Download one row per frame, with the same columns as the table above — for a spreadsheet"
+				onClick={() => save("csv")}
+			>
+				⭳ CSV ({records.length} FRAMES)
+			</button>
+			<button
+				disabled={records.length === 0}
+				title="Download the same columns as a JSON array — for a script"
+				onClick={() => save("json")}
+			>
+				⭳ JSON ({records.length} FRAMES)
+			</button>
+			{omitted && (
+				<span className="warn" style={{ fontSize: 11 }}>
+					{omitted}
+				</span>
+			)}
+		</>
+	);
+}
+
+/**
+ * Copy a link to the selected frame.
+ *
+ * The address bar already holds that link, because useFrameLink keeps it
+ * there. So when the clipboard is refused — an insecure origin, or a browser
+ * that will not write without a gesture it recognises — saying where the link
+ * already is beats failing silently.
+ */
+function CopyFrameLink({ frame }: { frame: HeardFrame }) {
+	const seq = frame.raw?.seq;
+	const [message, setMessage] = useState("");
+	useEffect(() => setMessage(""), [seq]);
+
+	const copy = async () => {
+		if (seq === undefined) return;
+		const url = permalinkUrl(snifferFrameHash(seq), window.location.href);
+		try {
+			await navigator.clipboard.writeText(url);
+			setMessage("LINK COPIED");
+		} catch {
+			setMessage("COULD NOT COPY — THE ADDRESS BAR HOLDS THE LINK");
+		}
+	};
+
+	return (
+		<div
+			style={{
+				display: "flex",
+				gap: 8,
+				alignItems: "center",
+				flexWrap: "wrap",
+				marginBottom: 8,
+			}}
+		>
+			<button
+				disabled={seq === undefined}
+				title={
+					seq === undefined
+						? "This frame arrived without its raw record, so it has no frame number for a link to name"
+						: "Copy a link that reopens this screen with this frame selected"
+				}
+				onClick={() => void copy()}
+			>
+				COPY LINK
+			</button>
+			{message && (
+				<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+					{message}
+				</span>
+			)}
+		</div>
+	);
+}
+
+/**
+ * Two-way binding between the selected frame and the URL.
+ *
+ * A permalink names a frame by its sequence number, the only identity that
+ * outlives the page: the list itself is a ring that shifts under the table.
+ * A link is usually opened before the session has heard anything, so the
+ * number it asks for is held until a frame carrying it actually arrives
+ * rather than being dropped on the spot — on a quiet band that can be
+ * minutes.
+ */
+function useFrameLink(
+	frames: HeardFrame[],
+	sel: HeardFrame | undefined,
+	setSel: (frame: HeardFrame | undefined) => void,
+): void {
+	const [wanted, setWanted] = useState<number | null>(() =>
+		readFrame(window.location.hash),
+	);
+
+	useEffect(() => {
+		const onHash = () => setWanted(readFrame(window.location.hash));
+		window.addEventListener("hashchange", onHash);
+		return () => window.removeEventListener("hashchange", onHash);
+	}, []);
+
+	useEffect(() => {
+		if (wanted === null) return;
+		const hit = frames.find((f) => f.raw?.seq === wanted);
+		if (hit) {
+			setSel(hit);
+			setWanted(null);
+			return;
+		}
+		// The operator picked a different frame while the link's was still out
+		// of reach. Their choice wins over the URL, or the requested frame
+		// would yank the pane away from them whenever it finally landed.
+		if (sel !== undefined && sel.raw?.seq !== wanted) setWanted(null);
+	}, [wanted, frames, sel, setSel]);
+
+	useEffect(() => {
+		// While a link is still waiting for its frame the hash IS the request,
+		// and an empty selection must not overwrite it.
+		if (wanted !== null) return;
+		const next = snifferFrameHash(sel?.raw?.seq ?? null);
+		if (next === window.location.hash) return;
+		// replaceState rather than assigning the hash: this is the same screen
+		// the operator is already on, not a place to go back to, and assigning
+		// would fire the hashchange the app routes on.
+		window.history.replaceState(
+			null,
+			"",
+			permalinkUrl(next, window.location.href),
+		);
+	}, [sel, wanted]);
+}
+
 export default function Sniffer() {
 	const link = useDeviceLink();
 	const session = useSnifferSession();
@@ -28,6 +241,7 @@ export default function Sniffer() {
 
 	const linked = link.status === "linked";
 	const frames = session.frames;
+	useFrameLink(frames, sel, setSel);
 	const rawRecords = frames.flatMap((f) => (f.raw ? [f.raw] : []));
 
 	// Same download shape as the TRAFFIC capture: a .lscap assembled in the
@@ -84,6 +298,7 @@ export default function Sniffer() {
 				>
 					⭳ SAVE CAPTURE
 				</button>
+				<SnifferExport frames={frames} onSaved={setExportMsg} />
 				{session.paused && (
 					<span className="warn" style={{ fontSize: 11 }}>
 						PAUSED
@@ -202,6 +417,7 @@ export default function Sniffer() {
 							</button>
 						</div>
 						<div className="scroll-y" style={{ padding: "10px 12px" }}>
+							<CopyFrameLink frame={sel} />
 							{(
 								[
 									["FROM", `${sel.name ?? ""} ${nodeId(sel.src)}`.trim()],

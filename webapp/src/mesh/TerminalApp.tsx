@@ -46,6 +46,7 @@ import {
   useDeviceLink,
 } from "../lib/deviceLink";
 import { bindAnalyzerMesh, setNetPublisher } from "./analyzerMesh";
+import { hashRoute } from "../lib/permalink";
 import { netConnect, publishHeardFrame } from "./net";
 import "./meshterm.css";
 
@@ -71,15 +72,18 @@ type Tab = (typeof TABS)[number];
 
 // Deep links: a shared URL can land straight on a screen instead of the intro.
 // #resolve opens TRAFFIC, where TrafficTab reads the same hash and plays the
-// Shelby resolve demo unattended; the rest are plain entry points. The hash is
-// read once at mount — this is an entry point, not a router, so tab changes
-// afterwards never write it back.
+// Shelby resolve demo unattended; the rest are plain entry points. Only the
+// routing token is matched here, so a permalink that carries a query bag
+// (#sniffer?frame=417) still finds its screen and the screen reads the bag
+// itself — see lib/permalink.ts. Tab changes are still never written back:
+// this is an entry point, not a router.
 const HASH_TAB: Partial<Record<string, Tab>> = {
   "#resolve": "TRAFFIC",
   "#traffic": "TRAFFIC",
   "#shelby": "SHELBY",
   "#docs": "DOCS",
   "#paper": "PAPER",
+  "#sniffer": "SNIFFER",
 };
 
 // ponytail: an error boundary for a single screen must not take down the app.
@@ -220,7 +224,7 @@ function App() {
   // The intro opens first: the device, its screens, and why it exists —
   // unless a deep link asked for a specific screen.
   const [tab, setTab] = useState<Tab>(
-    () => HASH_TAB[window.location.hash.toLowerCase()] ?? "INTRO",
+    () => HASH_TAB[hashRoute(window.location.hash)] ?? "INTRO",
   );
   // Phone nav: the ten tabs live behind a hamburger instead of a side-scroll.
   const [menuOpen, setMenuOpen] = useState(false);
@@ -280,7 +284,19 @@ function App() {
       if ((TABS as readonly string[]).includes(next)) setTab(next as Tab);
     };
     window.addEventListener("lilyshark-tab", onTab);
-    return () => window.removeEventListener("lilyshark-tab", onTab);
+    // A permalink pasted into the address bar of an already-open tab changes
+    // the hash without reloading, so the deep link has to be honoured here as
+    // well as at mount. Screens update their own part of the hash with
+    // replaceState, which fires no event and so cannot loop back through this.
+    const onHash = () => {
+      const next = HASH_TAB[hashRoute(window.location.hash)];
+      if (next) setTab(next);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      window.removeEventListener("lilyshark-tab", onTab);
+      window.removeEventListener("hashchange", onHash);
+    };
   }, []);
 
   const deviceLink = useDeviceLink();
