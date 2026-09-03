@@ -734,46 +734,44 @@
     }
 
     function tokenChip(ctx, x, y, width, height, label) {
+        // iOS 6 To: token is a light-blue lozenge, not the Send candy.
         const radius = height / 2;
         ctx.save();
-        ctx.shadowColor = "rgba(20,40,80,0.28)";
-        ctx.shadowBlur = 2;
+        ctx.shadowColor = "rgba(20,40,80,0.18)";
+        ctx.shadowBlur = 1.6;
         ctx.shadowOffsetY = 1;
-        panel(ctx, x, y, width, height, C.SendTop, C.SendBottom, C.SendEdge, radius);
+        panel(ctx, x, y, width, height, 0xb4d4f4, 0x6a9ad8, 0x3a6aa8, radius);
         ctx.restore();
-        candyGlass(ctx, x, y, width, height, 0.84);
+        candyGlass(ctx, x, y, width, height, 0.72);
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, x + 1, y + 1, width - 2, height - 2, Math.max(1, radius - 1));
+        ctx.stroke();
         text(ctx, label, x + width / 2, y + Math.round((height - 10) / 2), C.White, {
             size: 11,
             weight: "700",
             align: "center",
+            shadow: "rgba(20,50,90,0.28)",
         });
     }
 
     function plusDisc(ctx, cx, cy, radius) {
-        const x = cx - radius;
-        const y = cy - radius;
-        const size = radius * 2;
+        // iOS 6 add-contact: blue plus in a thin blue ring.
         ctx.save();
-        ctx.shadowColor = "rgba(20,40,80,0.30)";
-        ctx.shadowBlur = 2;
-        ctx.shadowOffsetY = 1;
+        ctx.strokeStyle = hex24(0x1478e6);
+        ctx.lineWidth = 1.55;
         ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        const fill = ctx.createLinearGradient(x, y, x, y + size);
-        fill.addColorStop(0, hex24(C.SendTop));
-        fill.addColorStop(1, hex24(C.SendBottom));
-        ctx.fillStyle = fill;
-        ctx.fill();
-        ctx.restore();
-        candyGlass(ctx, x, y, size, size, 0.82);
-        ctx.strokeStyle = hex24(C.SendEdge);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+        ctx.arc(cx, cy, radius - 0.7, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = hex24(C.White);
-        ctx.fillRect(cx - 4.4, cy - 1.05, 8.8, 2.1);
-        ctx.fillRect(cx - 1.05, cy - 4.4, 2.1, 8.8);
+        ctx.lineCap = "round";
+        ctx.lineWidth = 2.05;
+        ctx.beginPath();
+        ctx.moveTo(cx - 4.0, cy);
+        ctx.lineTo(cx + 4.0, cy);
+        ctx.moveTo(cx, cy - 4.0);
+        ctx.lineTo(cx, cy + 4.0);
+        ctx.stroke();
+        ctx.restore();
     }
 
     function badge(ctx, x, y, value) {
