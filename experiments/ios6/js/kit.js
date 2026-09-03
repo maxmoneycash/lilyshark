@@ -554,7 +554,7 @@
 
     function backButton(ctx, x, y, label, action) {
         const height = 18;
-        const point = 9;
+        const point = 11;
         const width = point + label.length * (Ios6.state.font === "pixel" ? 6 : 6.2) + 14;
         ctx.save();
         ctx.beginPath();
@@ -564,8 +564,8 @@
         ctx.lineTo(x + width + 4, y + height - 4);
         ctx.quadraticCurveTo(x + width + 4, y + height, x + width, y + height);
         ctx.lineTo(x + point, y + height);
-        ctx.quadraticCurveTo(x + 2.1, y + height * 0.60, x, y + height / 2);
-        ctx.quadraticCurveTo(x + 2.1, y + height * 0.40, x + point, y);
+        ctx.quadraticCurveTo(x + 1.0, y + height * 0.58, x, y + height / 2);
+        ctx.quadraticCurveTo(x + 1.0, y + height * 0.42, x + point, y);
         ctx.closePath();
         const gradient = ctx.createLinearGradient(x, y, x, y + height);
         gradient.addColorStop(0, hex24(0x4e6e96));
