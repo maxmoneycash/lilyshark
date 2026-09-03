@@ -78,16 +78,17 @@
         ctx.shadowOffsetY = 1.2;
         ctx.beginPath();
         ctx.ellipse(x + 24.0, y + 19.6, 18.8, 10.8, 0, 0, Math.PI * 2);
+        // User Messages icon: white crown to light grey foot, not cool blue.
         const body = ctx.createLinearGradient(x, y + 8, x, y + 33);
         body.addColorStop(0, "#ffffff");
-        body.addColorStop(0.58, "#e8eef4");
-        body.addColorStop(1, "#c8d6e2");
+        body.addColorStop(0.58, "#f2f2f4");
+        body.addColorStop(1, "#d4d4d8");
         ctx.fillStyle = body;
         ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(x + 14.8, y + 27.2);
-        ctx.lineTo(x + 10.4, y + 33.6);
-        ctx.quadraticCurveTo(x + 17.2, y + 31.2, x + 21.0, y + 28.4);
+        ctx.moveTo(x + 14.2, y + 27.4);
+        ctx.lineTo(x + 9.2, y + 34.4);
+        ctx.quadraticCurveTo(x + 16.4, y + 31.6, x + 20.6, y + 28.6);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
