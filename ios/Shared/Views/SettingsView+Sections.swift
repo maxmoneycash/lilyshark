@@ -759,7 +759,7 @@ extension SettingsView {
                 .listRowBackground(MeshTheme.surface)
             }
         } header: {
-            sectionInfoHeader("Connection", info: "PommeCore supports Bluetooth, WiFi, and USB Serial connections to your radio.")
+            sectionInfoHeader("Connection", info: "Lilyshark supports Bluetooth, WiFi, and USB Serial connections to your radio.")
         }
     }
 

@@ -8,7 +8,7 @@
 
 import Foundation
 
-let widgetAppGroupID = "group.com.mbedworth.meshcore"
+let widgetAppGroupID = "group.com.lilyshark.app"
 private let widgetStateKey = "widgetState"
 
 struct WidgetState: Codable {

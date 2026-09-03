@@ -10,7 +10,7 @@
 	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
-		<string>iCloud.com.mbedworth.meshcore</string>
+		<string>iCloud.com.lilyshark.app</string>
 	</array>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>

@@ -20,7 +20,7 @@ final class WatchUnlockManager: ObservableObject {
 
     @Published var isUnlocked = false
 
-    static let companionProductID = "com.mbedworth.meshcore.watch.companion"
+    static let companionProductID = "com.lilyshark.app.watch.companion"
     private static let supporterKVSKey = "supporter.watchUnlock"
 
     private var updateTask: Task<Void, Never>?

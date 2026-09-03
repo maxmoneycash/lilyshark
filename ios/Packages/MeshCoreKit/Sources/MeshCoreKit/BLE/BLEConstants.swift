@@ -25,8 +25,8 @@ public enum BLEConstants {
     public static let deviceNamePrefix = "MeshCore-"
 
     /// CBCentralManager restore identifier for background state preservation
-    public static let centralManagerRestoreIdentifier = "com.meshcore.centralmanager"
+    public static let centralManagerRestoreIdentifier = "com.lilyshark.app.centralmanager"
 
     /// BLE dispatch queue label
-    public static let bleQueueLabel = "com.meshcore.ble"
+    public static let bleQueueLabel = "com.lilyshark.app.ble"
 }

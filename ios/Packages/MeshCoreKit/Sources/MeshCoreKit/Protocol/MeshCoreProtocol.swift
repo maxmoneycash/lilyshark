@@ -22,7 +22,7 @@ public enum MeshCoreProtocol {
 
     /// CMD_APP_START (code 1) — initialize connection, returns SELF_INFO.
     /// Format: [cmd, appVer, 6×reserved, appName..., 0x00]
-    public static func buildAppStart(appName: String = "PommeCore") -> Data {
+    public static func buildAppStart(appName: String = "Lilyshark") -> Data {
         var frame = Data([MeshCoreCommand.appStart.rawValue])
         frame.append(supportedProtocolVersion)       // appVer
         frame.append(Data(repeating: 0, count: 6))   // 6 reserved bytes

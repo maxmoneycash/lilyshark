@@ -76,6 +76,12 @@
 		18B6F45B61F3581FB64D1DB0 /* DeviceScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2377BED4FF5A7170783BA649 /* DeviceScannerView.swift */; };
 		1EF6ECA717224849A5BE496C /* chime.caf in Resources */ = {isa = PBXBuildFile; fileRef = 6F287F4DDB0C464C99076282 /* chime.caf */; };
 		225E5EA5B1F24BE8B38A3BE9 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = E09A1F63605E4CA4ACDE7634 /* InfoPlist.xcstrings */; };
+		LIC10000000100000000001 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = LIC10000000000000000000 /* LICENSE */; };
+		LIC10000000100000000002 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = LIC10000000000000000000 /* LICENSE */; };
+		LIC10000000100000000003 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = LIC10000000000000000000 /* LICENSE */; };
+		NOT10000000100000000001 /* NOTICE in Resources */ = {isa = PBXBuildFile; fileRef = NOT10000000000000000000 /* NOTICE */; };
+		NOT10000000100000000002 /* NOTICE in Resources */ = {isa = PBXBuildFile; fileRef = NOT10000000000000000000 /* NOTICE */; };
+		NOT10000000100000000003 /* NOTICE in Resources */ = {isa = PBXBuildFile; fileRef = NOT10000000000000000000 /* NOTICE */; };
 		226CDDBC8386695737648451 /* WatchUnlockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4226DA6FB1C6225C757D16 /* WatchUnlockManager.swift */; };
 		25A8570F11FD411695EC9FA1 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = E09A1F63605E4CA4ACDE7634 /* InfoPlist.xcstrings */; };
 		3749B94D818310AD5ACF3B87 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFFE2BF3488F0C0647632CD /* ChatView.swift */; };
@@ -294,6 +300,8 @@
 		21606E2B959E6496D3B0230D /* ContactListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactListView.swift; sourceTree = "<group>"; };
 		2377BED4FF5A7170783BA649 /* DeviceScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceScannerView.swift; sourceTree = "<group>"; };
 		2EEF439B8EDC4A5408C299FB /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = macOS/PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
+		LIC10000000000000000000 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = SOURCE_ROOT; };
+		NOT10000000000000000000 /* NOTICE */ = {isa = PBXFileReference; lastKnownFileType = text; path = NOTICE; sourceTree = SOURCE_ROOT; };
 		38CA824A6E6A4B7D9DD6A055 /* alert.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = alert.caf; sourceTree = "<group>"; };
 		43931BD12312D05F62A9E3B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5D859AE9C98610F71C2FBAAF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -455,6 +463,8 @@
 				725951214897A58A06E32F73 /* Products */,
 				635B414AA8FC75B37367C7F5 /* PrivacyInfo.xcprivacy */,
 				2EEF439B8EDC4A5408C299FB /* PrivacyInfo.xcprivacy */,
+				LIC10000000000000000000 /* LICENSE */,
+				NOT10000000000000000000 /* NOTICE */,
 				0F4E79692F95627900307C73 /* Frameworks */,
 				0FFEA56D2F9FDADD0078A117 /* Recovered References */,
 			);
@@ -858,6 +868,8 @@
 				E28165853F83421C9DB40DBA /* alert.caf in Resources */,
 				D0850BE9C3F24035AFC8E789 /* chime.caf in Resources */,
 				BD93571403214ED79B2F4D15 /* pulse.caf in Resources */,
+				LIC10000000100000000001 /* LICENSE in Resources */,
+				NOT10000000100000000001 /* NOTICE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -869,6 +881,8 @@
 				B5EE485BAA6AEBB5F4E8FF23 /* PrivacyInfo.xcprivacy in Resources */,
 				0F05C0E42F9F004400818F68 /* Localizable.xcstrings in Resources */,
 				25A8570F11FD411695EC9FA1 /* InfoPlist.xcstrings in Resources */,
+				LIC10000000100000000002 /* LICENSE in Resources */,
+				NOT10000000100000000002 /* NOTICE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -883,6 +897,8 @@
 				F70142BB0E4E485FAA189AD7 /* alert.caf in Resources */,
 				1EF6ECA717224849A5BE496C /* chime.caf in Resources */,
 				D5EA89B86D044DD69287E9D0 /* pulse.caf in Resources */,
+				LIC10000000100000000003 /* LICENSE in Resources */,
+				NOT10000000100000000003 /* NOTICE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1125,7 +1141,7 @@
 				CURRENT_PROJECT_VERSION = 20260608.120603;
 				DEVELOPMENT_TEAM = 7R925EW7AT;
 				INFOPLIST_FILE = iOS/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PommeCore;
+				INFOPLIST_KEY_CFBundleDisplayName = Lilyshark;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1133,7 +1149,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mbedworth.meshcore;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lilyshark.app;
 				PRODUCT_NAME = PommeCore;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
@@ -1221,7 +1237,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PommeCore Watch Complications/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "PommeCore Watch Complications";
+				INFOPLIST_KEY_CFBundleDisplayName = "Lilyshark Watch Complications";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1231,7 +1247,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mbedworth.meshcore.watchos.PommeCore-Watch-Complications";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.lilyshark.app.watchos.Lilyshark-Watch-Complications";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -1263,7 +1279,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PommeCore Watch Complications/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "PommeCore Watch Complications";
+				INFOPLIST_KEY_CFBundleDisplayName = "Lilyshark Watch Complications";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1273,7 +1289,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mbedworth.meshcore.watchos.PommeCore-Watch-Complications";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.lilyshark.app.watchos.Lilyshark-Watch-Complications";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -1307,7 +1323,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PommeCore Widgets/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "PommeCore Widgets";
+				INFOPLIST_KEY_CFBundleDisplayName = "Lilyshark Widgets";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1317,7 +1333,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mbedworth.meshcore.PommeCore-Widgets";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.lilyshark.app.Lilyshark-Widgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -1346,7 +1362,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PommeCore Widgets/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "PommeCore Widgets";
+				INFOPLIST_KEY_CFBundleDisplayName = "Lilyshark Widgets";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1356,7 +1372,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mbedworth.meshcore.PommeCore-Widgets";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.lilyshark.app.Lilyshark-Widgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -1380,9 +1396,9 @@
 				CURRENT_PROJECT_VERSION = 20260608.120603;
 				DEVELOPMENT_TEAM = 7R925EW7AT;
 				INFOPLIST_FILE = watchOS/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PommeCore;
+				INFOPLIST_KEY_CFBundleDisplayName = Lilyshark;
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mbedworth.meshcore.watchos;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lilyshark.app.watchos;
 				PRODUCT_NAME = "PommeCore Watch";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = watchos;
@@ -1411,7 +1427,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mbedworth.meshcore;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lilyshark.app;
 				PRODUCT_NAME = PommeCore;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
@@ -1436,7 +1452,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mbedworth.meshcore;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lilyshark.app;
 				PRODUCT_NAME = PommeCore;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
@@ -1452,7 +1468,7 @@
 				CURRENT_PROJECT_VERSION = 20260608.120603;
 				DEVELOPMENT_TEAM = 7R925EW7AT;
 				INFOPLIST_FILE = iOS/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PommeCore;
+				INFOPLIST_KEY_CFBundleDisplayName = Lilyshark;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1460,7 +1476,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mbedworth.meshcore;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lilyshark.app;
 				PRODUCT_NAME = PommeCore;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
@@ -1545,9 +1561,9 @@
 				CURRENT_PROJECT_VERSION = 20260608.120603;
 				DEVELOPMENT_TEAM = 7R925EW7AT;
 				INFOPLIST_FILE = watchOS/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PommeCore;
+				INFOPLIST_KEY_CFBundleDisplayName = Lilyshark;
 				MARKETING_VERSION = 26.06.08;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mbedworth.meshcore.watchos;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lilyshark.app.watchos;
 				PRODUCT_NAME = "PommeCore Watch";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = watchos;

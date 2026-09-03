@@ -11,7 +11,7 @@
 
 name: PommeCore
 options:
-  bundleIdPrefix: com.meshcore
+  bundleIdPrefix: com.lilyshark
   # These must not drop below the floors in Packages/MeshCoreKit/Package.swift
   # (.iOS(.v18), .macOS(.v15), .watchOS(.v11)). Xcode resolves the package against
   # the app's deployment target, so a lower value here fails the package graph
@@ -43,15 +43,15 @@ targets:
       path: iOS/Info.plist
       properties:
         UILaunchScreen: {}
-        CFBundleDisplayName: PommeCore
+        CFBundleDisplayName: Lilyshark
         UIBackgroundModes:
           - bluetooth-central
           - remote-notification
-        NSBluetoothAlwaysUsageDescription: "PommeCore needs Bluetooth to communicate with your LoRa radio device."
-        NSBluetoothPeripheralUsageDescription: "PommeCore needs Bluetooth to communicate with your LoRa radio device."
+        NSBluetoothAlwaysUsageDescription: "Lilyshark needs Bluetooth to communicate with your LoRa radio device."
+        NSBluetoothPeripheralUsageDescription: "Lilyshark needs Bluetooth to communicate with your LoRa radio device."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.meshcore.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.lilyshark.app
         PRODUCT_NAME: PommeCore
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: 1
@@ -71,11 +71,11 @@ targets:
     info:
       path: macOS/Info.plist
       properties:
-        CFBundleDisplayName: PommeCore
-        NSBluetoothAlwaysUsageDescription: "PommeCore needs Bluetooth to communicate with your LoRa radio device."
+        CFBundleDisplayName: Lilyshark
+        NSBluetoothAlwaysUsageDescription: "Lilyshark needs Bluetooth to communicate with your LoRa radio device."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.meshcore.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.lilyshark.app
         PRODUCT_NAME: PommeCore
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: 1
@@ -95,14 +95,14 @@ targets:
     info:
       path: watchOS/Info.plist
       properties:
-        CFBundleDisplayName: PommeCore
+        CFBundleDisplayName: Lilyshark
         UIBackgroundModes:
           - bluetooth-central
-        NSBluetoothAlwaysUsageDescription: "PommeCore needs Bluetooth to communicate with your LoRa radio device."
+        NSBluetoothAlwaysUsageDescription: "Lilyshark needs Bluetooth to communicate with your LoRa radio device."
         WKApplication: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.meshcore.app.watchos
+        PRODUCT_BUNDLE_IDENTIFIER: com.lilyshark.app.watchos
         PRODUCT_NAME: PommeCore Watch
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: 1

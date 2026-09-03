@@ -5,15 +5,18 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>PommeCore</string>
+	<string>Lilyshark</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- Literal, not $(PRODUCT_NAME): the Xcode target keeps upstream's PommeCore
+	     name so the project's product references still resolve, but macOS titles the
+	     menu bar from CFBundleName, so this one has to say Lilyshark. -->
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Lilyshark</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -24,7 +27,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.mbedworth.meshcore</string>
+			<string>com.lilyshark.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>meshcore</string>
@@ -34,9 +37,9 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.social-networking</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>PommeCore needs Bluetooth to communicate with your LoRa radio device.</string>
+	<string>Lilyshark needs Bluetooth to communicate with your LoRa radio device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>PommeCore shows your location on the mesh map and can include it in your advertisements.</string>
+	<string>Lilyshark shows your location on the mesh map and can include it in your advertisements.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Michael Bedworth. All rights reserved.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

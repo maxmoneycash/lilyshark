@@ -164,7 +164,7 @@ struct PommeCoreCircularComplication: Widget {
             CircularEntryView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("PommeCore")
+        .configurationDisplayName("Lilyshark")
         .description("DM and public channel unread counts.")
         .supportedFamilies([.accessoryCircular, .accessoryInline])
     }
@@ -178,7 +178,7 @@ struct PommeCoreSplitComplication: Widget {
             SplitEntryView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("PommeCore Messages")
+        .configurationDisplayName("Lilyshark Messages")
         .description("DM and public channel counts side by side.")
         .supportedFamilies([.accessoryRectangular, .accessoryInline])
     }

@@ -10,7 +10,7 @@ import SwiftUI
 import WidgetKit
 
 struct PommeCore_WidgetsControl: ControlWidget {
-    static let kind: String = "com.mbedworth.meshcore.PommeCore Widgets"
+    static let kind: String = "com.lilyshark.app.Lilyshark Widgets"
 
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(

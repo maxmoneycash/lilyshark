@@ -18,7 +18,7 @@ import MeshCoreKit
 @MainActor
 final class TelemetryCloudSync {
 
-    private let container = CKContainer(identifier: "iCloud.com.mbedworth.meshcore")
+    private let container = CKContainer(identifier: "iCloud.com.lilyshark.app")
     private var database: CKDatabase { container.privateCloudDatabase }
     private let defaults = UserDefaults.standard
 

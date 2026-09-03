@@ -860,11 +860,11 @@ final class ContactStore {
         for contact in contacts {
             let attrs = CSSearchableItemAttributeSet(contentType: .contact)
             attrs.displayName = displayName(for: contact)
-            attrs.contentDescription = "PommeCore \(contact.type == .repeater ? "repeater" : contact.type == .room ? "room server" : "contact")"
+            attrs.contentDescription = "Lilyshark \(contact.type == .repeater ? "repeater" : contact.type == .room ? "room server" : "contact")"
             let pubkeyHex = contact.publicKey.hexCompact
             let item = CSSearchableItem(
                 uniqueIdentifier: "meshcore.contact.\(pubkeyHex)",
-                domainIdentifier: "com.mbedworth.meshcore.contacts",
+                domainIdentifier: "com.lilyshark.app.contacts",
                 attributeSet: attrs
             )
             item.expirationDate = .distantFuture

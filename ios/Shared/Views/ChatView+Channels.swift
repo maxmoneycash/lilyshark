@@ -113,7 +113,7 @@ struct ChannelChatView: View {
         .alert("Location Unavailable", isPresented: $showLocationUnavailableAlert) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Your location could not be determined. Enable Location Services for PommeCore in Settings.")
+            Text("Your location could not be determined. Enable Location Services for Lilyshark in Settings.")
         }
     }
 

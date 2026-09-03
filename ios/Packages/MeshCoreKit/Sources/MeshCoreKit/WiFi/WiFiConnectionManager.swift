@@ -33,7 +33,7 @@ public final class WiFiConnectionManager: ObservableObject {
 
     private var connection: NWConnection?
     private var readBuffer = Data()
-    private let queue = DispatchQueue(label: "com.meshcore.wifi", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "com.lilyshark.app.wifi", qos: .userInitiated)
 
     /// Auto-reconnect state
     public private(set) var lastHost: String?

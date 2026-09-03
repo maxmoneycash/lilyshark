@@ -96,7 +96,7 @@ struct ContactListView: View {
 
     var body: some View {
         mainListWithGroupSheets
-        .navigationTitle("PommeCore")
+        .navigationTitle("Lilyshark")
         // navigationDestination is only needed on iOS (not macOS/Catalyst) because on
         // macOS the NavigationSplitView's detail: block drives the detail column exclusively.
         // Leaving navigationDestination active on macOS creates a conflicting navigation
