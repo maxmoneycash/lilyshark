@@ -970,9 +970,9 @@
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
         const well = ctx.createLinearGradient(cx, cy - outer, cx, cy + outer);
-        well.addColorStop(0, "#6a727c");
-        well.addColorStop(0.40, "#4a525c");
-        well.addColorStop(1, "#2c3238");
+        well.addColorStop(0, "#8a929c");
+        well.addColorStop(0.40, "#5c646e");
+        well.addColorStop(1, "#3a424a");
         ctx.fillStyle = well;
         ctx.fill();
         ctx.save();
