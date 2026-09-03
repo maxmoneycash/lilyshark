@@ -110,6 +110,23 @@ test('parseLskLine reads a heard-frame line with a position', () => {
   assert.equal(parsed.frame.short, 'BAY');
 });
 
+test('parseLskLine reads a spectrum sweep line', () => {
+  const parsed = parseLskLine(
+    'LSK S {"f0":902000000,"f1":928000000,"bins":4,"db":[-121,-118,-87,-119]}',
+  );
+  assert.ok(parsed);
+  assert.equal(parsed.kind, 'S');
+  if (parsed.kind !== 'S') return;
+  assert.equal(parsed.sweep.f0Hz, 902000000);
+  assert.equal(parsed.sweep.f1Hz, 928000000);
+  assert.deepEqual(parsed.sweep.db, [-121, -118, -87, -119]);
+  // A clipped line whose JSON survives must not chart as a narrower band.
+  assert.equal(
+    parseLskLine('LSK S {"f0":902000000,"f1":928000000,"bins":4,"db":[-121,-118]}'),
+    undefined,
+  );
+});
+
 test('parseLskLine reads extra telemetry fields when present', () => {
   const parsed = parseLskLine(
     'LSK T {"bat":"BAT 87%","gps":"GPS FIX 7","profile":"LongFast","frames":12,' +

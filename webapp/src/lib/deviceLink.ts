@@ -5,9 +5,11 @@
  * This is not the MeshCore companion protocol — Lilyshark is the instrument,
  * not the messenger, so its link is the instrument's: a "LSK HELLO"
  * handshake, then newline-delimited telemetry lines ("LSK T {...}") every
- * couple of seconds and a full-coordinates pointer line ("LSK P {...}")
- * whenever the device decodes a Shelby pointer off the air. Plain text, so a
- * serial monitor shows a human exactly what the browser sees.
+ * couple of seconds, a full-coordinates pointer line ("LSK P {...}")
+ * whenever the device decodes a Shelby pointer off the air, and — while a
+ * sweep is running — one spectrum line ("LSK S {...}") per pass across the
+ * band. Plain text, so a serial monitor shows a human exactly what the
+ * browser sees.
  *
  * Finding the radio is half the problem. A Mac lists Bluetooth ports, headset
  * ports and a debug console alongside the board, and any of them opens
@@ -18,6 +20,12 @@
 
 import { useSyncExternalStore } from 'react';
 import { recordFrame } from './captureSession';
+import { recordSnifferFrame } from './snifferSession';
+import {
+  appendSpectrumSweep,
+  parseSpectrumBody,
+  type SpectrumSweep,
+} from './spectrum';
 
 /** USB vendors that put a serial device on a dev board: Espressif's native
  *  USB (the T-Deck), then the CH34x / CP210x / FTDI bridges other boards use.
@@ -207,6 +215,9 @@ export interface DeviceLinkState {
   history: DeviceTelemetry[];
   /** Newest last. Bounded by HEARD_FRAME_LIMIT. */
   frames: HeardFrame[];
+  /** Waterfall rows while the device sweeps the band, newest last. Bounded by
+   *  SPECTRUM_HISTORY_LIMIT (see spectrum.ts). */
+  sweeps: SpectrumSweep[];
   pointer?: DevicePointer;
 }
 
@@ -214,6 +225,7 @@ export type ParsedLsk =
   | { kind: 'ID'; firmware: string }
   | { kind: 'T'; telemetry: DeviceTelemetry }
   | { kind: 'F'; frame: HeardFrame }
+  | { kind: 'S'; sweep: SpectrumSweep }
   | { kind: 'P'; pointer: DevicePointer }
   | { kind: 'OK'; proto?: string; txKind?: string }
   | { kind: 'ERR'; reason?: string; proto?: string };
@@ -300,6 +312,10 @@ export function parseLskLine(line: string): ParsedLsk | undefined {
       },
     };
   }
+  if (kind === 'S') {
+    const sweep = parseSpectrumBody(body);
+    return sweep ? { kind: 'S', sweep } : undefined;
+  }
   if (kind === 'OK') {
     return {
       kind: 'OK',
@@ -350,7 +366,7 @@ export function appendHeardFrame(frames: HeardFrame[], frame: HeardFrame): Heard
   return next;
 }
 
-let state: DeviceLinkState = { status: 'off', history: [], frames: [] };
+let state: DeviceLinkState = { status: 'off', history: [], frames: [], sweeps: [] };
 
 export function getDeviceLinkState(): DeviceLinkState {
   return state;
@@ -447,7 +463,12 @@ function handleLine(line: string): void {
     // A capture session keeps the full record; the list above keeps only the
     // newest few for display.
     recordFrame(parsed.frame);
+    // The sniffer keeps its own, longer session log of the same stream.
+    recordSnifferFrame(parsed.frame);
     onAnalyzerFrame?.(parsed.frame);
+  } else if (parsed.kind === 'S') {
+    markLinked(state.firmware);
+    set({ sweeps: appendSpectrumSweep(state.sweeps, parsed.sweep) });
   } else if (parsed.kind === 'P') {
     set({ pointer: parsed.pointer });
   } else if (parsed.kind === 'OK') {
@@ -710,6 +731,13 @@ export async function sendDeviceLine(line: string): Promise<void> {
   });
 }
 
+/** Ask the firmware to start or stop sweeping the band. It answers LSK OK or
+ *  LSK ERR and, while sweeping, prints one "LSK S" line per pass; those lines
+ *  land in state.sweeps whether or not the SPECTRUM screen is mounted. */
+export async function setSweeping(on: boolean): Promise<void> {
+  await sendDeviceLine(on ? 'LSK SWEEP start' : 'LSK SWEEP stop');
+}
+
 export async function disconnectDeviceLink(): Promise<void> {
   try {
     await send('LSK BYE');
@@ -722,6 +750,7 @@ export async function disconnectDeviceLink(): Promise<void> {
     telemetry: undefined,
     history: [],
     frames: [],
+    sweeps: [],
     pointer: undefined,
     firmware: undefined,
     error: undefined,

@@ -33,6 +33,10 @@ import { ShelbyScreen } from "./screens/Shelby";
 const MapView = lazy(() => import("./screens/MapView"));
 const Telemetry = lazy(() => import("./screens/Telemetry"));
 const Docs = lazy(() => import("./screens/Docs"));
+// Instrument screens fed by the USB link: idle until a deck is attached, so
+// they load on first visit like the other heavy screens.
+const Spectrum = lazy(() => import("./screens/Spectrum"));
+const Sniffer = lazy(() => import("./screens/Sniffer"));
 import { fmtFreq, useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
@@ -58,6 +62,8 @@ const TABS = [
   "MAP",
   "MESH",
   "TELEMETRY",
+  "SPECTRUM",
+  "SNIFFER",
   "CONFIG",
   "DEBUG",
 ] as const;
@@ -865,6 +871,8 @@ function App() {
       {tab === "MESH" && <Mesh />}
       {tab === "CONFIG" && <Config />}
       {tab === "TELEMETRY" && <Telemetry />}
+      {tab === "SPECTRUM" && <Spectrum />}
+      {tab === "SNIFFER" && <Sniffer />}
       {tab === "DEBUG" && (
         <main>
           {/* no background of its own: hardcoding a near-black left the light
