@@ -48,6 +48,17 @@ number is carried in the 32-byte key space the app's stores are built on:
 `syntheticKey(forNodeNum:)`, `nodeNum(forSyntheticKey:)`,
 `defaultLabel(forNodeNum:)`, and `snrQuarterDecibels(from:)`.
 
+`Analyzer/` — the deck's *other* link, and a much wider one. Where the BLE path
+above carries chat, the LSK link over USB CDC carries the whole instrument:
+telemetry, every heard frame with its full `.lscap` record, spectrum sweeps and
+Shelby pointers, plus transmit, inject and sweep commands. `LSKDecoder` and
+`LSKLineAssembler` are pure and build on every platform; `LSKSerialLink` is
+macOS only, and `LSKUSBAvailability.current` explains why on the platforms where
+it is absent. The grammar, the firmware call site authoritative for each line
+kind, and the SDK evidence for the iOS answer are in `LSK.md` beside this file.
+
+Nothing in `Analyzer/` is wired into the app yet — see **Not verified** #10.
+
 ---
 
 ## 2. The one edit still outstanding
@@ -241,3 +252,14 @@ Stated plainly, because each of these will otherwise be discovered as a bug.
    manager avoids UIKit, but no watch screen reaches a deck, and this machine has
    no watchOS runtime installed, so that target has not been compiled with the
    package linked.
+
+10. **The analyzer link has no app-side wiring at all.** `Analyzer/` compiles,
+    is covered by tests, and is reachable from any target that imports the
+    package — but nothing in `ios/Shared/` calls it. There is no
+    `Transport.analyzer`, no port picker, and no screen showing a sweep. The Mac
+    target is the natural host for it (`enum Transport` in
+    `ios/Shared/Stores/ConnectionManager.swift` already has `.usb`, but that
+    case belongs to `MeshCoreKit.USBSerialManager` and speaks a different
+    protocol on the same cable — the two must not be conflated). On iOS the app
+    should read `LSKUSBAvailability.current` and say what it says rather than
+    offer a button; see `LSK.md` §8 for why.
