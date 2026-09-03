@@ -261,6 +261,70 @@ void sendKeyboard(std::uint8_t key)
     loop();
 }
 
+using ScanHistogram = std::array<std::uint16_t, RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE>;
+
+/// One SX1262 spectral-scan reading: `floor_count` samples in the bin the
+/// noise sits in, and optionally `signal_count` samples in a stronger bin.
+/// Lower bin indices are stronger; bin 32 is the catch-all at -139 dBm.
+ScanHistogram scanHistogram(std::size_t floor_bin, std::uint16_t floor_count,
+                            std::size_t signal_bin, std::uint16_t signal_count)
+{
+    ScanHistogram counts{};
+    counts[floor_bin] = floor_count;
+    if(signal_count != 0U) counts[signal_bin] = static_cast<std::uint16_t>(
+        counts[signal_bin] + signal_count);
+    return counts;
+}
+
+/// "SCANNING 4/11  36%  906.750 MHZ" -> "906.750". The screen's own progress
+/// line is where the expected peak frequency comes from, so the assertion
+/// cannot be satisfied by a display that agrees with a constant copied out of
+/// the profile table into the test.
+std::string scanningFrequencyText(const char *scanning)
+{
+    if(scanning == nullptr) return {};
+    const std::string text = scanning;
+    const std::size_t unit = text.rfind(" MHZ");
+    if(unit == std::string::npos || unit == 0U) return {};
+    const std::size_t start = text.rfind(' ', unit - 1U);
+    if(start == std::string::npos) return {};
+    return text.substr(start + 1U, unit - start - 1U);
+}
+
+/// Run one whole sweep through the RadioLib fake, feeding `loud` at the point
+/// with index `loud_point` and `quiet` everywhere else. `loud_frequency` comes
+/// back holding the frequency the deck reported itself to be scanning while
+/// `loud` was in the air.
+///
+/// The fake answers every frequency from one histogram, and spectralScanStart
+/// re-arms its "not finished yet" status, so the loud reading has to be swapped
+/// in and the scan declared finished on each pass around the real loop.
+bool driveFakeSweep(std::size_t loud_point, const ScanHistogram &loud,
+                    const ScanHistogram &quiet, std::string &loud_frequency)
+{
+    auto &radio = radiolib_fake::state();
+    loud_frequency.clear();
+    // "SCANNING 3/11 ..." is the deck saying three points are done and the
+    // fourth -- index three, the loud one -- is the frequency it is on now.
+    char in_flight[32]{};
+    std::snprintf(in_flight, sizeof(in_flight), "SCANNING %zu/", loud_point);
+    for(std::size_t iteration = 0U; iteration < 600U; ++iteration) {
+        const char *scanning = labelWithPrefix(lv_screen_active(), "SCANNING ");
+        if(scanning != nullptr &&
+           std::strncmp(scanning, in_flight, std::strlen(in_flight)) == 0) {
+            const std::string reported = scanningFrequencyText(scanning);
+            if(!reported.empty()) loud_frequency = reported;
+        }
+        const std::size_t started = radioOperationCount(radiolib_fake::Operation::ScanStart);
+        radio.scan_counts = started == loud_point + 1U ? loud : quiet;
+        radio.scan_status_result = RADIOLIB_ERR_NONE;
+        device_shell_fake::advance_ms(10);
+        loop();
+        if(hasLabel(lv_screen_active(), "COMPLETE")) return true;
+    }
+    return false;
+}
+
 bool healthyScenario()
 {
     device_shell_fake::reset();
@@ -1694,6 +1758,101 @@ bool capturePreferenceSaveFailureScenario()
     return true;
 }
 
+/// What the SPECTRUM screen says a sweep found, checked against what was fed
+/// into the radio fake to be found.
+///
+/// The three facts under test are the ones the screen previously blurred: a
+/// band nobody has swept, a band swept and heard quiet, and the loudest thing
+/// in a band that had something in it -- named at the frequency the deck said
+/// it was tuned to at the moment the strong reading arrived.
+bool spectrumSweepReadoutScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+
+    lilyshark::AppSettings settings = lilyshark::defaultAppSettings();
+    settings.onboarding_version = lilyshark::kAppSettingsOnboardingVersion;
+    settings.onboarding_complete = true;
+    // The first-use notice is its own screen and its own scenario. Starting
+    // past it keeps this one about what the sweep reports.
+    settings.spectrum_warning_acknowledged = true;
+    if(!require(seedAppSettings(settings),
+                "spectrum app settings could not be encoded")) return false;
+
+    setup();
+    if(!require(hasLabel(lv_screen_active(), "HOME"),
+                "spectrum scenario did not start at Home")) return false;
+
+    sendKeyboard('2');
+    if(!require(hasLabel(lv_screen_active(), "SPECTRUM") &&
+                    hasLabel(lv_screen_active(), "NOT SWEPT YET"),
+                "an unswept Spectrum screen did not say it was unswept")) return false;
+    if(!require(labelWithPrefix(lv_screen_active(), "LOUDEST ") == nullptr &&
+                    labelWithPrefix(lv_screen_active(), "SWEPT ") == nullptr &&
+                    labelWithPrefix(lv_screen_active(), "FLOOR ") == nullptr,
+                "an unswept Spectrum screen reported measurements it never made")) return false;
+
+    // 50 samples at bin 26 (-115 dBm) is the noise floor; 14 at bin 7 is
+    // -39 dBm, which is 76 dB above it and unmistakably a signal.
+    constexpr std::size_t kFloorBin = 26U;
+    constexpr std::size_t kSignalBin = 7U;
+    constexpr std::size_t kSilentBin = RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE - 1U;
+    constexpr std::size_t kLoudPoint = 3U;
+    const ScanHistogram loud = scanHistogram(kFloorBin, 50U, kSignalBin, 14U);
+    const ScanHistogram quiet = scanHistogram(kFloorBin, 64U, kSignalBin, 0U);
+    const ScanHistogram silent = scanHistogram(kSilentBin, 64U, kSignalBin, 0U);
+
+    sendKeyboard('\r');
+    if(!require(radioOperationCount(radiolib_fake::Operation::ScanStart) != 0U ||
+                    labelWithPrefix(lv_screen_active(), "SCANNING ") != nullptr,
+                "the Spectrum screen did not start an SX1262 sweep")) return false;
+
+    std::string loud_frequency;
+    if(!require(driveFakeSweep(kLoudPoint, loud, quiet, loud_frequency),
+                "the first sweep never reached its completed state")) return false;
+    if(!require(!loud_frequency.empty(),
+                "the deck never reported which frequency it was scanning")) return false;
+
+    char expected[80]{};
+    std::snprintf(expected, sizeof(expected), "LOUDEST %s MHZ  -39 DBM  76 DB OVER FLOOR",
+                  loud_frequency.c_str());
+    const char *loudest = labelWithPrefix(lv_screen_active(), "LOUDEST ");
+    if(!require(loudest != nullptr && std::strcmp(loudest, expected) == 0,
+                "the swept Spectrum screen did not name the strongest bin correctly")) {
+        std::fprintf(stderr, "  expected: %s\n  reported: %s\n", expected,
+                     loudest == nullptr ? "(no LOUDEST line)" : loudest);
+        return false;
+    }
+    // 14 of 704 samples across the sweep sat above their own floor bin.
+    if(!require(hasLabel(lv_screen_active(), "FLOOR -115 DBM  IN USE 1.9%"),
+                "the swept Spectrum screen misreported the floor or the occupancy")) return false;
+    if(!require(hasLabel(lv_screen_active(), "HOLD -39 DBM"),
+                "the peak hold did not record the strongest bin of the sweep")) return false;
+
+    // Second pass over the same band with nothing but the catch-all floor bin
+    // in it: swept and heard nothing, which must not read as unswept, and must
+    // not retract what the hold saw a moment ago.
+    sendKeyboard('\r');
+    std::string unused_frequency;
+    if(!require(driveFakeSweep(SIZE_MAX, loud, silent, unused_frequency),
+                "the silent sweep never reached its completed state")) return false;
+    const char *swept = labelWithPrefix(lv_screen_active(), "SWEPT ");
+    if(!require(swept != nullptr &&
+                    std::string(swept).find(" BINS - NOTHING ABOVE THE -139 DBM FLOOR") !=
+                        std::string::npos,
+                "a sweep that heard nothing did not say so")) {
+        std::fprintf(stderr, "  reported: %s\n", swept == nullptr ? "(no SWEPT line)" : swept);
+        return false;
+    }
+    if(!require(labelWithPrefix(lv_screen_active(), "LOUDEST ") == nullptr &&
+                    !hasLabel(lv_screen_active(), "NOT SWEPT YET"),
+                "a silent sweep was reported as a peak or as never having run")) return false;
+    if(!require(hasLabel(lv_screen_active(), "HOLD -39 DBM"),
+                "the peak hold forgot the earlier signal after a quiet sweep")) return false;
+    return true;
+}
+
 bool corruptSettingsScenario()
 {
     device_shell_fake::reset();
@@ -1755,6 +1914,8 @@ void testDeviceShellEntryPath()
                                   "capture-disabled-simulate-mode device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(capturePreferenceSaveFailureScenario),
                                   "capture-preference-save-failure device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(spectrumSweepReadoutScenario),
+                                  "spectrum-sweep-readout device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(corruptSettingsScenario),
                                   "corrupt-settings device-shell scenario failed");
 }
