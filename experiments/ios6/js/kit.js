@@ -939,14 +939,15 @@
 
     function cameraWell(ctx, x, y, action) {
         // iOS 6 Messages: stamped gunmetal disc, compact white camera.
+        // Viewfinder sits on the top-right; flash pip is left of it.
         const size = 28;
         const cx = x + size / 2;
         const cy = y + size / 2;
         const outer = size / 2 - 0.70;
         ctx.beginPath();
-        ctx.arc(cx, cy, outer + 0.85, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(236,240,244,0.55)";
-        ctx.lineWidth = 1.25;
+        ctx.arc(cx, cy, outer + 0.95, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(226,232,238,0.96)";
+        ctx.lineWidth = 1.55;
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
@@ -961,11 +962,11 @@
         ctx.arc(cx, cy, outer - 0.35, 0, Math.PI * 2);
         ctx.clip();
         const inset = ctx.createLinearGradient(cx, cy - outer, cx, cy + 3);
-        inset.addColorStop(0, "rgba(0,0,0,0.46)");
+        inset.addColorStop(0, "rgba(0,0,0,0.50)");
         inset.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = inset;
         ctx.fillRect(cx - outer, cy - outer, outer * 2, outer + 3);
-        ctx.strokeStyle = "rgba(255,255,255,0.28)";
+        ctx.strokeStyle = "rgba(255,255,255,0.32)";
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(cx, cy + 0.4, outer - 1.25, 0.10 * Math.PI, 0.90 * Math.PI);
@@ -976,15 +977,19 @@
         ctx.strokeStyle = "rgba(20,24,28,0.58)";
         ctx.lineWidth = 1.1;
         ctx.stroke();
-        fillRound(ctx, cx - 6.6, cy - 2.0, 13.2, 8.2, 1.7, "#ffffff");
-        fillRound(ctx, cx - 2.6, cy - 5.2, 5.2, 3.0, 0.95, "#ffffff");
+        fillRound(ctx, cx - 6.5, cy - 1.2, 13.0, 8.0, 1.55, "#ffffff");
+        fillRound(ctx, cx + 0.6, cy - 4.6, 4.4, 3.6, 0.80, "#ffffff");
         ctx.beginPath();
-        ctx.arc(cx - 4.4, cy + 0.6, 1.05, 0, Math.PI * 2);
+        ctx.arc(cx - 3.6, cy - 2.8, 1.15, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx + 0.85, cy + 2.0, 2.05, 0, Math.PI * 2);
+        ctx.arc(cx + 0.15, cy + 2.6, 2.15, 0, Math.PI * 2);
         ctx.fillStyle = "#161a1e";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx + 0.15, cy + 2.6, 0.75, 0, Math.PI * 2);
+        ctx.fillStyle = "#0c0e10";
         ctx.fill();
         if (action) hit(x, y, size, size, action);
     }
