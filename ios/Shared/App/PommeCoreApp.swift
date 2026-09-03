@@ -79,7 +79,7 @@ struct PommeCoreApp: App {
                 .meshTheme()
                 .onChange(of: hasCompletedOnboarding) { _, completed in
                     if completed {
-                        viewModel.connectionManager.bleManager.activate()
+                        viewModel.connectionManager.activateBluetooth()
                         viewModel.requestNotificationPermissionsIfNeeded()
                     }
                 }
@@ -106,7 +106,7 @@ struct PommeCoreApp: App {
                     #endif
                     .meshTheme()
                     .onAppear {
-                        viewModel.connectionManager.bleManager.activate()
+                        viewModel.connectionManager.activateBluetooth()
                         viewModel.requestNotificationPermissionsIfNeeded()
                     }
                     #if os(iOS)

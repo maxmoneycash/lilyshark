@@ -72,6 +72,21 @@ final class ChannelStore {
         radioPrefix12 = prefix
     }
 
+    /// Give a Meshtastic deck's broadcast traffic a conversation to live in.
+    ///
+    /// A deck's config dump carries one channel record and it holds only the
+    /// default pre-shared key and the PRIMARY role — no name, and no index,
+    /// because Meshtastic's primary channel is always index 0. The sequential
+    /// MeshCore channel sync has nothing to ask for here, so the row is seeded
+    /// instead. Without it the broadcast thread exists in the message store
+    /// with nothing in the UI to open it.
+    func seedPrimaryChannelForDeck() {
+        guard !channels.contains(where: { $0.index == 0 }) else { return }
+        // Flags zero is what makes index 0 read as the open public channel.
+        channels.insert(MeshChannel(index: 0, name: "Primary", flags: 0), at: 0)
+        hasCompletedInitialChannelSync = true
+    }
+
     // MARK: - Channel Notification Modes
 
     enum ChannelNotifyMode: String {
