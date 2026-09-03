@@ -1158,21 +1158,21 @@
         const top = barY === undefined ? composerLayout().barY : barY;
         panel(ctx, -1, top, 322, H - top + 2, C.BarTop, C.BarBottom, C.BarEdge, 0);
         const metal = ctx.createLinearGradient(0, top, 0, H);
-        metal.addColorStop(0, "rgba(255,255,255,0.36)");
-        metal.addColorStop(0.16, "rgba(255,255,255,0.10)");
-        metal.addColorStop(1, "rgba(0,0,0,0.10)");
+        metal.addColorStop(0, "rgba(255,255,255,0.52)");
+        metal.addColorStop(0.22, "rgba(255,255,255,0.16)");
+        metal.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = metal;
         ctx.fillRect(0, top, W, H - top);
         ctx.save();
-        ctx.globalAlpha = 0.05;
+        ctx.globalAlpha = 0.026;
         for (let row = top + 2; row < H; row += 2) {
-            ctx.fillStyle = row % 4 === 0 ? "#ffffff" : "#202428";
+            ctx.fillStyle = row % 4 === 0 ? "#ffffff" : "#8a929a";
             ctx.fillRect(0, row, W, 1);
         }
         ctx.restore();
-        ctx.fillStyle = "rgba(255,255,255,0.44)";
+        ctx.fillStyle = "rgba(255,255,255,0.56)";
         ctx.fillRect(0, top, W, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.34)";
+        ctx.fillStyle = "rgba(0,0,0,0.24)";
         ctx.fillRect(0, top + 1, W, 1);
     }
 
