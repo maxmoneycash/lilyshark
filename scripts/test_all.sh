@@ -238,6 +238,23 @@ build_and_run screenshot \
 build_and_run tdeck_display_init \
   test/tdeck_display_init/test_tdeck_display_init.cpp
 
+build_and_run curve25519 \
+  src/crypto/curve25519.cpp \
+  test/curve25519/test_curve25519.cpp
+
+build_and_run aes_ccm \
+  src/crypto/aes128.cpp \
+  src/crypto/aes_ccm.cpp \
+  test/aes_ccm/test_aes_ccm.cpp
+
+build_and_run meshtastic_pkc \
+  src/crypto/aes128.cpp \
+  src/crypto/aes_ccm.cpp \
+  src/crypto/curve25519.cpp \
+  src/crypto/sha256.cpp \
+  src/core/meshtastic_pkc.cpp \
+  test/meshtastic_pkc/test_meshtastic_pkc.cpp
+
 echo "Testing lscap_reader"
 python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
 

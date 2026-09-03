@@ -47,6 +47,56 @@ std::uint8_t gmul(std::uint8_t a, std::uint8_t b) noexcept
     return result;
 }
 
+/// The round walk shared by both key sizes: only the number of rounds and the
+/// schedule length differ between AES-128 and AES-256.
+void encryptWithSchedule(const std::uint8_t *round_keys, unsigned rounds,
+                         const std::uint8_t in[kAesBlockSize],
+                         std::uint8_t out[kAesBlockSize]) noexcept
+{
+    // The state is column-major: byte r + 4c is row r of column c.
+    std::uint8_t state[kAesBlockSize];
+    for (std::size_t index = 0; index < kAesBlockSize; ++index) {
+        state[index] = static_cast<std::uint8_t>(in[index] ^ round_keys[index]);
+    }
+
+    for (unsigned round = 1; round <= rounds; ++round) {
+        for (std::size_t index = 0; index < kAesBlockSize; ++index) {
+            state[index] = kSbox[state[index]];
+        }
+
+        std::uint8_t shifted[kAesBlockSize];
+        for (unsigned column = 0; column < 4; ++column) {
+            for (unsigned row = 0; row < 4; ++row) {
+                shifted[row + 4U * column] = state[row + 4U * ((column + row) % 4U)];
+            }
+        }
+        std::memcpy(state, shifted, kAesBlockSize);
+
+        // The final round omits MixColumns, which is what makes the cipher
+        // invertible with the same key schedule read backwards.
+        if (round != rounds) {
+            for (unsigned column = 0; column < 4; ++column) {
+                std::uint8_t *col = state + 4U * column;
+                const std::uint8_t a0 = col[0];
+                const std::uint8_t a1 = col[1];
+                const std::uint8_t a2 = col[2];
+                const std::uint8_t a3 = col[3];
+                col[0] = static_cast<std::uint8_t>(gmul(a0, 2) ^ gmul(a1, 3) ^ a2 ^ a3);
+                col[1] = static_cast<std::uint8_t>(a0 ^ gmul(a1, 2) ^ gmul(a2, 3) ^ a3);
+                col[2] = static_cast<std::uint8_t>(a0 ^ a1 ^ gmul(a2, 2) ^ gmul(a3, 3));
+                col[3] = static_cast<std::uint8_t>(gmul(a0, 3) ^ a1 ^ a2 ^ gmul(a3, 2));
+            }
+        }
+
+        for (std::size_t index = 0; index < kAesBlockSize; ++index) {
+            state[index] = static_cast<std::uint8_t>(state[index] ^
+                                                     round_keys[round * kAesBlockSize + index]);
+        }
+    }
+
+    std::memcpy(out, state, kAesBlockSize);
+}
+
 } // namespace
 
 Aes128::Aes128(const std::uint8_t key[kAes128KeySize]) noexcept
@@ -74,48 +124,40 @@ Aes128::Aes128(const std::uint8_t key[kAes128KeySize]) noexcept
 void Aes128::encryptBlock(const std::uint8_t in[kAesBlockSize],
                           std::uint8_t out[kAesBlockSize]) const noexcept
 {
-    // The state is column-major: byte r + 4c is row r of column c.
-    std::uint8_t state[kAesBlockSize];
-    for (std::size_t index = 0; index < kAesBlockSize; ++index) {
-        state[index] = static_cast<std::uint8_t>(in[index] ^ round_keys_[index]);
-    }
+    encryptWithSchedule(round_keys_, 10, in, out);
+}
 
-    for (unsigned round = 1; round <= 10; ++round) {
-        for (std::size_t index = 0; index < kAesBlockSize; ++index) {
-            state[index] = kSbox[state[index]];
-        }
-
-        std::uint8_t shifted[kAesBlockSize];
-        for (unsigned column = 0; column < 4; ++column) {
-            for (unsigned row = 0; row < 4; ++row) {
-                shifted[row + 4U * column] = state[row + 4U * ((column + row) % 4U)];
+Aes256::Aes256(const std::uint8_t key[kAes256KeySize]) noexcept
+{
+    std::memcpy(round_keys_, key, kAes256KeySize);
+    // Fifteen round keys of four words each. Every eighth word gets the full
+    // rotate-substitute-rcon treatment; AES-256 additionally substitutes (but
+    // does not rotate) the word halfway through each eight-word group.
+    for (unsigned word = 8; word < 60; ++word) {
+        std::uint8_t temp[4];
+        std::memcpy(temp, round_keys_ + (word - 1) * 4, 4);
+        if (word % 8 == 0) {
+            const std::uint8_t first = temp[0];
+            temp[0] = static_cast<std::uint8_t>(kSbox[temp[1]] ^ kRcon[word / 8]);
+            temp[1] = kSbox[temp[2]];
+            temp[2] = kSbox[temp[3]];
+            temp[3] = kSbox[first];
+        } else if (word % 8 == 4) {
+            for (unsigned byte = 0; byte < 4; ++byte) {
+                temp[byte] = kSbox[temp[byte]];
             }
         }
-        std::memcpy(state, shifted, kAesBlockSize);
-
-        // The final round omits MixColumns, which is what makes the cipher
-        // invertible with the same key schedule read backwards.
-        if (round != 10) {
-            for (unsigned column = 0; column < 4; ++column) {
-                std::uint8_t *col = state + 4U * column;
-                const std::uint8_t a0 = col[0];
-                const std::uint8_t a1 = col[1];
-                const std::uint8_t a2 = col[2];
-                const std::uint8_t a3 = col[3];
-                col[0] = static_cast<std::uint8_t>(gmul(a0, 2) ^ gmul(a1, 3) ^ a2 ^ a3);
-                col[1] = static_cast<std::uint8_t>(a0 ^ gmul(a1, 2) ^ gmul(a2, 3) ^ a3);
-                col[2] = static_cast<std::uint8_t>(a0 ^ a1 ^ gmul(a2, 2) ^ gmul(a3, 3));
-                col[3] = static_cast<std::uint8_t>(gmul(a0, 3) ^ a1 ^ a2 ^ gmul(a3, 2));
-            }
-        }
-
-        for (std::size_t index = 0; index < kAesBlockSize; ++index) {
-            state[index] = static_cast<std::uint8_t>(state[index] ^
-                                                     round_keys_[round * kAesBlockSize + index]);
+        for (unsigned byte = 0; byte < 4; ++byte) {
+            round_keys_[word * 4 + byte] =
+                static_cast<std::uint8_t>(round_keys_[(word - 8) * 4 + byte] ^ temp[byte]);
         }
     }
+}
 
-    std::memcpy(out, state, kAesBlockSize);
+void Aes256::encryptBlock(const std::uint8_t in[kAesBlockSize],
+                          std::uint8_t out[kAesBlockSize]) const noexcept
+{
+    encryptWithSchedule(round_keys_, 14, in, out);
 }
 
 void aesCtrXcrypt(const std::uint8_t key[kAes128KeySize],
