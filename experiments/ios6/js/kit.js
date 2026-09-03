@@ -700,27 +700,29 @@
     function sendButton(ctx, x, y, width, height, label, action, colors) {
         const tone = colors || {};
         const idle = tone.idle === true;
-        const top = idle ? 0xe4e8ee : (tone.top === undefined ? C.SendTop : tone.top);
-        const bottom = idle ? 0x8a929c : (tone.bottom === undefined ? C.SendBottom : tone.bottom);
-        const edge = idle ? 0x5c646c : (tone.edge === undefined ? C.SendEdge : tone.edge);
+        const top = idle ? 0xd8dce2 : (tone.top === undefined ? C.SendTop : tone.top);
+        const bottom = idle ? 0x9aa2aa : (tone.bottom === undefined ? C.SendBottom : tone.bottom);
+        const edge = idle ? 0x6a727a : (tone.edge === undefined ? C.SendEdge : tone.edge);
         const radius = height / 2;
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.44)";
-        ctx.shadowBlur = 3.4;
-        ctx.shadowOffsetY = 1.4;
+        ctx.shadowColor = idle ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.44)";
+        ctx.shadowBlur = idle ? 1.6 : 3.4;
+        ctx.shadowOffsetY = idle ? 0.8 : 1.4;
         panel(ctx, x, y, width, height, top, bottom, edge, radius);
         ctx.restore();
-        candyGlass(ctx, x, y, width, height, idle ? 0.78 : 0.92);
-        ctx.save();
-        roundRectPath(ctx, x, y, width, height, radius);
-        ctx.clip();
-        const equator = y + Math.round(height * 0.46);
-        ctx.fillStyle = "rgba(255,255,255," + (idle ? "0.30" : "0.42") + ")";
-        ctx.fillRect(x, equator, width, 1);
-        ctx.fillStyle = "rgba(0,0,0," + (idle ? "0.10" : "0.16") + ")";
-        ctx.fillRect(x, equator + 1, width, 1);
-        ctx.restore();
-        ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.42" : "0.50") + ")";
+        candyGlass(ctx, x, y, width, height, idle ? 0.52 : 0.92);
+        if (!idle) {
+            ctx.save();
+            roundRectPath(ctx, x, y, width, height, radius);
+            ctx.clip();
+            const equator = y + Math.round(height * 0.46);
+            ctx.fillStyle = "rgba(255,255,255,0.42)";
+            ctx.fillRect(x, equator, width, 1);
+            ctx.fillStyle = "rgba(0,0,0,0.16)";
+            ctx.fillRect(x, equator + 1, width, 1);
+            ctx.restore();
+        }
+        ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.28" : "0.50") + ")";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1.1, y + 1.1, width - 2.2, height - 2.2, Math.max(1, radius - 1.1));
         ctx.stroke();
