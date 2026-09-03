@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { profileProtocol } from "../profileProtocol";
 import { dissectFrame } from "./registry";
 import {
 	byteRangeLabel,
@@ -39,6 +40,19 @@ test("profileProtocolHint mirrors the builtin profile table", () => {
 	assert.equal(profileProtocolHint(5), "reticulum");
 	assert.equal(profileProtocolHint(6), "custom");
 	assert.equal(profileProtocolHint(250), "custom");
+});
+
+test("the hint is the shared profile table, not a second copy of it", () => {
+	// This used to be its own switch, and the copy went on saying profile 4
+	// was Reticulum after the firmware had changed it. Answering from
+	// lib/profileProtocol.ts is what makes that impossible to repeat.
+	for (const id of [null, 0, 1, 2, 3, 4, 5, 6, 7, 42, 250, 255] as const) {
+		assert.equal(
+			profileProtocolHint(id),
+			profileProtocol(id),
+			`profile ${id} must give one answer, not two`,
+		);
+	}
 });
 
 /* ── flattening ─────────────────────────────────────────────────────── */

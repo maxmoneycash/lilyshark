@@ -177,6 +177,49 @@ export interface ReticulumByteRange {
 	length: number;
 }
 
+/* ── the path a frame travelled ──────────────────────────────────────── */
+
+/**
+ * Everything an RNS header records about the route a frame took to get here:
+ * a hop count, plus — in a HEADER_2 frame only — one transport instance.
+ * There is no route list in the protocol, so this is the whole of the "path"
+ * a capture can show; a longer answer would be invented. The hop count is
+ * the frame's own claim, raised by each transport instance that retransmits
+ * it, and nothing here proves it was not simply written by hand.
+ */
+export interface ReticulumPath {
+	hops: number;
+	/** HEADER_2 only: the transport instance the header names. */
+	transportIdHex: string | null;
+}
+
+/**
+ * The sentence a surface must say next to any path it draws. It is a
+ * constant rather than prose repeated per call site because it is the one
+ * limit that makes the rest of the path honest.
+ */
+export const RETICULUM_PATH_CAVEAT =
+	"RNS records a hop count and, in a HEADER_2 frame, one transport instance — never the nodes in between";
+
+/**
+ * Stable identity of one observed path, so "the same path as last time" is a
+ * single string comparison wherever that question is asked.
+ */
+export function reticulumPathKey(path: ReticulumPath): string {
+	return `${path.hops}/${path.transportIdHex ?? ""}`;
+}
+
+/** The path in words, for a tree row or a table cell. */
+export function reticulumPathLabel(path: ReticulumPath): string {
+	const hops = `${path.hops} hop${path.hops === 1 ? "" : "s"}`;
+	if (path.transportIdHex !== null) {
+		return `${hops} via transport instance ${path.transportIdHex}`;
+	}
+	return path.hops === 0
+		? `${hops} — no relay claimed, and HEADER_1 names no transport instance`
+		: `${hops} — HEADER_1 names no transport instance, so no relay on the way here is named`;
+}
+
 /**
  * One decoded announce — the TypeScript form of ReticulumAnnounce filled by
  * readReticulumAnnounce in src/core/reticulum_decoder.cpp. Present only when
@@ -186,14 +229,12 @@ export interface ReticulumByteRange {
  * the ratchet when the context flag promises one). All ranges are absolute
  * offsets into the captured frame bytes.
  */
-export interface ReticulumAnnounceFields {
+export interface ReticulumAnnounceFields extends ReticulumPath {
 	headerType: 1 | 2;
-	hops: number;
 	/** Full 16-byte truncated destination hash, lowercase hex. */
 	destinationHashHex: string;
 	destinationHashRange: ReticulumByteRange;
-	/** HEADER_2 only: the transport instance the announce travelled through. */
-	transportIdHex: string | null;
+	/** Byte range of the transport instance ReticulumPath names, if any. */
 	transportIdRange: ReticulumByteRange | null;
 	/** Presence + range only — arithmetic cannot validate key bytes. */
 	publicKeyRange: ReticulumByteRange;
@@ -448,21 +489,38 @@ export function dissectRNode(
 		return malformed(root, fields);
 	}
 	fields.hops = hops;
-	root.children.push(node("Hops", 2, 1, String(hops)));
 
 	const transportOffset = 3;
 	const destinationOffset = headerTwo ? transportOffset + 16 : transportOffset;
+	// Hops and the transport id are the two header fields that say anything
+	// about how the frame got here, and they are adjacent, so they read as one
+	// branch: the path, with the raw fields it was read from underneath it. A
+	// frame whose hop count is outside RNS limits never reaches this — there is
+	// no path to describe there, only the malformed hop byte above.
+	const transportIdHex = headerTwo
+		? hexBytes(bytes, transportOffset, RETICULUM_HASH_BYTES)
+		: null;
+	const pathChildren: DissectNode[] = [node("Hops", 2, 1, String(hops))];
 	if (headerTwo) {
 		fields.transportIdPrefix = readBe32(bytes, transportOffset);
-		root.children.push(
+		pathChildren.push(
 			node(
 				"Transport id",
 				transportOffset,
-				16,
-				`${hexBytes(bytes, transportOffset, 16)} (prefix ${hex(fields.transportIdPrefix, 4)})`,
+				RETICULUM_HASH_BYTES,
+				`${transportIdHex} (prefix ${hex(fields.transportIdPrefix, 4)})`,
 			),
 		);
 	}
+	root.children.push(
+		node(
+			"Path",
+			2,
+			1 + (headerTwo ? RETICULUM_HASH_BYTES : 0),
+			`${reticulumPathLabel({ hops, transportIdHex })} · ${RETICULUM_PATH_CAVEAT}`,
+			pathChildren,
+		),
+	);
 	fields.destinationHashPrefix = readBe32(bytes, destinationOffset);
 	fields.destinationHashHex = hexBytes(bytes, destinationOffset, 16);
 	root.children.push(
@@ -546,16 +604,14 @@ export function dissectRNode(
 		// truncated capture never reaches this branch (the C++ reader refuses a
 		// malformed packet), and app_data beyond the frame arithmetic's maximum
 		// stays structural exactly as the firmware's reader refuses it.
-		fields.announce = fillAnnounce(
-			root,
-			bytes,
-			fields,
+		fields.announce = fillAnnounce(root, bytes, fields, {
 			headerTwo,
 			contextFlag,
 			hops,
+			transportIdHex,
 			transportOffset,
 			destinationOffset,
-		);
+		});
 		state = "payload-decoded";
 	} else {
 		// The generic clear-payload node, with the firmware reader's refusal
@@ -615,12 +671,17 @@ function fillAnnounce(
 	root: DissectNode,
 	bytes: Uint8Array,
 	fields: ReticulumFields,
-	headerTwo: boolean,
-	contextFlag: boolean,
-	hops: number,
-	transportOffset: number,
-	destinationOffset: number,
+	header: {
+		headerTwo: boolean;
+		contextFlag: boolean;
+		hops: number;
+		/** Already read once for the header's own Path branch. */
+		transportIdHex: string | null;
+		transportOffset: number;
+		destinationOffset: number;
+	},
 ): ReticulumAnnounceFields {
+	const { headerTwo, contextFlag, hops, transportIdHex } = header;
 	const range = (offset: number, length: number): ReticulumByteRange => ({
 		offset,
 		length,
@@ -662,12 +723,10 @@ function fillAnnounce(
 		hops,
 		// destinationHashHex is set for every clear header before this runs.
 		destinationHashHex: fields.destinationHashHex ?? "",
-		destinationHashRange: range(destinationOffset, RETICULUM_HASH_BYTES),
-		transportIdHex: headerTwo
-			? hexBytes(bytes, transportOffset, RETICULUM_HASH_BYTES)
-			: null,
+		destinationHashRange: range(header.destinationOffset, RETICULUM_HASH_BYTES),
+		transportIdHex,
 		transportIdRange: headerTwo
-			? range(transportOffset, RETICULUM_HASH_BYTES)
+			? range(header.transportOffset, RETICULUM_HASH_BYTES)
 			: null,
 		publicKeyRange,
 		nameHashHex: hexBytes(bytes, nameHashRange.offset, nameHashRange.length),
@@ -688,7 +747,14 @@ function fillAnnounce(
 		appDataPreview: previewText,
 	};
 
-	const children: DissectNode[] = [
+	// The key and the two hashes are one contiguous run, and together they are
+	// what the announce is FOR: the identity behind the destination hash. They
+	// get a branch of their own so a reader sees that at a glance instead of
+	// four sibling rows. RNS derives the destination hash from this key and the
+	// name hash, but checking that derivation needs SHA-256 over the announced
+	// key, and no crypto runs here — so this is announced material, never a
+	// confirmed identity.
+	const identityChildren: DissectNode[] = [
 		node(
 			"Public key",
 			publicKeyRange.offset,
@@ -709,7 +775,7 @@ function fillAnnounce(
 		),
 	];
 	if (ratchetRange) {
-		children.push(
+		identityChildren.push(
 			node(
 				"Ratchet key",
 				ratchetRange.offset,
@@ -718,14 +784,24 @@ function fillAnnounce(
 			),
 		);
 	}
-	children.push(
+	const identityEnd = ratchetRange
+		? ratchetRange.offset + ratchetRange.length
+		: randomHashRange.offset + randomHashRange.length;
+	const children: DissectNode[] = [
+		node(
+			"Announced identity",
+			publicKeyRange.offset,
+			identityEnd - publicKeyRange.offset,
+			`the identity this destination announces — key and hashes as sent, not checked against ${announce.destinationHashHex} (that derivation needs crypto this decoder does not run)`,
+			identityChildren,
+		),
 		node(
 			"Signature",
 			signatureRange.offset,
 			signatureRange.length,
 			"present — 64 bytes Ed25519; not verified (no crypto runs here)",
 		),
-	);
+	];
 	if (appDataRange) {
 		const hexShown =
 			hexBytes(
@@ -753,7 +829,7 @@ function fillAnnounce(
 			"Announce",
 			fields.payloadOffset,
 			fields.payloadLength,
-			`destination ${announce.destinationHashHex} · ${hops} hop(s) — cleartext by protocol rule; field layout proven by length arithmetic`,
+			`destination ${announce.destinationHashHex} · ${reticulumPathLabel(announce)} — cleartext by protocol rule; field layout proven by length arithmetic`,
 			children,
 		),
 	);
