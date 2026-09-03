@@ -1157,24 +1157,34 @@
     }
 
     function whitePill(ctx, x, y, width, height) {
-        // iOS 6 Call/FaceTime/Contact: raised rounded rect, not a well.
+        // iOS 6 Call/FaceTime/Contact: raised white rounded rect.
+        // Mamma is #fbfcfc → #ebeef4 with a thin grey stroke, no equator.
         const radius = 5;
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.20)";
-        ctx.shadowBlur = 1.8;
-        ctx.shadowOffsetY = 1.1;
-        panel(ctx, x, y, width, height, C.White, C.ButtonBottom, C.ButtonEdge, radius);
+        ctx.shadowColor = "rgba(40,48,58,0.16)";
+        ctx.shadowBlur = 1.2;
+        ctx.shadowOffsetY = 0.9;
+        panel(ctx, x, y, width, height, C.White, 0xe8eef4, 0xb8c0c8, radius);
         ctx.restore();
         hardGlass(ctx, function () {
             roundRectPath(ctx, x, y, width, height, radius);
-        }, x, y, width, height, 0.62, { hairline: false });
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        }, x, y, width, height, 0.36, { hairline: false });
+        ctx.fillStyle = "rgba(255,255,255,0.96)";
         ctx.fillRect(x + 5, y + 1, width - 10, 1);
-        ctx.strokeStyle = "rgba(255,255,255,0.90)";
+        ctx.strokeStyle = "rgba(255,255,255,0.88)";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1, y + 1, width - 2, height - 2, Math.max(1, radius - 1));
         ctx.stroke();
-        ctx.strokeStyle = hex24(C.ButtonEdge);
+        ctx.save();
+        roundRectPath(ctx, x, y, width, height, radius);
+        ctx.clip();
+        const shade = ctx.createLinearGradient(x, y + height * 0.62, x, y + height);
+        shade.addColorStop(0, "rgba(0,0,0,0)");
+        shade.addColorStop(1, "rgba(80,88,98,0.10)");
+        ctx.fillStyle = shade;
+        ctx.fillRect(x, y + height * 0.62, width, height * 0.38);
+        ctx.restore();
+        ctx.strokeStyle = hex24(0xb8c0c8);
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 0.5, y + 0.5, width - 1, height - 1, radius);
         ctx.stroke();
