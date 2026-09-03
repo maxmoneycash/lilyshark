@@ -9782,7 +9782,13 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 // The config dump told the phone who was here at connect
                 // time; an arrival after that has to be delivered, or the
                 // phone's node list is forever a photograph of one moment.
-                if (first_heard && tdeckBleStatus().connected) {
+                // Never for a node learned through a stored key: the phone
+                // API carries no channel field, so a private-channel node
+                // would arrive on the phone indistinguishable from public
+                // traffic. Until that API can say which key opened a frame,
+                // withholding it is the only honest option.
+                if (first_heard && chat_key.source != MeshtasticKeySource::StoredKey &&
+                    tdeckBleStatus().connected) {
                     ApiNodeEntry entry{};
                     entry.num = stored->decoded.source;
                     if (chat_payload.has_names && chat_payload.short_name[0] != '\0') {
@@ -9839,7 +9845,14 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
             // Only for frames that were really on some air (radio or the
             // net bridge), and never for our own or for Routing itself,
             // which would ack acks forever.
-            if (stored->decoded.hasAttribute(AttributeAcknowledgementRequested) &&
+            // Never for a frame a stored key opened. transmit_meshtastic_ack
+            // seals with the default PSK, so acknowledging a private-channel
+            // packet would broadcast, in the clear, both that this deck holds
+            // that channel's key and which packet it just read. Listening to a
+            // channel you were let into is not the same as announcing it to
+            // everyone who is not in it.
+            if (chat_key.source != MeshtasticKeySource::StoredKey &&
+                stored->decoded.hasAttribute(AttributeAcknowledgementRequested) &&
                 stored->decoded.destination == localMeshtasticNodeNum() &&
                 stored->decoded.source != localMeshtasticNodeNum() &&
                 chat_payload.portnum !=
@@ -9855,6 +9868,7 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
             // POSITION_APP packet stock firmware would forward, which is what
             // lets the app's map place the node instead of staying empty.
             if (chat_payload.has_position &&
+                chat_key.source != MeshtasticKeySource::StoredKey &&
                 stored->decoded.source != localMeshtasticNodeNum() &&
                 tdeckBleStatus().connected) {
                 std::uint8_t ble_frame[128]{};
@@ -9874,7 +9888,18 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 const bool broadcast = dest == 0xffffffffU;
                 const bool to_us = dest == localMeshtasticNodeNum();
                 const bool from_us = stored->decoded.source == localMeshtasticNodeNum();
-                if (!from_us && (broadcast || to_us)) {
+                // A borrowed-key message is readable but not answerable:
+                // transmit has no stored-key path, so anything composed in
+                // reply would go out under the default PSK -- publicly, to a
+                // conversation the operator believes is private. Rather than
+                // print a warning next to a working Send button, keyed text
+                // stays out of Chat entirely and appears on MESSAGES, which
+                // is the screen for text pulled off the air and has no reply
+                // affordance to misuse. It still banners and chimes on
+                // arrival. When transmit learns to seal with a stored key,
+                // this is the line that changes.
+                const bool keyed = chat_key.source == MeshtasticKeySource::StoredKey;
+                if (!from_us && !keyed && (broadcast || to_us)) {
                     const std::uint32_t peer = broadcast ? 0xffffffffU : stored->decoded.source;
                     chat_push(from, chat_payload.text, false, peer, nullptr, 0U,
                               stored->raw.rf.origin == FrameOrigin::Net, chat_key_name);
@@ -9883,7 +9908,8 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                     // A paired phone holds this same conversation, so a text
                     // the deck hears is handed over as FromRadio{packet} and
                     // FromNum tells the app to come read it.
-                    if (tdeckBleStatus().connected) {
+                    if (chat_key.source != MeshtasticKeySource::StoredKey &&
+                        tdeckBleStatus().connected) {
                         std::uint8_t ble_frame[512]{};
                         const std::size_t ble_length = encodeApiTextPacket(
                             stored->decoded.source, dest, stored->decoded.packet_id,

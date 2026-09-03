@@ -1032,15 +1032,29 @@ bool channelKeyReceiveScenario()
     device_shell_fake::advance_ms(250U);
     loop();
 
+    // A borrowed-key message must NOT reach Chat. Chat has a Send button and
+    // transmit has no stored-key path, so a reply composed there would go out
+    // under the default PSK -- publicly, into a conversation the operator
+    // believes is private. Reading a channel you were let into must not hand
+    // you a loaded way to answer it.
     sendKeyboard('C');
-    bool saw_keyed_line = false;
-    for(int hop = 0; hop < 5 && !saw_keyed_line; ++hop) {
-        saw_keyed_line = hasLabel(lv_screen_active(), "ridge repeater is up") &&
-                         labelWithPrefix(lv_screen_active(), "1234  KEY NORTH RIDGE") != nullptr;
-        if(!saw_keyed_line) sendKeyboard('\t');
+    bool leaked_into_chat = false;
+    for(int hop = 0; hop < 5 && !leaked_into_chat; ++hop) {
+        leaked_into_chat = hasLabel(lv_screen_active(), "ridge repeater is up");
+        if(!leaked_into_chat) sendKeyboard('\t');
     }
-    if(!require(saw_keyed_line,
-                "a frame opened by a stored key did not reach Chat naming that key")) {
+    if(!require(!leaked_into_chat,
+                "a stored-key message reached Chat, where replying would "
+                "transmit it publicly")) {
+        return false;
+    }
+    sendKeyboard(0x08U);
+
+    // It belongs on MESSAGES, which is the screen for text pulled off the air
+    // and has no reply affordance to misuse.
+    sendKeyboard('E');
+    if(!require(hasLabel(lv_screen_active(), "ridge repeater is up"),
+                "a frame opened by a stored key did not reach MESSAGES")) {
         return false;
     }
     sendKeyboard(0x08U);
