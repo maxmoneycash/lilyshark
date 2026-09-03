@@ -226,6 +226,19 @@ std::uint32_t chat_notice_until_ms = 0;
 // announced as new over and over.
 std::array<std::uint32_t, 16> announced_nodes{};
 std::size_t announced_node_count = 0;
+
+// The internet's view of the neighbourhood, pushed down the USB link by the
+// web analyzer as "LSK NODE" lines. Rumour, not reception: these fill the
+// node list and map only behind everything the radio itself heard, and carry
+// the same via-net provenance as bridged frames.
+struct NetRumourNode {
+    std::uint32_t id = 0;
+    char label[9]{};
+    double latitude_degrees = 0.0;
+    double longitude_degrees = 0.0;
+    std::uint32_t heard_ms = 0;
+};
+std::array<NetRumourNode, 16> net_rumour_nodes{};
 lv_obj_t * root = nullptr;
 #if defined(LILYSHARK_DEVICE)
 static uint8_t * spectrum_buffer = nullptr;
@@ -3454,6 +3467,28 @@ std::size_t collect_live_nodes(std::array<LiveNodeSummary, 8> &summaries) noexce
                                                      summary.protocol, summary.id)) {
             summary.crc_errors = incrementedNodeCrcErrorCount(summary.crc_errors);
         }
+    }
+    // The internet's rumours fill whatever slots the radio's own hearings
+    // left free -- never the other way around, and a node the radio heard is
+    // never duplicated by its rumour.
+    for (const NetRumourNode &rumour : net_rumour_nodes) {
+        if (rumour.id == 0U) continue;
+        if (count >= summaries.size()) break;
+        bool known = false;
+        for (std::size_t index = 0; index < count; ++index) {
+            if (summaries[index].id == rumour.id) { known = true; break; }
+        }
+        if (known) continue;
+        LiveNodeSummary &summary = summaries[count++];
+        summary = LiveNodeSummary{};
+        summary.protocol = ProtocolId::Meshtastic;
+        summary.id = rumour.id;
+        summary.heard_via_net = true;
+        summary.has_position = true;
+        summary.latitude_degrees = rumour.latitude_degrees;
+        summary.longitude_degrees = rumour.longitude_degrees;
+        summary.last_seen_us = static_cast<std::uint64_t>(rumour.heard_ms) * 1000ULL;
+        std::snprintf(summary.label, sizeof(summary.label), "%.8s", rumour.label);
     }
     return count;
 }
@@ -14284,6 +14319,42 @@ void transmit_meshtastic_ack(std::uint32_t to_node, std::uint32_t packet_id) noe
 
 void handle_mesh_tx_command(const char *line) noexcept
 {
+    if (std::strncmp(line, "LSK NODE ", 9) == 0) {
+        // LSK NODE <8-hex id> <lat*1e7> <lon*1e7> <label>
+        unsigned long id = 0;
+        long lat_i = 0;
+        long lon_i = 0;
+        char label[9]{};
+        const int fields = std::sscanf(line + 9, "%8lx %ld %ld %8s", &id, &lat_i, &lon_i, label);
+        if (fields < 3 || id == 0UL || id == 0xffffffffUL) {
+            Serial.println("LSK ERR {\"reason\":\"bad-node\"}");
+            return;
+        }
+        NetRumourNode *slot = nullptr;
+        for (NetRumourNode &candidate : net_rumour_nodes) {
+            if (candidate.id == static_cast<std::uint32_t>(id)) { slot = &candidate; break; }
+        }
+        if (slot == nullptr) {
+            for (NetRumourNode &candidate : net_rumour_nodes) {
+                if (candidate.id == 0U) { slot = &candidate; break; }
+            }
+        }
+        if (slot == nullptr) {
+            // Full: the oldest rumour makes room. Rumours are cheap.
+            slot = &net_rumour_nodes[0];
+            for (NetRumourNode &candidate : net_rumour_nodes) {
+                if (candidate.heard_ms < slot->heard_ms) slot = &candidate;
+            }
+        }
+        slot->id = static_cast<std::uint32_t>(id);
+        std::snprintf(slot->label, sizeof(slot->label), "%s", label);
+        slot->latitude_degrees = static_cast<double>(lat_i) / 1e7;
+        slot->longitude_degrees = static_cast<double>(lon_i) / 1e7;
+        slot->heard_ms = millis();
+        live_data_dirty = true;
+        Serial.println("LSK OK {\"kind\":\"node\"}");
+        return;
+    }
     if (std::strncmp(line, "LSK TX meshcore", 15) == 0) {
         Serial.println("LSK ERR {\"proto\":\"meshcore\",\"reason\":\"identity-pending\"}");
         return;

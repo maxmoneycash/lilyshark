@@ -67,7 +67,10 @@ export default function MapView({
 		// Opens on Palo Alto, where the demo mesh lives. Real nodes override this
 		// immediately via the fitBounds pass below, so this only decides what an
 		// empty map looks like.
-		const map = L.map(divRef.current, { zoomControl: true }).setView(
+		// Canvas markers: with the neighbourhood layer the map draws dozens of
+		// circle markers, and one canvas repaints far faster than that many
+		// SVG elements -- most of the map's sluggishness was exactly this.
+		const map = L.map(divRef.current, { zoomControl: true, preferCanvas: true }).setView(
 			[DEMO_CENTER.lat, DEMO_CENTER.lon],
 			12,
 		);

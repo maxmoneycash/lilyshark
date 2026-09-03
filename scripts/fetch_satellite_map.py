@@ -295,8 +295,11 @@ def to_rgb565(image):
     return bytes(out)
 
 
-def render_view(lat, lon, width, height, zoom, cache, style, origin=None):
-    """The finished picture: imagery under hillshade, contours, and labels."""
+def render_view(lat, lon, width, height, zoom, cache, style, origin=None,
+                contours=False):
+    """The finished picture: imagery under hillshade and labels. Contour
+    lines are opt-in -- at panel scale they read as white spaghetti over the
+    imagery, and the operator asked for the imagery."""
     dark = style == "dark"
     if dark:
         image = composite(lat, lon, width, height, zoom, cache, "dark", origin=origin)
@@ -304,22 +307,23 @@ def render_view(lat, lon, width, height, zoom, cache, style, origin=None):
         imagery = composite(lat, lon, width, height, zoom, cache, "imagery", origin=origin)
         hillshade = composite(lat, lon, width, height, zoom, cache, "hillshade", origin=origin)
         image = punch_imagery(blend_hillshade(imagery, hillshade))
-    # Terrarium elevation stops at z15, so deeper views upsample it.
-    elev_zoom = zoom if zoom <= 15 else 15
-    if elev_zoom == zoom:
-        terrain = composite(lat, lon, width, height, zoom, cache, "terrarium", origin=origin)
-    else:
-        factor = 2 ** (zoom - elev_zoom)
-        src_w = max(1, int(round(width / float(factor))))
-        src_h = max(1, int(round(height / float(factor))))
-        low = None
-        if origin is not None:
-            low = (int(math.floor(origin[0] / float(factor))),
-                   int(math.floor(origin[1] / float(factor))))
-        terrain = composite(
-            lat, lon, src_w, src_h, elev_zoom, cache, "terrarium", origin=low
-        ).resize((width, height), Image.BILINEAR)
-    draw_contours(image, terrarium_elevation(terrain), contour_interval(zoom), dark)
+    if contours:
+        # Terrarium elevation stops at z15, so deeper views upsample it.
+        elev_zoom = zoom if zoom <= 15 else 15
+        if elev_zoom == zoom:
+            terrain = composite(lat, lon, width, height, zoom, cache, "terrarium", origin=origin)
+        else:
+            factor = 2 ** (zoom - elev_zoom)
+            src_w = max(1, int(round(width / float(factor))))
+            src_h = max(1, int(round(height / float(factor))))
+            low = None
+            if origin is not None:
+                low = (int(math.floor(origin[0] / float(factor))),
+                       int(math.floor(origin[1] / float(factor))))
+            terrain = composite(
+                lat, lon, src_w, src_h, elev_zoom, cache, "terrarium", origin=low
+            ).resize((width, height), Image.BILINEAR)
+        draw_contours(image, terrarium_elevation(terrain), contour_interval(zoom), dark)
     if not dark:
         labels = composite(
             lat, lon, width, height, zoom, cache, "labels", "RGBA", origin=origin
@@ -338,6 +342,8 @@ def main():
     parser.add_argument("--zoom", type=int, default=15)
     parser.add_argument("--style", choices=("satellite", "dark"), default="satellite")
     parser.add_argument("--preview", default="")
+    parser.add_argument("--contours", action="store_true",
+                        help="overlay elevation contour lines (off by default)")
     parser.add_argument(
         "--cache",
         default=os.path.join(os.path.expanduser("~"), ".cache", "lilyshark-tiles"),
@@ -352,7 +358,8 @@ def main():
     )
     args = parser.parse_args()
     image = render_view(
-        args.lat, args.lon, args.width, args.height, args.zoom, args.cache, args.style
+        args.lat, args.lon, args.width, args.height, args.zoom, args.cache, args.style,
+        contours=args.contours,
     )
     payload = to_rgb565(image)
     parent = os.path.dirname(os.path.abspath(args.out))

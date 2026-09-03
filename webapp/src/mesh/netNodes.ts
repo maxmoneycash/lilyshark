@@ -9,6 +9,7 @@
  * truth outranks the internet's memory.
  */
 
+import { getDeviceLinkState, sendDeviceLine } from "../lib/deviceLink";
 import { getSnapshot, mutate, type NodeEntry } from "./store";
 
 export interface NetNodeRow {
@@ -71,7 +72,28 @@ async function fetchOnce(): Promise<void> {
 	const response = await fetch(`/api/net-nodes?lat=${lat}&lon=${lon}&km=80`);
 	if (!response.ok) return;
 	const body = (await response.json()) as { nodes?: NetNodeRow[] };
-	if (body.nodes?.length) applyNetNodes(body.nodes);
+	if (!body.nodes?.length) return;
+	applyNetNodes(body.nodes);
+	// A T-Deck on USB gets the same rumours, so its own map and node list
+	// carry the neighbourhood too. Nearest first; the deck keeps sixteen.
+	if (getDeviceLinkState().status === "linked") {
+		const cosLat = Math.cos((lat * Math.PI) / 180);
+		const nearest = [...body.nodes]
+			.sort((a, b) => {
+				const da = (a.lat - lat) ** 2 + ((a.lon - lon) * cosLat) ** 2;
+				const db = (b.lat - lat) ** 2 + ((b.lon - lon) * cosLat) ** 2;
+				return da - db;
+			})
+			.slice(0, 16);
+		for (const row of nearest) {
+			const label =
+				(row.shortName || row.num.toString(16).slice(-4)).replace(/\s+/g, "").slice(0, 8) ||
+				"NODE";
+			await sendDeviceLine(
+				`LSK NODE ${row.num.toString(16).padStart(8, "0")} ${Math.round(row.lat * 1e7)} ${Math.round(row.lon * 1e7)} ${label}`,
+			).catch(() => {});
+		}
+	}
 }
 
 /** Begin the rumour layer: one fetch now, then every ten minutes. Safe to
