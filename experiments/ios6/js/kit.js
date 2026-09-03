@@ -838,17 +838,17 @@
     }
 
     function balloonPath(ctx, x, y, width, height, mine, radius) {
-        // iOS 6 fin: a short corner triangle that hooks back into the
-        // bottom, not a drip past the side wall.
+        // iOS 6 fin: a short curve that hooks out and down, then back
+        // into the bottom — not a drip and not a hard corner triangle.
         const r = Math.min(radius, width / 2, height / 2);
         ctx.beginPath();
         if (mine) {
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + width - r, y);
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-            ctx.lineTo(x + width, y + height - 2.0);
-            ctx.lineTo(x + width + 5.2, y + height + 3.4);
-            ctx.quadraticCurveTo(x + width + 0.6, y + height + 1.0, x + width - 5.0, y + height);
+            ctx.lineTo(x + width, y + height - 3.2);
+            ctx.quadraticCurveTo(x + width + 1.4, y + height + 0.6, x + width + 5.4, y + height + 4.0);
+            ctx.quadraticCurveTo(x + width + 1.6, y + height + 2.0, x + width - 4.6, y + height);
             ctx.lineTo(x + r, y + height);
             ctx.quadraticCurveTo(x, y + height, x, y + height - r);
             ctx.lineTo(x, y + r);
@@ -859,9 +859,9 @@
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
             ctx.lineTo(x + width, y + height - r);
             ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-            ctx.lineTo(x + 5.0, y + height);
-            ctx.quadraticCurveTo(x - 0.6, y + height + 1.0, x - 5.2, y + height + 3.4);
-            ctx.lineTo(x, y + height - 2.0);
+            ctx.lineTo(x + 4.6, y + height);
+            ctx.quadraticCurveTo(x - 1.6, y + height + 2.0, x - 5.4, y + height + 4.0);
+            ctx.quadraticCurveTo(x - 1.4, y + height + 0.6, x, y + height - 3.2);
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
         }
@@ -909,8 +909,10 @@
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
-        ctx.fillStyle = incoming ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.92)";
-        ctx.fillRect(x + 7, y + 1, width - 14, 1.2);
+        ctx.fillStyle = incoming ? "rgba(255,255,255,0.98)" : "rgba(214,238,255,0.90)";
+        ctx.fillRect(x + 8, y + 1, width - 16, 1.15);
+        ctx.fillStyle = incoming ? "rgba(255,255,255,0.58)" : "rgba(255,255,255,0.52)";
+        ctx.fillRect(x + 10, y + 2.15, width - 20, 1);
         const shade = ctx.createLinearGradient(x, y + height * 0.70, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");
         shade.addColorStop(1, incoming ? "rgba(0,0,0,0.14)" : "rgba(0,0,0,0.16)");

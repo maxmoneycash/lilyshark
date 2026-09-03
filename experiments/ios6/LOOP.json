@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 65,
-  "stop_after_pass": 96,
+  "pass": 66,
+  "stop_after_pass": 98,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -91,7 +91,8 @@
     "ios6-camera-viewfinder-flash",
     "ios6-nav-upper-equator",
     "ios6-idle-send-muted-service",
-    "ios6-messages-icon-backslash-bands"
+    "ios6-messages-icon-backslash-bands",
+    "ios6-balloon-curved-fins-inner-rim"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -126,5 +127,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 65: Messages icon uses finer lime/forest bands running top-right to bottom-left, plus a whiter oval and a shorter hooked left tail, like the iOS 6 Messages icon. Raised stop_after_pass to 96 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
+  "notes": "Pass 66: balloons use a short curved hook fin and a double inner crown rim like Zach/Mamma, not a hard corner triangle. Bubble text stays black. Raised stop_after_pass to 98 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
 }
