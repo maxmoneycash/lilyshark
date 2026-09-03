@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 63,
-  "stop_after_pass": 92,
+  "pass": 64,
+  "stop_after_pass": 94,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -89,7 +89,8 @@
     "ios6-outgoing-candy-crown",
     "ios6-stamp-dashed-rules",
     "ios6-camera-viewfinder-flash",
-    "ios6-nav-upper-equator"
+    "ios6-nav-upper-equator",
+    "ios6-idle-send-muted-service"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -124,5 +125,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 63: Messages/Edit and the nav bar put the glass equator in the upper third with a darker recessed lower half, like Zach and the iOS 6 menu bar. Rim stays 0xa9c4e0. Raised stop_after_pass to 92 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
+  "notes": "Pass 64: idle Send is dusty service candy (muted blue iMessage / muted green SMS), like Zach/Mamma/New Message, not a flat silver pill. Active Send still uses frozen Send*/Sms*. Raised stop_after_pass to 94 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
 }

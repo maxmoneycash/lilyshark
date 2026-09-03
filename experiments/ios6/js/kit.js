@@ -706,9 +706,9 @@
     function sendButton(ctx, x, y, width, height, label, action, colors) {
         const tone = colors || {};
         const idle = tone.idle === true;
-        const top = idle ? 0xd8dce2 : (tone.top === undefined ? C.SendTop : tone.top);
-        const bottom = idle ? 0x9aa2aa : (tone.bottom === undefined ? C.SendBottom : tone.bottom);
-        const edge = idle ? 0x6a727a : (tone.edge === undefined ? C.SendEdge : tone.edge);
+        const top = tone.top !== undefined ? tone.top : (idle ? 0xd8dce2 : C.SendTop);
+        const bottom = tone.bottom !== undefined ? tone.bottom : (idle ? 0x9aa2aa : C.SendBottom);
+        const edge = tone.edge !== undefined ? tone.edge : (idle ? 0x6a727a : C.SendEdge);
         const radius = height / 2;
         ctx.save();
         ctx.shadowColor = idle ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.44)";

@@ -580,7 +580,18 @@
             ctx.fillStyle = kit.hex24(0x1478e6);
             ctx.fillRect(Math.min(caretX, row.caretMaxX), row.caretY, 1.4, row.caretH);
         }
-        const sendTone = !draft ? { idle: true } : (sms ? {
+        // iOS 6 idle Send is dusty service candy, not flat silver.
+        const sendTone = !draft ? (sms ? {
+            idle: true,
+            top: 0xb4c898,
+            bottom: 0x6a8a4c,
+            edge: 0x4e6a38,
+        } : {
+            idle: true,
+            top: 0xa8c0d8,
+            bottom: 0x5a7498,
+            edge: 0x4a6080,
+        }) : (sms ? {
             top: C.SmsTop,
             bottom: C.SmsBottom,
             edge: C.SmsEdge,
