@@ -618,6 +618,249 @@ void testCaptureRecordsCarryNoKeyMaterial()
     assert(contains(sink.bytes, frame.bytes, frame.captured_length));
 }
 
+// ── Transmitting on a channel the store holds the key for ───────────────────
+
+/// A frame the deck itself would put on the air for a stored key: sealed with
+/// the key, and stamped with the header hash of that key's name and bytes.
+/// Unlike `encodeFrameUnderKey` above -- which models a frame from a radio
+/// whose channel name this deck does not know -- this is the whole encoder,
+/// doing what the Chat screen asks of it.
+std::size_t encodeFrameForStoredKey(MeshtasticEncodeRequest request,
+                                    const ChannelKeyStore &store, std::size_t slot,
+                                    std::uint8_t *out, std::size_t out_size) noexcept
+{
+    request.channel_name = store.name(slot);
+    request.channel_key = store.channelKeyBytes(slot);
+    if (request.channel_name == nullptr || request.channel_key == nullptr) return 0U;
+    return encodeMeshtasticFrame(request, out, out_size);
+}
+
+void testAKeyedTransmissionCannotBeOpenedWithTheDefaultKey()
+{
+    ChannelKeyStore store;
+    std::size_t slot = 0;
+    assert(store.add("NORTH RIDGE", kOperatorKey, kChannelKeySize, slot) ==
+           ChannelKeyResult::Ok);
+
+    std::uint8_t frame[kMaxFrameBytes]{};
+    const std::size_t size =
+        encodeFrameForStoredKey(textRequest(), store, slot, frame, sizeof(frame));
+    assert(size > kHeaderLength);
+
+    // The header names the channel, by the same XOR of name and key that every
+    // radio on it computes. Not the default channel's byte.
+    assert(frame[13] == meshtasticChannelHash("NORTH RIDGE", kOperatorKey, kChannelKeySize));
+    assert(frame[13] != meshtasticChannelHash(kMeshtasticDefaultChannelName,
+                                              kMeshtasticDefaultPsk,
+                                              sizeof(kMeshtasticDefaultPsk)));
+
+    // Nobody holding only the published key can read it, through either entry
+    // point. This is what "the deck can now answer privately" has to mean.
+    MeshtasticPayload leaked{};
+    assert(!readMeshtasticPayload(frame + kHeaderLength, size - kHeaderLength,
+                                  textRequest().from_node, textRequest().packet_id, leaked));
+    assert(!leaked.readable);
+    MeshtasticKeyState leaked_state{};
+    assert(!readMeshtasticPayloadWithKeys(frame + kHeaderLength, size - kHeaderLength,
+                                          textRequest().from_node, textRequest().packet_id,
+                                          nullptr, leaked, leaked_state));
+    assert(leaked_state.source == MeshtasticKeySource::None);
+
+    // A deck that holds the key reads it, and knows which key did it.
+    MeshtasticPayload opened{};
+    MeshtasticKeyState state{};
+    assert(readMeshtasticPayloadWithKeys(frame + kHeaderLength, size - kHeaderLength,
+                                         textRequest().from_node, textRequest().packet_id,
+                                         &store, opened, state));
+    assert(state.source == MeshtasticKeySource::StoredKey);
+    assert(state.slot == slot);
+    assert(std::strcmp(opened.text, "private channel traffic") == 0);
+
+    // A deck holding a different key does not, and does not claim to.
+    ChannelKeyStore stranger;
+    std::size_t stranger_slot = 0;
+    assert(stranger.add("OTHER CHANNEL", kWrongKey, kChannelKeySize, stranger_slot) ==
+           ChannelKeyResult::Ok);
+    MeshtasticPayload refused{};
+    MeshtasticKeyState refused_state{};
+    assert(!readMeshtasticPayloadWithKeys(frame + kHeaderLength, size - kHeaderLength,
+                                          textRequest().from_node, textRequest().packet_id,
+                                          &stranger, refused, refused_state));
+    assert(refused_state.source == MeshtasticKeySource::None);
+}
+
+void testADefaultKeyTransmissionIsUntouchedByTheKeyStore()
+{
+    // The other half of the same promise. Sending on the public channel must
+    // produce exactly the bytes it always did, whether the deck holds stored
+    // keys or none, and must still read back as public traffic -- the claim
+    // that carries "this was never private".
+    std::uint8_t without_keys[kMaxFrameBytes]{};
+    const std::size_t size =
+        encodeMeshtasticFrame(textRequest(), without_keys, sizeof(without_keys));
+    assert(size > kHeaderLength);
+    assert(without_keys[13] == meshtasticChannelHash(kMeshtasticDefaultChannelName,
+                                                     kMeshtasticDefaultPsk,
+                                                     sizeof(kMeshtasticDefaultPsk)));
+
+    ChannelKeyStore store;
+    std::size_t slot = 0;
+    assert(store.add("NORTH RIDGE", kOperatorKey, kChannelKeySize, slot) ==
+           ChannelKeyResult::Ok);
+    assert(store.add("RIVER", kOtherKey, kChannelKeySize, slot) == ChannelKeyResult::Ok);
+
+    std::uint8_t with_keys[kMaxFrameBytes]{};
+    const std::size_t again =
+        encodeMeshtasticFrame(textRequest(), with_keys, sizeof(with_keys));
+    assert(again == size);
+    assert(std::memcmp(without_keys, with_keys, size) == 0);
+
+    MeshtasticPayload payload{};
+    MeshtasticKeyState state{};
+    assert(readMeshtasticPayloadWithKeys(with_keys + kHeaderLength, size - kHeaderLength,
+                                         textRequest().from_node, textRequest().packet_id,
+                                         &store, payload, state));
+    assert(state.source == MeshtasticKeySource::DefaultKey);
+    assert(std::strcmp(payload.text, "private channel traffic") == 0);
+}
+
+void testAKeyedAcknowledgementAddressesTheChannelItAnswers()
+{
+    // The rule the ingest path enforces, stated as arithmetic: an
+    // acknowledgement may go out on a keyed channel only when the header byte
+    // this deck would stamp equals the header byte the frame it answers
+    // arrived carrying. Anything else is a frame that announces a keyholder
+    // and reaches nobody.
+    ChannelKeyStore store;
+    std::size_t slot = 0;
+    assert(store.add("NORTH RIDGE", kOperatorKey, kChannelKeySize, slot) ==
+           ChannelKeyResult::Ok);
+
+    MeshtasticEncodeRequest incoming = textRequest();
+    incoming.from_node = 0x336a1b2cU;
+    incoming.to_node = 0x4c534b01U;
+    incoming.packet_id = 0x51a00002U;
+    incoming.want_ack = true;
+    std::uint8_t heard[kMaxFrameBytes]{};
+    const std::size_t heard_size =
+        encodeFrameForStoredKey(incoming, store, slot, heard, sizeof(heard));
+    assert(heard_size > kHeaderLength);
+
+    MeshtasticPayload payload{};
+    MeshtasticKeyState state{};
+    assert(readMeshtasticPayloadWithKeys(heard + kHeaderLength, heard_size - kHeaderLength,
+                                         incoming.from_node, incoming.packet_id, &store,
+                                         payload, state));
+    assert(state.source == MeshtasticKeySource::StoredKey);
+
+    // What the deck computes from the key that opened the frame, and what the
+    // frame actually carried. Equal, so the answer may be sent.
+    const std::uint8_t computed = meshtasticChannelHash(store.name(state.slot),
+                                                        store.channelKeyBytes(state.slot),
+                                                        kChannelKeySize);
+    assert(computed == heard[13]);
+
+    MeshtasticEncodeRequest ack{};
+    ack.from_node = incoming.to_node;
+    ack.to_node = incoming.from_node;
+    ack.packet_id = 0x51a00003U;
+    ack.port = MeshtasticPort::Routing;
+    ack.request_id = incoming.packet_id;
+    std::uint8_t answer[kMaxFrameBytes]{};
+    const std::size_t answer_size =
+        encodeFrameForStoredKey(ack, store, state.slot, answer, sizeof(answer));
+    assert(answer_size > kHeaderLength);
+
+    // The acknowledgement is addressed to the same channel, byte for byte.
+    assert(answer[13] == heard[13]);
+    // And it says nothing in the clear: the id it confirms is inside the
+    // ciphertext, where only the channel can read it.
+    MeshtasticPayload leaked{};
+    assert(!readMeshtasticPayload(answer + kHeaderLength, answer_size - kHeaderLength,
+                                  ack.from_node, ack.packet_id, leaked));
+    MeshtasticPayload confirmed{};
+    MeshtasticKeyState confirmed_state{};
+    assert(readMeshtasticPayloadWithKeys(answer + kHeaderLength, answer_size - kHeaderLength,
+                                         ack.from_node, ack.packet_id, &store, confirmed,
+                                         confirmed_state));
+    assert(confirmed_state.source == MeshtasticKeySource::StoredKey);
+    assert(confirmed.portnum == static_cast<std::uint16_t>(MeshtasticPort::Routing));
+    assert(confirmed.has_request_id);
+    assert(confirmed.request_id == incoming.packet_id);
+
+    // A key named anything but the channel's own name fails that comparison,
+    // which is exactly the case where the deck stays silent. The name is the
+    // half of the hash the operator supplies, and getting it wrong costs
+    // delivery rather than secrecy.
+    ChannelKeyStore misnamed;
+    std::size_t misnamed_slot = 0;
+    assert(misnamed.add("RIDGE TEAM", kOperatorKey, kChannelKeySize, misnamed_slot) ==
+           ChannelKeyResult::Ok);
+    assert(meshtasticChannelHash(misnamed.name(misnamed_slot),
+                                 misnamed.channelKeyBytes(misnamed_slot),
+                                 kChannelKeySize) != heard[13]);
+    // It still reads the channel perfectly -- only sending is affected.
+    MeshtasticPayload readable{};
+    MeshtasticKeyState readable_state{};
+    assert(readMeshtasticPayloadWithKeys(heard + kHeaderLength, heard_size - kHeaderLength,
+                                         incoming.from_node, incoming.packet_id, &misnamed,
+                                         readable, readable_state));
+    assert(readable_state.source == MeshtasticKeySource::StoredKey);
+}
+
+void testEveryMutationIsVisibleAsARevision()
+{
+    // Anything derived from the key list compares this instead of rebuilding
+    // itself on every redraw, so a mutation that did not bump it would leave a
+    // chat thread sealing with a key nobody chose.
+    ChannelKeyStore store;
+    const std::uint32_t empty = store.revision();
+
+    std::size_t slot = 0;
+    assert(store.add("FIELD TEAM", kOperatorKey, kChannelKeySize, slot) ==
+           ChannelKeyResult::Ok);
+    const std::uint32_t added = store.revision();
+    assert(added != empty);
+
+    // A refused mutation changes nothing, so it must not look like a change.
+    assert(store.add("FIELD TEAM", kOtherKey, kChannelKeySize, slot) ==
+           ChannelKeyResult::DuplicateName);
+    assert(store.revision() == added);
+    assert(store.rename(9U, "NOPE") == ChannelKeyResult::InvalidSlot);
+    assert(store.revision() == added);
+    assert(store.remove(9U) == ChannelKeyResult::InvalidSlot);
+    assert(store.revision() == added);
+
+    assert(store.rename(0U, "RIDGE") == ChannelKeyResult::Ok);
+    const std::uint32_t renamed = store.revision();
+    assert(renamed != added);
+
+    // The case a count comparison cannot see: one key out, a different key in
+    // under the same name. The list is the same length and the same name, and
+    // everything sealed with it from here on is sealed with other bytes.
+    assert(store.remove(0U) == ChannelKeyResult::Ok);
+    assert(store.add("RIDGE", kOtherKey, kChannelKeySize, slot) == ChannelKeyResult::Ok);
+    assert(store.size() == 1U);
+    assert(std::strcmp(store.name(0U), "RIDGE") == 0);
+    assert(store.revision() != renamed);
+
+    // clear() counts too, and never rewinds: a wiped store must not be
+    // mistaken for the store a caller last looked at.
+    const std::uint32_t before_clear = store.revision();
+    store.clear();
+    assert(store.revision() != before_clear);
+    assert(store.revision() != empty);
+
+    std::array<std::uint8_t, kChannelKeyStoreRecordSize> encoded{};
+    ChannelKeyStore source;
+    assert(source.add("FIELD TEAM", kOperatorKey, kChannelKeySize, slot) ==
+           ChannelKeyResult::Ok);
+    assert(source.encode(encoded.data(), encoded.size()));
+    const std::uint32_t before_load = store.revision();
+    assert(store.decode(encoded.data(), encoded.size()) == ChannelKeyDecodeResult::LoadedV1);
+    assert(store.revision() != before_load);
+}
+
 } // namespace
 
 int main()
@@ -634,6 +877,10 @@ int main()
     testStoredKeysAreTriedInOrderAndFailClosed();
     testAStoredKeyYieldsTheSameParseAsTheDefaultKey();
     testCaptureRecordsCarryNoKeyMaterial();
+    testAKeyedTransmissionCannotBeOpenedWithTheDefaultKey();
+    testADefaultKeyTransmissionIsUntouchedByTheKeyStore();
+    testAKeyedAcknowledgementAddressesTheChannelItAnswers();
+    testEveryMutationIsVisibleAsARevision();
     std::puts("channel key tests passed");
     return 0;
 }

@@ -68,8 +68,15 @@
 //     There is no UI path that renders a key, so there is nothing for a
 //     screenshot to capture.
 //   * `ChannelKeyProvider::channelKeyBytes()` is the one accessor that returns
-//     key material, and its only caller is the Meshtastic payload reader. The
+//     key material. Its callers are the Meshtastic payload reader and the
+//     Meshtastic encoder — reading a keyed channel and answering on it, and
+//     nothing else. Both hand the bytes to AES and neither keeps a copy. The
 //     name is deliberately greppable so that stays checkable.
+//   * Transmitting on a keyed channel puts no key material on the air either.
+//     The header carries `meshtasticChannelHash(name, key)`, one byte of XOR
+//     over the name and the key, which is the same byte every stock radio on
+//     that channel already stamps on every frame it sends — it is how the
+//     channel is addressed, not a leak of how it is locked.
 //
 // ── Fingerprints ────────────────────────────────────────────────────────────
 // `fingerprint()` is the first three bytes of SHA-256 over a domain-separation
@@ -92,6 +99,17 @@ inline constexpr std::size_t kChannelKeyCapacity = 8U;
 
 /// Name buffer, terminator included. Names are printable ASCII, which is what
 /// the device font can render and what a screenshot can honestly show.
+///
+/// The name is not only a label any more. Since the deck can transmit on a
+/// channel it holds the key for, the name is what gets hashed with the key
+/// into the header's channel byte, exactly as stock firmware hashes a
+/// channel's `settings.name` with its PSK. So a key named anything other than
+/// the channel's real name still seals correctly and still cannot be read by
+/// anyone outside the channel, but every stock node in earshot drops the
+/// frame before decrypting it, and the message goes nowhere. Naming a key
+/// after its channel is therefore a delivery requirement, not a preference;
+/// the naming screen says so, and `meshtasticChannelHash` is where the two
+/// facts meet.
 inline constexpr std::size_t kChannelKeyNameCapacity = 16U;
 
 /// AES-128 only. The firmware's cipher is AES-128
@@ -138,6 +156,13 @@ class ChannelKeyStore final : public ChannelKeyProvider
     /// stored record.
     void clear() noexcept;
 
+    /// Counts mutations of this store. Anything derived from the key list --
+    /// the chat threads are -- compares this instead of rebuilding on every
+    /// redraw. It catches what a size comparison cannot: a key removed and a
+    /// different one added under the same name leaves the count alone, and a
+    /// stale thread would then be sealing with a key nobody chose.
+    [[nodiscard]] std::uint32_t revision() const noexcept { return revision_; }
+
     /// The key's name, or nullptr when the slot is empty. Safe to render.
     [[nodiscard]] const char *name(std::size_t slot) const noexcept;
 
@@ -175,6 +200,9 @@ class ChannelKeyStore final : public ChannelKeyProvider
 
     Entry entries_[kChannelKeyCapacity]{};
     std::size_t size_ = 0U;
+    /// Never reset, including by clear(), so a caller that cached a revision
+    /// cannot be fooled into thinking a wiped store is the one it saw.
+    std::uint32_t revision_ = 0U;
 };
 
 /// True when the name is storable: non-empty, printable ASCII without leading
