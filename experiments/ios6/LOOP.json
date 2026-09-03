@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 83,
-  "stop_after_pass": 132,
+  "pass": 84,
+  "stop_after_pass": 134,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -109,7 +109,8 @@
     "ios6-inbox-search-soft-well",
     "ios6-plus-disc-candy",
     "ios6-balloon-tighter-hooks",
-    "ios6-camera-equator-glyph"
+    "ios6-camera-equator-glyph",
+    "ios6-send-royal-crown"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -144,5 +145,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 83: composer camera well gets a Mamma hard-glass equator and a taller centered viewfinder so the white glyph fills the slate disc like Zach. Well foot lifted toward measured #81868e. Frozen kIos6*/kChat* unchanged. Bubble text stays black. Raised stop_after_pass to 132 because this pass made visual progress."
+  "notes": "Pass 84: focused iMessage Send crown is royal (#7192f0 / #83a3f4) via a stronger overlay and quieter candy glass. Frozen SendTop/SendBottom/SendEdge stay put. No hard equator through the label. Bubble text stays black. Raised stop_after_pass to 134 because this pass made visual progress."
 }

@@ -725,28 +725,22 @@
         panel(ctx, x, y, width, height, top, bottom, edge, radius);
         ctx.restore();
         const imessageCandy = !idle && top === C.SendTop;
-        candyGlass(ctx, x, y, width, height, idle ? 0.52 : 0.58);
-        if (!idle) {
+        // Icy white glass on frozen SendTop reads #aacaf6. Zach/Mamma
+        // crowns are royal #7192f0 / #83a3f4 — quieter glass + royal wash.
+        candyGlass(ctx, x, y, width, height, idle ? 0.52 : (imessageCandy ? 0.34 : 0.58));
+        if (imessageCandy) {
             ctx.save();
             roundRectPath(ctx, x, y, width, height, radius);
             ctx.clip();
-            if (imessageCandy) {
-                // Zach/Mamma crowns are royal #7397f1, not icy white-cyan.
-                const royal = ctx.createLinearGradient(x, y, x, y + height);
-                royal.addColorStop(0, "rgba(80,120,240,0.12)");
-                royal.addColorStop(0.42, "rgba(40,80,220,0.18)");
-                royal.addColorStop(1, "rgba(20,48,180,0.22)");
-                ctx.fillStyle = royal;
-                ctx.fillRect(x, y, width, height);
-            }
-            const equator = y + Math.round(height * 0.40);
-            ctx.fillStyle = "rgba(255,255,255,0.40)";
-            ctx.fillRect(x, equator, width, 1);
-            ctx.fillStyle = "rgba(0,0,0,0.16)";
-            ctx.fillRect(x, equator + 1, width, 1);
+            const royal = ctx.createLinearGradient(x, y, x, y + height);
+            royal.addColorStop(0, "rgba(56,40,200,0.30)");
+            royal.addColorStop(0.38, "rgba(36,56,210,0.26)");
+            royal.addColorStop(1, "rgba(16,36,170,0.18)");
+            ctx.fillStyle = royal;
+            ctx.fillRect(x, y, width, height);
             ctx.restore();
         }
-        ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.28" : "0.58") + ")";
+        ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.28" : (imessageCandy ? "0.36" : "0.58")) + ")";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1.1, y + 1.1, width - 2.2, height - 2.2, Math.max(1, radius - 1.1));
         ctx.stroke();
