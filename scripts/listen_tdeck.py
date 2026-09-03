@@ -81,6 +81,15 @@ def main():
             position = record["pos"]
         if "rx" in record:
             rx, crc = record.get("rx"), record.get("crc")
+        if kind == "S" and "db" in record:
+            # A finished spectrum sweep pass. Start one from the deck's
+            # SPECTRUM screen while this script is attached to see it.
+            db = record.get("db") or []
+            print("*** SWEEP %.3f-%.3f MHz  bins=%s  peak=%s dBm  floor=%s dBm" % (
+                record.get("f0", 0) / 1e6, record.get("f1", 0) / 1e6,
+                record.get("bins", len(db)),
+                max(db) if db else "?", min(db) if db else "?"))
+            continue
         if kind == "F" and "src" in record:
             # src is a node number; the identity is the same value in hex.
             node = "!%08x" % int(record["src"])

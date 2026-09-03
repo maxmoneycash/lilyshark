@@ -14502,6 +14502,82 @@ void handle_mesh_inject_command(const char *line) noexcept
 }
 #endif
 
+#if defined(LILYSHARK_DEVICE)
+void handle_sweep_link_command(const char *line) noexcept
+{
+    // "LSK SWEEP start" runs the same SX1262 spectral scan the deck's own
+    // SPECTRUM screen starts, with the profile and scan mode currently
+    // selected on the deck. The refusals mirror the on-screen ones, because
+    // the web analyzer must not do what the operator standing at the deck
+    // could not.
+    const char *verb = line + 10;
+    if (std::strcmp(verb, "start") == 0) {
+        if (app_settings.simulate_mode) {
+            Serial.println("LSK ERR {\"reason\":\"simulate-mode\"}");
+            return;
+        }
+        if (survey_running) {
+            Serial.println("LSK ERR {\"reason\":\"survey-running\"}");
+            return;
+        }
+        if (radio_service.spectrumStatus().active()) {
+            Serial.println("LSK ERR {\"reason\":\"sweep-already-running\"}");
+            return;
+        }
+        const SpectrumSweepRequest request = spectrum_request_for_profile(
+            radio_service.activeProfile(), spectrum_scan_mode);
+        if (!radio_service.startSpectrumSweep(request)) {
+            const bool radio_down = radio_service.spectrumStatus().failure ==
+                                    SpectrumSweepFailure::RadioUnavailable;
+            Serial.printf("LSK ERR {\"reason\":\"%s\"}\n",
+                          radio_down ? "radio-unavailable" : "start-failed");
+            return;
+        }
+        // The scan silently pauses packet receive; the event log is how the
+        // operator learns the pause was asked for, not a radio fault.
+        record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::Spectrum,
+                             "Web analyzer started a spectrum scan; receive paused");
+        Serial.println("LSK OK {\"kind\":\"sweep\",\"state\":\"started\"}");
+        return;
+    }
+    if (std::strcmp(verb, "stop") == 0) {
+        // Stopping an already-idle sweep succeeds: the caller wanted no sweep
+        // running and none is, and the web side retries stop on reconnect.
+        if (radio_service.spectrumStatus().active()) {
+            radio_service.cancelSpectrumSweep();
+        }
+        Serial.println("LSK OK {\"kind\":\"sweep\",\"state\":\"stopped\"}");
+        return;
+    }
+    Serial.println("LSK ERR {\"reason\":\"bad-sweep\"}");
+}
+
+/// One line per completed sweep pass, whether the pass was started from this
+/// link or from the deck's own SPECTRUM screen. Each frequency point's 33-bin
+/// power histogram collapses to the strongest occupied bin -- the same peak
+/// the deck's trace draws -- and a point the scanner never filled reports the
+/// catch-all floor bin rather than inventing a reading.
+void emit_analyzer_sweep_result() noexcept
+{
+    if (!analyzer_link_active) return;
+    const SpectrumSweepResult &result = radio_service.spectrumResult();
+    if (result.point_count == 0U) return;
+    Serial.printf("LSK S {\"f0\":%lu,\"f1\":%lu,\"bins\":%u,\"db\":[",
+                  static_cast<unsigned long>(result.request.start_frequency_hz),
+                  static_cast<unsigned long>(result.request.end_frequency_hz),
+                  static_cast<unsigned>(result.point_count));
+    for (std::uint16_t point = 0; point < result.point_count; ++point) {
+        const SpectrumBinSummary summary = summarizeSpectrumBins(result.points[point].counts);
+        const std::size_t bin = summary.has_samples
+            ? summary.strongest_nonzero_bin
+            : kSpectrumPowerBinCount - 1U;
+        Serial.printf("%s%d", point == 0U ? "" : ",",
+                      static_cast<int>(spectrumBinDbmX10(bin) / 10));
+    }
+    Serial.printf("]}\n");
+}
+#endif
+
 void handle_analyzer_link_command(const char *line) noexcept
 {
     if(std::strcmp(line, "LSK HELLO") == 0) {
@@ -14532,6 +14608,8 @@ void handle_analyzer_link_command(const char *line) noexcept
         handle_mesh_tx_command(line);
     } else if(std::strncmp(line, "LSK INJ ", 8) == 0) {
         handle_mesh_inject_command(line);
+    } else if(std::strncmp(line, "LSK SWEEP ", 10) == 0) {
+        handle_sweep_link_command(line);
 #endif
     }
 }
@@ -14794,6 +14872,9 @@ void loop()
                               spectrum_status.points_completed);
                 record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::Spectrum,
                                      message);
+#if defined(LILYSHARK_DEVICE)
+                emit_analyzer_sweep_result();
+#endif
             } else if(spectrum_status.state == SpectrumSweepState::Failed) {
                 std::snprintf(message, sizeof(message), "Scan failed: cause %u, radio %d, restore %d",
                               static_cast<unsigned>(spectrum_status.failure),
