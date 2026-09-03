@@ -4,5 +4,6 @@
       "source": "/api/:path*",
       "destination": "https://64-23-133-21.sslip.io/api/:path*"
     }
-  ]
+  ],
+  "ignoreCommand": "exit 1"
 }
