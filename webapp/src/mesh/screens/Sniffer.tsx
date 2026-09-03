@@ -1,6 +1,10 @@
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useDeviceLink, type HeardFrame } from "../../lib/deviceLink";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useDeviceLink,
+	type HeardFrame,
+	type RawFrameFields,
+} from "../../lib/deviceLink";
 import { dissectFrame } from "../../lib/dissect/registry";
 import type { FlatTreeRow } from "../../lib/dissect/tree";
 import {
@@ -13,7 +17,20 @@ import {
 	treeKeyNav,
 } from "../../lib/dissect/tree";
 import type { DissectNode, NodeTone } from "../../lib/dissect/types";
+import {
+	buildCsv,
+	buildJson,
+	buildLoraTapPcap,
+	CSV_MIME,
+	downloadFile,
+	JSON_MIME,
+	type LoraTapCounts,
+	PCAP_MIME,
+	sessionFrames,
+	sessionPcapCounts,
+} from "../../lib/export";
 import { buildLscap } from "../../lib/lscapWrite";
+import { permalinkUrl, snifferFrameHash } from "../../lib/permalink";
 import {
 	clearSnifferSession,
 	setSnifferPaused,
@@ -22,6 +39,12 @@ import {
 import { fmtMHz } from "../../lib/spectrum";
 import { stamp } from "../export";
 import { hhmm, snrClass } from "../fmt";
+import {
+	type FrameLinkEvent,
+	type FrameLinkState,
+	frameLinkStep,
+	INITIAL_FRAME_LINK,
+} from "../frameLink";
 
 const BROADCAST = 0xffffffff;
 
@@ -255,6 +278,161 @@ function DissectTree({
 	);
 }
 
+/** "1 FRAME", "2 FRAMES" — a count nobody has to squint at. */
+function frameCount(n: number): string {
+	return `${n} FRAME${n === 1 ? "" : "S"}`;
+}
+
+/**
+ * What a pcap of this session will leave behind, in words, or "" when it
+ * leaves nothing behind.
+ *
+ * Both omissions are properties of the format rather than faults in the
+ * session: LoRaTap v0 has no channel to mark a frame as synthetic, and it
+ * cannot encode a bandwidth that is not a whole number of 125 kHz steps —
+ * MeshCore's 62.5 kHz profile is the one operators meet.
+ */
+function pcapOmissions(counts: LoraTapCounts): string {
+	const parts: string[] = [];
+	if (counts.excludedSynthetic > 0) {
+		parts.push(`${counts.excludedSynthetic} SYNTHETIC`);
+	}
+	if (counts.excludedUnencodable > 0) {
+		parts.push(`${counts.excludedUnencodable} THE FORMAT CANNOT CARRY`);
+	}
+	return parts.length === 0 ? "" : `PCAP LEAVES OUT ${parts.join(" AND ")}`;
+}
+
+/**
+ * The three download buttons.
+ *
+ * Every label carries the number of frames that format will actually write,
+ * so an empty or short file is visible before the click rather than after
+ * opening it in Wireshark. The pcap's number is the smaller one whenever the
+ * session heard something LoRaTap v0 cannot describe.
+ */
+function ExportButtons({
+	records,
+	onSaved,
+}: {
+	records: readonly RawFrameFields[];
+	onSaved: (message: string) => void;
+}) {
+	// Counting goes through the same predicate the writer uses, so the number
+	// on the button and the number of records in the file cannot drift apart.
+	const pcap = useMemo(() => sessionPcapCounts(records), [records]);
+	const omitted = pcapOmissions(pcap);
+
+	const save = (format: "pcap" | "csv" | "json") => {
+		// The session's raw records become decoded frames by way of the capture
+		// format itself, so all three files describe exactly what SAVE CAPTURE
+		// would have written.
+		const decoded = sessionFrames(records);
+		const name = `lilyshark-sniffer-${stamp()}`;
+		if (format === "pcap") {
+			const built = buildLoraTapPcap({ frames: decoded });
+			downloadFile(`${name}.pcap`, built.bytes, PCAP_MIME);
+			onSaved(`SAVED ${frameCount(built.written)} TO ${name}.pcap`);
+			return;
+		}
+		const text =
+			format === "csv"
+				? buildCsv({ frames: decoded })
+				: buildJson({ frames: decoded });
+		downloadFile(
+			`${name}.${format}`,
+			text,
+			format === "csv" ? CSV_MIME : JSON_MIME,
+		);
+		onSaved(`SAVED ${frameCount(decoded.length)} TO ${name}.${format}`);
+	};
+
+	return (
+		<>
+			<button
+				disabled={pcap.written === 0}
+				title="Download these frames as a LoRaTap pcap — the file Wireshark opens"
+				onClick={() => save("pcap")}
+			>
+				⭳ PCAP ({frameCount(pcap.written)})
+			</button>
+			<button
+				disabled={records.length === 0}
+				title="Download one row per frame, with the columns of the table above — for a spreadsheet"
+				onClick={() => save("csv")}
+			>
+				⭳ CSV ({frameCount(records.length)})
+			</button>
+			<button
+				disabled={records.length === 0}
+				title="Download those same columns as a JSON array — for a script"
+				onClick={() => save("json")}
+			>
+				⭳ JSON ({frameCount(records.length)})
+			</button>
+			{omitted && (
+				<span className="warn" style={{ fontSize: 11 }}>
+					{omitted}
+				</span>
+			)}
+		</>
+	);
+}
+
+/**
+ * Copy a link that reopens this screen with this frame selected.
+ *
+ * The address bar already holds that link, because picking the frame put it
+ * there. So when the clipboard is refused — an insecure origin, or a browser
+ * that wants a gesture it did not recognise — saying where the link already
+ * is beats failing silently.
+ */
+function CopyFrameLink({ seq }: { seq: number | undefined }) {
+	const [message, setMessage] = useState("");
+	// The message belongs to the frame it was shown for, not to the pane.
+	useEffect(() => {
+		setMessage("");
+	}, [seq]);
+
+	if (seq === undefined) {
+		// A dead button would say nothing about why it is dead, and the reason is
+		// the frame's, not the operator's.
+		return (
+			<span className="dim" style={{ fontSize: 11 }}>
+				This frame arrived without its raw record, so it carries no frame
+				number a link could name.
+			</span>
+		);
+	}
+
+	const copy = async () => {
+		const url = permalinkUrl(snifferFrameHash(seq), window.location.href);
+		try {
+			await navigator.clipboard.writeText(url);
+			setMessage("LINK COPIED");
+		} catch {
+			setMessage("COULD NOT COPY — THE ADDRESS BAR HOLDS THE LINK");
+		}
+	};
+
+	return (
+		<>
+			<button
+				title="Copy a link that reopens this screen with this frame selected"
+				style={{ fontSize: 10, letterSpacing: 1 }}
+				onClick={() => void copy()}
+			>
+				COPY LINK
+			</button>
+			{message && (
+				<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+					{message}
+				</span>
+			)}
+		</>
+	);
+}
+
 export default function Sniffer() {
 	const link = useDeviceLink();
 	const session = useSnifferSession();
@@ -271,7 +449,78 @@ export default function Sniffer() {
 
 	const linked = link.status === "linked";
 	const frames = session.frames;
-	const rawRecords = frames.flatMap((f) => (f.raw ? [f.raw] : []));
+	// Only a frame that arrived with its whole record can be written into any
+	// capture format, or named by a link — the rest carry a decoded summary and
+	// nothing else.
+	const rawRecords = useMemo(
+		() => frames.flatMap((f) => (f.raw ? [f.raw] : [])),
+		[frames],
+	);
+	const seqs = useMemo(() => rawRecords.map((r) => r.seq), [rawRecords]);
+
+	// The link machine's state is read by handlers and effects and rendered by
+	// nothing, so it lives in a ref: keeping it in state would re-render the
+	// whole table for a change no pixel depends on. These two refs let a
+	// listener registered once at mount still see the current list.
+	const linkRef = useRef<FrameLinkState>(INITIAL_FRAME_LINK);
+	const framesRef = useRef(frames);
+	framesRef.current = frames;
+	const seqsRef = useRef(seqs);
+	seqsRef.current = seqs;
+
+	const dispatch = useCallback((event: FrameLinkEvent) => {
+		const step = frameLinkStep(linkRef.current, event);
+		linkRef.current = step.state;
+		if (step.hash !== null) {
+			// replaceState rather than assigning location.hash: this is the screen
+			// the operator is already on, not a place to go back to, and assigning
+			// would fire the hashchange the router and this screen both listen on.
+			window.history.replaceState(
+				null,
+				"",
+				permalinkUrl(step.hash, window.location.href),
+			);
+		}
+		if (step.select !== undefined) {
+			const hit = framesRef.current.find((f) => f.raw?.seq === step.select);
+			if (hit) setSel(hit);
+		}
+	}, []);
+
+	// Every selection the operator makes goes through here, and only these
+	// reach the address bar. A frame opened by a link is set straight from
+	// dispatch instead, because the hash it came from already names it.
+	const pickFrame = useCallback(
+		(frame: HeardFrame | undefined) => {
+			setSel(frame);
+			dispatch({
+				kind: "pick",
+				hash: window.location.hash,
+				seq: frame?.raw?.seq ?? null,
+			});
+		},
+		[dispatch],
+	);
+
+	// The hash the tab was opened with and one pasted into it later are the
+	// same event, read by the same function: a permalink dropped into an
+	// already-open tab changes the hash without reloading, and a screen that
+	// read it only at mount would ignore it.
+	useEffect(() => {
+		const read = () => {
+			dispatch({ kind: "url", hash: window.location.hash });
+			dispatch({ kind: "frames", seqs: seqsRef.current });
+		};
+		read();
+		window.addEventListener("hashchange", read);
+		return () => window.removeEventListener("hashchange", read);
+	}, [dispatch]);
+
+	// A link opened before its frame was heard waits; this is where the wait
+	// ends.
+	useEffect(() => {
+		dispatch({ kind: "frames", seqs });
+	}, [seqs, dispatch]);
 
 	// Every path belongs to one frame's tree; a new frame starts over.
 	useEffect(() => {
@@ -317,20 +566,13 @@ export default function Sniffer() {
 	};
 
 	// Same download shape as the TRAFFIC capture: a .lscap assembled in the
-	// browser, holding only the frames that carry their full record.
+	// browser, holding only the frames that carry their full record. It hands
+	// the blob over through the same helper the other three formats use, whose
+	// delayed revoke is what stops a browser saving an empty file.
 	const onSave = () => {
-		const bytes = buildLscap(rawRecords);
-		const url = URL.createObjectURL(
-			new Blob([bytes.slice().buffer as ArrayBuffer], {
-				type: "application/octet-stream",
-			}),
-		);
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = `lilyshark-sniffer-${stamp()}.lscap`;
-		a.click();
-		URL.revokeObjectURL(url);
-		setExportMsg(`SAVED ${rawRecords.length} FRAMES`);
+		const name = `lilyshark-sniffer-${stamp()}.lscap`;
+		downloadFile(name, buildLscap(rawRecords), "application/octet-stream");
+		setExportMsg(`SAVED ${frameCount(rawRecords.length)} TO ${name}`);
 	};
 
 	return (
@@ -357,18 +599,11 @@ export default function Sniffer() {
 					title="Empty the list and start the session over"
 					onClick={() => {
 						clearSnifferSession();
-						setSel(undefined);
+						pickFrame(undefined);
 						setExportMsg("");
 					}}
 				>
 					CLEAR
-				</button>
-				<button
-					disabled={rawRecords.length === 0}
-					title="Save the listed frames as a .lscap capture — the TRAFFIC screen opens it, and only frames that carry their raw bytes can be written"
-					onClick={onSave}
-				>
-					⭳ SAVE CAPTURE
 				</button>
 				{session.paused && (
 					<span className="warn" style={{ fontSize: 11 }}>
@@ -382,15 +617,40 @@ export default function Sniffer() {
 						T-Deck not linked — this is what was heard before the link closed.
 					</span>
 				)}
+				<span className="spacer" />
+				<span className="dim" style={{ fontSize: 11 }}>
+					{`${frames.length} LISTED · ${session.totalHeard} HEARD`}
+				</span>
+			</div>
+
+			{/* Exports get their own row: four buttons and their counts do not
+			    belong in the same line as the controls that change what is
+			    listed. */}
+			<div
+				style={{
+					display: "flex",
+					gap: 10,
+					alignItems: "center",
+					flexShrink: 0,
+					flexWrap: "wrap",
+				}}
+			>
+				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
+					EXPORT //
+				</span>
+				<button
+					disabled={rawRecords.length === 0}
+					title="Save the listed frames as a .lscap capture — the TRAFFIC screen opens it, and only frames that carry their raw bytes can be written"
+					onClick={onSave}
+				>
+					⭳ CAPTURE ({frameCount(rawRecords.length)})
+				</button>
+				<ExportButtons records={rawRecords} onSaved={setExportMsg} />
 				{exportMsg && (
 					<span className="dim" style={{ fontSize: 11 }}>
 						{exportMsg}
 					</span>
 				)}
-				<span className="spacer" />
-				<span className="dim" style={{ fontSize: 11 }}>
-					{`${frames.length} LISTED · ${session.totalHeard} HEARD`}
-				</span>
 			</div>
 
 			<div
@@ -434,7 +694,7 @@ export default function Sniffer() {
 											<tr
 												key={`${f.atMs}:${f.src}:${i}`}
 												className={f === sel ? "sel" : ""}
-												onClick={() => setSel(f === sel ? undefined : f)}
+												onClick={() => pickFrame(f === sel ? undefined : f)}
 											>
 												<td>{hhmm(f.atMs)}</td>
 												<td title={nodeId(f.src)}>{f.short ?? nodeId(f.src)}</td>
@@ -484,7 +744,8 @@ export default function Sniffer() {
 						<div className="panel-title">
 							<span>FRAME // {sel.short ?? nodeId(sel.src)}</span>
 							<button
-								onClick={() => setSel(undefined)}
+								title="Close this frame"
+								onClick={() => pickFrame(undefined)}
 								style={{ width: 22, height: 22, padding: 0, fontSize: 12, minWidth: 22 }}
 							>
 								✕
@@ -530,6 +791,25 @@ export default function Sniffer() {
 									<span style={{ wordBreak: "break-all" }}>{value}</span>
 								</div>
 							))}
+							{/* One more row in the same column grammar as the fields above:
+							    a frame's link is part of what identifies it. */}
+							<div
+								style={{
+									display: "flex",
+									gap: 10,
+									lineHeight: 1.8,
+									alignItems: "center",
+									flexWrap: "wrap",
+								}}
+							>
+								<span
+									className="dim"
+									style={{ width: 92, flexShrink: 0, fontSize: 10, letterSpacing: 1 }}
+								>
+									LINK
+								</span>
+								<CopyFrameLink seq={sel.raw?.seq} />
+							</div>
 							{sel.text && (
 								<div style={{ margin: "8px 0" }}>
 									<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
