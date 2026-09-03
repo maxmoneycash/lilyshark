@@ -37,6 +37,12 @@ import {
 	useSnifferSession,
 } from "../../lib/snifferSession";
 import { fmtMHz } from "../../lib/spectrum";
+import {
+	SPACER_CELL_STYLE,
+	SPACER_ROW_STYLE,
+	useRowWindow,
+} from "../../lib/useRowWindow";
+import { rowWindowPositions } from "../../lib/virtualRows";
 import { stamp } from "../export";
 import { hhmm, snrClass } from "../fmt";
 import {
@@ -281,6 +287,106 @@ function DissectTree({
 /** "1 FRAME", "2 FRAMES" — a count nobody has to squint at. */
 function frameCount(n: number): string {
 	return `${n} FRAME${n === 1 ? "" : "S"}`;
+}
+
+/** Columns in the live table, so a spacer row spans exactly the table. */
+const TABLE_COLUMNS = 8;
+
+interface FrameTableProps {
+	/** The session's own order: oldest first. */
+	frames: HeardFrame[];
+	sel: HeardFrame | undefined;
+	onPick: (frame: HeardFrame | undefined) => void;
+}
+
+/**
+ * The live frame list, newest first.
+ *
+ * Only the rows the scrollport can show are mounted, with two spacers standing
+ * in for the rest (lib/virtualRows.ts). The session is bounded at
+ * SNIFFER_FRAME_LIMIT, so this is not the difference between working and not
+ * the way it is on the TRAFFIC table — but a full ring is 500 rows of eight
+ * cells rebuilt on every arriving frame, and a sniffer's whole job is to keep
+ * up with the radio while someone reads it.
+ *
+ * The reversal is done by INDEX, not by reversing a copy of the list: position
+ * 0 is the newest frame, which is `frames[frames.length - 1]`.
+ */
+function FrameTable({ frames, sel, onPick }: FrameTableProps) {
+	const rows = useRowWindow(frames.length);
+	const win = rows.win;
+	const newest = frames.length - 1;
+
+	return (
+		<div className="scroll-y" ref={rows.scrollRef}>
+			<table className="grid">
+				<thead ref={rows.headRef}>
+					<tr>
+						<th>TIME</th>
+						<th>FROM</th>
+						<th>TO</th>
+						<th>PROTOCOL</th>
+						<th>TYPE</th>
+						<th>RSSI</th>
+						<th>SNR</th>
+						<th>BYTES</th>
+					</tr>
+				</thead>
+				<tbody>
+					{win.topPadPx > 0 && (
+						<tr aria-hidden="true" style={SPACER_ROW_STYLE}>
+							<td
+								colSpan={TABLE_COLUMNS}
+								style={{ ...SPACER_CELL_STYLE, height: win.topPadPx }}
+							/>
+						</tr>
+					)}
+					{rowWindowPositions(win).map((position) => {
+						const f = frames[newest - position];
+						return (
+							<tr
+								key={`${f.atMs}:${f.src}:${position}`}
+								ref={position === win.start ? rows.rowRef : undefined}
+								className={f === sel ? "sel" : ""}
+								onClick={() => onPick(f === sel ? undefined : f)}
+							>
+								<td>{hhmm(f.atMs)}</td>
+								<td title={nodeId(f.src)}>{f.short ?? nodeId(f.src)}</td>
+								<td>{f.dst === BROADCAST ? "ALL" : nodeId(f.dst)}</td>
+								<td>{f.proto}</td>
+								<td
+									className={f.sim ? "warn" : ""}
+									title={
+										f.sim
+											? "Synthetic frame from the device's simulate mode — not heard over the air"
+											: undefined
+									}
+								>
+									{f.kind}
+									{f.sim && " · SYNTHETIC"}
+								</td>
+								<td>{(f.rssiX10 / 10).toFixed(1)}</td>
+								<td className={snrClass(f.snrX10 / 10)}>
+									{(f.snrX10 / 10).toFixed(1)}
+								</td>
+								<td className={f.raw ? "" : "dim"}>
+									{f.raw ? f.raw.bytes.length : "—"}
+								</td>
+							</tr>
+						);
+					})}
+					{win.bottomPadPx > 0 && (
+						<tr aria-hidden="true" style={SPACER_ROW_STYLE}>
+							<td
+								colSpan={TABLE_COLUMNS}
+								style={{ ...SPACER_CELL_STYLE, height: win.bottomPadPx }}
+							/>
+						</tr>
+					)}
+				</tbody>
+			</table>
+		</div>
+	);
 }
 
 /**
@@ -671,58 +777,7 @@ export default function Sniffer() {
 								: "Nothing captured yet — connect a T-Deck over USB with the CONNECT button, and every frame its radio hears lands here_"}
 						</p>
 					) : (
-						<div className="scroll-y">
-							<table className="grid">
-								<thead>
-									<tr>
-										<th>TIME</th>
-										<th>FROM</th>
-										<th>TO</th>
-										<th>PROTOCOL</th>
-										<th>TYPE</th>
-										<th>RSSI</th>
-										<th>SNR</th>
-										<th>BYTES</th>
-									</tr>
-								</thead>
-								<tbody>
-									{/* Newest first: a sniffer is read from the top. */}
-									{frames
-										.slice()
-										.reverse()
-										.map((f, i) => (
-											<tr
-												key={`${f.atMs}:${f.src}:${i}`}
-												className={f === sel ? "sel" : ""}
-												onClick={() => pickFrame(f === sel ? undefined : f)}
-											>
-												<td>{hhmm(f.atMs)}</td>
-												<td title={nodeId(f.src)}>{f.short ?? nodeId(f.src)}</td>
-												<td>{f.dst === BROADCAST ? "ALL" : nodeId(f.dst)}</td>
-												<td>{f.proto}</td>
-												<td
-													className={f.sim ? "warn" : ""}
-													title={
-														f.sim
-															? "Synthetic frame from the device's simulate mode — not heard over the air"
-															: undefined
-													}
-												>
-													{f.kind}
-													{f.sim && " · SYNTHETIC"}
-												</td>
-												<td>{(f.rssiX10 / 10).toFixed(1)}</td>
-												<td className={snrClass(f.snrX10 / 10)}>
-													{(f.snrX10 / 10).toFixed(1)}
-												</td>
-												<td className={f.raw ? "" : "dim"}>
-													{f.raw ? f.raw.bytes.length : "—"}
-												</td>
-											</tr>
-										))}
-								</tbody>
-							</table>
-						</div>
+						<FrameTable frames={frames} sel={sel} onPick={pickFrame} />
 					)}
 					<div className="panel-foot">
 						<span>RSSI IN dBm · SNR IN dB</span>
