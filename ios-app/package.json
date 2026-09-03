@@ -1,0 +1,26 @@
+{
+  "name": "lilyshark-ios",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Capacitor iOS shell around the Lilyshark webapp, with a Web-Bluetooth-shaped bridge to the T-Deck",
+  "type": "module",
+  "scripts": {
+    "build:webapp": "npm --prefix ../webapp run build",
+    "build:bridge": "esbuild src/ble-bridge.ts --bundle --format=iife --target=safari15 --outfile=www/native-bridge.js",
+    "assemble": "node scripts/assemble-www.mjs && npm run build:bridge",
+    "build": "npm run build:webapp && npm run assemble",
+    "typecheck": "tsc --noEmit",
+    "sync": "npm run build && cap sync ios",
+    "open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.3.0",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.6.3"
+  }
+}
