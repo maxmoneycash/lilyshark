@@ -88,7 +88,33 @@ hears shows up in the app, and what you type in the app goes out over the
 deck's radio and into its chat log. Node positions come across as well, so
 the app's map places your neighbours.
 
-## 5. What you will and won't see of each other
+## 5. Use it as an analyzer
+
+The deck is also an instrument, and most of that lives in the browser.
+Open **lilyshark.com** in Chrome, Edge or Arc on a computer, press CONNECT,
+and choose **LILYSHARK T-DECK · USB** for the analyzer link or
+**LILYSHARK T-DECK · BLUETOOTH** for the mesh conversation. Then:
+
+- **SNIFFER** lists every frame the deck hears, with a dissection tree that
+  names each field and highlights the bytes it came from. Export the capture
+  as LoRaTap PCAP and open it in Wireshark, or as CSV or JSON.
+- **SPECTRUM** draws a live waterfall from sweeps the deck runs on command.
+- **TRAFFIC** follows a conversation between two nodes, diffs two captures,
+  and takes a display-filter expression.
+- **MAP** shows what your radio has actually heard, and — in amber, labelled
+  NET — what the wider internet-connected mesh knows is out there. The two
+  are never mixed up: amber is somebody else's hearing, not yours.
+
+The site installs as an offline app. Once it has loaded, it opens with no
+internet at all, which matters for an instrument whose network does not need
+one either.
+
+There is also a native app in `ios/` for iPhone, Mac and Watch, because Apple
+does not permit Web Bluetooth and the website therefore cannot reach a deck
+from an iPhone. Build it with `./scripts/build_ios.sh`; it needs Xcode and
+your own signing identity.
+
+## 6. What you will and won't see of each other
 
 - **In LoRa range** (same neighbourhood, line of sight — hundreds of metres
   urban, kilometres open): each deck appears in the other's NODES list with
