@@ -671,28 +671,28 @@
             const thread = THREADS[key];
             const last = thread.messages[thread.messages.length - 1];
             const top = tableY + index * rowH;
-            ctx.fillStyle = kit.hex24(C.Rule);
-            ctx.fillRect(22, top + rowH - 1, W - 22, 1);
+            ctx.fillStyle = "#c4c8ce";
+            ctx.fillRect(20, top + rowH - 1, W - 20, 1);
             if (thread.unread) {
                 ctx.fillStyle = kit.hex24(0x147efb);
                 ctx.beginPath();
                 ctx.arc(10, top + 22, 3.6, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = "rgba(255,255,255,0.55)";
+                ctx.fillStyle = "rgba(255,255,255,0.62)";
                 ctx.beginPath();
-                ctx.ellipse(9.1, top + 20.5, 1.7, 1.15, 0, 0, Math.PI * 2);
+                ctx.ellipse(9.0, top + 20.4, 1.8, 1.2, 0, 0, Math.PI * 2);
                 ctx.fill();
             }
             kit.text(ctx, thread.name, 22, top + 7, C.Ink, {
                 size: 14,
                 weight: thread.unread ? "800" : "500",
             });
-            kit.text(ctx, last ? last.text : "", 22, top + 25, C.Meta, {
-                size: 11,
-                maxWidth: 230,
+            kit.text(ctx, last ? last.text : "", 22, top + 25, 0x8a9098, {
+                size: 12,
+                maxWidth: 220,
             });
-            kit.text(ctx, thread.when, 292, top + 9, 0x5078a0, { size: 11, align: "right" });
-            kit.chevron(ctx, 300, top + 17);
+            kit.text(ctx, thread.when, 298, top + 9, 0x5078a0, { size: 11, align: "right" });
+            kit.chevron(ctx, 306, top + 17);
             kit.hit(0, top, W, rowH, openThread(key));
         }
     }
