@@ -7,7 +7,9 @@
 
 #include "device_shell_fake.h"
 #include "lilyshark/core/app_settings.h"
+#include "lilyshark/core/channel_keys.h"
 #include "lilyshark/core/profile_settings.h"
+#include "lilyshark/crypto/aes128.h"
 #include "lilyshark/protocols/meshtastic_encode.h"
 #include "lilyshark/protocols/meshtastic_payload.h"
 #include "lilyshark/device/tdeck_display_init.h"
@@ -926,6 +928,167 @@ bool healthyScenario()
     return true;
 }
 
+/// A Meshtastic frame sealed under one of the operator's channel keys instead
+/// of the key every radio ships with. AES-CTR is a keystream, so undoing the
+/// default key and applying the operator's leaves exactly the bytes a radio on
+/// that channel would have put on the air.
+std::vector<std::uint8_t> frameSealedUnderKey(
+    const lilyshark::MeshtasticEncodeRequest &request,
+    const std::uint8_t key[lilyshark::kChannelKeySize])
+{
+    std::uint8_t frame[256]{};
+    const std::size_t length = lilyshark::encodeMeshtasticFrame(request, frame, sizeof(frame));
+    if(length <= 16U) return {};
+    std::uint8_t nonce[lilyshark::crypto::kAesBlockSize]{};
+    for(std::size_t index = 0; index < 4U; ++index) {
+        nonce[index] = static_cast<std::uint8_t>((request.packet_id >> (8U * index)) & 0xffU);
+        nonce[8U + index] =
+            static_cast<std::uint8_t>((request.from_node >> (8U * index)) & 0xffU);
+    }
+    const std::size_t body = length - 16U;
+    std::vector<std::uint8_t> plain(body, 0U);
+    lilyshark::crypto::aesCtrXcrypt(lilyshark::kMeshtasticDefaultPsk, nonce, frame + 16U, body,
+                                    plain.data());
+    lilyshark::crypto::aesCtrXcrypt(key, nonce, plain.data(), body, frame + 16U);
+    return std::vector<std::uint8_t>(frame, frame + length);
+}
+
+/// Typing in a channel key somebody handed the operator, and then reading a
+/// frame on that channel with it. This is the one path that crosses every
+/// layer the feature touches -- keyboard, key store, preference record, radio
+/// callback, decoder, payload reader and screen -- and the one place the rule
+/// that a borrowed key never looks like the public one can actually be seen.
+bool channelKeyReceiveScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+    if(!require(seedCompletedAppSettings(),
+                "completed app settings could not be encoded")) return false;
+
+    setup();
+
+    sendKeyboard('8');
+    if(!require(hasLabel(lv_screen_active(), "SETTINGS"),
+                "8 did not open Settings for the channel key checks")) return false;
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "CHANNEL KEYS") &&
+                    hasLabel(lv_screen_active(), "ADD A KEY"),
+                "right on Settings did not open an empty channel key list")) return false;
+
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "TYPE THE CHANNEL KEY"),
+                "the ADD A KEY row did not open key entry")) return false;
+    static constexpr char kTypedKey[] = "8a1c0f43d29b57e6104fb8237ce5a90d";
+    for(const char *digit = kTypedKey; *digit != '\0'; ++digit) {
+        sendKeyboard(static_cast<std::uint8_t>(*digit));
+    }
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), "NAME THIS KEY"),
+                "a complete key did not lead on to naming it")) return false;
+    static constexpr char kKeyName[] = "NORTH RIDGE";
+    for(const char *letter = kKeyName; *letter != '\0'; ++letter) {
+        sendKeyboard(static_cast<std::uint8_t>(*letter));
+    }
+    sendKeyboard('\r');
+    if(!require(hasLabel(lv_screen_active(), kKeyName),
+                "the named key did not appear in the key list")) return false;
+    // Typed once, kept through a power cycle: the record is in the namespace
+    // under its own key, and it is the checksummed blob the store encodes.
+    const auto &stored_record = state().saved_records["keys"];
+    if(!require(stored_record.size() == lilyshark::kChannelKeyStoreRecordSize &&
+                    stored_record[0] == 'L' && stored_record[1] == 'S' &&
+                    stored_record[2] == 'C' && stored_record[3] == 'K',
+                "the added key was not written to the preferences namespace")) return false;
+    // Nothing on this screen may be the key itself. A BMP screenshot is a dump
+    // of the framebuffer, so a key drawn here would be a key in the file.
+    if(!require(!hasLabel(lv_screen_active(), kTypedKey) &&
+                    labelWithPrefix(lv_screen_active(), "8a1c") == nullptr &&
+                    labelWithPrefix(lv_screen_active(), "8A1C") == nullptr,
+                "the key list rendered key material")) return false;
+
+    sendKeyboard(0x08U);
+    if(!require(hasLabel(lv_screen_active(), "SETTINGS"),
+                "back did not leave the key list")) return false;
+
+    std::uint8_t key_bytes[lilyshark::kChannelKeySize]{};
+    if(!require(lilyshark::parseChannelKeyHex(kTypedKey, key_bytes, sizeof(key_bytes)),
+                "the test could not parse its own key")) return false;
+    lilyshark::MeshtasticEncodeRequest sealed{};
+    sealed.from_node = 0x5a5a1234U;
+    sealed.to_node = 0xffffffffU;
+    sealed.packet_id = 910001U;
+    sealed.port = lilyshark::MeshtasticPort::TextMessage;
+    sealed.text = "ridge repeater is up";
+    const std::vector<std::uint8_t> sealed_frame = frameSealedUnderKey(sealed, key_bytes);
+    if(!require(sealed_frame.size() > 16U,
+                "the test could not seal a frame under the stored key")) return false;
+
+    auto &radio = radiolib_fake::state();
+    radio.packet = sealed_frame;
+    radio.packet_length = radio.packet.size();
+    radio.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+    radio.triggerDio1();
+    device_shell_fake::advance_ms(250U);
+    loop();
+
+    sendKeyboard('C');
+    bool saw_keyed_line = false;
+    for(int hop = 0; hop < 5 && !saw_keyed_line; ++hop) {
+        saw_keyed_line = hasLabel(lv_screen_active(), "ridge repeater is up") &&
+                         labelWithPrefix(lv_screen_active(), "1234  KEY NORTH RIDGE") != nullptr;
+        if(!saw_keyed_line) sendKeyboard('\t');
+    }
+    if(!require(saw_keyed_line,
+                "a frame opened by a stored key did not reach Chat naming that key")) {
+        return false;
+    }
+    sendKeyboard(0x08U);
+
+    sendKeyboard('1');
+    if(!require(hasLabel(lv_screen_active(), "5A5A1234"),
+                "the sealed frame did not reach the live Traffic list")) return false;
+    sendKeyboard('\r');
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "DECODED") &&
+                    hasLabel(lv_screen_active(), "TEXT  KEY NORTH RIDGE") &&
+                    hasLabel(lv_screen_active(), "ridge repeater is up"),
+                "Packet Detail did not name the stored key that opened the frame")) return false;
+    sendKeyboard(0x08U);
+
+    // The other half of the distinction: a frame anybody within earshot can
+    // read must still say so, on the same screen, in the same place. Without
+    // this the two cases could quietly converge on one label and nobody would
+    // notice until it mattered.
+    lilyshark::MeshtasticEncodeRequest public_text{};
+    public_text.from_node = 0x5a5a5678U;
+    public_text.to_node = 0xffffffffU;
+    public_text.packet_id = 910002U;
+    public_text.port = lilyshark::MeshtasticPort::TextMessage;
+    public_text.text = "anyone can read this";
+    std::uint8_t public_frame[256]{};
+    const std::size_t public_length =
+        lilyshark::encodeMeshtasticFrame(public_text, public_frame, sizeof(public_frame));
+    if(!require(public_length > 16U,
+                "the test could not encode a default-key frame")) return false;
+    radio.packet.assign(public_frame, public_frame + public_length);
+    radio.packet_length = radio.packet.size();
+    radio.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+    radio.triggerDio1();
+    device_shell_fake::advance_ms(250U);
+    loop();
+
+    sendKeyboard('1');
+    sendKeyboard('\r');
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    sendKeyboard(static_cast<std::uint8_t>(LV_KEY_RIGHT));
+    if(!require(hasLabel(lv_screen_active(), "TEXT  DEFAULT KEY") &&
+                    hasLabel(lv_screen_active(), "anyone can read this"),
+                "Packet Detail stopped naming the published default key")) return false;
+    return true;
+}
+
 bool recoverableFailureScenario()
 {
     device_shell_fake::reset();
@@ -1737,6 +1900,8 @@ void testDeviceShellEntryPath()
 {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(healthyScenario),
                                   "healthy device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(channelKeyReceiveScenario),
+                                  "channel-key receive device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(recoverableFailureScenario),
                                   "recoverable device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(freshOnboardingScenario),

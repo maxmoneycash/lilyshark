@@ -137,3 +137,34 @@ point:
 A wrong key produces noise, and noise is never presented as a message: the
 plaintext must parse as a well-formed Data message or the key is skipped. The
 decode fails closed to ciphertext.
+
+## Where the distinction is visible
+
+Three screens show a decoded Meshtastic message, and each of them names the key
+that opened it. A stored key is drawn in amber — the same shade a frame relayed
+over the internet bridge wears, this firmware's mark for a result with a caveat
+attached — while the published default key keeps lime, because it carries the
+stronger claim that the traffic was never private.
+
+- **Packet detail, DECODE tab** — `PORT TEXT  KEY NORTH RIDGE`, against
+  `PORT TEXT  DEFAULT KEY` for a public one. The decoder library only ever
+  tries the default key, so a frame a stored key opened reaches this screen
+  labelled OPAQUE / HEADER; the screen states what the deck as a whole made of
+  the frame instead, since printing HEADER above a message it is displaying
+  would be the wrong kind of honest.
+- **Messages** — the key's name follows the sender and the route, and the
+  row's edge marker turns amber.
+- **Chat** — the same name follows the sender on the line's header, and the
+  line's edge marker turns amber. A chat line stores the key's *name* rather
+  than its slot, because the line outlives the key list; a line that pointed at
+  a slot would name a different key after a removal.
+
+The name, never the bytes: a decode result carries a slot index and the slot is
+resolved to the name the operator typed.
+
+One decode deliberately does **not** use stored keys. The USB link to
+lilyshark.com emits a JSON summary per heard frame, and that record has no
+field for which key opened it — so a borrowed key's plaintext sent down it
+would arrive looking exactly like traffic anybody within earshot could read.
+The raw frame still goes over the link, so nothing is hidden from the analyzer;
+it simply does not get a decode it cannot label.
