@@ -743,16 +743,16 @@
     }
 
     function tokenChip(ctx, x, y, width, height, label) {
-        // iOS 6 To: token is a light-blue lozenge, not the Send candy.
+        // iOS 6 To: token is a pale sky lozenge, not the Send candy.
         const radius = height / 2;
         ctx.save();
-        ctx.shadowColor = "rgba(20,40,80,0.18)";
-        ctx.shadowBlur = 1.6;
+        ctx.shadowColor = "rgba(20,40,80,0.16)";
+        ctx.shadowBlur = 1.4;
         ctx.shadowOffsetY = 1;
-        panel(ctx, x, y, width, height, 0xb4d4f4, 0x6a9ad8, 0x3a6aa8, radius);
+        panel(ctx, x, y, width, height, 0xc8e6fa, 0x7ab6ea, 0x4a8ac8, radius);
         ctx.restore();
-        candyGlass(ctx, x, y, width, height, 0.72);
-        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        candyGlass(ctx, x, y, width, height, 0.80);
+        ctx.strokeStyle = "rgba(255,255,255,0.62)";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1, y + 1, width - 2, height - 2, Math.max(1, radius - 1));
         ctx.stroke();
@@ -760,25 +760,39 @@
             size: 11,
             weight: "700",
             align: "center",
-            shadow: "rgba(20,50,90,0.28)",
+            shadow: "rgba(20,50,90,0.24)",
         });
     }
 
     function plusDisc(ctx, cx, cy, radius) {
-        // iOS 6 add-contact: blue plus in a thin blue ring.
+        // iOS 6 add-contact: filled blue disc, white plus.
         ctx.save();
-        ctx.strokeStyle = hex24(0x1478e6);
-        ctx.lineWidth = 1.55;
         ctx.beginPath();
-        ctx.arc(cx, cy, radius - 0.7, 0, Math.PI * 2);
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        const fill = ctx.createLinearGradient(cx, cy - radius, cx, cy + radius);
+        fill.addColorStop(0, hex24(0x5aa8f0));
+        fill.addColorStop(0.48, hex24(0x1478e6));
+        fill.addColorStop(1, hex24(0x0c5cbc));
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 0.85, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.lineCap = "round";
-        ctx.lineWidth = 2.05;
+        ctx.strokeStyle = hex24(0x0a4a96);
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(cx - 4.0, cy);
-        ctx.lineTo(cx + 4.0, cy);
-        ctx.moveTo(cx, cy - 4.0);
-        ctx.lineTo(cx, cy + 4.0);
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = hex24(C.White);
+        ctx.lineCap = "round";
+        ctx.lineWidth = 2.15;
+        ctx.beginPath();
+        ctx.moveTo(cx - 3.6, cy);
+        ctx.lineTo(cx + 3.6, cy);
+        ctx.moveTo(cx, cy - 3.6);
+        ctx.lineTo(cx, cy + 3.6);
         ctx.stroke();
         ctx.restore();
     }
