@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 73,
-  "stop_after_pass": 112,
+  "pass": 74,
+  "stop_after_pass": 114,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -99,7 +99,8 @@
     "ios6-camera-slate-and-bubble-light",
     "ios6-focused-send-full-candy",
     "ios6-incoming-silver-shade",
-    "ios6-camera-mid-slate-gloss"
+    "ios6-camera-mid-slate-gloss",
+    "ios6-nav-stamped-steel"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -134,5 +135,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 73: composer camera well lifts to Zach/Mamma mid-slate (#9aa2aa/#727a84/#5a626c) with a soft top-half gloss instead of a dark trough. White glyph, centered viewfinder, no flash. Bubble text stays black. Raised stop_after_pass to 112 because this pass made visual progress. Frozen kIos6*/kChat* unchanged."
+  "notes": "Pass 74: Messages/Edit nav buttons use stamped steel-blue (0x7a92b0/0x567494/0x3a5a86) plus a short drop shadow like ios6_menu_bar and Mamma. Rim stays 0xa9c4e0. Bubble text stays black. Raised stop_after_pass to 114 because this pass made visual progress. Frozen kIos6*/kChat* unchanged."
 }
