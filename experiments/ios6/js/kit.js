@@ -567,31 +567,32 @@
         ctx.quadraticCurveTo(x + 1.0, y + height * 0.58, x, y + height / 2);
         ctx.quadraticCurveTo(x + 1.0, y + height * 0.42, x + point, y);
         ctx.closePath();
-        // ios6_menu_bar / Mamma: stamped steel-blue, not a near-black capsule.
-        ctx.shadowColor = "rgba(8,16,28,0.40)";
-        ctx.shadowBlur = 1.8;
-        ctx.shadowOffsetY = 1.1;
+        // ios6_menu_bar: stamped into the glass, not a raised capsule.
         const gradient = ctx.createLinearGradient(x, y, x, y + height);
         gradient.addColorStop(0, hex24(0x7a92b0));
         gradient.addColorStop(0.36, hex24(0x567494));
         gradient.addColorStop(1, hex24(0x3a5a86));
         ctx.fillStyle = gradient;
         ctx.fill();
-        ctx.shadowColor = "transparent";
         ctx.save();
         ctx.clip();
+        const inset = ctx.createLinearGradient(x, y, x, y + 6);
+        inset.addColorStop(0, "rgba(8,16,28,0.32)");
+        inset.addColorStop(1, "rgba(8,16,28,0)");
+        ctx.fillStyle = inset;
+        ctx.fillRect(x, y, width + 4, 6);
         const equator = y + Math.round(height * 0.36);
         const shine = ctx.createLinearGradient(x, y, x, equator);
-        shine.addColorStop(0, "rgba(255,255,255,0.42)");
-        shine.addColorStop(0.55, "rgba(255,255,255,0.12)");
-        shine.addColorStop(1, "rgba(255,255,255,0.03)");
+        shine.addColorStop(0, "rgba(255,255,255,0.22)");
+        shine.addColorStop(0.55, "rgba(255,255,255,0.08)");
+        shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fillRect(x, y, width + 4, equator - y);
-        ctx.fillStyle = "rgba(255,255,255,0.36)";
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
         ctx.fillRect(x, equator, width + 4, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.22)";
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
         ctx.fillRect(x, equator + 1, width + 4, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.20)";
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
         ctx.fillRect(x, y + height - 3, width + 4, 3);
         ctx.fillStyle = hex24(0xa9c4e0);
         ctx.fillRect(x + point + 2, y + 1, width - point - 4, 1);
@@ -614,34 +615,35 @@
     }
 
     function navButton(ctx, x, y, width, height, label, action) {
-        // Same candy glass as Messages back: 3-stop fill, equator, inner rim.
+        // Same stamped glass as Messages back: inset, not a raised capsule.
         const radius = 5;
         ctx.save();
         roundRectPath(ctx, x, y, width, height, radius);
-        ctx.shadowColor = "rgba(8,16,28,0.40)";
-        ctx.shadowBlur = 1.8;
-        ctx.shadowOffsetY = 1.1;
         const gradient = ctx.createLinearGradient(x, y, x, y + height);
         gradient.addColorStop(0, hex24(0x7a92b0));
         gradient.addColorStop(0.36, hex24(0x567494));
         gradient.addColorStop(1, hex24(0x3a5a86));
         ctx.fillStyle = gradient;
         ctx.fill();
-        ctx.shadowColor = "transparent";
         ctx.save();
         ctx.clip();
+        const inset = ctx.createLinearGradient(x, y, x, y + 6);
+        inset.addColorStop(0, "rgba(8,16,28,0.32)");
+        inset.addColorStop(1, "rgba(8,16,28,0)");
+        ctx.fillStyle = inset;
+        ctx.fillRect(x, y, width, 6);
         const equator = y + Math.round(height * 0.36);
         const shine = ctx.createLinearGradient(x, y, x, equator);
-        shine.addColorStop(0, "rgba(255,255,255,0.42)");
-        shine.addColorStop(0.55, "rgba(255,255,255,0.12)");
-        shine.addColorStop(1, "rgba(255,255,255,0.03)");
+        shine.addColorStop(0, "rgba(255,255,255,0.22)");
+        shine.addColorStop(0.55, "rgba(255,255,255,0.08)");
+        shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fillRect(x, y, width, equator - y);
-        ctx.fillStyle = "rgba(255,255,255,0.36)";
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
         ctx.fillRect(x, equator, width, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.22)";
+        ctx.fillStyle = "rgba(0,0,0,0.18)");
         ctx.fillRect(x, equator + 1, width, 1);
-        ctx.fillStyle = "rgba(0,0,0,0.20)";
+        ctx.fillStyle = "rgba(0,0,0,0.22)");
         ctx.fillRect(x, y + height - 3, width, 3);
         ctx.fillStyle = hex24(0xa9c4e0);
         ctx.fillRect(x + 4, y + 1, width - 8, 1);
