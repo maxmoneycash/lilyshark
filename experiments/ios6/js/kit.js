@@ -724,19 +724,29 @@
         ctx.shadowOffsetY = idle ? 0.8 : 1.4;
         panel(ctx, x, y, width, height, top, bottom, edge, radius);
         ctx.restore();
-        candyGlass(ctx, x, y, width, height, idle ? 0.52 : 0.98);
+        const imessageCandy = !idle && top === C.SendTop;
+        candyGlass(ctx, x, y, width, height, idle ? 0.52 : 0.58);
         if (!idle) {
             ctx.save();
             roundRectPath(ctx, x, y, width, height, radius);
             ctx.clip();
+            if (imessageCandy) {
+                // Zach/Mamma crowns are royal #7397f1, not icy white-cyan.
+                const royal = ctx.createLinearGradient(x, y, x, y + height);
+                royal.addColorStop(0, "rgba(80,120,240,0.12)");
+                royal.addColorStop(0.42, "rgba(40,80,220,0.18)");
+                royal.addColorStop(1, "rgba(20,48,180,0.22)");
+                ctx.fillStyle = royal;
+                ctx.fillRect(x, y, width, height);
+            }
             const equator = y + Math.round(height * 0.40);
-            ctx.fillStyle = "rgba(255,255,255,0.52)";
+            ctx.fillStyle = "rgba(255,255,255,0.40)";
             ctx.fillRect(x, equator, width, 1);
-            ctx.fillStyle = "rgba(0,0,0,0.18)";
+            ctx.fillStyle = "rgba(0,0,0,0.16)";
             ctx.fillRect(x, equator + 1, width, 1);
             ctx.restore();
         }
-        ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.28" : "0.68") + ")";
+        ctx.strokeStyle = "rgba(255,255,255," + (idle ? "0.28" : "0.58") + ")";
         ctx.lineWidth = 1;
         roundRectPath(ctx, x + 1.1, y + 1.1, width - 2.2, height - 2.2, Math.max(1, radius - 1.1));
         ctx.stroke();
