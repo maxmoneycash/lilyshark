@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 47,
-  "stop_after_pass": 60,
+  "pass": 48,
+  "stop_after_pass": 62,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -73,7 +73,8 @@
     "details-blue-and-action-inset",
     "deeper-composer-field-well",
     "imessage-paper-wash-and-dot-stamp",
-    "idle-send-flat-capsule"
+    "idle-send-flat-capsule",
+    "ios6-inbox-search-metal"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -108,5 +109,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 47: Empty Send is a flatter silver capsule without an equator, so it reads disabled. Active Send keeps the candy equator. Raised stop_after_pass to 60 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
+  "notes": "Pass 48: Inbox search is a darker metal strip with a deeper white well and a thinner magnifying glass. Raised stop_after_pass to 62 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
 }

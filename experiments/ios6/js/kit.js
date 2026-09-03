@@ -1060,14 +1060,14 @@
     function searchGlyph(ctx, x, y, color) {
         ctx.save();
         ctx.strokeStyle = hex24(color);
-        ctx.lineWidth = 2.0;
+        ctx.lineWidth = 1.7;
         ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.arc(x, y, 4.4, 0, Math.PI * 2);
+        ctx.arc(x, y, 4.0, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(x + 3.4, y + 3.4);
-        ctx.lineTo(x + 7.6, y + 7.6);
+        ctx.moveTo(x + 3.0, y + 3.0);
+        ctx.lineTo(x + 7.2, y + 7.2);
         ctx.stroke();
         ctx.restore();
     }
