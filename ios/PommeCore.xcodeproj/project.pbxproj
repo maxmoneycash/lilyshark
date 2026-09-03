@@ -212,6 +212,9 @@
 		WSW10000000100000000002 /* WidgetStateWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = WSW10000000000000000000 /* WidgetStateWriter.swift */; };
 		WSW10000000100000000003 /* WidgetStateWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = WSW10000000000000000000 /* WidgetStateWriter.swift */; };
 		XUOVAQ6Y1NIWH1G3OMK55ENV /* RemoteManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LP9PDGZGN1LKSGLAB8EQ67PF /* RemoteManagementView.swift */; };
+		MTKBUILDFILE000000000001 /* MeshtasticKit in Frameworks */ = {isa = PBXBuildFile; productRef = MTKPRODDEP0000000000001 /* MeshtasticKit */; };
+		MTKBUILDFILE000000000002 /* MeshtasticKit in Frameworks */ = {isa = PBXBuildFile; productRef = MTKPRODDEP0000000000002 /* MeshtasticKit */; };
+		MTKBUILDFILE000000000003 /* MeshtasticKit in Frameworks */ = {isa = PBXBuildFile; productRef = MTKPRODDEP0000000000003 /* MeshtasticKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -410,6 +413,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				MTKBUILDFILE000000000002 /* MeshtasticKit in Frameworks */,
 				FE123217A6AD32B385F9ACBC /* MeshCoreKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -418,6 +422,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				MTKBUILDFILE000000000003 /* MeshtasticKit in Frameworks */,
 				65CD1325656C00EAA6EB6050 /* MeshCoreKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -444,6 +449,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				MTKBUILDFILE000000000001 /* MeshtasticKit in Frameworks */,
 				0F4E796B2F95627900307C73 /* WatchConnectivity.framework in Frameworks */,
 				49709E93735B40512587904A /* MeshCoreKit in Frameworks */,
 			);
@@ -739,6 +745,7 @@
 			);
 			name = "PommeCore-watchOS";
 			packageProductDependencies = (
+				MTKPRODDEP0000000000003 /* MeshtasticKit */,
 				635A77C284788242D78AE126 /* MeshCoreKit */,
 			);
 			productName = "PommeCore-watchOS";
@@ -761,6 +768,7 @@
 			);
 			name = PommeCore;
 			packageProductDependencies = (
+				MTKPRODDEP0000000000001 /* MeshtasticKit */,
 				98C321AB3594D357C6B0816A /* MeshCoreKit */,
 			);
 			productName = PommeCore;
@@ -781,6 +789,7 @@
 			);
 			name = "PommeCore-macOS";
 			packageProductDependencies = (
+				MTKPRODDEP0000000000002 /* MeshtasticKit */,
 				FBBB0BD5BAFCC905A8DC17D3 /* MeshCoreKit */,
 			);
 			productName = "PommeCore-macOS";
@@ -828,6 +837,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				477F4245CF05A9CAD0255ADA /* XCLocalSwiftPackageReference "Packages/MeshCoreKit" */,
+				MTKPKGREF00000000000001 /* XCLocalSwiftPackageReference "Packages/MeshtasticKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 725951214897A58A06E32F73 /* Products */;
@@ -1638,6 +1648,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/MeshCoreKit;
 		};
+		MTKPKGREF00000000000001 /* XCLocalSwiftPackageReference "Packages/MeshtasticKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MeshtasticKit;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1655,6 +1669,18 @@
 		FBBB0BD5BAFCC905A8DC17D3 /* MeshCoreKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MeshCoreKit;
+		};
+		MTKPRODDEP0000000000001 /* MeshtasticKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MeshtasticKit;
+		};
+		MTKPRODDEP0000000000002 /* MeshtasticKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MeshtasticKit;
+		};
+		MTKPRODDEP0000000000003 /* MeshtasticKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MeshtasticKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
