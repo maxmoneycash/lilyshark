@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --import tsx --test src/lib/lscap.test.ts src/lib/lscapWrite.test.ts src/lib/captureSession.test.ts src/lib/deviceLink.test.ts src/lib/spectrum.test.ts src/lib/snifferSession.test.ts src/mesh/*.test.ts",
+    "test": "node --import tsx --test src/lib/lscap.test.ts src/lib/lscapWrite.test.ts src/lib/captureSession.test.ts src/lib/deviceLink.test.ts src/lib/spectrum.test.ts src/lib/snifferSession.test.ts src/lib/conversation.test.ts src/lib/frameFilter.test.ts src/lib/captureDiff.test.ts src/lib/trafficView.test.ts src/mesh/*.test.ts",
     "lint": "biome lint --write .",
     "fmt": "biome format --write .",
     "shelby:upload": "tsx scripts/shelby-upload.ts",
