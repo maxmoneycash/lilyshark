@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 66,
-  "stop_after_pass": 98,
+  "pass": 67,
+  "stop_after_pass": 100,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -92,7 +92,8 @@
     "ios6-nav-upper-equator",
     "ios6-idle-send-muted-service",
     "ios6-messages-icon-backslash-bands",
-    "ios6-balloon-curved-fins-inner-rim"
+    "ios6-balloon-curved-fins-inner-rim",
+    "ios6-light-status-rounded-bars"
   ],
   "queue": [
     "keep-running-until-exact"

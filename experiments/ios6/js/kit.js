@@ -407,14 +407,14 @@
     }
 
     function signalBars(ctx, x, y, filled, color) {
-        // iOS 6 used five rising rectangles. Dots are iOS 7.
+        // iOS 6 used five rising pips with rounded crowns. Dots are iOS 7.
         const count = filled === undefined ? 4 : filled;
         const on = color === undefined ? C.White : color;
         const off = color === undefined ? "rgba(255,255,255,0.28)" : "rgba(16,20,24,0.22)";
         for (let bar = 0; bar < 5; bar += 1) {
             const height = 3 + bar * 2;
-            ctx.fillStyle = bar < count ? hex24(on) : off;
-            ctx.fillRect(x + bar * 4, y - height, 3, height);
+            fillRound(ctx, x + bar * 4, y - height, 3, height, 0.75,
+                bar < count ? hex24(on) : off);
         }
     }
 
@@ -452,12 +452,11 @@
         const fill = spec.fill === undefined ? stroke : spec.fill;
         ctx.save();
         ctx.strokeStyle = hex24(stroke);
-        ctx.lineWidth = 1;
-        roundRectPath(ctx, x + 0.5, y + 1, 21, 8, 1.4);
+        ctx.lineWidth = 1.15;
+        roundRectPath(ctx, x + 0.5, y + 1.4, 20, 7.4, 1.2);
         ctx.stroke();
-        ctx.fillStyle = hex24(stroke);
-        ctx.fillRect(x + 22, y + 3, 2, 4);
-        fillRound(ctx, x + 2, y + 2.5, Math.max(2, Math.round(17 * level)), 5, 0.8, hex24(fill));
+        fillRound(ctx, x + 20.4, y + 3.4, 2.2, 3.4, 0.6, hex24(stroke));
+        fillRound(ctx, x + 2.1, y + 2.9, Math.max(2, Math.round(16 * level)), 4.4, 0.7, hex24(fill));
         ctx.restore();
     }
 
@@ -490,7 +489,7 @@
             ctx.fillRect(0, height - 1, W, 1);
             const ink = 0x101418;
             const carrier = options.carrier || "LilyGO";
-            signalBars(ctx, 4, 13, filled, ink);
+            signalBars(ctx, 4, 13, options.bars === undefined ? 4 : filled, ink);
             const carrierW = text(ctx, carrier, 26, 3, ink, { size: 10, weight: "700" });
             wifi(ctx, 26 + carrierW + 7, 2, ink);
             text(ctx, clock, 160, 3, ink, { size: 10, weight: "700", align: "center" });
