@@ -7,67 +7,67 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         }
       }
@@ -78,67 +78,67 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore"
+            "value": "Lilyshark"
           }
         }
       }
@@ -149,55 +149,55 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore benötigt Bluetooth, um mit Ihrem LoRa-Funkgerät für Off-Grid-Mesh-Nachrichten zu kommunizieren."
+            "value": "Lilyshark benötigt Bluetooth, um mit Ihrem LoRa-Funkgerät für Off-Grid-Mesh-Nachrichten zu kommunizieren."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore needs Bluetooth to communicate with your LoRa radio device for off-grid mesh messaging."
+            "value": "Lilyshark needs Bluetooth to communicate with your LoRa radio device for off-grid mesh messaging."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore nécessite Bluetooth pour communiquer avec votre dispositif radio LoRa pour le messagerie maillé hors réseau."
+            "value": "Lilyshark nécessite Bluetooth pour communiquer avec votre dispositif radio LoRa pour le messagerie maillé hors réseau."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore necesita Bluetooth para comunicarse con su dispositivo de radio LoRa para mensajes de red sin conexión."
+            "value": "Lilyshark necesita Bluetooth para comunicarse con su dispositivo de radio LoRa para mensajes de red sin conexión."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore richiede Bluetooth per comunicare con il suo dispositivo radio LoRa per messaggistica mesh fuori rete."
+            "value": "Lilyshark richiede Bluetooth per comunicare con il suo dispositivo radio LoRa per messaggistica mesh fuori rete."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore heeft Bluetooth nodig om te communiceren met uw LoRa-radiocontrole voor off-grid mesh-berichten."
+            "value": "Lilyshark heeft Bluetooth nodig om te communiceren met uw LoRa-radiocontrole voor off-grid mesh-berichten."
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "O PommeCore precisa de Bluetooth para se comunicar com o seu dispositivo de rádio LoRa para mensagens em malha fora da rede."
+            "value": "O Lilyshark precisa de Bluetooth para se comunicar com o seu dispositivo de rádio LoRa para mensagens em malha fora da rede."
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore potřebuje Bluetooth pro komunikaci s vaším LoRa rádiovým zařízením pro mimo síťové meshé zprávy."
+            "value": "Lilyshark potřebuje Bluetooth pro komunikaci s vaším LoRa rádiovým zařízením pro mimo síťové meshé zprávy."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore potrzebuje Bluetooth do komunikacji z Twoim urządzeniem radiowym LoRa dla wiadomości sieciowych bez połączenia z siecią."
+            "value": "Lilyshark potrzebuje Bluetooth do komunikacji z Twoim urządzeniem radiowym LoRa dla wiadomości sieciowych bez połączenia z siecią."
           }
         },
         "uk": {
@@ -215,7 +215,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore 需要蓝牙与您的 LoRa 无线电设备通信，用于离网网格消息。"
+            "value": "Lilyshark 需要蓝牙与您的 LoRa 无线电设备通信，用于离网网格消息。"
           }
         }
       }
@@ -226,55 +226,55 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore benötigt Bluetooth, um mit Ihrem LoRa-Funkgerät für Off-Grid-Mesh-Nachrichten zu kommunizieren."
+            "value": "Lilyshark benötigt Bluetooth, um mit Ihrem LoRa-Funkgerät für Off-Grid-Mesh-Nachrichten zu kommunizieren."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore needs Bluetooth to communicate with your LoRa radio device for off-grid mesh messaging."
+            "value": "Lilyshark needs Bluetooth to communicate with your LoRa radio device for off-grid mesh messaging."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore utilise la caméra pour scanner des codes QR afin d'importer des contacts et des canaux."
+            "value": "Lilyshark utilise la caméra pour scanner des codes QR afin d'importer des contacts et des canaux."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore requiere Bluetooth para interactuar con su radio LoRa en red sin conexión."
+            "value": "Lilyshark requiere Bluetooth para interactuar con su radio LoRa en red sin conexión."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore utilizza la fotocamera per scansionare i codici QR per l'importazione di contatti e canali."
+            "value": "Lilyshark utilizza la fotocamera per scansionare i codici QR per l'importazione di contatti e canali."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore maakt gebruik van de camera om QR-codes te scannen voor het importeren van contacten en kanalen."
+            "value": "Lilyshark maakt gebruik van de camera om QR-codes te scannen voor het importeren van contacten en kanalen."
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "O PommeCore precisa de Bluetooth para se conectar ao seu dispositivo de rádio LoRa para comunicação em malha fora da rede."
+            "value": "O Lilyshark precisa de Bluetooth para se conectar ao seu dispositivo de rádio LoRa para comunicação em malha fora da rede."
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore potřebuje Bluetooth pro komunikaci s vaším LoRa rádiovým zařízením pro mimo síťové meshé zprávy."
+            "value": "Lilyshark potřebuje Bluetooth pro komunikaci s vaším LoRa rádiovým zařízením pro mimo síťové meshé zprávy."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore wykorzystuje kamerę do skanowania kodów QR w celu importowania kontaktów i kanałów."
+            "value": "Lilyshark wykorzystuje kamerę do skanowania kodów QR w celu importowania kontaktów i kanałów."
           }
         },
         "uk": {
@@ -292,7 +292,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore 也需要蓝牙与 LoRa 无线电设备通信，用于离网网格消息。"
+            "value": "Lilyshark 也需要蓝牙与 LoRa 无线电设备通信，用于离网网格消息。"
           }
         }
       }
@@ -303,55 +303,55 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore verwendet die Kamera zum Scannen von QR-Codes für den Import von Kontakten und Kanälen."
+            "value": "Lilyshark verwendet die Kamera zum Scannen von QR-Codes für den Import von Kontakten und Kanälen."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore uses the camera to scan QR codes for importing contacts and channels."
+            "value": "Lilyshark uses the camera to scan QR codes for importing contacts and channels."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore utilise Face ID pour protéger vos messages lorsque App Lock est activé."
+            "value": "Lilyshark utilise Face ID pour protéger vos messages lorsque App Lock est activé."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore utiliza la cámara para escanear códigos QR para importar contactos y canales."
+            "value": "Lilyshark utiliza la cámara para escanear códigos QR para importar contactos y canales."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore impiega Face ID per proteggere i tuoi messaggi quando è attivato App Lock."
+            "value": "Lilyshark impiega Face ID per proteggere i tuoi messaggi quando è attivato App Lock."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore gebruikt Face ID om uw berichten te beveiligen wanneer App Lock is ingeschakeld."
+            "value": "Lilyshark gebruikt Face ID om uw berichten te beveiligen wanneer App Lock is ingeschakeld."
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "O PommeCore utiliza a câmera para escanear códigos QR na importação de contatos e canais."
+            "value": "O Lilyshark utiliza a câmera para escanear códigos QR na importação de contatos e canais."
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore používá kameru ke skenování QR kódů pro import kontaktů a kanálů."
+            "value": "Lilyshark používá kameru ke skenování QR kódů pro import kontaktů a kanálů."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore używa Face ID do ochrony wiadomości, gdy włączony jest App Lock."
+            "value": "Lilyshark używa Face ID do ochrony wiadomości, gdy włączony jest App Lock."
           }
         },
         "uk": {
@@ -369,7 +369,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore 使用相机扫描 QR 码导入联系人和频道。"
+            "value": "Lilyshark 使用相机扫描 QR 码导入联系人和频道。"
           }
         }
       }
@@ -380,55 +380,55 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore verwendet Face ID zum Schutz Ihrer Nachrichten, wenn die App-Sperre aktiviert ist."
+            "value": "Lilyshark verwendet Face ID zum Schutz Ihrer Nachrichten, wenn die App-Sperre aktiviert ist."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore uses Face ID to protect your messages when App Lock is enabled."
+            "value": "Lilyshark uses Face ID to protect your messages when App Lock is enabled."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore utilise votre emplacement pour la carte maillée et envoie automatiquement un balise d'urgence si vous quittez une zone sûre."
+            "value": "Lilyshark utilise votre emplacement pour la carte maillée et envoie automatiquement un balise d'urgence si vous quittez une zone sûre."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore emplea Face ID para proteger sus mensajes cuando está activado el bloqueo de aplicación."
+            "value": "Lilyshark emplea Face ID para proteger sus mensajes cuando está activado el bloqueo de aplicación."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore utilizza la tua posizione per la mappa mesh e per inviare automaticamente un segnale di emergenza se lasci una zona sicura."
+            "value": "Lilyshark utilizza la tua posizione per la mappa mesh e per inviare automaticamente un segnale di emergenza se lasci una zona sicura."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore maakt gebruik van uw locatie voor de mesh-kaart en om automatisch een noodsignaal te verzenden als u een veilige zone verlaat."
+            "value": "Lilyshark maakt gebruik van uw locatie voor de mesh-kaart en om automatisch een noodsignaal te verzenden als u een veilige zone verlaat."
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "O PommeCore usa o Face ID para proteger suas mensagens quando o App Lock está ativado."
+            "value": "O Lilyshark usa o Face ID para proteger suas mensagens quando o App Lock está ativado."
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore používá Face ID k ochraně vašich zpráv, když je povolená aplikace zámek."
+            "value": "Lilyshark používá Face ID k ochraně vašich zpráv, když je povolená aplikace zámek."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore wykorzystuje Twoją lokalizację dla mapy sieciowej i automatycznego wysyłania sygnału alarmowego, jeśli opuszczysz strefę bezpieczną."
+            "value": "Lilyshark wykorzystuje Twoją lokalizację dla mapy sieciowej i automatycznego wysyłania sygnału alarmowego, jeśli opuszczysz strefę bezpieczną."
           }
         },
         "uk": {
@@ -446,7 +446,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore 使用面部识别保护您的消息，当启用应用锁时。"
+            "value": "Lilyshark 使用面部识别保护您的消息，当启用应用锁时。"
           }
         }
       }
@@ -469,55 +469,55 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore verwendet Ihren Standort für die Mesh-Karte und um automatisch einen Notfallsignal zu senden, wenn Sie eine Sicherheitszone verlassen."
+            "value": "Lilyshark verwendet Ihren Standort für die Mesh-Karte und um automatisch einen Notfallsignal zu senden, wenn Sie eine Sicherheitszone verlassen."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore uses your location for the mesh map and to automatically send an emergency beacon if you leave a safe zone."
+            "value": "Lilyshark uses your location for the mesh map and to automatically send an emergency beacon if you leave a safe zone."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore affiche votre emplacement sur la carte maillée et peut l'inclure dans vos publicités."
+            "value": "Lilyshark affiche votre emplacement sur la carte maillée et peut l'inclure dans vos publicités."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore usa su ubicación para el mapa de malla y para enviar automáticamente una baliza de emergencia si sale de una zona segura."
+            "value": "Lilyshark usa su ubicación para el mapa de malla y para enviar automáticamente una baliza de emergencia si sale de una zona segura."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore mostra la tua posizione sulla mappa mesh e può includerla nelle tue pubblicità."
+            "value": "Lilyshark mostra la tua posizione sulla mappa mesh e può includerla nelle tue pubblicità."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore toont uw locatie op de mesh-kaart en kan deze opnemen in uw advertenties."
+            "value": "Lilyshark toont uw locatie op de mesh-kaart en kan deze opnemen in uw advertenties."
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "O PommeCore utiliza sua localização para o mapa em malha e para enviar automaticamente um sinal de emergência se você sair de uma zona segura."
+            "value": "O Lilyshark utiliza sua localização para o mapa em malha e para enviar automaticamente um sinal de emergência se você sair de uma zona segura."
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore používá vaši polohu pro mapu meshé sítě a automatické odeslání nouzového signálu, pokud opustíte bezpečnou zónu."
+            "value": "Lilyshark používá vaši polohu pro mapu meshé sítě a automatické odeslání nouzového signálu, pokud opustíte bezpečnou zónu."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore wyświetla Twoją lokalizację na mapie sieciowej i może uwzględniać ją w Twoich reklamach."
+            "value": "Lilyshark wyświetla Twoją lokalizację na mapie sieciowej i może uwzględniać ją w Twoich reklamach."
           }
         },
         "uk": {
@@ -535,7 +535,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore 使用您的位置信息创建网格地图，并在您离开安全区域时自动发送紧急信标。"
+            "value": "Lilyshark 使用您的位置信息创建网格地图，并在您离开安全区域时自动发送紧急信标。"
           }
         }
       }
@@ -546,55 +546,55 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore zeigt Ihren Standort auf der Mesh-Karte und kann ihn in Ihren Ankündigungen einbeziehen."
+            "value": "Lilyshark zeigt Ihren Standort auf der Mesh-Karte und kann ihn in Ihren Ankündigungen einbeziehen."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore shows your location on the mesh map and can include it in your advertisements."
+            "value": "Lilyshark shows your location on the mesh map and can include it in your advertisements."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore shows your location on the mesh map and can include it in your advertisements."
+            "value": "Lilyshark shows your location on the mesh map and can include it in your advertisements."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore muestra su ubicación en el mapa de malla y puede incluirla en sus anuncios."
+            "value": "Lilyshark muestra su ubicación en el mapa de malla y puede incluirla en sus anuncios."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore shows your location on the mesh map and can include it in your advertisements."
+            "value": "Lilyshark shows your location on the mesh map and can include it in your advertisements."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore shows your location on the mesh map and can include it in your advertisements."
+            "value": "Lilyshark shows your location on the mesh map and can include it in your advertisements."
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "O PommeCore exibe sua localização no mapa em malha e pode incluí-la em seus anúncios."
+            "value": "O Lilyshark exibe sua localização no mapa em malha e pode incluí-la em seus anúncios."
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore zobrazuje vaši polohu na mapě meshé sítě a může ji zahrnout do vašich reklam."
+            "value": "Lilyshark zobrazuje vaši polohu na mapě meshé sítě a může ji zahrnout do vašich reklam."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore shows your location on the mesh map and can include it in your advertisements."
+            "value": "Lilyshark shows your location on the mesh map and can include it in your advertisements."
           }
         },
         "uk": {
@@ -612,7 +612,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "PommeCore 在网格地图上显示您的位置，并可能将其包含在您的广告中。"
+            "value": "Lilyshark 在网格地图上显示您的位置，并可能将其包含在您的广告中。"
           }
         }
       }

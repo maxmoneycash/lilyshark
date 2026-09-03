@@ -16,14 +16,14 @@
     <string>Apple Distribution</string>
     <key>provisioningProfiles</key>
     <dict>
-        <key>com.mbedworth.meshcore</key>
-        <string>PommeCore iOS App Store</string>
-        <key>com.mbedworth.meshcore.watchos</key>
-        <string>PommeCore Watch App Store</string>
-        <key>com.mbedworth.meshcore.PommeCore-Widgets</key>
-        <string>PommeCore Widgets App Store</string>
-        <key>com.mbedworth.meshcore.watchos.PommeCore-Watch-Complications</key>
-        <string>PommeCore Watch Complications App Store</string>
+        <key>com.lilyshark.app</key>
+        <string>Lilyshark iOS App Store</string>
+        <key>com.lilyshark.app.watchos</key>
+        <string>Lilyshark Watch App Store</string>
+        <key>com.lilyshark.app.Lilyshark-Widgets</key>
+        <string>Lilyshark Widgets App Store</string>
+        <key>com.lilyshark.app.watchos.Lilyshark-Watch-Complications</key>
+        <string>Lilyshark Watch Complications App Store</string>
     </dict>
 </dict>
 </plist>

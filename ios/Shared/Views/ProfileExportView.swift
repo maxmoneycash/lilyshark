@@ -84,7 +84,7 @@ struct ProfileExportView: View {
                     Image(systemName: "key.slash")
                         .font(.caption2)
                         .foregroundStyle(.orange)
-                    Text("Radio identity (private key) is not included. To back up your radio's identity, use the PommeCore Mac app: Settings → Device → Identity Backup while connected via USB.")
+                    Text("Radio identity (private key) is not included. To back up your radio's identity, use the Lilyshark Mac app: Settings → Device → Identity Backup while connected via USB.")
                         .font(.caption2)
                         .foregroundStyle(.orange)
                 }

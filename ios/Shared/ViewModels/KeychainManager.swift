@@ -28,7 +28,7 @@ struct KeychainManager {
         UserDefaults.standard.object(forKey: "iCloudSyncEnabled") == nil ? true : UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
     }
 
-    private static let service = "com.mbedworth.meshcore.logins"
+    private static let service = "com.lilyshark.app.logins"
 
     /// In-memory cache: account key → password bytes (mutable for zeroing).
     /// Once `cacheLoaded` is true, any key NOT in `cache` has no saved password.
@@ -161,7 +161,7 @@ struct KeychainManager {
 
     // MARK: - Channel Secrets (iCloud Keychain sync)
 
-    private static let channelService = "com.mbedworth.meshcore.channels"
+    private static let channelService = "com.lilyshark.app.channels"
 
     /// Legacy channel secret account key — keyed by name only (no radio isolation).
     private static func channelAccount(_ name: String) -> String {

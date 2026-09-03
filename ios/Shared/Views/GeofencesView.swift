@@ -48,7 +48,7 @@ struct GeofencesView: View {
             } header: {
                 SectionInfoHeader(
                     title: "Safe Zones",
-                    info: "When you leave an enabled zone, PommeCore sends a flood advert and SOS message to the public channel. Requires \u{201C}Always\u{201D} location permission for background monitoring."
+                    info: "When you leave an enabled zone, Lilyshark sends a flood advert and SOS message to the public channel. Requires \u{201C}Always\u{201D} location permission for background monitoring."
                 )
             }
         }

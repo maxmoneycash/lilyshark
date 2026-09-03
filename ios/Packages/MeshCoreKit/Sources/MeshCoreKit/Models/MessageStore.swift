@@ -103,7 +103,7 @@ public final class MessageStore {
     /// AES-256-GCM key for at-rest message encryption. Stored in device Keychain.
     /// Generated once per radio directory, retrieved on subsequent launches.
     private lazy var encryptionKey: SymmetricKey? = {
-        let tag = "com.mbedworth.meshcore.msgkey.\(directory.lastPathComponent)"
+        let tag = "com.lilyshark.app.msgkey.\(directory.lastPathComponent)"
         if let existing = Self.loadKeyFromKeychain(tag: tag) {
             return existing
         }
@@ -118,7 +118,7 @@ public final class MessageStore {
     private static func loadKeyFromKeychain(tag: String) -> SymmetricKey? {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.mbedworth.meshcore.encryption",
+            kSecAttrService as String: "com.lilyshark.app.encryption",
             kSecAttrAccount as String: tag,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
@@ -136,7 +136,7 @@ public final class MessageStore {
         let keyData = key.withUnsafeBytes { Data($0) }
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.mbedworth.meshcore.encryption",
+            kSecAttrService as String: "com.lilyshark.app.encryption",
             kSecAttrAccount as String: tag,
             kSecValueData as String: keyData,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly

@@ -5,15 +5,18 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>PommeCore</string>
+	<string>Lilyshark</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- Literal, not $(PRODUCT_NAME): the Xcode target and its built product keep
+	     upstream's PommeCore name so the project's product references and the
+	     embed-extension build phases still resolve. Only the shown name is ours. -->
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Lilyshark</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -21,17 +24,17 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>PommeCore shows your location on the mesh map and can include it in your advertisements.</string>
+	<string>Lilyshark shows your location on the mesh map and can include it in your advertisements.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>PommeCore uses your location for the mesh map and to automatically send an emergency beacon if you leave a safe zone.</string>
+	<string>Lilyshark uses your location for the mesh map and to automatically send an emergency beacon if you leave a safe zone.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>PommeCore uses the camera to scan QR codes for importing contacts and channels.</string>
+	<string>Lilyshark uses the camera to scan QR codes for importing contacts and channels.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>PommeCore uses Face ID to protect your messages when App Lock is enabled.</string>
+	<string>Lilyshark uses Face ID to protect your messages when App Lock is enabled.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>PommeCore needs Bluetooth to communicate with your LoRa radio device for off-grid mesh messaging.</string>
+	<string>Lilyshark needs Bluetooth to communicate with your LoRa radio device for off-grid mesh messaging.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>PommeCore needs Bluetooth to communicate with your LoRa radio device for off-grid mesh messaging.</string>
+	<string>Lilyshark needs Bluetooth to communicate with your LoRa radio device for off-grid mesh messaging.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
@@ -41,7 +44,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.mbedworth.meshcore</string>
+			<string>com.lilyshark.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>meshcore</string>

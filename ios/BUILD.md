@@ -92,17 +92,20 @@ Apple account.
 
 - An Apple Developer account and its **Team ID**, set as `DEVELOPMENT_TEAM`. There is no team
   ID in this repository and none should be committed.
-- **A different bundle identifier.** Every target ships upstream's `com.meshcore.app` (and
-  `com.meshcore.app.watchos`), which belongs to PommeCore's author. You cannot sign or upload
-  under it. Lilyshark needs its own prefix before any device or TestFlight build.
-- **Provisioning profiles** for the app and both extensions, with the App Group and iCloud
-  entitlements in `iOS/PommeCore.entitlements` and the extensions' `.entitlements` files
-  provisioned to match. Entitlements are the usual reason a device build fails after the
-  simulator build has been green for weeks.
+- **Bundle identifiers registered to that team.** Every target now ships `com.lilyshark.app`
+  (and `com.lilyshark.app.watchos`, plus the two extension suffixes). Those identifiers are
+  ours to claim, but nobody has registered them with Apple yet, so no device or TestFlight
+  build can be signed until someone does.
+- **Provisioning profiles** for the app and both extensions, with the App Group
+  `group.com.lilyshark.app` and the iCloud container `iCloud.com.lilyshark.app` from
+  `iOS/PommeCore.entitlements` and the extensions' `.entitlements` files provisioned to match.
+  Entitlements are the usual reason a device build fails after the simulator build has been
+  green for weeks.
 
 `ios/build-and-distribute.sh` and the `ExportOptions-AppStore-*.plist` files are upstream's
-distribution path and still carry upstream's identifiers. Treat them as unverified: nothing in
-them has been run or checked here.
+distribution path. Their bundle identifiers and profile names moved to Lilyshark's with
+everything else, but `teamID` in them is still upstream's `7R925EW7AT` and the profiles they
+name do not exist yet. Treat them as unverified: nothing in them has been run or checked here.
 
 ## Do not run `xcodegen`
 

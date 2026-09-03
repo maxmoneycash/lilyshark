@@ -61,7 +61,7 @@ public final class USBSerialManager: ObservableObject {
     /// All readBuffer access MUST happen on serialQueue to prevent races between
     /// the background read loop and main-thread disconnect/cleanup.
     private var readBuffer = Data()
-    private let serialQueue = DispatchQueue(label: "com.meshcore.serial", qos: .userInitiated)
+    private let serialQueue = DispatchQueue(label: "com.lilyshark.app.serial", qos: .userInitiated)
     /// Mode flag — accessed from serialQueue (read loop dispatches there) and main thread
     /// (probes set it). Safe because probes check fileDescriptor first and read loop
     /// dispatches to serialQueue before reading it.

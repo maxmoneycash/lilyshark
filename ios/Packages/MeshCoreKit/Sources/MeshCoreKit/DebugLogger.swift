@@ -18,7 +18,7 @@ public final class DebugLogger: ObservableObject {
 
     @Published public var entries: [LogEntry] = []
     private let maxEntries = 500
-    private let queue = DispatchQueue(label: "com.meshcore.debuglogger")
+    private let queue = DispatchQueue(label: "com.lilyshark.app.debuglogger")
 
     public struct LogEntry: Identifiable, Sendable {
         public let id = UUID()

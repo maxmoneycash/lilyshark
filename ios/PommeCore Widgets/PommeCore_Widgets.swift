@@ -414,7 +414,7 @@ struct PommeCoreStatusWidget: Widget {
             PommeCoreWidgetEntryView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("PommeCore Status")
+        .configurationDisplayName("Lilyshark Status")
         .description("Radio connection, battery, safe zones, and unread messages.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
@@ -428,7 +428,7 @@ struct PommeCoreLockWidget: Widget {
             PommeCoreWidgetEntryView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("PommeCore")
+        .configurationDisplayName("Lilyshark")
         .description("Radio connection status and unread count on your lock screen.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
@@ -442,7 +442,7 @@ struct PommeCoreSplitWidget: Widget {
             PommeCoreSplitEntryView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("PommeCore Messages")
+        .configurationDisplayName("Lilyshark Messages")
         .description("Separate DM and channel unread counts.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
     }

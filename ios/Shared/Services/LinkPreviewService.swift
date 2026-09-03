@@ -38,7 +38,7 @@ actor LinkPreviewService {
 
         do {
             var request = URLRequest(url: url, timeoutInterval: 5)
-            request.setValue("PommeCore/1.0", forHTTPHeaderField: "User-Agent")
+            request.setValue("Lilyshark/1.0", forHTTPHeaderField: "User-Agent")
 
             let (data, response) = try await URLSession.shared.data(for: request)
 

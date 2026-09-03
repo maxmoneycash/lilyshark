@@ -50,9 +50,9 @@ class TipJarManager: ObservableObject {
 
     var thankYouMessage: String {
         guard let id = purchasedProductID else { return "Your support means a lot." }
-        if id.hasSuffix(".decent") { return "Every bit helps keep PommeCore free for everyone." }
+        if id.hasSuffix(".decent") { return "Every bit helps keep Lilyshark free for everyone." }
         if id.hasSuffix(".nice") { return "Your generosity helps fund new features and improvements." }
-        if id.hasSuffix(".great") { return "Seriously, thank you. People like you make PommeCore possible." }
+        if id.hasSuffix(".great") { return "Seriously, thank you. People like you make Lilyshark possible." }
         if id.hasSuffix(".help") { return "You're helping build the future of off-grid communication. Check the Supporters Wall!" }
         return "Your support means a lot."
     }
@@ -66,17 +66,17 @@ class TipJarManager: ObservableObject {
     }
 
     static let placeholders: [PlaceholderTip] = [
-        PlaceholderTip(id: "decent", emoji: "\u{1F44B}", name: "Decent Try!", description: "Thanks for giving PommeCore a shot", price: "$0.99"),
+        PlaceholderTip(id: "decent", emoji: "\u{1F44B}", name: "Decent Try!", description: "Thanks for giving Lilyshark a shot", price: "$0.99"),
         PlaceholderTip(id: "nice", emoji: "\u{1F44D}", name: "Nice App!", description: "You're enjoying the mesh life", price: "$2.99"),
-        PlaceholderTip(id: "great", emoji: "\u{1F389}", name: "Great Job!", description: "PommeCore has become your go-to client", price: "$4.99"),
+        PlaceholderTip(id: "great", emoji: "\u{1F389}", name: "Great Job!", description: "Lilyshark has become your go-to client", price: "$4.99"),
         PlaceholderTip(id: "help", emoji: "\u{1F49A}", name: "I Want to Help!", description: "You believe in off-grid communication", price: "$9.99"),
     ]
 
     nonisolated static let productIDs = [
-        "com.mbedworth.meshcore.tip.decent",
-        "com.mbedworth.meshcore.tip.nice",
-        "com.mbedworth.meshcore.tip.great",
-        "com.mbedworth.meshcore.tip.help"
+        "com.lilyshark.app.tip.decent",
+        "com.lilyshark.app.tip.nice",
+        "com.lilyshark.app.tip.great",
+        "com.lilyshark.app.tip.help"
     ]
 
     func loadProductsIfNeeded() {
@@ -180,7 +180,7 @@ class SupportersManager: ObservableObject {
         let date: Date
     }
 
-    private let container = CKContainer(identifier: "iCloud.com.mbedworth.meshcore")
+    private let container = CKContainer(identifier: "iCloud.com.lilyshark.app")
 
     @MainActor
     func fetchSupporters() async {
@@ -377,7 +377,7 @@ extension SettingsView {
             .buttonStyle(.plain)
             .listRowBackground(MeshTheme.surface)
         } header: {
-            sectionInfoHeader("Support the App", info: "PommeCore is free with all features. Tips help fund development. \u{1F49A} tippers join the Supporters Wall!")
+            sectionInfoHeader("Support the App", info: "Lilyshark is free with all features. Tips help fund development. \u{1F49A} tippers join the Supporters Wall!")
         }
     }
 
@@ -399,11 +399,11 @@ struct TipJarView: View {
                     .foregroundStyle(MeshTheme.accent)
                     .padding(.top, 20)
 
-                Text("Support PommeCore Development")
+                Text("Support Lilyshark Development")
                     .font(.title2.bold())
                     .foregroundStyle(MeshTheme.textPrimary)
 
-                Text("PommeCore is free with all features unlocked. If you find it useful, consider leaving a tip to support continued development.")
+                Text("Lilyshark is free with all features unlocked. If you find it useful, consider leaving a tip to support continued development.")
                     .font(.subheadline)
                     .foregroundStyle(MeshTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -628,7 +628,7 @@ struct SupportersView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 } else {
-                    Text("These generous people help keep PommeCore free for everyone.")
+                    Text("These generous people help keep Lilyshark free for everyone.")
                         .font(.subheadline)
                         .foregroundStyle(MeshTheme.textSecondary)
                         .multilineTextAlignment(.center)

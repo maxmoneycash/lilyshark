@@ -38,25 +38,27 @@ enum AppTheme: String, CaseIterable {
 // MARK: - Theme Colors
 
 enum MeshTheme {
-    // Primary accent — adaptive green: darker/richer in light mode, bright in dark mode
+    // Lily Pink #FF4F9D is Lilyshark's mark, but it reaches only 2.8:1 against a
+    // near-white page — short of the 4.5:1 that the small type this accent colours in
+    // a List needs. webapp/src/mesh/theme.ts already settled that trade-off for the
+    // brand: the bright pink where the ground is dark, a deeper tone of the same hue
+    // (#C00068) where it is light. These two are those values, not a second decision.
+    private static let pink = (r: 1.0, g: 0.310, b: 0.616)      // #FF4F9D
+    private static let pinkDeep = (r: 0.753, g: 0.0, b: 0.408)  // #C00068
+
+    // Primary accent — adaptive Lily Pink: deeper in light mode, bright in dark mode
     static var accent: Color {
         #if os(macOS)
         Color(nsColor: NSColor(name: nil) { appearance in
-            if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-                return NSColor(red: 0.0, green: 0.85, blue: 0.35, alpha: 1.0)
-            } else {
-                return NSColor(red: 0.0, green: 0.60, blue: 0.25, alpha: 1.0)
-            }
+            let c = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? pink : pinkDeep
+            return NSColor(red: c.r, green: c.g, blue: c.b, alpha: 1.0)
         })
         #elseif os(watchOS)
-        Color(red: 0.0, green: 0.85, blue: 0.35) // always bright on watch
+        Color(red: pink.r, green: pink.g, blue: pink.b) // always bright on watch
         #else
         Color(uiColor: UIColor { traitCollection in
-            if traitCollection.userInterfaceStyle == .dark {
-                return UIColor(red: 0.0, green: 0.85, blue: 0.35, alpha: 1.0)
-            } else {
-                return UIColor(red: 0.0, green: 0.60, blue: 0.25, alpha: 1.0)
-            }
+            let c = traitCollection.userInterfaceStyle == .dark ? pink : pinkDeep
+            return UIColor(red: c.r, green: c.g, blue: c.b, alpha: 1.0)
         })
         #endif
     }

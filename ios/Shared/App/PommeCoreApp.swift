@@ -663,7 +663,7 @@ class AppLockManager: ObservableObject {
             }
 
             context.evaluatePolicy(.deviceOwnerAuthentication,
-                                   localizedReason: "Unlock PommeCore to access your messages") { success, authError in
+                                   localizedReason: "Unlock Lilyshark to access your messages") { success, authError in
                 Task { @MainActor in
                     if success {
                         DebugLogger.shared.log("APP LOCK: authenticated successfully", level: .info)
@@ -702,7 +702,7 @@ struct AppLockView: View {
             Image(systemName: "lock.shield.fill")
                 .font(.system(size: 72))
                 .foregroundStyle(MeshTheme.accent)
-            Text("PommeCore is Locked")
+            Text("Lilyshark is Locked")
                 .font(.title2.bold())
                 .foregroundStyle(MeshTheme.textPrimary)
             Text("Authenticate to access your messages")

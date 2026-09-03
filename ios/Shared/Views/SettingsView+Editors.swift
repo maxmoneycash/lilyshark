@@ -66,6 +66,8 @@ extension SettingsView {
             }
             .listRowBackground(MeshTheme.surface)
 
+            UpstreamCreditRows()
+
             Link(destination: URL(string: "https://gist.github.com/mbedworth/7cccc52eec16626a5ad7f5328b456fb3")!) {
                 HStack {
                     Text("Privacy Policy")
@@ -158,6 +160,119 @@ extension SettingsView {
         } header: {
             sectionInfoHeader("About", info: "Debug Log records connection and protocol events for troubleshooting.")
         }
+    }
+}
+
+// MARK: - Upstream credit
+
+/// The two About rows that name where this app came from: a link to PommeCore, and
+/// the licence it arrived under.
+///
+/// These own their own presentation state rather than borrowing SettingsView's, so
+/// the credit can be dropped into any About list without threading a @State through.
+struct UpstreamCreditRows: View {
+    @State private var showLicense = false
+
+    var body: some View {
+        Group {
+            Link(destination: URL(string: "https://github.com/mbedworth/PommeCore")!) {
+                HStack {
+                    Text("Built on PommeCore")
+                        .foregroundStyle(MeshTheme.accent)
+                    Spacer()
+                    Image(systemName: "arrow.up.right.square")
+                        .foregroundStyle(MeshTheme.textSecondary)
+                }
+            }
+            .listRowBackground(MeshTheme.surface)
+
+            // Debug Log a few rows down splits the same way: macOS sheets what iOS pushes.
+            #if os(macOS) || targetEnvironment(macCatalyst)
+            Button {
+                showLicense = true
+            } label: {
+                licenseRowLabel
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(MeshTheme.surface)
+            .sheet(isPresented: $showLicense) {
+                NavigationStack {
+                    UpstreamLicenseView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") { showLicense = false }
+                            }
+                        }
+                }
+                .frame(minWidth: 560, minHeight: 480)
+            }
+            #else
+            NavigationLink {
+                UpstreamLicenseView()
+            } label: {
+                licenseRowLabel
+            }
+            .listRowBackground(MeshTheme.surface)
+            #endif
+        }
+    }
+
+    private var licenseRowLabel: some View {
+        HStack {
+            Text("Licence")
+                .foregroundStyle(MeshTheme.accent)
+            Spacer()
+            Text("Apache 2.0")
+                .font(.caption)
+                .foregroundStyle(MeshTheme.textSecondary)
+        }
+    }
+}
+
+/// NOTICE and the full Apache 2.0 licence, read from the app bundle.
+///
+/// Apache 2.0 section 4(a) wants the licence to travel with the distribution, so the
+/// real `LICENSE` and `NOTICE` files are Copy Bundle Resources rather than a second
+/// copy of the same text pasted into Swift. If either ever falls out of that build
+/// phase this view says so instead of rendering an empty page.
+struct UpstreamLicenseView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Lilyshark is a rename of PommeCore by Michael P. Bedworth, used under the Apache License 2.0. The notice and licence below are the originals.")
+                    .font(.callout)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(Self.bundledText("NOTICE"))
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                Text(Self.bundledText("LICENSE"))
+                    .font(.system(.caption2, design: .monospaced))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+        .background(MeshTheme.background)
+        .navigationTitle("Licence")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    private static func bundledText(_ name: String) -> String {
+        guard let url = Bundle.main.url(forResource: name, withExtension: nil),
+              let text = try? String(contentsOf: url, encoding: .utf8) else {
+            return "\(name) is missing from this build. The file is in the repository at ios/\(name); it belongs in the app target's Copy Bundle Resources phase."
+        }
+        return text
     }
 }
 
