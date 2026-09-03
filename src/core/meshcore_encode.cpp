@@ -122,6 +122,23 @@ static_assert(kMeshCoreAdvertFixedPayloadBytes + kMeshCoreMaxAdvertAppDataBytes 
 static_assert(kEd25519PrivateKeySize == 64,
               "MeshCore's LocalIdentity persists expanded Ed25519 private keys");
 
+std::uint32_t meshCoreNextAdvertTimestamp(std::uint32_t clock_floor,
+                                          std::uint32_t seconds_since_boot,
+                                          std::uint32_t last_emitted) noexcept
+{
+    constexpr std::uint32_t kMaxTimestamp = 0xffffffffU;
+    std::uint32_t candidate = clock_floor;
+    if (seconds_since_boot > kMaxTimestamp - candidate) {
+        candidate = kMaxTimestamp;
+    } else {
+        candidate += seconds_since_boot;
+    }
+    if (candidate <= last_emitted) {
+        candidate = last_emitted == kMaxTimestamp ? kMaxTimestamp : last_emitted + 1U;
+    }
+    return candidate;
+}
+
 std::int32_t meshCoreDegreesToMicros(double degrees) noexcept
 {
     const double scaled = degrees * 1e6;

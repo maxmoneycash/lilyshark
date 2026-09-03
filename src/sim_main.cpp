@@ -58,6 +58,7 @@
 #include "lilyshark/core/rolling_diagnostics.h"
 #include "lilyshark/core/runtime_event_history.h"
 #include "lilyshark/core/survey_accumulator.h"
+#include "lilyshark/crypto/ed25519.h"
 #include "lilyshark/device/hardware_status.h"
 #include "lilyshark/device/tdeck_chime.h"
 #include "lilyshark/device/tdeck_ble.h"
@@ -70,6 +71,7 @@
 #include "lilyshark/export/lilyshark_capture.h"
 #include "lilyshark/export/pcap_loratap.h"
 #include "lilyshark/protocols/meshcore_decoder.h"
+#include "lilyshark/protocols/meshcore_encode.h"
 #include "lilyshark/protocols/meshtastic_decoder.h"
 #include "lilyshark/protocols/meshtastic_encode.h"
 #include "lilyshark/protocols/meshtastic_payload.h"
@@ -347,6 +349,50 @@ std::uint32_t mesh_beacon_last_nodeinfo_ms = 0;
 // almost no airtime and a device shows up while you are still looking at it.
 constexpr std::uint32_t kPositionBeaconMs = 60000U;
 constexpr std::uint32_t kNodeInfoBeaconMs = 90000U;
+
+// Our MeshCore identity. The public key IS the address on that network, so
+// this has the same all-or-nothing rule as the Curve25519 keypair above: a
+// deck that mints a new key every boot is a different stranger every boot.
+// Only the expanded private key is persisted, because the public half is
+// derivable from it and a second stored copy would be a second thing to go
+// stale — the same choice MeshCore's own LocalIdentity::readFrom makes.
+std::uint8_t meshcore_public_key[::lilyshark::crypto::kEd25519PublicKeySize]{};
+std::uint8_t meshcore_private_key[::lilyshark::crypto::kEd25519PrivateKeySize]{};
+bool meshcore_identity_ready = false;
+
+// The advert clock. The deck has no real-time clock, and MeshCore receivers
+// enforce per-identity monotonicity, so what is persisted is a floor rather
+// than a time: seconds are reserved in NVS *before* any of them go on the air,
+// which means every timestamp actually transmitted is below the stored floor
+// and a power cycle mid-block resumes above everything already emitted.
+// Persisting after transmitting would leave exactly the gap that makes a deck
+// advertise perfectly and stay invisible.
+std::uint32_t meshcore_clock_floor = 0;
+std::uint32_t meshcore_clock_reserved_through = 0;
+std::uint32_t meshcore_last_advert_timestamp = 0;
+// Where the clock starts on a deck that has never advertised. Any plausible
+// recent epoch works, because peers compare an advert only against the last
+// one they stored for this key and never against their own clock; starting
+// near this firmware's own age just keeps the number from looking absurd in a
+// stock app's contact list. 2026-09-01T00:00:00Z.
+constexpr std::uint32_t kMeshCoreAdvertEpochFloor = 1788220800U;
+// One hour of seconds per NVS write. Long enough that the deck writes flash
+// once an hour rather than once an advert, short enough that a reboot does not
+// jump the identity's clock far enough to look like a different node's.
+constexpr std::uint32_t kMeshCoreClockReserveSeconds = 3600U;
+
+// MeshCore advert pacing. Zero is "not advertised on this profile yet", which
+// is how walking into a MeshCore profile produces an immediate advert.
+std::uint16_t meshcore_advert_profile_id = 0;
+std::uint32_t meshcore_last_advert_ms = 0;
+// A 107-byte advert at MeshCore's SF7/62.5 kHz costs about 0.42 s of airtime,
+// so a quarter of an hour between them is roughly 0.05 % duty — fifteen times
+// more sparing than the position beacon above, which is the floor this had to
+// clear. An advert is a discovery packet rather than telemetry: a node that
+// has heard us once keeps the contact, so repeating faster buys nothing and
+// spends everybody's airtime. Arrival on the profile is what needs to be
+// prompt, and that is handled separately.
+constexpr std::uint32_t kMeshCoreAdvertMs = 900000U;
 
 char analyzer_link_line[240]{};
 std::size_t analyzer_link_line_length = 0;
@@ -10351,6 +10397,130 @@ bool load_or_create_pkc_identity() noexcept
     return true;
 }
 
+/// MeshCore's own rule, from LocalIdentity::validatePrivateKey: a public key
+/// whose first byte is 0x00 or 0xff is unusable, because that byte is the
+/// node's path hash on the wire and both values are reserved there.
+bool usable_meshcore_public_key(const std::uint8_t *key) noexcept
+{
+    return key[0] != 0x00U && key[0] != 0xffU;
+}
+
+/// Our MeshCore identity: loaded from NVS, or minted once from hardware
+/// randomness and kept forever after. Same contract as the Curve25519 identity
+/// above — an identity that cannot be stored must not be used, because peers
+/// file us under the key they first heard and a key this deck forgets at the
+/// next power cycle turns every reconnection into a new stranger.
+bool load_or_create_meshcore_identity() noexcept
+{
+    if(!ensure_preferences_ready()) return false;
+    if(profile_preferences.getBytesLength("mcid") == sizeof(meshcore_private_key) &&
+       profile_preferences.getBytes("mcid", meshcore_private_key,
+                                    sizeof(meshcore_private_key)) ==
+           sizeof(meshcore_private_key)) {
+        ::lilyshark::crypto::ed25519DerivePublicKey(meshcore_public_key, meshcore_private_key);
+        if(usable_meshcore_public_key(meshcore_public_key)) {
+            meshcore_identity_ready = true;
+            return true;
+        }
+        // A stored key that derives a reserved path hash was never usable on
+        // the air, so it is not an identity worth keeping. Fall through and
+        // mint a replacement rather than advertising something stock nodes
+        // refuse to file.
+    }
+#if defined(ESP_PLATFORM)
+    // esp_random is the hardware RNG, properly seeded once the RF subsystem is
+    // up, which it is by the time settings load. Retry rather than accept a
+    // reserved first byte; two values out of 256 are excluded, so this
+    // effectively never runs twice.
+    for(int attempt = 0; attempt < 8; ++attempt) {
+        std::uint8_t seed[::lilyshark::crypto::kEd25519SeedSize]{};
+        for(std::size_t index = 0; index < sizeof(seed); index += 4U) {
+            const std::uint32_t word = esp_random();
+            seed[index] = static_cast<std::uint8_t>(word);
+            seed[index + 1U] = static_cast<std::uint8_t>(word >> 8U);
+            seed[index + 2U] = static_cast<std::uint8_t>(word >> 16U);
+            seed[index + 3U] = static_cast<std::uint8_t>(word >> 24U);
+        }
+        ::lilyshark::crypto::ed25519CreateKeypair(meshcore_public_key, meshcore_private_key, seed);
+        if(usable_meshcore_public_key(meshcore_public_key)) break;
+    }
+    if(!usable_meshcore_public_key(meshcore_public_key)) {
+        std::memset(meshcore_public_key, 0, sizeof(meshcore_public_key));
+        std::memset(meshcore_private_key, 0, sizeof(meshcore_private_key));
+        return false;
+    }
+#else
+    return false;
+#endif
+    if(profile_preferences.putBytes("mcid", meshcore_private_key,
+                                    sizeof(meshcore_private_key)) !=
+       sizeof(meshcore_private_key)) {
+        std::memset(meshcore_public_key, 0, sizeof(meshcore_public_key));
+        std::memset(meshcore_private_key, 0, sizeof(meshcore_private_key));
+        return false;
+    }
+    meshcore_identity_ready = true;
+    return true;
+}
+
+/// Read the persisted advert-clock floor. A deck that has never advertised
+/// starts at the constant floor; anything shorter or longer than four bytes is
+/// treated as absent rather than guessed at.
+void load_meshcore_advert_clock() noexcept
+{
+    std::uint32_t stored = kMeshCoreAdvertEpochFloor;
+    std::uint8_t bytes[4]{};
+    if(ensure_preferences_ready() &&
+       profile_preferences.getBytesLength("mcclock") == sizeof(bytes) &&
+       profile_preferences.getBytes("mcclock", bytes, sizeof(bytes)) == sizeof(bytes)) {
+        const std::uint32_t value = static_cast<std::uint32_t>(bytes[0]) |
+                                    (static_cast<std::uint32_t>(bytes[1]) << 8U) |
+                                    (static_cast<std::uint32_t>(bytes[2]) << 16U) |
+                                    (static_cast<std::uint32_t>(bytes[3]) << 24U);
+        // A stored floor below the built-in one can only come from a much
+        // older record; taking the later of the two keeps the clock moving
+        // forward, which is the whole contract.
+        if(value > stored) stored = value;
+    }
+    meshcore_clock_floor = stored;
+    meshcore_clock_reserved_through = stored;
+    meshcore_last_advert_timestamp = stored;
+}
+
+bool store_meshcore_advert_clock(std::uint32_t reserved_through) noexcept
+{
+    if(!ensure_preferences_ready()) return false;
+    const std::uint8_t bytes[4] = {
+        static_cast<std::uint8_t>(reserved_through & 0xffU),
+        static_cast<std::uint8_t>((reserved_through >> 8U) & 0xffU),
+        static_cast<std::uint8_t>((reserved_through >> 16U) & 0xffU),
+        static_cast<std::uint8_t>((reserved_through >> 24U) & 0xffU),
+    };
+    return profile_preferences.putBytes("mcclock", bytes, sizeof(bytes)) == sizeof(bytes);
+}
+
+/// Claim the next advert timestamp, extending the persisted reservation when
+/// this one would reach it. Returns false when the reservation could not be
+/// written, and the advert must then not be sent: a timestamp we cannot
+/// promise to stay below after a reboot is a timestamp that can make every
+/// future advert from this key look like a replay.
+bool reserve_meshcore_advert_timestamp(std::uint32_t &timestamp) noexcept
+{
+    const std::uint32_t seconds_since_boot = static_cast<std::uint32_t>(millis() / 1000UL);
+    const std::uint32_t candidate = ::lilyshark::meshCoreNextAdvertTimestamp(
+        meshcore_clock_floor, seconds_since_boot, meshcore_last_advert_timestamp);
+    if(candidate >= meshcore_clock_reserved_through) {
+        const std::uint32_t reserved = candidate > 0xffffffffU - kMeshCoreClockReserveSeconds
+                                           ? 0xffffffffU
+                                           : candidate + kMeshCoreClockReserveSeconds;
+        if(!store_meshcore_advert_clock(reserved)) return false;
+        meshcore_clock_reserved_through = reserved;
+    }
+    meshcore_last_advert_timestamp = candidate;
+    timestamp = candidate;
+    return true;
+}
+
 bool write_app_settings() noexcept
 {
     if(!ensure_preferences_ready()) return false;
@@ -15351,6 +15521,17 @@ void setup()
     // Minted once and kept: this key is how peers address us privately.
     Serial.printf("Lilyshark identity: %s\n",
                   load_or_create_pkc_identity() ? "public key ready" : "channel key only");
+    // The MeshCore half of the same idea, and a separate key: on that network
+    // the Ed25519 public key is the address, and its first byte is the path
+    // hash every peer files us under.
+    load_meshcore_advert_clock();
+    if(load_or_create_meshcore_identity()) {
+        Serial.printf("Lilyshark MeshCore identity: %02x%02x%02x%02x\n",
+                      meshcore_public_key[0], meshcore_public_key[1], meshcore_public_key[2],
+                      meshcore_public_key[3]);
+    } else {
+        Serial.println("Lilyshark MeshCore identity: unavailable");
+    }
     onboarding_complete = app_settings_loaded && app_settings.onboarding_complete;
 
     lv_init();
@@ -15528,18 +15709,14 @@ void announce_local_mesh_identity() noexcept
     }
 }
 
-/// Encode and send one request, and ingest the transmitted frame so it shows
-/// in traffic and captures like anything else on the air. Shared by messages,
-/// beacons, and Routing acknowledgements.
-bool transmit_meshtastic_request(const MeshtasticEncodeRequest &request) noexcept
+/// Ingest bytes this deck just put on the air, so traffic, captures and the
+/// packet inspector show them like anything else that crossed this radio. Every
+/// protocol's transmit path goes through here: a capture that omitted our own
+/// frames would be a dishonest record of the channel.
+void ingest_own_transmission(const std::uint8_t *frame, std::size_t length) noexcept
 {
-    std::uint8_t frame[kMaxFrameBytes]{};
-    const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
-    if (n == 0) return false;
-    if (!radio_service.transmit(frame, n)) return false;
-
     RawFrame raw{};
-    (void)raw.assignPayload(frame, n);
+    (void)raw.assignPayload(frame, length);
     const RadioProfile &profile = radio_service.activeProfile();
     raw.rf.direction = FrameDirection::Transmit;
     raw.rf.origin = FrameOrigin::Radio;
@@ -15557,7 +15734,77 @@ bool transmit_meshtastic_request(const MeshtasticEncodeRequest &request) noexcep
                             RfFieldCodingRate | RfFieldSyncWord | RfFieldPreamble | RfFieldProfile;
     ingest_analyzer_frame(raw, profile, true);
     live_data_dirty = true;
+}
+
+/// Encode and send one request, and ingest the transmitted frame so it shows
+/// in traffic and captures like anything else on the air. Shared by messages,
+/// beacons, and Routing acknowledgements.
+bool transmit_meshtastic_request(const MeshtasticEncodeRequest &request) noexcept
+{
+    std::uint8_t frame[kMaxFrameBytes]{};
+    const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
+    if (n == 0) return false;
+    if (!radio_service.transmit(frame, n)) return false;
+    ingest_own_transmission(frame, n);
     return true;
+}
+
+/// Why a MeshCore advert cannot go out right now, or nullptr when it can. The
+/// strings are what the USB link reports, so a failed send says which of the
+/// preconditions was missing instead of going quiet.
+const char *meshcore_advert_blocker() noexcept
+{
+    if (app_settings.simulate_mode) return "simulate-mode";
+    if (!radio_service.status().initialized) return "radio-unavailable";
+    // The frame is only meaningful under a MeshCore profile. Sent under any
+    // other one it is a well-formed MeshCore packet on a band where no
+    // MeshCore node is listening, so this is gated on the tuned profile rather
+    // than on the operator remembering.
+    if (radio_service.activeProfile().protocol_hint != ProtocolId::MeshCore) {
+        return "not-meshcore-profile";
+    }
+    if (!meshcore_identity_ready) return "no-identity";
+    return nullptr;
+}
+
+/// Build, sign and transmit one advert. Returns nullptr when the frame went
+/// out, or the short reason it did not.
+///
+/// Zero-hop is the ordinary reach: only nodes that hear us directly learn
+/// about us and nobody repeats it, which is what stock companion firmware
+/// sends by default. Flood costs the whole mesh airtime and is reserved for a
+/// deliberate request.
+const char *transmit_meshcore_advert(MeshCoreAdvertReach reach) noexcept
+{
+    const char *blocked = meshcore_advert_blocker();
+    if (blocked != nullptr) return blocked;
+
+    std::uint32_t timestamp = 0;
+    if (!reserve_meshcore_advert_timestamp(timestamp)) return "clock-not-stored";
+
+    MeshCoreAdvertAppData app_data{};
+    app_data.node_type = MeshCoreNodeType::Chat;
+    // One name for this deck on every network it speaks. The helper is named
+    // for Meshtastic because that is where it first appeared, but what it
+    // returns is the deck's own long name, and a node listed under two
+    // different names is a node nobody can correlate.
+    char name[24]{};
+    formatLocalMeshtasticLongName(name, sizeof(name));
+    app_data.name = name;
+    const GpsStatus &gps = hardware_status.snapshot().gps;
+    if (app_settings.gps_enabled && gps.state == GpsState::Fix && gps.position_valid) {
+        app_data.has_location = true;
+        app_data.latitude_micros = meshCoreDegreesToMicros(gps.latitude_degrees);
+        app_data.longitude_micros = meshCoreDegreesToMicros(gps.longitude_degrees);
+    }
+
+    std::uint8_t frame[kMeshCoreMaxFrameBytes]{};
+    const std::size_t n = encodeMeshCoreAdvert(app_data, timestamp, reach, meshcore_public_key,
+                                               meshcore_private_key, frame, sizeof(frame));
+    if (n == 0) return "encode-failed";
+    if (!radio_service.transmit(frame, n)) return "radio-error";
+    ingest_own_transmission(frame, n);
+    return nullptr;
 }
 
 bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to_node) noexcept
@@ -15666,8 +15913,27 @@ void handle_mesh_tx_command(const char *line) noexcept
         Serial.println("LSK OK {\"kind\":\"node\"}");
         return;
     }
+    // Deliberate advert over USB, for testing next to a stock node. The bare
+    // form matches what the deck sends on its own; the flood form is the
+    // explicit request that costs the whole mesh airtime, which is why it is
+    // never the automatic one.
+    const bool advert_flood = std::strcmp(line, "LSK TX meshcore advert flood") == 0;
+    if (advert_flood || std::strcmp(line, "LSK TX meshcore advert") == 0) {
+        const char *failure = transmit_meshcore_advert(
+            advert_flood ? MeshCoreAdvertReach::Flood : MeshCoreAdvertReach::ZeroHop);
+        if (failure != nullptr) {
+            Serial.printf("LSK ERR {\"proto\":\"meshcore\",\"reason\":\"%s\"}\n", failure);
+            return;
+        }
+        Serial.printf("LSK OK {\"proto\":\"meshcore\",\"kind\":\"advert\",\"reach\":\"%s\"}\n",
+                      advert_flood ? "flood" : "zero-hop");
+        record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
+                             advert_flood ? "MeshCore flood advert transmitted"
+                                          : "MeshCore advert transmitted");
+        return;
+    }
     if (std::strncmp(line, "LSK TX meshcore", 15) == 0) {
-        Serial.println("LSK ERR {\"proto\":\"meshcore\",\"reason\":\"identity-pending\"}");
+        Serial.println("LSK ERR {\"reason\":\"bad-tx\"}");
         return;
     }
     if (std::strncmp(line, "LSK TX meshtastic text ", 23) == 0) {
@@ -16068,21 +16334,54 @@ void loop()
     // two T-Decks could never place each other on a map. The radio is the
     // product; USB is an accessory.
     if(!app_settings.simulate_mode && radio_service.status().initialized) {
-        const GpsStatus &beacon_gps = hardware_status.snapshot().gps;
-        const bool have_fix = beacon_gps.state == GpsState::Fix && beacon_gps.position_valid;
-        if(have_fix &&
-           (mesh_beacon_last_position_ms == 0U ||
-            static_cast<std::uint32_t>(now - mesh_beacon_last_position_ms) >= kPositionBeaconMs)) {
-            // First fix goes out immediately: a peer should see you arrive,
-            // not a minute later.
-            mesh_beacon_last_position_ms = now == 0U ? 1U : now;
-            (void)transmit_meshtastic(MeshtasticPort::Position, nullptr);
+        const RadioProfile &beacon_profile = radio_service.activeProfile();
+        // Beacon in the language of the band you are tuned to. Meshtastic
+        // NodeInfo on MeshCore's channel is noise nobody can read, and the
+        // deck now has something better to say there.
+        if(beacon_profile.protocol_hint == ProtocolId::Meshtastic) {
+            const GpsStatus &beacon_gps = hardware_status.snapshot().gps;
+            const bool have_fix = beacon_gps.state == GpsState::Fix && beacon_gps.position_valid;
+            if(have_fix &&
+               (mesh_beacon_last_position_ms == 0U ||
+                static_cast<std::uint32_t>(now - mesh_beacon_last_position_ms) >=
+                    kPositionBeaconMs)) {
+                // First fix goes out immediately: a peer should see you arrive,
+                // not a minute later.
+                mesh_beacon_last_position_ms = now == 0U ? 1U : now;
+                (void)transmit_meshtastic(MeshtasticPort::Position, nullptr);
+            }
+            if(mesh_beacon_last_nodeinfo_ms == 0U ||
+               static_cast<std::uint32_t>(now - mesh_beacon_last_nodeinfo_ms) >=
+                   kNodeInfoBeaconMs) {
+                mesh_beacon_last_nodeinfo_ms = now == 0U ? 1U : now;
+                (void)transmit_meshtastic(MeshtasticPort::NodeInfo, nullptr);
+            }
+        } else if(beacon_profile.protocol_hint == ProtocolId::MeshCore &&
+                  meshcore_identity_ready) {
+            // Arriving on a MeshCore profile advertises at once — a node
+            // walking into range should appear while someone is still looking
+            // at the screen — and after that only every kMeshCoreAdvertMs.
+            // Leaving the profile clears the marker, so coming back is an
+            // arrival again.
+            const bool arrived = meshcore_advert_profile_id != beacon_profile.id;
+            if(arrived || static_cast<std::uint32_t>(now - meshcore_last_advert_ms) >=
+                              kMeshCoreAdvertMs) {
+                // The attempt is paced whether or not it succeeded: a deck
+                // that cannot advertise must not spend the loop retrying, and
+                // the reason is already on the event log.
+                meshcore_advert_profile_id = beacon_profile.id;
+                meshcore_last_advert_ms = now == 0U ? 1U : now;
+                const char *failure = transmit_meshcore_advert(MeshCoreAdvertReach::ZeroHop);
+                if(failure != nullptr) {
+                    char message[80]{};
+                    std::snprintf(message, sizeof(message), "MeshCore advert not sent: %s",
+                                  failure);
+                    record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Radio,
+                                         message);
+                }
+            }
         }
-        if(mesh_beacon_last_nodeinfo_ms == 0U ||
-           static_cast<std::uint32_t>(now - mesh_beacon_last_nodeinfo_ms) >= kNodeInfoBeaconMs) {
-            mesh_beacon_last_nodeinfo_ms = now == 0U ? 1U : now;
-            (void)transmit_meshtastic(MeshtasticPort::NodeInfo, nullptr);
-        }
+        if(beacon_profile.protocol_hint != ProtocolId::MeshCore) meshcore_advert_profile_id = 0U;
     }
 #endif
 
