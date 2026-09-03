@@ -68,14 +68,16 @@ The diagnostic views change as the radio environment changes. Frames enter the T
 - **Status** — [Project status](#project-status) · [Roadmap](#roadmap-to-a-stable-release)
 - **More** — [Documentation](#documentation) · [License](#license-and-project-names)
 
-## Two halves: the device and the analyzer
+## Three surfaces: the device, the analyzer, and the app
 
-Lilyshark is firmware plus a web analyzer that reads what the firmware records.
+Lilyshark is firmware, a web analyzer that reads what the firmware records, and
+a native app that carries the same mesh onto a phone, a Mac and a watch.
 
 | | Where | What it does |
 | --- | --- | --- |
 | **Firmware** | `src/`, `include/` | Captures LoRa frames off the SX1262 with their radio measurements. Writes `.lscap` and LoRaTap PCAP to microSD. |
-| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app: the **TRAFFIC** screen opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, capture statistics, inline Shelby-pointer decode — the **SHELBY** screen shows the off-grid storage design with an airtime model derived from bundled synthetic sample metadata, and CHAT/NODES/MAP/MESH/TELEMETRY drive a real radio over USB or Bluetooth. Without a radio attached, the app seeds an explicitly synthetic demo mesh around Palo Alto so every screen shows useful, moving data. |
+| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app. **TRAFFIC** opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, statistics, inline Shelby-pointer decode. **SNIFFER** adds a protocol dissection tree whose rows highlight the bytes they came from, and exports the capture as LoRaTap PCAP, CSV or JSON. **SPECTRUM** draws a live waterfall from sweeps the deck streams up the cable. CHAT/NODES/MAP/MESH/TELEMETRY drive a real radio over USB or Bluetooth. It installs as an offline app: once loaded, it opens with no internet at all, which is the point for an instrument whose network does not need one. Without a radio attached it seeds an explicitly synthetic demo mesh, labelled as such. |
+| **App** | [`ios/`](ios/) | A native iOS, macOS and watchOS client, built on [PommeCore](https://github.com/mbedworth/PommeCore) (Apache 2.0, by Michael P. Bedworth) with a `MeshtasticKit` package added beside its MeshCore one. It exists because Apple does not permit Web Bluetooth, so lilyshark.com can never reach a deck from an iPhone — and it brings a real macOS client with it. Build it with `./scripts/build_ios.sh`. |
 
 Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAMPLE** on the TRAFFIC screen, and select frame 9 — it carries a Shelby pointer, decoded inline.
 
@@ -445,6 +447,32 @@ The deck advertises Meshtastic's client Bluetooth service, so the official Mesht
 Texts flow both ways. A message the deck hears on the air appears in the app's conversation view; a message typed in the app goes out through the same transmit path as one typed on the deck's own keyboard — same packet ids, same want-ack request on direct messages, and it lands in the deck's chat log alongside everything else, where the peer's acknowledgement marks it DELIVERED.
 
 Positions travel too: nodes with a known location arrive in the app with coordinates at pairing, and a position heard afterwards is forwarded as the same POSITION_APP packet stock firmware would send, so the app's map places nodes the way the deck's own map does. What pairing does not yet do, so nobody discovers it the hard way: settings changed in the app are read back but not applied — the deck's own Settings screen remains the way to change the radio.
+
+## Private messages, and borrowed channels
+
+Two kinds of privacy, kept honestly apart.
+
+A **direct message** to a node whose public key the deck has heard is sealed to
+that node with Curve25519 and AES-256-CCM, the way Meshtastic 2.5 does it. The
+deck mints its identity once from the hardware random generator and keeps it in
+NVS forever, because an identity regenerated each boot goes stale in every
+peer's memory and private replies quietly stop arriving. The public half rides
+our NodeInfo, which is the only way anyone can address us privately. Anything
+that cannot be sealed still goes out under the channel key — a message nobody
+can open would be worse than one the channel can read.
+
+A **channel key** somebody gives you is different: it makes their traffic
+readable, and it must not make you loud. So a frame opened with a stored key is
+never acknowledged on the public channel (the acknowledgement would be sealed
+with the default key, announcing both that you hold the key and which packet you
+just read), it is not forwarded to a paired phone (that API has no field to say
+which key opened it, so the message would arrive looking public), and it appears
+on MESSAGES rather than in CHAT — because CHAT has a Send button and a reply
+would go out publicly into a conversation you believed was private.
+
+That last rule holds until the deck can transmit sealed with a stored key. The
+comment in the code says so, and names itself as the thing that changes when it
+can.
 
 ## Protocol coverage
 
