@@ -298,6 +298,22 @@ export async function meshtasticBleSendText(text: string, convo: string): Promis
 	);
 }
 
+/** Resend a failed message as a fresh packet that still resolves to the
+ *  same chat row, so RETRY updates the message it retried. */
+export async function meshtasticBleRetry(msg: {
+	id: number;
+	convo: string;
+	text: string;
+}): Promise<void> {
+	const to = msg.convo.startsWith("dm:") ? Number(msg.convo.slice(3)) : BROADCAST;
+	const channel = msg.convo.startsWith("ch:") ? Number(msg.convo.slice(3)) : 0;
+	const packetId = randomPacketId();
+	pending.set(packetId, msg.id);
+	await writeToRadio(
+		encodeTextPacket({ to, channel, packetId, text: msg.text, wantAck: to !== BROADCAST }),
+	);
+}
+
 export function disconnectMeshtasticBle(): void {
 	deliberateDisconnect = true;
 	active = false;

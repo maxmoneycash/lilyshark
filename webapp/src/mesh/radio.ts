@@ -6,7 +6,7 @@ import CayenneLpp from "@liamcottle/meshcore.js/src/cayenne_lpp.js";
 import { COOLDOWN_MS, getAlertCfg } from "./alerts";
 import { getDeviceLinkState, sendDeviceLine } from "../lib/deviceLink";
 import { DEMO_NODE_FLOOR, demoSendText, isDemo } from "./demo";
-import { meshtasticBleActive, meshtasticBleSendText } from "./meshtasticBle";
+import { meshtasticBleActive, meshtasticBleRetry, meshtasticBleSendText } from "./meshtasticBle";
 import { t } from "./i18n";
 import {
   addLog,
@@ -1327,6 +1327,16 @@ async function transmit(msg: Message): Promise<void> {
 
 // Retries a failed message reusing the same entry (id/ts untouched).
 export async function retryMessage(msg: Message): Promise<void> {
+  if (meshtasticBleActive()) {
+    setMsgState(msg.id, msg.ts, "queued");
+    try {
+      await meshtasticBleRetry(msg);
+    } catch (e) {
+      setMsgState(msg.id, msg.ts, "failed");
+      throw e;
+    }
+    return;
+  }
   if (!device) throw new Error(t("Not connected"));
   setMsgState(msg.id, msg.ts, "queued");
   try {
