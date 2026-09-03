@@ -389,7 +389,10 @@ test("protocol labels mirror the firmware's builtin profile table", () => {
 	assert.equal(label(1), "Meshtastic");
 	assert.equal(label(2), "MeshCore");
 	assert.equal(label(3), "MeshCore");
-	assert.equal(label(4), "Reticulum");
+	// Profile 4 is MESHTASTIC BAY MF on this firmware, not the RNode
+	// example it was upstream. An export carries these labels into a file
+	// somebody keeps, so a wrong one outlives the session that wrote it.
+	assert.equal(label(4), "Meshtastic");
 	assert.equal(label(5), "Reticulum");
 	assert.equal(label(0), "Unknown");
 	assert.equal(label(9), "Custom");

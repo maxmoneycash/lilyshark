@@ -7,6 +7,7 @@
  * (except for the pcap writer's synthetic exclusion, which is a format
  * limitation, not a filter — see loratap.ts).
  */
+import { profileProtocol, type ProfileProtocol } from "../profileProtocol";
 import {
 	findShelbyPointer,
 	hasField,
@@ -122,20 +123,19 @@ export function exportColumns(
  */
 export function protocolLabel(frame: LscapFrame): string {
 	if (!hasField(frame, RF_FIELD.profile)) return "Unknown";
-	switch (frame.profileId) {
-		case 0:
-			return "Unknown";
-		case 1:
-			return "Meshtastic";
-		case 2:
-		case 3:
-			return "MeshCore";
-		case 4:
-		case 5:
-			return "Reticulum";
-		default:
-			return "Custom";
-	}
+	// Derived, never re-tabulated. This was the fourth hand-written copy of
+	// the profile table, and like the other three it said profile 4 was
+	// Reticulum -- true of the firmware it was written against, false here,
+	// where profile 4 is MESHTASTIC BAY MF. Exports carry these labels into
+	// files people keep, so a wrong one outlives the session that made it.
+	const display: Record<ProfileProtocol, string> = {
+		meshtastic: "Meshtastic",
+		meshcore: "MeshCore",
+		reticulum: "Reticulum",
+		custom: "Custom",
+		unknown: "Unknown",
+	};
+	return display[profileProtocol(frame.profileId)];
 }
 
 /** Decode the frames of an export into the shared row shape. */
