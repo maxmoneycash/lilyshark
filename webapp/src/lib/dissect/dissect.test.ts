@@ -468,6 +468,101 @@ test("a structural announce says which arithmetic refused it", () => {
 	}
 });
 
+test("the header's path branch says how a frame got here, and what RNS never records", () => {
+	const one = findNode(
+		announceOf("announce-header-one-minimal").primary.root,
+		"Path",
+	);
+	assert.ok(one, "a clear Reticulum header gets a path branch");
+	assert.equal(one.byteOffset, 2);
+	assert.equal(one.byteLength, 1, "HEADER_1 records only a hop count");
+	assert.match(one.value ?? "", /^3 hops/);
+	assert.match(one.value ?? "", /never the nodes in between/);
+	assert.equal(findNode(one, "Hops")?.value, "3");
+	assert.equal(findNode(one, "Transport id"), null);
+
+	const two = findNode(
+		announceOf("announce-header-two-transported").primary.root,
+		"Path",
+	);
+	assert.ok(two);
+	assert.equal(two.byteOffset, 2);
+	assert.equal(
+		two.byteLength,
+		17,
+		"the hop byte plus the 16-byte transport id",
+	);
+	assert.match(
+		two.value ?? "",
+		/7 hops via transport instance 707172737475767778797a7b7c7d7e7f/,
+	);
+	const transport = findNode(two, "Transport id");
+	assert.ok(transport);
+	assert.equal(transport.byteOffset, 3);
+	assert.equal(transport.byteLength, 16);
+
+	// The path is header evidence, so it is read for any packet type, not
+	// only for announces.
+	const data = findNode(
+		announceOf("header-two-transport-single-data").primary.root,
+		"Path",
+	);
+	assert.ok(data);
+	assert.match(data.value ?? "", /^3 hops via transport instance/);
+
+	// A hop count outside RNS limits describes no path at all: the malformed
+	// hop byte is reported on its own, with nothing built on top of it.
+	const excessive = announceOf("excessive-hops").primary.root;
+	assert.equal(findNode(excessive, "Path"), null);
+	assert.ok(findNode(excessive, "Hops"), "the refused hop byte is still shown");
+});
+
+test("selecting an announce shows the path it travelled", () => {
+	const announce = findNode(
+		announceOf("announce-header-two-transported").primary.root,
+		"Announce",
+	);
+	assert.ok(announce);
+	assert.match(
+		announce.value ?? "",
+		/destination d0d1d2d3d4d5d6d7d8d9dadbdcdddedf · 7 hops via transport instance 707172737475767778797a7b7c7d7e7f/,
+	);
+});
+
+test("an announce's identity material reads as one branch, and stays unverified", () => {
+	const identity = findNode(
+		announceOf("announce-ratchet-and-app-data").primary.root,
+		"Announced identity",
+	);
+	assert.ok(identity);
+	// Public key, name hash, random hash and the promised ratchet are one
+	// contiguous run: 64 + 10 + 10 + 32.
+	assert.equal(identity.byteOffset, 20);
+	assert.equal(identity.byteLength, 116);
+	assert.match(identity.value ?? "", /not checked against d0d1d2d3/);
+	for (const label of [
+		"Public key",
+		"Name hash",
+		"Random hash",
+		"Ratchet key",
+	]) {
+		assert.ok(findNode(identity, label), `${label} sits under the identity`);
+	}
+	assert.equal(
+		findNode(identity, "Signature"),
+		null,
+		"the signature is evidence about the identity, not part of it",
+	);
+
+	// With no ratchet promised, the run ends at the random hash: 64 + 10 + 10.
+	const minimal = findNode(
+		announceOf("announce-header-one-minimal").primary.root,
+		"Announced identity",
+	);
+	assert.ok(minimal);
+	assert.equal(minimal.byteLength, 84);
+});
+
 test("reticulumDestinationHashHex never disagrees with the dissector", () => {
 	const check = (bytes: Uint8Array, context: string) => {
 		const { primary } = dissectFrame(bytes, "reticulum");

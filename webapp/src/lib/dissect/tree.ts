@@ -12,38 +12,22 @@
  * Everything here is pure so it can be covered by node:test without a DOM.
  */
 
+import { profileProtocol } from "../profileProtocol";
 import type { ProtocolHint } from "./registry";
 import type { Dissection, DissectNode } from "./types";
 
 /**
- * Protocol hint for a frame's capture profile ID, from the builtin profile
- * table in src/core/builtin_profiles.cpp: IDs 1–5 are the shipped profiles,
- * anything else is user-defined. Pass null for a frame that never reported
- * its profile; the dissector then never guesses, matching the firmware's
+ * Protocol hint for a frame's capture profile ID. The table itself lives in
+ * lib/profileProtocol.ts, which names src/core/builtin_profiles.cpp as its
+ * authority; this is only the dissector's name for the same answer. It used
+ * to be a second copy of that table, and the copy said profile 4 was
+ * Reticulum long after the firmware had made it MESHTASTIC BAY MF — a wrong
+ * fact with its own passing test. Pass null for a frame that never reported
+ * a profile; the dissector then never guesses, matching the firmware's
  * unknown fallback.
  */
 export function profileProtocolHint(profileId: number | null): ProtocolHint {
-	if (profileId === null) return "unknown";
-	switch (profileId) {
-		case 0:
-			return "unknown";
-		case 1:
-			return "meshtastic";
-		case 2:
-		case 3:
-			return "meshcore";
-		case 4:
-			// Profile 4 was the EU RNode example when this table was written
-			// upstream. It is MESHTASTIC BAY MF now -- the Bay Area
-			// community's Medium Range Fast slot -- and calling it Reticulum
-			// made the dissector invent Reticulum addresses out of Meshtastic
-			// headers, which is worse than refusing to dissect at all.
-			return "meshtastic";
-		case 5:
-			return "reticulum";
-		default:
-			return "custom";
-	}
+	return profileProtocol(profileId);
 }
 
 /**
