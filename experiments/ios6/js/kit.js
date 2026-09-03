@@ -943,6 +943,14 @@
             wall.addColorStop(1, "rgba(148,150,154,0.08)");
             ctx.fillStyle = wall;
             ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
+        } else if (!sms) {
+            // Zach crown #b5cff8 / body #8dbff6 — overlay only, Blue* stay frozen.
+            const royal = ctx.createLinearGradient(x, y, x, y + height);
+            royal.addColorStop(0, "rgba(40,70,200,0.12)");
+            royal.addColorStop(0.42, "rgba(30,80,190,0.08)");
+            royal.addColorStop(1, "rgba(20,50,160,0.06)");
+            ctx.fillStyle = royal;
+            ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
         }
         ctx.beginPath();
         ctx.moveTo(x - 4, y - 1);
@@ -951,12 +959,12 @@
         ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.66, x - 4, y + height * 0.34);
         ctx.closePath();
         const shine = ctx.createLinearGradient(x, y, x, y + height * 0.54);
-        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.94)");
-        shine.addColorStop(0.42, incoming ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.52)");
+        shine.addColorStop(0, incoming ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.88)");
+        shine.addColorStop(0.42, incoming ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.40)");
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
-        ctx.fillStyle = incoming ? "rgba(255,255,255,0.78)" : "rgba(230,244,255,0.92)";
+        ctx.fillStyle = incoming ? "rgba(255,255,255,0.78)" : "rgba(236,240,252,0.70)";
         ctx.fillRect(x + 8, y + 1, width - 16, 1.2);
         ctx.fillStyle = incoming ? "rgba(228,228,230,0.48)" : "rgba(255,255,255,0.58)";
         ctx.fillRect(x + 10, y + 2.2, width - 20, 1);
