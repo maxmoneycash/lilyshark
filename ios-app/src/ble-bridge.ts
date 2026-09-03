@@ -73,16 +73,23 @@ function lower(uuid: string): string {
 }
 
 class BridgedCharacteristic {
-	private readonly valueChangedListeners: Array<() => void> = [];
+	private readonly valueChangedListeners: Array<(event: { target: BridgedCharacteristic }) => void> = [];
+	/** Latest notified or read value, exactly where Web Bluetooth keeps it:
+	 *  meshcore.js reads event.target.value rather than re-reading the
+	 *  characteristic, so the payload has to ride the event. */
+	value: DataView | undefined;
 
 	constructor(
 		private readonly deviceId: string,
 		private readonly serviceUuid: string,
-		private readonly uuid: string,
+		/** Public because meshcore.js matches characteristics by .uuid. */
+		readonly uuid: string,
 	) {}
 
 	async readValue(): Promise<DataView> {
-		return BleClient.read(this.deviceId, this.serviceUuid, this.uuid);
+		const view = await BleClient.read(this.deviceId, this.serviceUuid, this.uuid);
+		this.value = view;
+		return view;
 	}
 
 	async writeValueWithResponse(data: BufferSource): Promise<void> {
@@ -97,16 +104,18 @@ class BridgedCharacteristic {
 	}
 
 	async startNotifications(): Promise<unknown> {
-		await BleClient.startNotifications(this.deviceId, this.serviceUuid, this.uuid, () => {
-			// Web Bluetooth hands the new value on event.target.value, but the
-			// webapp's drain loop re-reads FromRadio itself, so listeners only
-			// need the nudge, not the payload.
-			for (const listener of this.valueChangedListeners) listener();
+		await BleClient.startNotifications(this.deviceId, this.serviceUuid, this.uuid, (view) => {
+			// Web Bluetooth hands the new value on event.target.value. The
+			// Lilyshark drain loop re-reads FromRadio itself and only needs
+			// the nudge, but meshcore.js consumes the payload straight off
+			// the event, so it rides along like the real API.
+			this.value = view;
+			for (const listener of this.valueChangedListeners) listener({ target: this });
 		});
 		return this;
 	}
 
-	addEventListener(type: string, cb: () => void): void {
+	addEventListener(type: string, cb: (event: { target: BridgedCharacteristic }) => void): void {
 		if (type === "characteristicvaluechanged") this.valueChangedListeners.push(cb);
 	}
 }
@@ -134,7 +143,23 @@ class BridgedDevice {
 							async getCharacteristic(characteristicUuid: string) {
 								return new BridgedCharacteristic(deviceId, service, lower(characteristicUuid));
 							},
+							// meshcore.js discovers by listing rather than asking
+							// by UUID, so the plural form walks the plugin's
+							// service inventory for the real characteristic list.
+							async getCharacteristics() {
+								const services = await BleClient.getServices(deviceId);
+								const match = services.find((entry) => lower(entry.uuid) === service);
+								return (match?.characteristics ?? []).map(
+									(entry) => new BridgedCharacteristic(deviceId, service, lower(entry.uuid)),
+								);
+							},
 						};
+					},
+					// meshcore.js calls disconnect() on the server object that
+					// connect() returned, not on device.gatt.
+					disconnect() {
+						device.gatt.connected = false;
+						void BleClient.disconnect(deviceId).catch(() => {});
 					},
 				};
 			},
