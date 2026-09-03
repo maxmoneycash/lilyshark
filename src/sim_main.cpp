@@ -7514,11 +7514,16 @@ const char *home_protocol_tag(ProtocolId protocol) noexcept
 
 const char *home_profile_tag(const RadioProfile &profile) noexcept
 {
+    // These short forms exist because a 320 px row cannot afford the full
+    // profile name. They duplicate knowledge builtin_profiles.cpp owns, and
+    // that duplication already bit once: profile 4 became the Bay Area
+    // preset while this table kept saying RNODE EU, so the picker showed a
+    // profile that no longer existed and hid one that did.
     switch (profile.id) {
     case 1: return "US LF";
     case 2: return "MCORE US";
     case 3: return "MCORE LEG";
-    case 4: return "RNODE EU";
+    case 4: return "BAY MF";
     case 5: return "RNODE US";
     default: return profile.name;
     }
@@ -12452,7 +12457,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xa066240e572f0e6aULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
-        0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0xdbf9317cdfe0b856ULL,
+        0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0xadef2eb28eb36c85ULL,
         0x7e1363de7108f530ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
         0xde0a7b1d16ecf53aULL, 0x7ed210334475e24aULL, 0x14f80c364b5d4568ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
