@@ -3194,9 +3194,13 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
             theme::rect(parent, x - 3, y - 3, 7, 7, lv_color_hex(0x000000));
             theme::rect(parent, x - 2, y - 2, 5, 5, color);
         }
-        if (!collide && !mark.you) {
+        if (!collide) {
+            // The crosshair used to stand unlabelled on the theory that it
+            // was self-evidently you. It read as map furniture instead, and
+            // the operator asked why their own node never shows. Everyone on
+            // the map gets a name, the operator included.
             put_map_label(parent, tag, tag_x, tag_y, tag_w + 8,
-                          mark.selected ? theme::pink() : theme::lime(),
+                          mark.you || mark.selected ? theme::pink() : theme::lime(),
                           &font_pixel_6x8);
             if (label_count < labels.size()) {
                 labels[label_count++] = {tag_x, tag_y, tag_w};
@@ -10774,7 +10778,7 @@ void handle_navigation_key(uint32_t key)
          key == 'g' || key == 'G' ||
          key == LV_KEY_UP || key == LV_KEY_DOWN ||
          key == LV_KEY_LEFT || key == LV_KEY_RIGHT ||
-         (key == LV_KEY_ENTER && map_panned && !map_popup.open))) {
+         (key == LV_KEY_ENTER && !map_popup.open))) {
         bool changed = false;
         if ((key == '+' || key == '=') && map_zoom < kMapZoomMax) {
             ++map_zoom;
@@ -10814,11 +10818,19 @@ void handle_navigation_key(uint32_t key)
             map_popup.open = false;
             changed = true;
         } else if (key == LV_KEY_ENTER) {
-            // Clicking the trackball is the way back: one press returns the
-            // view to where you are standing.
-            map_pan_east_m = 0.0;
-            map_pan_north_m = 0.0;
-            map_panned = false;
+            // One click steps the view inward through four useful heights --
+            // neighbourhood, town, streets, houses -- and past the deepest it
+            // swings back out wide. Returning to your own position lives on
+            // the MAP chip, which appears exactly when you have panned away.
+            constexpr int kMapZoomStops[] = {10, 13, 16, 19};
+            int next_zoom = kMapZoomStops[0];
+            for (const int stop : kMapZoomStops) {
+                if (stop > map_zoom) {
+                    next_zoom = stop;
+                    break;
+                }
+            }
+            map_zoom = next_zoom;
             changed = true;
         }
         if (changed) build_current_screen();
@@ -11983,10 +11995,19 @@ bool run_simulator_interaction_test() noexcept
                                    "trackball up must pan the map north")) return false;
         if(!expect_simulator_state(current_screen == Screen::map,
                                    "panning must not leave the map")) return false;
+        // A click steps the zoom inward through the four stops and wraps
+        // back out past the deepest; it must never navigate away or drop the
+        // pan the operator just made.
+        const int zoom_before_click = map_zoom;
         handle_navigation_key(LV_KEY_ENTER);
-        if(!expect_simulator_state(!map_panned && map_pan_east_m == 0.0 &&
-                                       map_pan_north_m == 0.0,
-                                   "clicking the trackball must return the view to here")) return false;
+        if(!expect_simulator_state(map_zoom != zoom_before_click,
+                                   "clicking the trackball must step the zoom")) return false;
+        if(!expect_simulator_state(map_panned && current_screen == Screen::map,
+                                   "the zoom click must keep the pan and the map")) return false;
+        map_zoom = 19;
+        handle_navigation_key(LV_KEY_ENTER);
+        if(!expect_simulator_state(map_zoom == 10,
+                                   "past the deepest stop the click must swing back out wide")) return false;
     }
 
     // Edge markers point at heard nodes beyond the view. The clamp is pure so
@@ -12460,7 +12481,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0xa9a8caf8710d718cULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
         0x932ca408b25d655fULL, 0x3b6ca3507efcd29cULL, 0x3d61199a6d61d28cULL,
-        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x57277dd5eba9eb3eULL,
+        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x4631c9cb6f356c44ULL,
         0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xae5f04f11f7d4fb1ULL,
         0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
     }};

@@ -423,7 +423,7 @@ The simulator drives these views with deterministic synthetic RF telemetry. A fi
 | `T` | Open Timeline |
 | `X` from Traffic | Open Traffic Filter; use Up/Down to choose a predicate, Left/Right to change it, `R` to reset, and Enter to apply |
 | `P` | Open the five-preset radio-profile picker with the active preset focused |
-| Trackball on Map | Roll to pan; press to return the view to where you are standing. A fingertip covers about 40 px of a 320 px panel, which at deep zoom is most of the gap between two operators standing together |
+| Trackball on Map | Roll to pan. Press to step the zoom inward through neighbourhood, town, streets, houses, then back out wide. Return to your own position with the on-screen MAP chip, which appears once you have panned |
 | `+` / `-` on Map | Zoom, from z8 (about 150 km across) in to z23 |
 | `I` / `D` / `G` on Map | Satellite imagery, dark road map, or the drawn field chart. The on-screen chip names the layer you are on and moves to the next when tapped |
 | `-` / `+` | Move the active profile down or up one bandwidth-sized frequency step within its region |
