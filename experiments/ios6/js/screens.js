@@ -683,13 +683,13 @@
             }
             kit.text(ctx, thread.name, 22, top + 7, C.Ink, {
                 size: 14,
-                weight: thread.unread ? "700" : "500",
+                weight: thread.unread ? "800" : "500",
             });
             kit.text(ctx, last ? last.text : "", 22, top + 25, C.Meta, {
                 size: 11,
                 maxWidth: 230,
             });
-            kit.text(ctx, thread.when, 292, top + 9, C.Chevron, { size: 11, align: "right" });
+            kit.text(ctx, thread.when, 292, top + 9, 0x5078a0, { size: 11, align: "right" });
             kit.chevron(ctx, 300, top + 17);
             kit.hit(0, top, W, rowH, openThread(key));
         }

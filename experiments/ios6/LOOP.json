@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 41,
-  "stop_after_pass": 48,
+  "pass": 42,
+  "stop_after_pass": 50,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -67,7 +67,8 @@
     "stamped-composer-camera-well",
     "send-equator-and-candy-badge",
     "springboard-glyphs-and-etched-nav-title",
-    "ios6-lock-slider-trough"
+    "ios6-lock-slider-trough",
+    "tighter-ios6-fins-and-inbox-times"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -102,5 +103,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 41: Lock uses a recessed iOS 6 slider trough, candy-glass knob with a chevron, and a white camera silhouette on the right well. Raised stop_after_pass to 48 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
+  "notes": "Pass 42: Balloon fins are smaller iOS 6 hooks. Candy crown is heavier. Inbox times are steel blue; unread names are extra bold. Raised stop_after_pass to 50 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
 }

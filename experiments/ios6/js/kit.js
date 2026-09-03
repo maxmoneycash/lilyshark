@@ -821,9 +821,9 @@
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + width - r, y);
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-            ctx.lineTo(x + width, y + height + 4.8);
-            ctx.lineTo(x + width + 5.2, y + height + 6.1);
-            ctx.quadraticCurveTo(x + width + 0.4, y + height + 2.1, x + width - 7.4, y + height);
+            ctx.lineTo(x + width, y + height + 2.8);
+            ctx.lineTo(x + width + 4.2, y + height + 4.4);
+            ctx.quadraticCurveTo(x + width + 0.2, y + height + 1.5, x + width - 6.2, y + height);
             ctx.lineTo(x + r, y + height);
             ctx.quadraticCurveTo(x, y + height, x, y + height - r);
             ctx.lineTo(x, y + r);
@@ -834,9 +834,9 @@
             ctx.quadraticCurveTo(x + width, y, x + width, y + r);
             ctx.lineTo(x + width, y + height - r);
             ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-            ctx.lineTo(x + 7.4, y + height);
-            ctx.quadraticCurveTo(x - 0.4, y + height + 2.1, x - 5.2, y + height + 6.1);
-            ctx.lineTo(x, y + height + 4.8);
+            ctx.lineTo(x + 6.2, y + height);
+            ctx.quadraticCurveTo(x - 0.2, y + height + 1.5, x - 4.2, y + height + 4.4);
+            ctx.lineTo(x, y + height + 2.8);
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
         }
@@ -873,12 +873,12 @@
         ctx.beginPath();
         ctx.moveTo(x - 4, y - 1);
         ctx.lineTo(x + width + 4, y - 1);
-        ctx.lineTo(x + width + 4, y + height * 0.34);
-        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.64, x - 4, y + height * 0.34);
+        ctx.lineTo(x + width + 4, y + height * 0.36);
+        ctx.quadraticCurveTo(x + width * 0.5, y + height * 0.68, x - 4, y + height * 0.36);
         ctx.closePath();
-        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.56);
-        shine.addColorStop(0, "rgba(255,255,255,0.92)");
-        shine.addColorStop(0.48, "rgba(255,255,255,0.30)");
+        const shine = ctx.createLinearGradient(x, y, x, y + height * 0.58);
+        shine.addColorStop(0, "rgba(255,255,255,0.94)");
+        shine.addColorStop(0.50, "rgba(255,255,255,0.32)");
         shine.addColorStop(1, "rgba(255,255,255,0.02)");
         ctx.fillStyle = shine;
         ctx.fill();
