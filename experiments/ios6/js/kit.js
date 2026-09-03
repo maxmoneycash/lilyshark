@@ -995,8 +995,9 @@
     }
 
     function cameraWell(ctx, x, y, action) {
-        // Zach/Mamma: mid-slate disc, silver bezel, white camera
-        // with a centered viewfinder bump and a lens hole.
+        // Zach/Mamma: mid-slate disc with a hard glass equator,
+        // silver lip, white camera that fills the well — wide body,
+        // tall centered viewfinder, lens hole. No flash pip.
         const size = 28;
         const cx = x + size / 2;
         const cy = y + size / 2;
@@ -1013,28 +1014,33 @@
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
         const well = ctx.createLinearGradient(cx, cy - outer, cx, cy + outer);
-        well.addColorStop(0, "#9aa2aa");
-        well.addColorStop(0.42, "#727a84");
-        well.addColorStop(1, "#5a626c");
+        well.addColorStop(0, "#a8b0b8");
+        well.addColorStop(0.40, "#848c94");
+        well.addColorStop(1, "#6e767e");
         ctx.fillStyle = well;
         ctx.fill();
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, outer - 0.35, 0, Math.PI * 2);
         ctx.clip();
-        // Mamma: soft white gloss on the top half, not a black trough.
         const gloss = ctx.createLinearGradient(cx, cy - outer, cx, cy + 2);
-        gloss.addColorStop(0, "rgba(255,255,255,0.38)");
-        gloss.addColorStop(0.48, "rgba(255,255,255,0.06)");
+        gloss.addColorStop(0, "rgba(255,255,255,0.42)");
+        gloss.addColorStop(0.48, "rgba(255,255,255,0.08)");
         gloss.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = gloss;
         ctx.fillRect(cx - outer, cy - outer, outer * 2, outer + 4);
+        // Mamma: glossy top half ends on a sharp equator, darker foot.
+        const equator = cy - outer + Math.round(outer * 2 * 0.40);
+        ctx.fillStyle = "rgba(255,255,255,0.34)";
+        ctx.fillRect(cx - outer, equator, outer * 2, 1);
+        ctx.fillStyle = "rgba(0,0,0,0.16)";
+        ctx.fillRect(cx - outer, equator + 1, outer * 2, 1);
         const inset = ctx.createLinearGradient(cx, cy - outer, cx, cy);
-        inset.addColorStop(0, "rgba(0,0,0,0.16)");
+        inset.addColorStop(0, "rgba(0,0,0,0.14)");
         inset.addColorStop(0.40, "rgba(0,0,0,0)");
         ctx.fillStyle = inset;
         ctx.fillRect(cx - outer, cy - outer, outer * 2, outer);
-        ctx.strokeStyle = "rgba(230,236,242,0.70)";
+        ctx.strokeStyle = "rgba(236,240,244,0.78)";
         ctx.lineWidth = 1.15;
         ctx.beginPath();
         ctx.arc(cx, cy - 0.15, outer - 1.15, 1.12 * Math.PI, 1.88 * Math.PI);
@@ -1049,14 +1055,14 @@
         ctx.strokeStyle = "rgba(40,46,54,0.36)";
         ctx.lineWidth = 1.05;
         ctx.stroke();
-        fillRound(ctx, cx - 6.8, cy - 1.35, 13.6, 8.4, 1.6, "#ffffff");
-        fillRound(ctx, cx - 2.2, cy - 4.85, 4.4, 3.6, 0.75, "#ffffff");
+        fillRound(ctx, cx - 6.5, cy - 1.20, 13.0, 8.1, 1.7, "#ffffff");
+        fillRound(ctx, cx - 2.8, cy - 5.95, 5.6, 5.1, 0.95, "#ffffff");
         ctx.beginPath();
-        ctx.arc(cx + 0.1, cy + 2.55, 2.2, 0, Math.PI * 2);
+        ctx.arc(cx + 0.1, cy + 2.70, 2.15, 0, Math.PI * 2);
         ctx.fillStyle = "#2a3036";
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx + 0.1, cy + 2.55, 0.85, 0, Math.PI * 2);
+        ctx.arc(cx + 0.1, cy + 2.70, 0.80, 0, Math.PI * 2);
         ctx.fillStyle = "#1a1e22";
         ctx.fill();
         if (action) hit(x, y, size, size, action);

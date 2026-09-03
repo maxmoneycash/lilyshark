@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 82,
-  "stop_after_pass": 130,
+  "pass": 83,
+  "stop_after_pass": 132,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -108,7 +108,8 @@
     "ios6-token-pale-lozenge",
     "ios6-inbox-search-soft-well",
     "ios6-plus-disc-candy",
-    "ios6-balloon-tighter-hooks"
+    "ios6-balloon-tighter-hooks",
+    "ios6-camera-equator-glyph"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -143,5 +144,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 82: balloon fins are shorter hooks (out 4.6, down 2.8) like Zach/Mamma, not drips. Frozen Gray*/Blue*/Sms* fills stay put. Bubble text stays black. Raised stop_after_pass to 130 because this pass made visual progress. Frozen kIos6*/kChat* unchanged."
+  "notes": "Pass 83: composer camera well gets a Mamma hard-glass equator and a taller centered viewfinder so the white glyph fills the slate disc like Zach. Well foot lifted toward measured #81868e. Frozen kIos6*/kChat* unchanged. Bubble text stays black. Raised stop_after_pass to 132 because this pass made visual progress."
 }
