@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 77,
-  "stop_after_pass": 120,
+  "pass": 78,
+  "stop_after_pass": 122,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -103,7 +103,8 @@
     "ios6-nav-stamped-steel",
     "ios6-action-white-pills",
     "ios6-messages-icon-lime-oval",
-    "ios6-send-royal-candy"
+    "ios6-send-royal-candy",
+    "ios6-composer-field-soft-well"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -138,5 +139,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 77: focused iMessage Send uses quieter candy glass plus a royal overlay so the crown reads like Zach/Mamma #7397f1, not icy #aacaf6. Frozen Send*/Sms* fills stay put. Empty New Message stays dusty. Bubble text stays black. Raised stop_after_pass to 120 because this pass made visual progress. Frozen kIos6*/kChat* unchanged."
+  "notes": "Pass 78: composer field well is a soft grey recess over #f2f2f2 like Zach/Mamma, not a near-black slit. Frozen Input* fills stay put. Bubble text stays black. Raised stop_after_pass to 122 because this pass made visual progress. Frozen kIos6*/kChat* unchanged."
 }
