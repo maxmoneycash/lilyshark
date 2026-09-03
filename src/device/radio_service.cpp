@@ -234,6 +234,15 @@ bool TDeckRadioService::configure(const RadioProfile &profile) noexcept
     if (state == RADIOLIB_ERR_NONE) {
         state = radio_.invertIQ(profile.inverted_iq);
     }
+    if (state == RADIOLIB_ERR_NONE) {
+        // The SX1262's boosted receive gain buys about 2 dB of sensitivity
+        // for ~0.7 mA, and stock Meshtastic firmware listens with it on.
+        // This radio never enabled it, so every fringe node sat 2 dB further
+        // away than it did for every stock deck on the same shelf -- at the
+        // edge where the Bay Area community actually arrives, that is the
+        // difference between one node an evening and several.
+        state = radio_.setRxBoostedGainMode(true);
+    }
 
     status_.last_error = state;
     status_.initialized = state == RADIOLIB_ERR_NONE;

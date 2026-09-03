@@ -80,6 +80,10 @@ void testConfigureInterruptReadAndRearm()
     TDeckRadioService service{};
     const RadioProfile profile = testProfile();
     assert(service.begin(profile, captureFrame, &capture));
+    // Boosted receive gain is part of what "configured" means: stock
+    // Meshtastic listens with it on, and a receiver 2 dB deafer than every
+    // stock deck on the same shelf is a silent field bug, not a preference.
+    assert(radiolib_fake::state().rx_boosted_gain);
     assert(service.status().initialized);
     assert(service.status().receiving);
     assert(fake.begin_calls == 1U);

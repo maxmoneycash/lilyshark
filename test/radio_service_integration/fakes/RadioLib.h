@@ -67,6 +67,7 @@ enum class Operation : std::uint8_t {
 };
 
 struct State {
+    bool rx_boosted_gain = false;
     std::uint32_t now_ms = 0;
     std::uint64_t now_us = 0;
     std::vector<Operation> operations{};
@@ -181,6 +182,11 @@ class SX1262
     }
 
     std::int16_t setDio2AsRfSwitch(bool) { return radiolib_fake::state().set_dio2_result; }
+    std::int16_t setRxBoostedGainMode(bool, bool = true)
+    {
+        radiolib_fake::state().rx_boosted_gain = true;
+        return 0;
+    }
     std::int16_t setCRC(std::uint8_t) { return radiolib_fake::state().set_crc_result; }
     std::int16_t implicitHeader(std::size_t)
     {
