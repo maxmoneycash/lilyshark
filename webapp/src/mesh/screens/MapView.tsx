@@ -239,7 +239,11 @@ export default function MapView({
 
 		for (const group of byCoord.values()) {
 			const hasMe = group.some((n) => n.num === s.myNodeNum);
-			const color = hasMe ? accent() : fg();
+			// A marker every one of whose nodes arrived over the internet is a
+			// rumour, and rumours are amber -- the same provenance colour the
+			// deck itself uses for bridged traffic.
+			const allNet = group.every((n) => n.viaNet);
+			const color = hasMe ? accent() : allNet ? "#d99000" : fg();
 			const lat = group[0].lat as number;
 			const lon = group[0].lon as number;
 			const label =

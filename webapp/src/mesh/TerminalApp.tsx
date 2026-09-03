@@ -13,6 +13,7 @@ import {
 } from "./radio";
 import { evalAlerts, evalRuntime, getAlertCfg } from "./alerts";
 import { clearDemo, seedDemo } from "./demo";
+import { startNetNodes } from "./netNodes";
 import { forecastBattery } from "./battery";
 import { addLog, DeviceStatus, fmtLog, getSnapshot, subscribe } from "./store";
 import { getAutoPurgeDays, loadTelemetry, purgeOlderThan } from "./db";
@@ -284,6 +285,10 @@ function App() {
     if (connected || lilyLinked) {
       everConnectedRef.current = true;
       clearDemo();
+      // With a real radio attached, add the internet's view of the mesh
+      // around it -- amber, labelled NET -- so the map answers both "what do
+      // I hear" and "who is out there".
+      startNetNodes();
     } else if (!everConnectedRef.current) {
       seedDemo();
     }
