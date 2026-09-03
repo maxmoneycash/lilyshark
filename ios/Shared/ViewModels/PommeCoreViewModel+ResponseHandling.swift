@@ -11,6 +11,9 @@
 import Foundation
 import os.log
 import MeshCoreKit
+#if canImport(MeshtasticKit)
+import MeshtasticKit
+#endif
 #if !os(watchOS)
 import CryptoKit
 #endif
@@ -510,6 +513,230 @@ extension PommeCoreViewModel {
         offset += 4; return UInt32(littleEndian: v)
     }
 }
+
+// MARK: - Meshtastic Response Handling
+
+#if canImport(MeshtasticKit)
+/// The deck's side of the conversation, landing in the same stores the MeshCore
+/// path fills.
+///
+/// Nothing here is a second copy of a MeshCore rule: contacts still go through
+/// `ContactStore.handleAdvert`, messages still go through
+/// `handleIncomingMessage`, and the send confirmation still lands in
+/// `MessageStoreManager`. This extension only translates one protocol's
+/// vocabulary into the models those already speak.
+extension PommeCoreViewModel {
+
+    /// Ask a connected deck for everything it knows.
+    ///
+    /// A deck answers exactly one question: `ToRadio{want_config_id}`. It
+    /// replies with my_info, its metadata, one node_info per node it has heard,
+    /// the primary channel, the LoRa config, and finally `config_complete_id`
+    /// echoing the nonce.
+    func requestMeshtasticConfigDump() {
+        // Any nonce would do, but zero is the value the deck sends when it has
+        // never been asked, so a random non-zero one cannot be mistaken for it.
+        let nonce = UInt32.random(in: 1...UInt32.max)
+        meshtasticConfigNonce = nonce
+        deviceConfig.isLoading = true
+        deviceConfig.loadedSections = []
+        connectionManager.sendToRadio(
+            MeshtasticProto.encodeWantConfig(nonce: nonce),
+            label: "WANT_CONFIG"
+        )
+        DebugLogger.shared.log("MT: requested config dump (nonce \(nonce))", level: .tx)
+    }
+
+    /// Dispatch one FromRadio protobuf from a connected deck.
+    func handleFromRadioFrame(_ data: Data) {
+        guard let message = MeshtasticProto.parseFromRadio(data) else {
+            // Unreadable bytes on this link are a symptom, not noise. The
+            // firmware pops a fresh protobuf on every BLE read instead of
+            // serving offsets into the one it already handed out, so a payload
+            // over about 184 bytes comes back spliced with the next message —
+            // and that is what arrives here. See INTEGRATION.md, "Not wired
+            // yet" #8: the fix is firmware-side.
+            Self.logger.error("MT RX: unreadable FromRadio [\(data.count) bytes]")
+            DebugLogger.shared.log("MT RX: unreadable FromRadio [\(data.count)B]", level: .error)
+            return
+        }
+
+        switch message {
+        case .myInfo(let num):
+            handleMeshtasticMyInfo(nodeNum: num)
+
+        case .metadata(let firmware):
+            deviceConfig.semanticVersion = firmware
+            deviceConfig.loadedSections.insert("deviceInfo")
+            DebugLogger.shared.log("MT: firmware '\(firmware)'", level: .rx)
+
+        case .nodeInfo(let info):
+            upsertMeshtasticNode(
+                num: info.num,
+                name: info.displayName,
+                latitude: info.latitude,
+                longitude: info.longitude
+            )
+            if info.num == messageStoreManager.meshtasticNodeNum {
+                // The deck lists itself first in the dump, and that entry is
+                // where the Settings screen gets a name to show.
+                deviceConfig.deviceName = info.displayName
+                deviceConfig.latitude = info.latitude ?? deviceConfig.latitude
+                deviceConfig.longitude = info.longitude ?? deviceConfig.longitude
+            }
+
+        case .position(let position):
+            upsertMeshtasticNode(
+                num: position.from,
+                name: nil,
+                latitude: position.latitude,
+                longitude: position.longitude
+            )
+
+        case .text(let text):
+            handleMeshtasticText(text)
+
+        case .routing(let requestID, let error):
+            Self.logger.info("MT ROUTING: id=\(requestID) error=\(error)")
+            messageStoreManager.handleMeshtasticRouting(packetID: requestID, error: error)
+
+        case .configComplete(let nonce):
+            handleMeshtasticConfigComplete(nonce: nonce)
+
+        case .other:
+            // Channel and config messages this client has no use for. They
+            // still have to be read past to reach config_complete_id.
+            break
+        }
+    }
+
+    // MARK: - Meshtastic Helpers
+
+    private func handleMeshtasticMyInfo(nodeNum: UInt32) {
+        guard nodeNum != 0 else {
+            Self.logger.warning("MT: my_info carried node number 0 — the deck has no identity yet")
+            return
+        }
+        // Meshtastic has no public key to key storage on, and the node number
+        // is the only stable name the deck ever gives itself.
+        let radioPrefix = String(format: "%08x", nodeNum)
+        messageStoreManager.meshtasticNodeNum = nodeNum
+        deviceConfig.publicKeyHex = radioPrefix
+        // Per-radio isolation, in exactly the place the MeshCore path does it
+        // on .selfInfo. Skip it and a deck's messages are written into the last
+        // MeshCore radio's encrypted store.
+        messageStoreManager.activateForRadio(radioPrefix)
+        channelStore.activateForRadio(radioPrefix)
+        contactStore.loadNicknamesFromiCloud()
+        contactStore.loadContactNotesFromiCloud()
+        deviceConfig.loadedSections.insert("selfInfo")
+        Self.logger.info("MT: my_info node=\(radioPrefix)")
+        DebugLogger.shared.log("MT: deck node number \(radioPrefix)", level: .rx)
+    }
+
+    private func handleMeshtasticConfigComplete(nonce: UInt32) {
+        let expected = meshtasticConfigNonce
+        guard nonce == expected else {
+            // The tail of an older dump. Its nodes are still worth keeping, but
+            // it does not close the request that is outstanding now.
+            Self.logger.warning("MT: config_complete nonce \(nonce), expected \(expected)")
+            return
+        }
+        meshtasticConfigNonce = 0
+        // A deck reports no battery and no radio parameters, so the MeshCore
+        // loading gate — selfInfo plus deviceInfo plus battAndStorage — can
+        // never close on its own and every settings screen would spin forever.
+        deviceConfig.isLoading = false
+        channelStore.seedPrimaryChannelForDeck()
+        let nodeCount = contactStore.contacts.count
+        Self.logger.info("MT: config dump complete — \(nodeCount) nodes")
+        DebugLogger.shared.log("MT: config complete, \(nodeCount) nodes", level: .info)
+        #if os(iOS)
+        syncWidget()
+        #endif
+    }
+
+    /// Merge what one message says about a node into the contact list.
+    ///
+    /// Names and positions arrive on different messages — a node_info in the
+    /// dump, a POSITION_APP packet afterwards, a text from a node that has not
+    /// announced itself at all — so each carries only what it knows, and none
+    /// of them may erase what another established.
+    @discardableResult
+    private func upsertMeshtasticNode(
+        num: UInt32,
+        name: String?,
+        latitude: Double?,
+        longitude: Double?
+    ) -> Contact? {
+        guard num != 0 else { return nil }
+        let key = MeshtasticIdentity.syntheticKey(forNodeNum: num)
+        let prefix = Data(key.prefix(MeshtasticIdentity.prefixLength))
+        let existing = contactStore.contacts.first { $0.publicKeyPrefix == prefix }
+        let now = Date().epochUInt32
+
+        let contact = Contact(
+            publicKey: key,
+            name: name ?? existing?.name ?? MeshtasticIdentity.defaultLabel(forNodeNum: num),
+            // A deck reports no roles, so every node it hears is a peer to talk
+            // to rather than a repeater, room or sensor.
+            type: .chat,
+            // Favourite and telemetry bits are the operator's, not the deck's.
+            flags: existing?.flags ?? 0,
+            // This API exposes none of Meshtastic's routing, and -1 is what
+            // every screen reads as "no path known".
+            outPathLen: -1,
+            outPath: Data(),
+            lastAdvert: now,
+            latitude: latitude ?? existing?.latitude ?? 0,
+            longitude: longitude ?? existing?.longitude ?? 0,
+            lastmod: now
+        )
+        contactStore.handleAdvert(contact)
+        contactStore.recordPosition(for: contact)
+        return contact
+    }
+
+    private func handleMeshtasticText(_ text: MeshtasticProto.TextMessage) {
+        // A node can be heard talking before it has announced itself, so the
+        // sender is upserted here too — otherwise the conversation would be
+        // headed by a name nobody recognises.
+        let sender = upsertMeshtasticNode(num: text.from, name: nil, latitude: nil, longitude: nil)
+        let senderPrefix = Data(
+            MeshtasticIdentity.syntheticKey(forNodeNum: text.from)
+                .prefix(MeshtasticIdentity.prefixLength)
+        )
+        let isBroadcast = text.to == MeshtasticProto.broadcast
+        let channelIndex = UInt8(truncatingIfNeeded: text.channel)
+        // A channel thread is keyed by its one-byte index — the same key
+        // sendChannelMessage writes into — so heard traffic and sent traffic
+        // land in one conversation instead of two.
+        let conversationKey = isBroadcast ? Data([channelIndex]) : senderPrefix
+
+        let message = Message(
+            senderKeyHash: senderPrefix,
+            contactKeyHash: conversationKey,
+            text: text.text,
+            timestamp: Date(),
+            isOutgoing: false,
+            status: .sent,
+            snr: text.rxSNR.map { MeshtasticIdentity.snrQuarterDecibels(from: $0) },
+            // The deck relays no hop count, and a fabricated zero would tell the
+            // UI the sender is a direct neighbour.
+            hops: nil,
+            channelIndex: isBroadcast ? channelIndex : nil,
+            senderName: sender.map { contactStore.displayName(for: $0) }
+        )
+
+        Self.logger.info("MT RX text: from=\(String(format: "%08x", text.from)) broadcast=\(isBroadcast)")
+        DebugLogger.shared.log("MT RX: '\(text.text.prefix(60))'", level: .rx)
+        handleIncomingMessage(message)
+        #if os(iOS)
+        syncWidget()
+        #endif
+    }
+}
+#endif
 
 // MARK: - Mesh Responder
 

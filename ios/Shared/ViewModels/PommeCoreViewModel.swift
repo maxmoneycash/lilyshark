@@ -138,20 +138,25 @@ final class PommeCoreViewModel: ObservableObject {
     /// Not @Published: the observeStores bridge tracks changes via @Observable.
     /// Reference is replaced (= DeviceConfig()) on disconnect to reset all state.
     var deviceConfig = DeviceConfig()
-    
+
+    /// Nonce sent with a deck's config request, which the deck echoes back in
+    /// `config_complete_id` to mark the dump finished. Zero when none is
+    /// outstanding. Only ever set on a Meshtastic link.
+    var meshtasticConfigNonce: UInt32 = 0
+
     private let iCloudStore = NSUbiquitousKeyValueStore.default
     
     private func registerTerminationHandler() {
 #if os(iOS)
         NotificationCenter.default.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
-                self?.connectionManager.bleManager.disconnectForTermination()
+                self?.connectionManager.disconnectForTermination()
             }
         }
 #elseif os(macOS)
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
-                self?.connectionManager.bleManager.disconnectForTermination()
+                self?.connectionManager.disconnectForTermination()
             }
         }
 #endif
@@ -219,6 +224,11 @@ final class PommeCoreViewModel: ObservableObject {
         
         // MessageStoreManager dependencies
         messageStoreManager.sendCommand = { [weak self] data, label in self?.connectionManager.sendCommand(data, label: label) }
+        #if canImport(MeshtasticKit)
+        messageStoreManager.sendToRadio = { [weak self] data, label in
+            self?.connectionManager.sendToRadio(data, label: label) ?? false
+        }
+        #endif
         messageStoreManager.displayNameProvider = { [weak self] key in
             guard let self, let contact = self.contactStore.contacts.first(where: { $0.publicKeyPrefix == key }) else { return "Unknown" }
             return self.contactStore.displayName(for: contact)
@@ -327,6 +337,11 @@ final class PommeCoreViewModel: ObservableObject {
         connectionManager.onDeviceReady = { [weak self] in
             self?.onDeviceReady()
         }
+        #if canImport(MeshtasticKit)
+        connectionManager.onFromRadioFrameReceived = { [weak self] data in
+            self?.handleFromRadioFrame(data)
+        }
+        #endif
         connectionManager.onUSBCLIReady = { [weak self] in
 #if os(macOS) || targetEnvironment(macCatalyst)
             self?.onUSBCLIReady()
@@ -344,6 +359,7 @@ final class PommeCoreViewModel: ObservableObject {
     
     /// Handle disconnect cleanup — called by ConnectionManager when state → disconnected.
     private func handleDisconnect(previousState: BLEConnectionState) {
+        meshtasticConfigNonce = 0
         remoteSessionManager.resetLoginSessions()
         remoteSessionManager.reset()
         connectionManager.stopAutoLocationUpdates()
@@ -504,6 +520,20 @@ final class PommeCoreViewModel: ObservableObject {
             )
         }
         channelStore.hasCompletedInitialChannelSync = false
+
+        #if canImport(MeshtasticKit)
+        // A deck answers exactly one question. Everything below this point is
+        // MeshCore: twelve settings commands, a contact sync and a message sync,
+        // none of which a deck can parse.
+        if connectionManager.activeTransport == .meshtastic {
+            requestMeshtasticConfigDump()
+            #if os(iOS)
+            syncWidget()
+            #endif
+            return
+        }
+        #endif
+
         connectionManager.refreshAllSettings()
         contactStore.requestContacts(fullSync: true)
         syncNextMessage()

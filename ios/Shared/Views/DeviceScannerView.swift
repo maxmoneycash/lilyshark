@@ -10,6 +10,9 @@
 
 import SwiftUI
 import MeshCoreKit
+#if canImport(MeshtasticKit)
+import MeshtasticKit
+#endif
 
 struct DeviceScannerView: View {
     @Environment(ConnectionManager.self) private var connectionManager
@@ -114,6 +117,56 @@ struct DeviceScannerView: View {
                 Text("Nearby Devices")
                     .foregroundStyle(MeshTheme.textSecondary)
             }
+
+            #if canImport(MeshtasticKit)
+            // Kept as its own list. The two lists hold CBPeripherals owned by
+            // different centrals, and connecting to one through the other's
+            // manager fails in a way that looks like a radio with a bad antenna.
+            Section {
+                if connectionManager.discoveredMeshtasticDevices.isEmpty {
+                    Text(connectionManager.isScanning ? "Looking for a deck..." : "No decks found")
+                        .font(.caption)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .listRowBackground(MeshTheme.surface)
+                } else {
+                    ForEach(connectionManager.discoveredMeshtasticDevices) { device in
+                        Button {
+                            connectionManager.connectMeshtastic(to: device)
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(MeshTheme.accent.opacity(0.12))
+                                        .frame(width: 40, height: 40)
+                                    Image(systemName: "dot.radiowaves.left.and.right")
+                                        .foregroundStyle(MeshTheme.accent)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(device.name)
+                                        .font(.body)
+                                        .foregroundStyle(MeshTheme.accent)
+                                    Text("Speaks Meshtastic")
+                                        .font(.caption)
+                                        .foregroundStyle(MeshTheme.textSecondary)
+                                }
+                                Spacer()
+                                signalBars(rssi: device.rssi)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(MeshTheme.surface)
+                    }
+                }
+            } header: {
+                Text("Lilyshark Decks")
+                    .foregroundStyle(MeshTheme.textSecondary)
+            } footer: {
+                Text("A deck speaks Meshtastic, not MeshCore. Connect to one and you get the nodes it has heard and the messages it carries. The radio settings and management tools are for a MeshCore radio and stay unavailable.")
+                    .font(.caption2)
+            }
+            #endif
 
             Section {
                 if connectionManager.wifiManager.isConnected {

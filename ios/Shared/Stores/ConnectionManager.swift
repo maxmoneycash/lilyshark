@@ -12,12 +12,25 @@ import SwiftUI
 import Combine
 import os.log
 import MeshCoreKit
+// MeshtasticKit is a second local package, and the committed Xcode project does
+// not link it yet -- see the note beside `meshtasticManager` below. Everything
+// that needs the package is written against `canImport` so this file builds
+// either way, and the MeshCore path is byte-for-byte what it was when the
+// package is absent.
+#if canImport(MeshtasticKit)
+import MeshtasticKit
+#endif
 #if !os(watchOS)
 import CoreLocation
 #endif
 
 /// Connection transport type.
-enum Transport { case ble, usb, wifi }
+///
+/// `.ble` is MeshCore over the Nordic UART service; `.meshtastic` is a Lilyshark
+/// deck over Meshtastic's client GATT service. They are different protocols end
+/// to end, not two dialects of one, so a frame built for either is never valid
+/// on the other.
+enum Transport { case ble, usb, wifi, meshtastic }
 
 #if !os(watchOS)
 /// Shared CLLocationManager — reused across all GPS operations to avoid
@@ -70,8 +83,22 @@ final class ConnectionManager {
     var isVerifyingConfig = false
     var lastConfigVerification: RadioConfigVerification?
 
+    /// True while a Lilyshark deck is connected over the Meshtastic service and
+    /// ready to take a ToRadio write.
+    ///
+    /// Stored rather than derived from `meshtasticState` because every transport
+    /// decision below reads it, and in a build without MeshtasticKit it stays
+    /// false — which is what makes all of them read exactly as they did before.
+    private(set) var isMeshtasticReady = false
+
+    /// True from the moment a deck is chosen until the link to it is gone,
+    /// including while it is still coming up. `isMeshtasticReady` narrows that
+    /// to the part where the deck can actually be talked to.
+    private(set) var isMeshtasticLinkActive = false
+
     /// True when the app has an active binary connection via any transport.
     var isActivelyConnected: Bool {
+        if isMeshtasticReady { return true }
         if connectionState == .connected || connectionState == .ready { return true }
         if wifiManager.isConnected { return true }
         #if os(macOS) || targetEnvironment(macCatalyst)
@@ -81,7 +108,10 @@ final class ConnectionManager {
     }
 
     /// Active connection transport, derived from sendCommand routing priority.
+    /// A connected deck comes first: it is an explicit operator choice and must
+    /// not be shadowed by a WiFi session left over from another radio.
     var activeTransport: Transport {
+        if isMeshtasticReady { return .meshtastic }
         if wifiManager.isConnected { return .wifi }
         #if os(macOS) || targetEnvironment(macCatalyst)
         if usbManager.isConnected && usbManager.detectedMode == .binary { return .usb }
@@ -93,6 +123,26 @@ final class ConnectionManager {
 
     let bleManager = BLEManager()
     let wifiManager = WiFiConnectionManager()
+
+    #if canImport(MeshtasticKit)
+    /// A second CoreBluetooth central, for radios speaking Meshtastic's client
+    /// service. It sits beside `bleManager` rather than inside it because the
+    /// conversation is not Nordic UART: the radio queues protobufs and the phone
+    /// drains a read characteristic, where MeshCore notifies framed bytes.
+    ///
+    /// Nothing in the app reaches this until the package is linked into the
+    /// Xcode project — `ios/PommeCore.xcodeproj` and `ios/project.yml` both
+    /// still list MeshCoreKit alone.
+    let meshtasticManager = MeshtasticBLEManager()
+
+    /// Decks the Meshtastic central has found. Deliberately not merged into
+    /// `discoveredPeripherals`: the two lists hold CBPeripherals owned by
+    /// different centrals, and connecting through the wrong one fails in a way
+    /// that looks like a flaky radio.
+    var discoveredMeshtasticDevices: [DiscoveredMeshtasticDevice] = []
+
+    private(set) var meshtasticState: MeshtasticBLEConnectionState = .disconnected
+    #endif
     #if os(macOS) || targetEnvironment(macCatalyst)
     let usbManager = USBSerialManager()
     /// USB serial ports — bridged from USBSerialManager @Published for @Observable tracking.
@@ -109,6 +159,13 @@ final class ConnectionManager {
 
     /// Called when a binary frame is received from any transport.
     var onFrameReceived: ((Data) -> Void)?
+
+    /// Called with one whole FromRadio protobuf from a connected deck.
+    ///
+    /// Separate from `onFrameReceived` because that payload is handed to
+    /// `MeshCoreKit.FrameParser`, which would read a protobuf as a corrupt
+    /// MeshCore frame and act on whatever its first byte happened to be.
+    var onFromRadioFrameReceived: ((Data) -> Void)?
 
     /// Called when connection state transitions to .ready (binary mode device connected).
     var onDeviceReady: (() -> Void)?
@@ -141,11 +198,41 @@ final class ConnectionManager {
         setupSubscriptions()
     }
 
+    // MARK: - Bluetooth Activation
+
+    /// Create the CoreBluetooth centrals. Kept out of `init` so onboarding can
+    /// finish before iOS shows the Bluetooth prompt; both centrals live in one
+    /// process and share the one system permission, so this prompts once.
+    func activateBluetooth() {
+        bleManager.activate()
+        #if canImport(MeshtasticKit)
+        meshtasticManager.activate()
+        #endif
+    }
+
+    /// Drop every live link without ceremony, for app termination.
+    func disconnectForTermination() {
+        bleManager.disconnectForTermination()
+        #if canImport(MeshtasticKit)
+        meshtasticManager.disconnectForTermination()
+        #endif
+    }
+
     // MARK: - Send Command
 
     /// Route a command frame to the active transport (WiFi > USB binary > BLE).
     func sendCommand(_ data: Data, label: String) {
         let verbose = !Self.routineLabels.contains(label)
+
+        // A deck cannot parse a MeshCore frame. Unhandled, this would fall
+        // through to `bleManager.send`, which drops it silently because there is
+        // no MeshCore link to write on — a no-op that reads to the operator as
+        // the app being broken. Refuse it loudly instead.
+        if isMeshtasticReady {
+            Self.logger.warning("Refusing \(label) — a MeshCore frame is not valid on a Meshtastic deck")
+            DebugLogger.shared.log("TX BLOCKED \(label) — deck speaks Meshtastic", level: .error)
+            return
+        }
 
         if wifiManager.isConnected {
             let hex = data.hexFormatted()
@@ -173,6 +260,26 @@ final class ConnectionManager {
         if verbose { DebugLogger.shared.log("TX \(label) [\(data.count)B] \(hex)", level: .tx) }
         bleManager.send(data: data)
     }
+
+    #if canImport(MeshtasticKit)
+    /// Send one already-encoded ToRadio protobuf to a connected deck.
+    ///
+    /// Deliberately not part of `sendCommand`: the bytes come from
+    /// `MeshtasticProto`, not `MeshCoreProtocol`, and confusing the two is the
+    /// one mistake this transport pair makes easy. Returns false when the
+    /// payload was refused outright — no deck, or too large for its inbox.
+    @discardableResult
+    func sendToRadio(_ data: Data, label: String) -> Bool {
+        guard isMeshtasticReady else {
+            Self.logger.warning("Cannot send \(label) — no deck connected")
+            DebugLogger.shared.log("TX(MT) FAIL \(label) — no deck connected", level: .error)
+            return false
+        }
+        Self.logger.info("TX(Meshtastic) \(label) [\(data.count) bytes]")
+        DebugLogger.shared.log("TX(MT) \(label) [\(data.count)B]", level: .tx)
+        return meshtasticManager.send(toRadio: data)
+    }
+    #endif
 
     // MARK: - Protocol Convenience Commands
 
@@ -510,6 +617,11 @@ final class ConnectionManager {
         scanRetryTask?.cancel()
         isScanning = true
         bleManager.startScanning()
+        // Both centrals scan at once: the operator does not know which protocol
+        // the radio in their hand speaks until they see it in the list.
+        #if canImport(MeshtasticKit)
+        meshtasticManager.startScanning()
+        #endif
     }
 
     func stopScanning() {
@@ -518,23 +630,46 @@ final class ConnectionManager {
         scanRetryCount = 0
         isScanning = false
         bleManager.stopScanning()
+        #if canImport(MeshtasticKit)
+        meshtasticManager.stopScanning()
+        #endif
+    }
+
+    /// Whether either central has anything to show. A scan that found a deck but
+    /// no MeshCore radio must not count as an empty scan, or the retry loop
+    /// restarts a scan whose results are already on screen.
+    private var foundNoDevices: Bool {
+        #if canImport(MeshtasticKit)
+        return discoveredPeripherals.isEmpty && discoveredMeshtasticDevices.isEmpty
+        #else
+        return discoveredPeripherals.isEmpty
+        #endif
     }
 
     func handleScanTimeout() {
         guard isScanning else { return }
-        if discoveredPeripherals.isEmpty && scanRetryCount > 0 {
+        if foundNoDevices && scanRetryCount > 0 {
             scanRetryCount -= 1
             Self.logger.info("Scan found nothing, retrying (\(self.scanRetryCount) retries left)")
             bleManager.stopScanning()
+            #if canImport(MeshtasticKit)
+            meshtasticManager.stopScanning()
+            #endif
             scanRetryTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 guard !Task.isCancelled else { return }
                 self?.bleManager.startScanning()
+                #if canImport(MeshtasticKit)
+                self?.meshtasticManager.startScanning()
+                #endif
             }
-        } else if discoveredPeripherals.isEmpty {
+        } else if foundNoDevices {
             Self.logger.info("Scan retries exhausted, stopping")
             isScanning = false
             bleManager.stopScanning()
+            #if canImport(MeshtasticKit)
+            meshtasticManager.stopScanning()
+            #endif
         }
     }
 
@@ -542,6 +677,14 @@ final class ConnectionManager {
         stopScanning()
         bleManager.connect(to: peripheral.peripheral)
     }
+
+    #if canImport(MeshtasticKit)
+    /// Connect to a deck found by the Meshtastic central.
+    func connectMeshtastic(to device: DiscoveredMeshtasticDevice) {
+        stopScanning()
+        meshtasticManager.connect(to: device.peripheral)
+    }
+    #endif
 
     func connectWiFi(host: String, port: UInt16 = 5000) {
         stopScanning()
@@ -693,6 +836,16 @@ final class ConnectionManager {
 
     func disconnect() {
         // Route to the correct transport disconnect
+        #if canImport(MeshtasticKit)
+        if isMeshtasticLinkActive {
+            // A Meshtastic client is expected to say goodbye, so the radio stops
+            // queuing for a phone that has gone; its outbound queue is eight
+            // deep and drops live traffic once full.
+            meshtasticManager.disconnect(farewell: MeshtasticProto.encodeDisconnect())
+            scheduleRescanAfterDisconnect()
+            return
+        }
+        #endif
         if wifiManager.isConnected {
             disconnectWiFi()
             return
@@ -704,7 +857,12 @@ final class ConnectionManager {
         }
         #endif
         bleManager.disconnect()
-        // Auto-scan after user-initiated disconnect
+        scheduleRescanAfterDisconnect()
+    }
+
+    /// Show the scanner again a moment after the operator disconnects, so the
+    /// app lands somewhere useful rather than on an empty radio screen.
+    private func scheduleRescanAfterDisconnect() {
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard let self, self.connectionState == .disconnected else { return }
@@ -723,6 +881,10 @@ final class ConnectionManager {
     // MARK: - Subscriptions
 
     private func setupSubscriptions() {
+        #if canImport(MeshtasticKit)
+        setupMeshtasticSubscriptions()
+        #endif
+
         // BLE received data → frame handler
         bleManager.receivedDataSubject
             .receive(on: DispatchQueue.main)
@@ -755,7 +917,8 @@ final class ConnectionManager {
         bleManager.$connectedDeviceName
             .receive(on: DispatchQueue.main)
             .sink { [weak self] name in
-                self?.connectedDeviceName = name
+                guard let self, !self.isMeshtasticLinkActive else { return }
+                self.connectedDeviceName = name
             }
             .store(in: &cancellables)
 
@@ -766,6 +929,10 @@ final class ConnectionManager {
                 guard let self else { return }
                 // Don't let BLE state changes override an active WiFi connection
                 guard !self.wifiManager.isConnected else { return }
+                // The MeshCore central keeps scanning while a deck is connected,
+                // and its own .disconnected is its resting state — publishing it
+                // would tear down a live Meshtastic session.
+                guard !self.isMeshtasticLinkActive else { return }
                 let previousState = self.connectionState
                 self.connectionState = state
 
@@ -907,4 +1074,87 @@ final class ConnectionManager {
             .store(in: &cancellables)
         #endif
     }
+
+    #if canImport(MeshtasticKit)
+
+    /// The one place the two connection-state enums are equated.
+    ///
+    /// They are separate types on purpose — the two managers reach `.ready` on
+    /// different evidence, one on a subscribed UART characteristic and one on a
+    /// subscribed FromNum — so the mapping has to exist, and has to exist once.
+    private static func bridged(_ state: MeshtasticBLEConnectionState) -> BLEConnectionState {
+        switch state {
+        case .disconnected: return .disconnected
+        case .scanning:     return .scanning
+        case .connecting:   return .connecting
+        case .connected:    return .connected
+        case .ready:        return .ready
+        }
+    }
+
+    private func setupMeshtasticSubscriptions() {
+        // FromRadio protobufs arrive on the BLE queue; every store they end up
+        // touching is @MainActor, so the hop happens once, here.
+        meshtasticManager.fromRadioSubject
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] data in
+                self?.onFromRadioFrameReceived?(data)
+            }
+            .store(in: &cancellables)
+
+        meshtasticManager.$discoveredDevices
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] devices in
+                self?.discoveredMeshtasticDevices = devices
+            }
+            .store(in: &cancellables)
+
+        meshtasticManager.$connectionState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                guard let self else { return }
+                let wasActive = self.isMeshtasticLinkActive
+                self.meshtasticState = state
+                self.isMeshtasticReady = (state == .ready)
+                // .scanning is a shared idle state — both centrals scan at the
+                // same time — so it is not evidence that a deck owns the link.
+                self.isMeshtasticLinkActive = (state == .connecting || state == .connected || state == .ready)
+
+                // A MeshCore radio and a deck are never connected at once, so
+                // whichever link is live owns the single connectionState every
+                // screen reads. `wasActive` keeps the final .disconnected: it
+                // arrives after the flag has already gone false.
+                guard wasActive || self.isMeshtasticLinkActive else { return }
+                guard !self.wifiManager.isConnected else { return }
+
+                let previousState = self.connectionState
+                self.connectionState = Self.bridged(state)
+                if self.connectionState == .disconnected {
+                    self.connectedDeviceName = nil
+                    if previousState != .disconnected { self.onDisconnected?(previousState) }
+                }
+                if state == .ready && previousState != .ready { self.onDeviceReady?() }
+            }
+            .store(in: &cancellables)
+
+        meshtasticManager.$connectedDeviceName
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] name in
+                guard let self, self.isMeshtasticLinkActive else { return }
+                self.connectedDeviceName = name
+            }
+            .store(in: &cancellables)
+
+        meshtasticManager.$statusMessage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] message in
+                // Only a real complaint is surfaced. A nil here is the deck's
+                // central saying it has nothing to report, not a reason to wipe
+                // a message the MeshCore central just put on screen.
+                guard let message else { return }
+                self?.bleStatusMessage = message
+            }
+            .store(in: &cancellables)
+    }
+    #endif
 }

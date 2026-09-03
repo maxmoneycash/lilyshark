@@ -19,6 +19,9 @@ import WatchKit
 import Intents
 #endif
 import MeshCoreKit
+#if canImport(MeshtasticKit)
+import MeshtasticKit
+#endif
 
 /// Observable store for messages, ACK tracking, echo detection, drafts, and unread counts.
 /// Extracted from PommeCoreViewModel to enable fine-grained view observation.
@@ -41,6 +44,15 @@ final class MessageStoreManager {
 
     /// Closure to send a command frame to the device.
     var sendCommand: ((Data, String) -> Void)?
+
+    /// Closure to send one encoded ToRadio protobuf to a connected deck.
+    /// Returns false when the deck refused to take it.
+    var sendToRadio: ((Data, String) -> Bool)?
+
+    /// The connected deck's own node number, from FromRadio.my_info. Zero
+    /// whenever the app is talking to a MeshCore radio instead, which is the
+    /// single test every branch below uses to pick a protocol.
+    var meshtasticNodeNum: UInt32 = 0
 
     /// Closure to get the display name for a contact key prefix.
     var displayNameProvider: ((Data) -> String)?
@@ -100,6 +112,18 @@ final class MessageStoreManager {
 
     /// Maps expected ACK code -> message tracking info.
     private var pendingACKs: [UInt32: (contactKeyHash: Data, messageID: UUID)] = [:]
+
+    /// Meshtastic packet ids the deck still owes a Routing result for.
+    ///
+    /// Deliberately not `pendingACKs`: that table drives the MeshCore retry
+    /// ladder, which on timeout rebuilds MeshCore frames — bytes a deck cannot
+    /// parse. Two protocols, two waiting rooms.
+    private var pendingMeshtasticPackets: [UInt32: (conversationKey: Data, messageID: UUID)] = [:]
+
+    /// How long to wait for a deck's Routing result before calling a message
+    /// failed. The deck answers as soon as its radio has taken the packet, so
+    /// this is a backstop for a link that died mid-send, not a mesh round trip.
+    private static let meshtasticRoutingTimeoutSeconds: UInt64 = 20
 
     /// Tracks the most recent outgoing channel message for echo detection.
     var pendingChannelEcho: (id: UUID, channelKey: Data, sent: Date)?
@@ -281,6 +305,20 @@ final class MessageStoreManager {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
+        #if canImport(MeshtasticKit)
+        if meshtasticNodeNum != 0 {
+            guard let node = MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) else {
+                // A MeshCore contact left over from another radio: it has no
+                // node number, so there is no address on this mesh to send to.
+                Self.logger.warning("MT SEND: \(contact.name) is not a Meshtastic node — refusing")
+                DebugLogger.shared.log("MT SEND blocked: '\(contact.name)' has no node number", level: .error)
+                return
+            }
+            sendMeshtasticText(trimmed, to: node, channelIndex: nil, conversationKey: contact.publicKeyPrefix)
+            return
+        }
+        #endif
+
         let outgoing = Message(
             contactKeyHash: contact.publicKeyPrefix,
             text: trimmed,
@@ -354,6 +392,18 @@ final class MessageStoreManager {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
+        #if canImport(MeshtasticKit)
+        if meshtasticNodeNum != 0 {
+            sendMeshtasticText(
+                trimmed,
+                to: MeshtasticProto.broadcast,
+                channelIndex: channelIndex,
+                conversationKey: Data([channelIndex])
+            )
+            return
+        }
+        #endif
+
         let frame = MeshCoreProtocol.buildSendChannelMessage(
             text: trimmed,
             channelIndex: channelIndex,
@@ -403,6 +453,90 @@ final class MessageStoreManager {
         )
         sendCommand?(frame, "SEND_ROOM_TXT")
     }
+
+    #if canImport(MeshtasticKit)
+
+    // MARK: - Send Over a Meshtastic Deck
+
+    /// Send one text through a connected deck.
+    ///
+    /// The deck answers any packet carrying a non-zero id with a Routing result
+    /// naming that id, and that is the only evidence the app ever gets that the
+    /// message left the radio — this firmware does not relay Meshtastic's
+    /// end-to-end acknowledgement. So the id is stamped here and remembered,
+    /// and the bubble reads "Sending…" until the result arrives.
+    private func sendMeshtasticText(
+        _ text: String,
+        to destination: UInt32,
+        channelIndex: UInt8?,
+        conversationKey: Data
+    ) {
+        // Zero is the id the firmware reads as "no id wanted", and it would
+        // leave the message waiting on a result that is never sent.
+        let packetID = UInt32.random(in: 1...UInt32.max)
+
+        let outgoing = Message(
+            contactKeyHash: conversationKey,
+            text: text,
+            timestamp: Date(),
+            isOutgoing: true,
+            status: .sending,
+            expectedACK: packetID,
+            channelIndex: channelIndex
+        )
+        messagesByContact[conversationKey, default: []].append(outgoing)
+        persistMessages(for: conversationKey)
+
+        let payload = MeshtasticProto.encodeTextPacket(
+            to: destination,
+            channel: UInt32(channelIndex ?? 0),
+            packetID: packetID,
+            text: text,
+            wantAck: true
+        )
+        let label = channelIndex == nil ? "SEND_TXT(MT)" : "SEND_CHANNEL_TXT(MT)"
+        Self.logger.info("MT SEND: to=\(String(format: "%08x", destination)) id=\(packetID) [\(payload.count) bytes]")
+        DebugLogger.shared.log("MT TX: to=\(String(format: "%08x", destination)) '\(text.prefix(40))'", level: .tx)
+
+        guard sendToRadio?(payload, label) == true else {
+            markMeshtasticMessage(outgoing.id, in: conversationKey, as: .failed)
+            return
+        }
+
+        pendingMeshtasticPackets[packetID] = (conversationKey: conversationKey, messageID: outgoing.id)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.meshtasticRoutingTimeoutSeconds * 1_000_000_000)
+            guard let self,
+                  let pending = self.pendingMeshtasticPackets.removeValue(forKey: packetID) else { return }
+            Self.logger.warning("MT SEND: no routing result for id \(packetID) — marking failed")
+            self.markMeshtasticMessage(pending.messageID, in: pending.conversationKey, as: .failed)
+        }
+    }
+
+    /// Apply a deck's Routing result to the message waiting on it. `error` is
+    /// Meshtastic's `Routing.Error`, where zero means the radio transmitted.
+    func handleMeshtasticRouting(packetID: UInt32, error: UInt32) {
+        guard let pending = pendingMeshtasticPackets.removeValue(forKey: packetID) else {
+            Self.logger.debug("MT ROUTING: nothing waiting on id \(packetID)")
+            return
+        }
+        // `.sent`, never `.delivered`: the deck answers for its own radio, not
+        // for the far end, so claiming delivery would be a promise nobody made.
+        markMeshtasticMessage(
+            pending.messageID,
+            in: pending.conversationKey,
+            as: error == 0 ? .sent : .failed
+        )
+    }
+
+    private func markMeshtasticMessage(_ id: UUID, in conversationKey: Data, as status: DeliveryStatus) {
+        guard var messages = messagesByContact[conversationKey],
+              let index = messages.firstIndex(where: { $0.id == id }) else { return }
+        messages[index].status = status
+        messagesByContact[conversationKey] = messages
+        persistMessages(for: conversationKey)
+    }
+    #endif
 
     func syncNextMessage() {
         isSyncingMessages = true
@@ -1042,5 +1176,9 @@ final class MessageStoreManager {
         isSyncingMessages = false
         pendingACKs.removeAll()
         pendingChannelEcho = nil
+        meshtasticNodeNum = 0
+        #if canImport(MeshtasticKit)
+        pendingMeshtasticPackets.removeAll()
+        #endif
     }
 }

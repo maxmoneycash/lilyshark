@@ -44,6 +44,19 @@ public enum MeshtasticProto {
         return Data(writer.bytes)
     }
 
+    /// `ToRadio{disconnect}`, the parting word a client owes the radio.
+    ///
+    /// Without it the deck keeps queuing FromRadio for a phone that has gone,
+    /// and its queue is eight deep: live traffic is then dropped until the
+    /// radio notices the link is down on its own. The firmware acts on this in
+    /// `parseApiToRadio`, field 4, and ignores a zero.
+    public static func encodeDisconnect() -> Data {
+        var writer = ProtoWriter()
+        writer.tag(4, ProtoWriter.wireVarint)
+        writer.varint(1)
+        return Data(writer.bytes)
+    }
+
     /// `ToRadio{packet}` carrying a text message for the mesh.
     ///
     /// Pass `broadcast` as `to` for a channel message, or a node number for a
@@ -100,6 +113,17 @@ public enum MeshtasticProto {
             self.snr = snr
             self.latitude = latitude
             self.longitude = longitude
+        }
+
+        /// What to call this node on screen. The deck fills `longName` from
+        /// whatever the node advertised and falls back to a hex label, but a
+        /// node heard before it announced a name has neither, and an entry
+        /// labelled with an empty string is one the operator cannot tell from
+        /// any other.
+        public var displayName: String {
+            if !longName.isEmpty { return longName }
+            if !shortName.isEmpty { return shortName }
+            return MeshtasticIdentity.defaultLabel(forNodeNum: num)
         }
     }
 
