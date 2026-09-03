@@ -281,18 +281,22 @@ Two honest caveats:
 
 ## Building from a clean clone
 
-`scripts/build_ios.sh` was re-confirmed against a fresh `git clone` (not the working tree) at
-commit `a30b84d`, after the two merge waves that landed MeshtasticKit:
+`scripts/build_ios.sh` was re-confirmed against a fresh `git clone` — a real clone into a temp
+directory, not the working tree — after the two merge waves that landed MeshtasticKit. Twice:
+once on the merge tip before this file changed, and again on the commit that introduced it.
 
 ```
 ==> Building scheme 'PommeCore' for the iOS Simulator
 ** BUILD SUCCEEDED **
-app: .../cleanclone/ios/DerivedData/Build/Products/Debug-iphonesimulator/PommeCore.app
+app: .../cleanclone2/ios/DerivedData/Build/Products/Debug-iphonesimulator/PommeCore.app
 ```
 
-86.8 s wall clock for the clone-cold build, exit 0. In the same clean clone,
-`MeshtasticKit` ran 21 tests and `MeshCoreKit` 32 tests, both with 0 failures. No network
-access and no Apple account were needed.
+Exit 0 both times; 86.8 s and 66.6 s wall clock for the clone-cold builds. In the same clean
+clone, `MeshtasticKit` ran 21 tests and `MeshCoreKit` 32 tests, both with 0 failures. The
+resulting `PommeCore.app` is a real bundle (`Assets.car`, localized `.lproj` directories, audio
+resources), not an empty directory. No network access and no Apple account were needed.
+
+Those two commands, in that order, are exactly what the CI job runs.
 
 ## Signing: what needs a human
 
