@@ -1,0 +1,13 @@
+{
+  "name": "Lilyshark — Mesh Radio Analyzer",
+  "short_name": "Lilyshark",
+  "description": "Wireshark for mesh radio. Works offline: the mesh does not need the internet, so neither does its instrument.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#F2E2EC",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/lilyshark-wordmark-pink.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
