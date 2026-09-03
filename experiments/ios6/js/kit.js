@@ -398,7 +398,12 @@
         // Visible stripes read as Settings.
         ctx.fillStyle = hex24(C.Backdrop);
         ctx.fillRect(0, 0, W, H);
-        applyGrain(ctx, 0, 0, W, H, 0.06);
+        applyGrain(ctx, 0, 0, W, H, 0.11);
+        const wash = ctx.createLinearGradient(0, 0, 0, H);
+        wash.addColorStop(0, "rgba(255,255,255,0.10)");
+        wash.addColorStop(1, "rgba(40,60,80,0.04)");
+        ctx.fillStyle = wash;
+        ctx.fillRect(0, 0, W, H);
     }
 
     function signalBars(ctx, x, y, filled, color) {
@@ -896,15 +901,16 @@
         const left = 160 - labelW / 2 - 8;
         const right = 160 + labelW / 2 + 8;
         ctx.save();
-        ctx.strokeStyle = hex24(C.Meta);
-        ctx.lineWidth = 1;
-        ctx.setLineDash([1, 3]);
-        ctx.beginPath();
-        ctx.moveTo(16, y + 6);
-        ctx.lineTo(left, y + 6);
-        ctx.moveTo(right, y + 6);
-        ctx.lineTo(W - 16, y + 6);
-        ctx.stroke();
+        ctx.fillStyle = hex24(C.Meta);
+        function stampDots(from, to) {
+            for (let x = from; x < to; x += 4) {
+                ctx.beginPath();
+                ctx.arc(x, y + 6, 0.7, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        stampDots(16, left);
+        stampDots(right, W - 16);
         ctx.restore();
         text(ctx, label, 160, y, C.Meta, { size: 10, weight: "700", align: "center" });
         if (when) {

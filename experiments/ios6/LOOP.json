@@ -1,7 +1,7 @@
 {
   "active": true,
-  "pass": 45,
-  "stop_after_pass": 56,
+  "pass": 46,
+  "stop_after_pass": 58,
   "goal": "Make the 320x240 iOS 6 lab EXACTLY like iOS 6 iMessage. Do not wait for the user. Main stays the terminal chat.",
   "done_when": "Messages matches the iOS 5/6 iMessage shots (light status, Messages/Edit, blue/green organic balloons, camera composer, inbox) and selftest stays ok, or pass >= stop_after_pass.",
   "completed": [
@@ -71,7 +71,8 @@
     "tighter-ios6-fins-and-inbox-times",
     "new-message-light-token-and-plus-ring",
     "details-blue-and-action-inset",
-    "deeper-composer-field-well"
+    "deeper-composer-field-well",
+    "imessage-paper-wash-and-dot-stamp"
   ],
   "queue": [
     "keep-running-until-exact"
@@ -106,5 +107,5 @@
     "Increment pass. Re-subscribe ios6-lab-loop for 180s.",
     "User said continue to run. Do not stop because the queue looks empty — pick the next remaining iOS 6 miss from the reference shots."
   ],
-  "notes": "Pass 45: Composer field has a deeper top-and-side well and a darker rim, matching Zach/Mamma/New Message. Raised stop_after_pass to 56 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
+  "notes": "Pass 46: Message paper has a finer tooth and a cool wash. The iMessage stamp is a row of dots, matching Mamma. Raised stop_after_pass to 58 because this pass made visual progress. Frozen kIos6*/kChat* unchanged. Selftest and 16 host tests must stay green."
 }
