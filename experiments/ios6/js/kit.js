@@ -787,17 +787,32 @@
     }
 
     function plusDisc(ctx, cx, cy, radius) {
-        // iOS 6 add-contact: filled blue disc, white plus.
+        // iOS 6 add-contact: candy blue disc, white plus.
         ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy + 0.6, radius + 0.15, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(8,24,48,0.18)";
+        ctx.fill();
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         const fill = ctx.createLinearGradient(cx, cy - radius, cx, cy + radius);
-        fill.addColorStop(0, hex24(0x5aa8f0));
-        fill.addColorStop(0.48, hex24(0x1478e6));
+        fill.addColorStop(0, hex24(0x7ec4f8));
+        fill.addColorStop(0.42, hex24(0x2a8ef0));
         fill.addColorStop(1, hex24(0x0c5cbc));
         ctx.fillStyle = fill;
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 0.35, 0, Math.PI * 2);
+        ctx.clip();
+        const gloss = ctx.createLinearGradient(cx, cy - radius, cx, cy + 1);
+        gloss.addColorStop(0, "rgba(255,255,255,0.58)");
+        gloss.addColorStop(0.55, "rgba(255,255,255,0.12)");
+        gloss.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = gloss;
+        ctx.fillRect(cx - radius, cy - radius, radius * 2, radius + 2);
+        ctx.restore();
+        ctx.strokeStyle = "rgba(255,255,255,0.62)";
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(cx, cy, radius - 0.85, 0, Math.PI * 2);
