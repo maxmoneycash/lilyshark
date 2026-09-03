@@ -52,6 +52,17 @@ esac
 
 [ -d "$PROJECT" ] || fail "$PROJECT not found. The vendored iOS app is missing from this checkout."
 
+# The watch targets cannot be built from this checkout by any means, so refuse them here
+# rather than let the iOS Simulator destination below produce a misleading error about
+# destinations or asset catalogs. The real cause is a missing private package, not a flag.
+case "$SCHEME" in
+    *watchOS*|*Watch*)
+        fail "Scheme '$SCHEME' cannot be built from this checkout, and not because of this script.
+   Both watch targets use PommeCoreWatchKit, a private upstream package that is not vendored
+   here, so six types they reference are undefined. This machine is also missing the watchOS
+   simulator runtime. See ios/BUILD.md, 'The watch target cannot be built from this checkout'." ;;
+esac
+
 # The simulator app links MeshCoreKit, which requires iOS 18, so a machine whose Xcode
 # ships no iOS 18-or-newer simulator runtime cannot build this at all.
 if ! xcrun simctl list runtimes 2>/dev/null | grep -qE '^iOS (1[89]|[2-9][0-9])'; then
