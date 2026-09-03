@@ -894,8 +894,16 @@
         ctx.stroke();
         ctx.clip();
         // Curved candy crown only. A mid-bubble equator strikes the type.
-        // Incoming grey needs a brighter crown to read as iOS 6 silver glass.
+        // Incoming grey needs a cooler silver wash so it does not read as paper.
         const incoming = !mine;
+        if (incoming) {
+            const silver = ctx.createLinearGradient(x, y, x, y + height);
+            silver.addColorStop(0, "rgba(200,210,220,0.10)");
+            silver.addColorStop(0.55, "rgba(176,184,192,0.18)");
+            silver.addColorStop(1, "rgba(148,156,164,0.30)");
+            ctx.fillStyle = silver;
+            ctx.fillRect(x - 10, y - 2, width + 20, height + 12);
+        }
         ctx.beginPath();
         ctx.moveTo(x - 4, y - 1);
         ctx.lineTo(x + width + 4, y - 1);
@@ -914,7 +922,7 @@
         ctx.fillRect(x + 10, y + 2.15, width - 20, 1);
         const shade = ctx.createLinearGradient(x, y + height * 0.70, x, y + height);
         shade.addColorStop(0, "rgba(0,0,0,0)");
-        shade.addColorStop(1, incoming ? "rgba(0,0,0,0.14)" : "rgba(0,0,0,0.16)");
+        shade.addColorStop(1, incoming ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.16)");
         ctx.fillStyle = shade;
         ctx.fillRect(x - 10, y + height * 0.72, width + 20, height * 0.28);
         ctx.restore();
