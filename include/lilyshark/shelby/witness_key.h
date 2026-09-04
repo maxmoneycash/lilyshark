@@ -44,6 +44,15 @@ enum class WitnessEligibility : std::uint8_t {
     /// No wall-clock anchor: .lscap v1 timestamps are boot-relative ticks, so
     /// unix time needs an anchor from outside the record (spec rule 4).
     NoWallClock,
+    /// This deck sent the frame. A witness key asserts that a receiver heard
+    /// a transmission it did not make, which is the whole value of one; a key
+    /// over our own beacon attests to nothing but our own existence. Our
+    /// transmissions were excluded by accident until now -- they carried no
+    /// timestamp, so they failed the rule above -- and the moment they were
+    /// given the real timestamp they always deserved, they would have started
+    /// producing receipts. Refused by name so the count is visible rather
+    /// than hidden inside a field-absence tally.
+    SelfTransmitted,
 };
 
 /// Round to the nearest 25 kHz step, half-up — an offset of exactly 12,500 Hz

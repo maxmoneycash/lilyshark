@@ -2,6 +2,7 @@
 
 #if defined(LILYSHARK_DEVICE)
 
+#include "lilyshark/core/lora_airtime.h"
 #include "lilyshark/tdeck.h"
 
 #include <Arduino.h>
@@ -33,31 +34,24 @@ std::uint64_t monotonicMicros() noexcept
     return static_cast<std::uint64_t>(esp_timer_get_time());
 }
 
-std::uint32_t receivedLoRaAirtimeUs(SX1262 &radio, const RadioProfile &profile,
+/// Airtime for a frame this radio just received. The coding rate and CRC come
+/// from the packet's own header rather than the profile, because a foreign
+/// sender picks both and a receiver that assumed its own settings would
+/// mis-measure exactly the frames it did not expect.
+///
+/// This used to call RadioLib's `calculateTimeOnAir` directly. It now goes
+/// through `loraTimeOnAirUs`, which is a transcription of that same routine,
+/// so the transmit path can reach the identical arithmetic without a radio
+/// object and a host test can check the numbers with no hardware.
+std::uint32_t receivedLoRaAirtimeUs(const RadioProfile &profile,
                                     const LoRaRxMetadata &metadata,
                                     std::size_t packet_length) noexcept
 {
-    if (metadata.coding_rate_denominator == 0U || profile.bandwidth_hz == 0U) {
-        return 0U;
-    }
-
-    DataRate_t data_rate{};
-    data_rate.lora.spreadingFactor = profile.spreading_factor;
-    data_rate.lora.bandwidth = static_cast<float>(profile.bandwidth_hz) / 1000.0F;
-    data_rate.lora.codingRate = metadata.coding_rate_denominator;
-
-    PacketConfig_t packet_config{};
-    packet_config.lora.preambleLength = profile.preamble_symbols;
-    packet_config.lora.implicitHeader = profile.implicit_header;
-    packet_config.lora.crcEnabled = metadata.crc == CrcStatus::Valid ||
-                                    metadata.crc == CrcStatus::Invalid;
-    const float symbol_length_ms =
-        static_cast<float>(std::uint32_t{1} << profile.spreading_factor) /
-        data_rate.lora.bandwidth;
-    packet_config.lora.ldrOptimize = symbol_length_ms >= 16.0F;
-
-    return static_cast<std::uint32_t>(radio.calculateTimeOnAir(
-        RADIOLIB_MODEM_LORA, data_rate, packet_config, packet_length));
+    const bool crc_enabled =
+        metadata.crc == CrcStatus::Valid || metadata.crc == CrcStatus::Invalid;
+    return loraTimeOnAirUs(profile.spreading_factor, profile.bandwidth_hz,
+                           metadata.coding_rate_denominator, profile.preamble_symbols,
+                           profile.implicit_header, crc_enabled, packet_length);
 }
 
 } // namespace
@@ -93,6 +87,33 @@ bool TDeckRadioService::begin(const RadioProfile &profile, FrameHandler handler,
     return configure(profile);
 }
 
+void TDeckRadioService::discardPendingReceive() noexcept
+{
+    // A set flag here means the radio finished something and raised DIO1 while
+    // poll() was elsewhere in the loop. loop() polls the radio before it sends
+    // anything, so the window is narrow -- but the beacon block, the BLE
+    // service and the analyzer link all transmit later in the same pass, and
+    // poll() returns without consuming whenever status_.receiving is false.
+    // Narrow is not zero, and an uncounted drop is the bug this repo has
+    // shipped three times.
+    if (dio1_pending_) {
+        ++status_.receive_preempted;
+    }
+    dio1_pending_ = false;
+}
+
+std::uint32_t TDeckRadioService::airtimeUsFor(std::size_t length) const noexcept
+{
+    if (profile_.modulation != Modulation::LoRa) {
+        return 0U;
+    }
+    // Our own coding rate and CRC setting, not a header's: configure() put
+    // exactly these on the modem, so this is what the frame will cost.
+    return loraTimeOnAirUs(profile_.spreading_factor, profile_.bandwidth_hz,
+                           profile_.coding_rate_denominator, profile_.preamble_symbols,
+                           profile_.implicit_header, profile_.crc_enabled, length);
+}
+
 bool TDeckRadioService::transmit(const std::uint8_t *data, std::size_t length) noexcept
 {
     if (data == nullptr || length == 0 || length > kMaxFrameBytes) {
@@ -103,7 +124,7 @@ bool TDeckRadioService::transmit(const std::uint8_t *data, std::size_t length) n
     }
     radio_.clearDio1Action();
     radio_.standby();
-    dio1_pending_ = false;
+    discardPendingReceive();
     status_.receiving = false;
     const std::int16_t state = radio_.transmit(data, length);
     status_.last_error = state;
@@ -119,7 +140,7 @@ bool TDeckRadioService::setProfile(const RadioProfile &profile) noexcept
     const RadioProfile previous_profile = profile_;
     radio_.clearDio1Action();
     radio_.standby();
-    dio1_pending_ = false;
+    discardPendingReceive();
     if (configure(profile)) {
         status_.last_profile_error = RADIOLIB_ERR_NONE;
         return true;
@@ -178,7 +199,7 @@ bool TDeckRadioService::startSpectrumSweep(const SpectrumSweepRequest &request) 
     // DIO1 is shared with packet receive. No scan call is allowed until the
     // receive ISR has been detached and any pending edge has been discarded.
     radio_.clearDio1Action();
-    dio1_pending_ = false;
+    discardPendingReceive();
     status_.receiving = false;
     const std::int16_t state = radio_.standby();
     if (state != RADIOLIB_ERR_NONE) {
@@ -337,8 +358,7 @@ void TDeckRadioService::consumeInterrupt() noexcept
             rx_metadata);
         frame.rf.center_frequency_hz = profile_.center_frequency_hz;
         frame.rf.bandwidth_hz = profile_.bandwidth_hz;
-        frame.rf.airtime_us = receivedLoRaAirtimeUs(radio_, profile_, rx_metadata,
-                                                    packet_length);
+        frame.rf.airtime_us = receivedLoRaAirtimeUs(profile_, rx_metadata, packet_length);
         frame.rf.rssi_dbm_x10 = static_cast<std::int16_t>(radio_.getRSSI() * 10.0F);
         frame.rf.snr_db_x10 = static_cast<std::int16_t>(radio_.getSNR() * 10.0F);
         frame.rf.frequency_error_hz = static_cast<std::int32_t>(radio_.getFrequencyError());
@@ -566,7 +586,7 @@ void TDeckRadioService::beginSpectrumRestoration(SpectrumSweepState terminal_sta
     radio_.clearDio1Action();
     radio_.spectralScanAbort();
     radio_.standby();
-    dio1_pending_ = false;
+    discardPendingReceive();
     status_.receiving = false;
     spectrum_terminal_state_ = terminal_state;
     spectrum_status_.state = SpectrumSweepState::Restoring;
@@ -610,7 +630,7 @@ void TDeckRadioService::stop() noexcept
     status_.initialized = false;
     next_receive_retry_ms_ = 0;
     configure_recovery_.clear();
-    dio1_pending_ = false;
+    discardPendingReceive();
     if (instance_ == this) {
         instance_ = nullptr;
     }

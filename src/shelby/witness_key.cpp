@@ -38,6 +38,13 @@ WitnessEligibility witnessEligibility(const RawFrame &frame, bool has_wall_clock
     if (frame.rf.origin == FrameOrigin::Synthetic) {
         return WitnessEligibility::Synthetic;
     }
+    // Our own transmissions sit in the same store as everything we heard, and
+    // they are not evidence of reception. Refuse them before the field checks,
+    // beside the synthetic refusal, because they fail for the same reason: the
+    // frame is ours, not the channel's.
+    if (frame.rf.direction == FrameDirection::Transmit) {
+        return WitnessEligibility::SelfTransmitted;
+    }
     if (frame.rf.crc != CrcStatus::Valid) {
         return WitnessEligibility::CrcNotValid;
     }
@@ -84,6 +91,7 @@ const char *witnessEligibilityLabel(WitnessEligibility eligibility) noexcept
     case WitnessEligibility::Truncated: return "truncated";
     case WitnessEligibility::RequiredFieldsAbsent: return "required_fields_absent";
     case WitnessEligibility::NoWallClock: return "no_wall_clock";
+    case WitnessEligibility::SelfTransmitted: return "self_transmitted";
     }
     return "unknown";
 }
