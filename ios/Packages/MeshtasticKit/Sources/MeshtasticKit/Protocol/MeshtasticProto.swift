@@ -29,6 +29,7 @@ public enum MeshtasticProto {
 
     private static let portText: UInt64 = 1
     private static let portPosition: UInt64 = 3
+    private static let portTelemetry: UInt64 = 67
     private static let portRouting: UInt64 = 5
 
     // MARK: - ToRadio (phone -> deck)
@@ -196,6 +197,39 @@ public enum MeshtasticProto {
 
     /// A position heard on the mesh, already converted out of Meshtastic's
     /// 1e-7-degree integers into degrees.
+    /// What a deck says about its own health.
+    ///
+    /// Every field is optional and stays nil when the deck did not send it.
+    /// A radio running from USB has no battery reading to give, and showing
+    /// 0% for "did not say" would read as a flat battery -- the one reading
+    /// an operator would act on.
+    public struct DeviceMetrics: Equatable, Sendable {
+        public var from: UInt32
+        /// 0-100, or nil. Meshtastic sends values above 100 to mean plugged
+        /// in rather than to mean a battery fuller than full.
+        public var batteryPercent: UInt32?
+        public var voltage: Float?
+        public var uptimeSeconds: UInt32?
+
+        /// True when the deck reported being on external power.
+        public var isPluggedIn: Bool {
+            guard let percent = batteryPercent else { return false }
+            return percent > 100
+        }
+
+        public init(
+            from: UInt32,
+            batteryPercent: UInt32? = nil,
+            voltage: Float? = nil,
+            uptimeSeconds: UInt32? = nil
+        ) {
+            self.from = from
+            self.batteryPercent = batteryPercent
+            self.voltage = voltage
+            self.uptimeSeconds = uptimeSeconds
+        }
+    }
+
     public struct Position: Equatable, Sendable {
         public var from: UInt32
         public var latitude: Double
@@ -221,6 +255,7 @@ public enum MeshtasticProto {
         case text(TextMessage)
         case position(Position)
         case routing(requestID: UInt32, error: UInt32)
+        case deviceMetrics(DeviceMetrics)
         case other
     }
 
@@ -355,6 +390,33 @@ public enum MeshtasticProto {
                 if field.number == 2 { longitude = degrees(field.value) }
             }
             return .position(Position(from: from, latitude: latitude, longitude: longitude))
+        case portTelemetry:
+            // Telemetry.device_metrics is field 2. Other variants exist
+            // (environment, power) and are not read here; a Telemetry with
+            // none of them parses to .other rather than to an empty reading,
+            // because "said nothing about the battery" and "battery is zero"
+            // must not look the same to the caller.
+            var metrics: DeviceMetrics?
+            for field in readFields(payload) ?? []
+            where field.number == 2 && field.wireType == ProtoWriter.wireLength {
+                guard let body = field.bytes else { continue }
+                var parsed = DeviceMetrics(from: from)
+                for metric in readFields(body) ?? [] {
+                    switch (metric.number, metric.wireType) {
+                    case (1, ProtoWriter.wireVarint):
+                        parsed.batteryPercent = truncate(metric.value)
+                    case (2, ProtoWriter.wireFixed32):
+                        parsed.voltage = Float(bitPattern: truncate(metric.value))
+                    case (5, ProtoWriter.wireVarint):
+                        parsed.uptimeSeconds = truncate(metric.value)
+                    default:
+                        break
+                    }
+                }
+                metrics = parsed
+            }
+            if let metrics { return .deviceMetrics(metrics) }
+            return .other
         case portRouting:
             var error: UInt32 = 0
             for field in readFields(payload) ?? []

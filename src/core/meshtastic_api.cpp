@@ -172,6 +172,7 @@ struct Reader {
 constexpr std::uint64_t kPortText = 1;
 constexpr std::uint64_t kPortPosition = 3;
 constexpr std::uint64_t kPortRouting = 5;
+constexpr std::uint64_t kPortTelemetry = 67;
 
 /// A Position the PHONE sent us, in Meshtastic's 1e-7 degree units.
 ///
@@ -345,6 +346,42 @@ bool parseApiToRadio(const std::uint8_t *bytes, std::size_t length,
         }
     }
     return reader.ok;
+}
+
+std::size_t encodeApiDeviceTelemetry(std::uint32_t packet_id,
+                                     const ApiDeviceMetrics &metrics,
+                                     std::uint8_t *out,
+                                     std::size_t capacity) noexcept
+{
+    if (out == nullptr || capacity == 0U) return 0;
+    // Nothing known is not the same as everything zero. A phone shown 0%
+    // would read it as a flat battery rather than as no reading.
+    if (!metrics.has_battery && !metrics.has_voltage && !metrics.has_uptime) return 0;
+
+    std::uint8_t device_scratch[32]{};
+    Writer device{device_scratch, sizeof(device_scratch)};
+    if (metrics.has_battery) device.field_uint(1, metrics.battery_level);
+    if (metrics.has_voltage) device.field_float(2, metrics.voltage);
+    if (metrics.has_uptime) device.field_uint(5, metrics.uptime_seconds);
+
+    std::uint8_t telemetry_scratch[48]{};
+    Writer telemetry{telemetry_scratch, sizeof(telemetry_scratch)};
+    telemetry.field_message(2, device);  // Telemetry.device_metrics
+
+    std::uint8_t data_scratch[64]{};
+    Writer data{data_scratch, sizeof(data_scratch)};
+    data.field_uint(1, kPortTelemetry);
+    data.field_bytes(2, telemetry_scratch, telemetry.length);
+
+    std::uint8_t packet_scratch[96]{};
+    Writer packet{packet_scratch, sizeof(packet_scratch)};
+    packet.field_fixed32(1, localMeshtasticNodeNum());  // from
+    packet.field_message(4, data);
+    packet.field_fixed32(6, packet_id);
+
+    Writer from_radio{out, capacity};
+    from_radio.field_message(2, packet);
+    return from_radio.ok ? from_radio.length : 0U;
 }
 
 std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,

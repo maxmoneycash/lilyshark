@@ -113,6 +113,30 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
                                    std::size_t channel_count,
                                    std::uint8_t *out, std::size_t capacity) noexcept;
 
+/// What the deck can say about its own health, as Meshtastic's DeviceMetrics.
+///
+/// A phone in a pocket cannot see the radio in a bag, and "is it about to die"
+/// is the question an operator asks most often about hardware they cannot
+/// look at. Every field is optional because a deck running from USB has no
+/// battery reading to give, and inventing 100% would be worse than silence.
+struct ApiDeviceMetrics {
+    bool has_battery = false;
+    /// 0-100. Meshtastic reserves values above 100 for "plugged in"; this
+    /// sends 101 for that, which is what its own firmware does.
+    std::uint32_t battery_level = 0;
+    bool has_voltage = false;
+    float voltage = 0.0f;
+    bool has_uptime = false;
+    std::uint32_t uptime_seconds = 0;
+};
+
+/// Encode FromRadio{packet} carrying this deck's own telemetry, addressed to
+/// the phone. Returns bytes written, or 0 if nothing is known worth sending.
+std::size_t encodeApiDeviceTelemetry(std::uint32_t packet_id,
+                                     const ApiDeviceMetrics &metrics,
+                                     std::uint8_t *out,
+                                     std::size_t capacity) noexcept;
+
 /// Encode one FromRadio{node_info} on its own, for the node that just
 /// appeared. The config dump tells the phone who was here at connect time;
 /// this is how it learns about everyone who arrives afterwards.

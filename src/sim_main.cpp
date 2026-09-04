@@ -16920,6 +16920,36 @@ void service_ble_api() noexcept
                                              : "Phone disconnected");
     }
 
+    // Tell the phone how the deck is doing, on a slow cadence.
+    //
+    // A phone in a pocket cannot see a radio in a bag, and "is it about to
+    // die" is the question an operator asks most often about hardware they
+    // cannot look at. Every five minutes: often enough to catch a battery
+    // falling, rare enough that it costs nothing next to the BLE link's
+    // ordinary traffic. This never touches the air -- it is a fact about this
+    // deck told to the phone holding it, not a packet for the mesh.
+    constexpr std::uint32_t kBleTelemetryPeriodMs = 300000U;
+    static std::uint32_t ble_telemetry_due_ms = 0U;
+    if (phone_connected &&
+        static_cast<std::int32_t>(millis() - ble_telemetry_due_ms) >= 0) {
+        ble_telemetry_due_ms = millis() + kBleTelemetryPeriodMs;
+        const HardwareStatusSnapshot &snapshot = hardware_status.snapshot();
+        ApiDeviceMetrics metrics{};
+        if (snapshot.battery.present) {
+            metrics.has_battery = true;
+            metrics.battery_level = snapshot.battery.approximate_percent;
+            metrics.has_voltage = true;
+            metrics.voltage = static_cast<float>(snapshot.battery.voltage_millivolts) / 1000.0f;
+        }
+        metrics.has_uptime = true;
+        metrics.uptime_seconds = static_cast<std::uint32_t>(millis() / 1000U);
+        std::uint8_t telemetry_frame[128]{};
+        const std::size_t telemetry_length = encodeApiDeviceTelemetry(
+            next_meshtastic_packet_id(), metrics, telemetry_frame,
+            sizeof(telemetry_frame));
+        if (telemetry_length > 0U) (void)queueBleFromRadio(telemetry_frame, telemetry_length);
+    }
+
     std::uint8_t buffer[512]{};
     std::size_t length = 0;
     while ((length = takeBleToRadio(buffer, sizeof(buffer))) > 0U) {
