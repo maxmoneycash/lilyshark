@@ -11,8 +11,8 @@ import {
   RF_FIELD,
   summarize,
 } from '../lib/lscap';
-import { demoNextFrame, isDemo } from '../mesh/demo';
-import { startTrafficDemoInterval } from './trafficDemo';
+import { isDemo } from '../mesh/demo';
+import { simLiveTick, startTrafficDemoInterval } from './trafficDemo';
 import {
   DEMO_BLOB,
   APTOS_EXPLORER_ACCOUNT,
@@ -65,8 +65,6 @@ import { CaptureSlotBar, type SlotTab } from './CaptureSlotBar';
 import { TrafficFrameTable } from './TrafficFrameTable';
 import { crcClass, fmtFreq } from './trafficFormat';
 
-/** The live table stops growing here; old frames age out on the left. */
-const LIVE_CAP = 250;
 
 /**
  * TRAFFIC — the analyzer. Opens a .lscap capture written by the T-Deck
@@ -524,13 +522,18 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   // table's own job now (TrafficFrameTable's `follow`), because only the
   // table knows which rows are mounted.
   //
-  // The stream is PINNED to the capture it started in, and switching tabs
-  // does not move it. This is not a nicety: demoNextFrame makes frames that
-  // were generated rather than heard, and a stream that followed the active
-  // tab would drop them into a capture pulled off a microSD card or fetched
-  // from Shelby. They would still be marked — the SIM badge, the ORIGIN
-  // column, the footer count — but a file the operator opened must not gain
-  // frames nobody's radio heard just because it was the tab on screen.
+  // The stream gets its OWN slot and never writes into anybody else's. It
+  // used to pin to whichever capture happened to be open at the first tick,
+  // which was meant to stop generated frames wandering into a file — but the
+  // capture open at the first tick IS the operator's file. Pressing SIM LIVE
+  // over a 20,000-frame .lscap rewrote that slot's frames as
+  // `[...frames.slice(-(LIVE_CAP - 1)), f]`, and 19,750 frames off a microSD
+  // card were gone in about nine seconds, with the tab still showing the
+  // file's name. The cap is right for a live stream and ruinous applied to a
+  // file, so the stream owns a slot where the cap is the truth: opening it
+  // under the fixed key 'sim-live' means toggling SIM LIVE off and on reuses
+  // that slot rather than piling up tabs, origin 'live' keeps the LRU from
+  // evicting a running stream, and the operator's captures are untouched.
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
   const slotRef = useRef<CaptureSlot<TrafficSlotView> | null>(slot);
@@ -542,40 +545,23 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const demoSlotIdRef = useRef(demoSlotId);
   demoSlotIdRef.current = demoSlotId;
   useEffect(() => {
-    // Pinned at the first tick, not here: SIM LIVE is on before the bundled
-    // sample has finished loading, so at this moment there is nothing open.
+    // Claimed at the first tick, not here: the reducer assigns the slot id, so
+    // there is nothing to record until the open has actually gone through.
     setDemoSlotId('');
     return startTrafficDemoInterval(
       simulatedLive,
       () => demoActiveRef.current,
       () => {
-        if (demoSlotIdRef.current === '') {
-          const first = slotRef.current?.id ?? '';
-          if (first === '') return;
-          demoSlotIdRef.current = first;
-          setDemoSlotId(first);
-        }
-        const open = slotsRef.current.slots.find((s) => s.id === demoSlotIdRef.current);
-        // The capture the stream was feeding has been closed or evicted; it is
-        // not this stream's business to pick another one.
-        if (!open) return;
-        const c = open.view.capture;
-        const last = c.frames[c.frames.length - 1];
-        const seq = liveSeq.current++;
-        const f = demoNextFrame(
-          seq,
-          Number(last ? last.timestampUs : 0n) + 2_400_000 + (seq % 5) * 640_000,
+        const claimed = simLiveTick(
+          slotsRef.current,
+          demoSlotIdRef.current,
+          liveSeq.current++,
+          dispatchSlots,
         );
-        dispatchSlots({
-          type: 'patch',
-          id: open.id,
-          view: {
-            capture: { ...c, frames: [...c.frames.slice(-(LIVE_CAP - 1)), f] },
-            // demoNextFrame is generated, never heard, and says so on every
-            // frame it makes; the capture it lands in has to say so too.
-            containsSynthetic: true,
-          },
-        });
+        if (claimed !== demoSlotIdRef.current) {
+          demoSlotIdRef.current = claimed;
+          setDemoSlotId(claimed);
+        }
       },
     );
   }, [simulatedLive]);

@@ -20,8 +20,11 @@
  */
 
 import {
+  type LscapCapture,
   type LscapFrame,
+  LSCAP_FILE_HEADER_SIZE,
   LSCAP_METADATA_FLAG,
+  LSCAP_RECORD_HEADER_SIZE,
   RF_FIELD,
   SHELBY_POINTER_SIZE,
 } from "../lib/lscap";
@@ -245,6 +248,34 @@ function demoPointerBytes(_seed: number): Uint8Array {
   view.setUint16(78, 0, true); // chunk index
   view.setUint16(80, 1, true); // chunk count
   return b;
+}
+
+/**
+ * An empty capture for the simulated live stream to fill.
+ *
+ * The stream needs somewhere of its own to write. It used to append into
+ * whichever capture happened to be open, which meant a file the operator had
+ * opened got truncated to the live window — so the stream now opens its own
+ * slot, and this is what that slot starts as. The header is the current
+ * format's, so everything that reads a capture (export, diff, the dissection
+ * tree) treats it like any other rather than special-casing a synthetic one.
+ */
+export function emptyDemoCapture(): LscapCapture {
+  return {
+    header: {
+      majorVersion: 1,
+      minorVersion: 0,
+      fileHeaderSize: LSCAP_FILE_HEADER_SIZE,
+      recordHeaderSize: LSCAP_RECORD_HEADER_SIZE,
+      fileFlags: 0,
+      // Frame timestamps are microseconds, and demoNextFrame spaces them in
+      // microseconds too, so the tick rate has to agree or every interval the
+      // analyzer computes off this capture is wrong by a million.
+      ticksPerSecond: 1_000_000,
+    },
+    frames: [],
+    trailingBytes: 0,
+  };
 }
 
 /**
