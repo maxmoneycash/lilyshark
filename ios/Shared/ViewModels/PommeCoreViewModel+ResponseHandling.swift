@@ -611,9 +611,23 @@ extension PommeCoreViewModel {
                     max(0, min(65535, (voltage * 1000).rounded()))
                 )
             }
+            // Straight across, nil included. A deck on USB sends uptime and
+            // nothing else, so coalescing a missing percent to zero — or to
+            // whatever the last packet said — would put a flat battery on
+            // screen for a radio that is plugged in and fine.
+            deviceConfig.isExternallyPowered = metrics.isPluggedIn
+            deviceConfig.reportedBatteryPercent = metrics.reportedPercent
+            deviceConfig.reportedUptimeSeconds = metrics.uptimeSeconds
+            deviceConfig.healthReportedAt = Date()
             let batteryText = metrics.batteryPercent.map(String.init) ?? "—"
             let uptimeText = metrics.uptimeSeconds.map(String.init) ?? "—"
             Self.logger.info("MT TELEMETRY: battery=\(batteryText)% uptime=\(uptimeText)s")
+            #if os(iOS)
+            // Telemetry is the only thing that moves the battery on a deck, so
+            // without this the widget shows whatever it was told at connect
+            // time until the next message arrives.
+            syncWidget()
+            #endif
 
         case .text(let text):
             handleMeshtasticText(text)

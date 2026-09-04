@@ -217,6 +217,16 @@ public enum MeshtasticProto {
             return percent > 100
         }
 
+        /// The percentage there is to show, or nil when there is none.
+        ///
+        /// Above 100 is a flag, not a charge level, so it is not a percentage
+        /// to put on screen -- read `isPluggedIn` for that. Handing 101
+        /// straight to the UI would render "101%", which is the sort of number
+        /// an operator stops trusting the whole screen over.
+        public var reportedPercent: Int? {
+            isPluggedIn ? nil : batteryPercent.map(Int.init)
+        }
+
         public init(
             from: UInt32,
             batteryPercent: UInt32? = nil,

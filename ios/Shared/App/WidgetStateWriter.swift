@@ -26,9 +26,15 @@ func syncWidgetState(
     state.deviceName = deviceConfig.deviceName
 
     let chemistry = deviceConfig.batteryCalibration.flatMap { BatteryChemistry(rawValue: $0.chemistry) } ?? .lipo
-    state.batteryPct = deviceConfig.batteryMillivolts > 0
-        ? deviceConfig.batteryPercent(chemistry: chemistry)
-        : -1
+    switch deviceConfig.batteryReading(chemistry: chemistry) {
+    case .reported(let pct), .estimated(let pct):
+        state.batteryPct = pct
+    case .externalPower, .unknown:
+        // -1 is the widget's "unknown" (PommeCore_Widgets.swift hides the row
+        // on it). External power lands here too: the widget has no way to draw
+        // a plug, and 100% would be a lie about a deck that may have no cell.
+        state.batteryPct = -1
+    }
 
     var dmCount = 0
     var channelCount = 0

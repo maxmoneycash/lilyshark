@@ -52,6 +52,20 @@ final class MeshtasticProtoTests: XCTestCase {
         XCTAssertTrue(metrics.isPluggedIn)
     }
 
+    func testTheAboveFullFlagIsNotAPercentageToShow() {
+        // The flag must not reach a battery row: 101 rendered as "101%" is the
+        // sort of number an operator stops trusting the screen over.
+        let plugged = MeshtasticProto.DeviceMetrics(from: 1, batteryPercent: 101)
+        XCTAssertNil(plugged.reportedPercent)
+
+        // An ordinary reading still comes through untouched.
+        let onBattery = MeshtasticProto.DeviceMetrics(from: 1, batteryPercent: 87)
+        XCTAssertEqual(onBattery.reportedPercent, 87)
+
+        // And nothing reported is still nothing.
+        XCTAssertNil(MeshtasticProto.DeviceMetrics(from: 1, voltage: 5.0).reportedPercent)
+    }
+
     // MARK: - ToRadio
 
     func testPositionPacketIsTheVectorTheFirmwareParses() {

@@ -1,0 +1,1058 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.xctest/Contents/MacOS/MeshCoreKitPackageTests",
+      "packagePath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit",
+      "productName" : "MeshCoreKitPackageTests"
+    }
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.MeshCoreKit-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/sources",
+      "importPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEBackgroundHandler.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEConstants.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Crypto/MeshCoreCrypto.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/DebugLogger.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/ElevationProfile.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/FresnelZone.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/GeoMath.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/LineOfSightCalculator.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/BatteryProfile.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Channel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Contact.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/DeviceConfig.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/DeviceInfo.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Message.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/MessageStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/ProtocolPayloads.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/RemoteDeviceSession.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/FrameParser.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/MeshCoreCommands.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/MeshCoreProtocol.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/USB/USBSerialManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/WiFi/WiFiConnectionManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "MeshCoreKit",
+      "moduleOutputPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules/MeshCoreKit.swiftmodule",
+      "objects" : [
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEBackgroundHandler.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEConstants.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEManager.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreCrypto.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DebugLogger.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/ElevationProfile.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/FresnelZone.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/GeoMath.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/LineOfSightCalculator.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BatteryProfile.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Channel.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Contact.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DeviceConfig.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DeviceInfo.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Message.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MessageStore.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/ProtocolPayloads.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/RemoteDeviceSession.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/FrameParser.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreCommands.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreProtocol.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/USBSerialManager.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/WiFiConnectionManager.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx15.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/include/MeshCoreKit-Swift.h",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "meshcorekit"
+      ],
+      "outputFileMapPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEBackgroundHandler.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEConstants.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreCrypto.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DebugLogger.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/ElevationProfile.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/FresnelZone.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/GeoMath.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/LineOfSightCalculator.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BatteryProfile.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Channel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Contact.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DeviceConfig.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DeviceInfo.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Message.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MessageStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/ProtocolPayloads.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/RemoteDeviceSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/FrameParser.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreCommands.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreProtocol.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/USBSerialManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/WiFiConnectionManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules/MeshCoreKit.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEBackgroundHandler.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEConstants.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEManager.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Crypto/MeshCoreCrypto.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/DebugLogger.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/ElevationProfile.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/FresnelZone.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/GeoMath.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/LineOfSightCalculator.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/BatteryProfile.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Channel.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Contact.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/DeviceConfig.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/DeviceInfo.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Message.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/MessageStore.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/ProtocolPayloads.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/RemoteDeviceSession.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/FrameParser.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/MeshCoreCommands.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/MeshCoreProtocol.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/USB/USBSerialManager.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/WiFi/WiFiConnectionManager.swift"
+      ],
+      "tempsPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.MeshCoreKitPackageTests-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/sources",
+      "importPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules/MeshCoreKitTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "MeshCoreKitPackageTests",
+      "moduleOutputPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules/MeshCoreKitPackageTests.swiftmodule",
+      "objects" : [
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx15.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/include/MeshCoreKitPackageTests-Swift.h",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "meshcorekit"
+      ],
+      "outputFileMapPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules/MeshCoreKitPackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.MeshCoreKitTests-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/sources",
+      "importPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/FresnelZoneTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/GeoMathTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/MeshCoreKitTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules/MeshCoreKit.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "MeshCoreKitTests",
+      "moduleOutputPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules/MeshCoreKitTests.swiftmodule",
+      "objects" : [
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/FresnelZoneTests.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/GeoMathTests.swift.o",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/MeshCoreKitTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx15.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "meshcorekit"
+      ],
+      "outputFileMapPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/FresnelZoneTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/GeoMathTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/MeshCoreKitTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules/MeshCoreKitTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/FresnelZoneTests.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/GeoMathTests.swift",
+        "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/MeshCoreKitTests.swift"
+      ],
+      "tempsPath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "MeshCoreKit" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "MeshCoreKit",
+      "-package-name",
+      "meshcorekit",
+      "-c",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEBackgroundHandler.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEConstants.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEManager.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Crypto/MeshCoreCrypto.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/DebugLogger.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/ElevationProfile.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/FresnelZone.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/GeoMath.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/LineOfSightCalculator.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/BatteryProfile.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Channel.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Contact.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/DeviceConfig.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/DeviceInfo.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Message.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/MessageStore.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/ProtocolPayloads.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/RemoteDeviceSession.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/FrameParser.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/MeshCoreCommands.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/MeshCoreProtocol.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/USB/USBSerialManager.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/WiFi/WiFiConnectionManager.swift",
+      "-I",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx15.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/include/MeshCoreKit-Swift.h",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "meshcorekit",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "MeshCoreKitPackageTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "MeshCoreKitPackageTests",
+      "-package-name",
+      "meshcorekit",
+      "-c",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.derived/runner.swift",
+      "-I",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx15.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/include/MeshCoreKitPackageTests-Swift.h",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "meshcorekit",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "MeshCoreKitTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "MeshCoreKitTests",
+      "-package-name",
+      "meshcorekit",
+      "-c",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/FresnelZoneTests.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/GeoMathTests.swift",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/MeshCoreKitTests.swift",
+      "-I",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx15.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "meshcorekit",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "MeshCoreKit" : [
+
+    ],
+    "MeshCoreKitPackageTests" : [
+      "MeshCoreKitTests",
+      "MeshCoreKit"
+    ],
+    "MeshCoreKitTests" : [
+      "MeshCoreKit"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+    "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.derived/runner.swift" : {
+      "inputs" : [
+
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.derived/runner.swift"
+        }
+      ]
+    }
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEBackgroundHandler.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEConstants.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/BLE/BLEManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Crypto/MeshCoreCrypto.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/DebugLogger.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/ElevationProfile.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/FresnelZone.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/GeoMath.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/GeoMath/LineOfSightCalculator.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/BatteryProfile.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Channel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Contact.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/DeviceConfig.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/DeviceInfo.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/Message.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/MessageStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/ProtocolPayloads.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Models/RemoteDeviceSession.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/FrameParser.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/MeshCoreCommands.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/Protocol/MeshCoreProtocol.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/USB/USBSerialManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Sources/MeshCoreKit/WiFi/WiFiConnectionManager.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/sources"
+    },
+    "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/sources"
+    },
+    "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEBackgroundHandler.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEConstants.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BLEManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/BatteryProfile.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Channel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Contact.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DebugLogger.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DeviceConfig.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/DeviceInfo.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/ElevationProfile.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/FrameParser.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/FresnelZone.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/GeoMath.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/LineOfSightCalculator.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreCommands.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreCrypto.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MeshCoreProtocol.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/Message.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/MessageStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/ProtocolPayloads.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/RemoteDeviceSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/USBSerialManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKit.build/WiFiConnectionManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/FresnelZoneTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/GeoMathTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/MeshCoreKitTests.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.product/Objects.LinkFileList"
+    },
+    "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/FresnelZoneTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/GeoMathTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/MeshCoreKitTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/sources"
+    },
+    "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

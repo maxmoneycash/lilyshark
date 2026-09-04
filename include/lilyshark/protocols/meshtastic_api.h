@@ -121,8 +121,10 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
 /// battery reading to give, and inventing 100% would be worse than silence.
 struct ApiDeviceMetrics {
     bool has_battery = false;
-    /// 0-100. Meshtastic reserves values above 100 for "plugged in"; this
-    /// sends 101 for that, which is what its own firmware does.
+    /// 0-100. Meshtastic reserves values above 100 for "plugged in", but this
+    /// deck never sends one: hardware_status has no USB or charge detect, and
+    /// battery_model caps its estimate at 100. The phone still handles the
+    /// >100 case, for firmware that can tell.
     std::uint32_t battery_level = 0;
     bool has_voltage = false;
     float voltage = 0.0f;

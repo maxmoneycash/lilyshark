@@ -300,16 +300,60 @@ struct DeviceInfoSection: View {
         .contentShape(Rectangle())
     }
 
+    private var batteryChemistry: BatteryChemistry {
+        BatteryChemistry(rawValue: batteryChemistryRaw) ?? .lipo
+    }
+
+    /// "as of 4m ago" under a health row, and nothing at all until the radio
+    /// has reported once.
+    ///
+    /// A deck sends its health every five minutes, and BLE drops without
+    /// announcing it. Without this, a forty-minute-old battery reading looks
+    /// exactly like a fresh one. `Text(_:style: .relative)` keeps counting on
+    /// its own, so the age cannot itself go stale on screen.
+    @ViewBuilder
+    private var healthAgeCaption: some View {
+        if let reportedAt = config.healthReportedAt {
+            Text("as of \(reportedAt, style: .relative) ago")
+                .font(.caption2)
+                .foregroundStyle(MeshTheme.textSecondary)
+        }
+    }
+
     private var batteryRow: some View {
-        HStack {
-            Label("Battery", systemImage: "battery.50percent")
+        // Resolved before the body — see batteryRowContent. The voltage shown
+        // is the radio's raw report; the calibration correction belongs to the
+        // percentage, and batteryReading() has already applied it.
+        let content = batteryRowContent(
+            config.batteryReading(chemistry: batteryChemistry),
+            voltage: config.batteryVoltage
+        )
+        return HStack {
+            Label("Battery", systemImage: content.icon)
                 .foregroundStyle(MeshTheme.accent)
             Spacer()
-            let battV = String(format: "%.2f", Double(config.batteryMillivolts) / 1000.0)
-            let battPct = config.batteryPercent()
-            let battColor: Color = battPct > 50 ? .green : battPct > 20 ? .yellow : battPct > 0 ? .red : MeshTheme.textSecondary
-            Text(battPct > 0 ? String(format: "%@V (%d%%)", battV, battPct) : "\(battV)V")
-                .foregroundStyle(battColor)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(content.text)
+                    .foregroundStyle(content.color)
+                healthAgeCaption
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    /// Time since the radio booted. Meshtastic telemetry carries it; MeshCore
+    /// only answers it on CMD_GET_STATS, so on a deck this is the one place
+    /// it comes from.
+    private var uptimeRow: some View {
+        HStack {
+            Label("Uptime", systemImage: "clock.arrow.circlepath")
+                .foregroundStyle(MeshTheme.accent)
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formatUptime(config.displayUptimeSeconds))
+                    .foregroundStyle(MeshTheme.textSecondary)
+                healthAgeCaption
+            }
         }
         .contentShape(Rectangle())
     }
@@ -366,6 +410,8 @@ struct DeviceInfoSection: View {
                 .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
             Button { openInspector(.battery) } label: { batteryRow }
                 .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+            uptimeRow
+                .listRowBackground(MeshTheme.surface)
             Button { openInspector(.firmware) } label: { firmwareRow }
                 .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
             firmwareUpdateRow
@@ -499,6 +545,8 @@ struct DeviceInfoSection: View {
                 .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
             Button { activeSheet = .battery } label: { batteryRow }
                 .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+            uptimeRow
+                .listRowBackground(MeshTheme.surface)
             Button { activeSheet = .firmware } label: { firmwareRow }
                 .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
         }
@@ -628,14 +676,6 @@ extension SettingsView {
         .listRowBackground(MeshTheme.surface)
     }
 
-    var correctedBatteryPercent: Int {
-        if let cal = deviceConfig.batteryCalibration {
-            let correctedMV = cal.correctedMillivolts(config.batteryMillivolts)
-            return batteryChemistry.profile.percentage(forMillivolts: correctedMV)
-        }
-        return config.batteryPercent(chemistry: batteryChemistry)
-    }
-
     var correctedBatteryVoltage: Double {
         if let cal = deviceConfig.batteryCalibration {
             return cal.correctedVoltage(config.batteryVoltage)
@@ -644,20 +684,23 @@ extension SettingsView {
     }
 
     var batteryRow: some View {
-        HStack {
-            Image(systemName: batteryIconName)
-                .foregroundStyle(batteryColor)
+        // The glyph used to come from a percentage that was 0 when nothing had
+        // been reported, so an absent reading drew a red empty battery beside
+        // its own em dash -- the icon says "act now", the text says "we don't
+        // know". batteryRowContent keeps the absent case a case.
+        let content = batteryRowContent(
+            deviceConfig.batteryReading(chemistry: batteryChemistry),
+            voltage: correctedBatteryVoltage
+        )
+        return HStack {
+            Image(systemName: content.icon)
+                .foregroundStyle(content.color)
                 .frame(width: 24)
             Text("Battery")
                 .foregroundStyle(MeshTheme.accent)
             Spacer()
-            if config.batteryMillivolts > 0 {
-                Text(String(format: "%.2fV (%d%%)", correctedBatteryVoltage, correctedBatteryPercent))
-                    .foregroundStyle(batteryColor)
-            } else {
-                Text("\u{2014}")
-                    .foregroundStyle(MeshTheme.textSecondary)
-            }
+            Text(content.text)
+                .foregroundStyle(content.color)
         }
         .listRowBackground(MeshTheme.surface)
     }
@@ -699,21 +742,6 @@ extension SettingsView {
         }
     }
 
-    var batteryIconName: String {
-        let pct = correctedBatteryPercent
-        if pct > 75 { return "battery.100" }
-        if pct > 50 { return "battery.75" }
-        if pct > 25 { return "battery.50" }
-        if pct > 0 { return "battery.25" }
-        return "battery.0"
-    }
-
-    var batteryColor: Color {
-        let pct = correctedBatteryPercent
-        if pct > 50 { return .green }
-        if pct > 20 { return .yellow }
-        return .red
-    }
 }
 
 // MARK: - Section 2: Connection

@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/primary.swiftdeps"
+  },
+  "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/FresnelZoneTests.swift": {
+    "dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/FresnelZoneTests.d",
+    "object": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/FresnelZoneTests.swift.o",
+    "swiftmodule": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/FresnelZoneTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/FresnelZoneTests.swiftdeps",
+    "diagnostics": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/FresnelZoneTests.dia"
+  },
+  "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/GeoMathTests.swift": {
+    "dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/GeoMathTests.d",
+    "object": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/GeoMathTests.swift.o",
+    "swiftmodule": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/GeoMathTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/GeoMathTests.swiftdeps",
+    "diagnostics": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/GeoMathTests.dia"
+  },
+  "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/Tests/MeshCoreKitTests/MeshCoreKitTests.swift": {
+    "dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/MeshCoreKitTests.d",
+    "object": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/MeshCoreKitTests.swift.o",
+    "swiftmodule": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/MeshCoreKitTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/MeshCoreKitTests.swiftdeps",
+    "diagnostics": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitTests.build/MeshCoreKitTests.dia"
+  }
+}

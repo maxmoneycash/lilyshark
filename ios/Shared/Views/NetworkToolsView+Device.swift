@@ -40,11 +40,15 @@ struct DeviceInfoPopover: View {
             }
 
             Section {
-                if config.batteryMillivolts > 0 {
-                    infoRow("Battery", value: String(format: "%.2fV (%d%%)", config.batteryVoltage, config.batteryPercent()))
+                // Absent stays absent: no row at all rather than a zero.
+                let battery = config.batteryReading()
+                if battery != .unknown {
+                    infoRow("Battery", value: batteryRowContent(battery, voltage: config.batteryVoltage).text)
                 }
-                if config.statsUptime > 0 {
-                    infoRow("Uptime", value: formatUptime(config.statsUptime))
+                // A deck answers no CMD_GET_STATS, so its uptime arrives only
+                // on Meshtastic telemetry.
+                if config.displayUptimeSeconds > 0 {
+                    infoRow("Uptime", value: formatUptime(config.displayUptimeSeconds))
                 }
                 if config.statsLastRSSI != 0 {
                     infoRow("Last RSSI", value: "\(config.statsLastRSSI) dBm")
