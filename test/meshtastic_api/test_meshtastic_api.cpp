@@ -114,12 +114,101 @@ void testPhoneTextParses()
     assert(std::strcmp(message.text, "hi") == 0);
 }
 
-void testNonTextPortIsIgnoredButValid()
+void testEmptyPositionPayloadIsIgnoredButValid()
 {
-    // Same shape, portnum = 3 (POSITION): parses fine, acts on nothing.
+    // portnum = 3 (POSITION) with an EMPTY payload: no latitude, no
+    // longitude, so there is no fix in it. Parses fine, acts on nothing.
+    // This case used to stand for every position packet, because the deck
+    // ignored the port entirely.
     const std::uint8_t bytes[] = {
         0x0a, 0x0b, 0x15, 0x44, 0x33, 0x22, 0x11,
         0x22, 0x04, 0x08, 0x03, 0x12, 0x00,
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::None);
+}
+
+void testPhonePositionParses()
+{
+    // Bytes generated rather than hand-written: the first version of this
+    // test was hand-assembled and wrong, which is the same mistake in the
+    // same place twice, so the vector is now produced by the encoder it is
+    // meant to describe.
+    //
+    // ToRadio.packet{ decoded{ portnum=3, payload=Position{
+    //   latitude_i=377785000 (37.7785 N), longitude_i=-1224218000 } } }
+    const std::uint8_t bytes[] = {
+        0x0a, 0x10, 0x22, 0x0e, 0x08, 0x03, 0x12, 0x0a,
+        0x0d, 0xa8, 0x8a, 0x84, 0x16, 0x15, 0x70, 0xea,
+        0x07, 0xb7,
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::Position);
+    assert(message.latitude_i == 377785000);
+    assert(message.longitude_i == -1224218000);
+}
+
+void testSwiftPositionVectorParses()
+{
+    // The EXACT bytes MeshtasticProto.encodePositionPacket produces, copied
+    // from MeshtasticProtoTests.swift. The phone and the deck cannot import
+    // each other's code, so this pair of assertions is the only thing holding
+    // their idea of a Position together. If either drifts, one of the two
+    // suites fails on a desk instead of the deck silently never learning
+    // where it is.
+    const std::uint8_t bytes[] = {
+        0x0a, 0x15,                          // ToRadio.packet, 21 bytes
+        0x15, 0xff, 0xff, 0xff, 0xff,        // MeshPacket.to = broadcast
+        0x22, 0x0e,                          // MeshPacket.decoded, 14
+        0x08, 0x03,                          // Data.portnum = POSITION
+        0x12, 0x0a,                          // Data.payload, 10 bytes
+        0x0d, 0xa8, 0x8a, 0x84, 0x16,        // Position.latitude_i
+        0x15, 0x70, 0xea, 0x07, 0xb7,        // Position.longitude_i
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::Position);
+    assert(message.latitude_i == 377785000);
+    assert(message.longitude_i == -1224218000);
+}
+
+void testNullIslandIsNotAFix()
+{
+    // 0,0 is a real place in the Gulf of Guinea and also exactly what an
+    // uninitialised struct looks like. A phone without a fix sends it, and a
+    // deck that believed it would draw every unfixed phone on Null Island.
+    const std::uint8_t bytes[] = {
+        0x0a, 0x10, 0x22, 0x0e, 0x08, 0x03, 0x12, 0x0a,
+        0x0d, 0x00, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00,
+        0x00, 0x00,
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::None);
+}
+
+void testOutOfRangePositionRefused()
+{
+    // Latitude beyond 90 degrees is a mis-scaled or malformed sender, not a
+    // place. 0x7fffffff = 2147483647, well past 900000000.
+    const std::uint8_t bytes[] = {
+        0x0a, 0x10, 0x22, 0x0e, 0x08, 0x03, 0x12, 0x0a,
+        0x0d, 0xff, 0xff, 0xff, 0x7f, 0x15, 0x70, 0xea,
+        0x07, 0xb7,
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::None);
+}
+
+void testHalfAPositionIsNotAFix()
+{
+    // Latitude only. Half a coordinate places nothing.
+    const std::uint8_t bytes[] = {
+        0x0a, 0x0b, 0x22, 0x09, 0x08, 0x03, 0x12, 0x05,
+        0x0d, 0xa8, 0x8a, 0x84, 0x16,
     };
     ApiToRadio message{};
     assert(parseApiToRadio(bytes, sizeof(bytes), message));
@@ -301,7 +390,12 @@ int main()
     testSequenceShapeAndTermination();
     testWantConfigParses();
     testPhoneTextParses();
-    testNonTextPortIsIgnoredButValid();
+    testEmptyPositionPayloadIsIgnoredButValid();
+    testPhonePositionParses();
+    testSwiftPositionVectorParses();
+    testNullIslandIsNotAFix();
+    testOutOfRangePositionRefused();
+    testHalfAPositionIsNotAFix();
     testMalformedBytesRefuse();
     testHeardTextRoundTripsThroughParse();
     testLiveNodeInfoMatchesTheDump();

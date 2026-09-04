@@ -173,6 +173,47 @@ constexpr std::uint64_t kPortText = 1;
 constexpr std::uint64_t kPortPosition = 3;
 constexpr std::uint64_t kPortRouting = 5;
 
+/// A Position the PHONE sent us, in Meshtastic's 1e-7 degree units.
+///
+/// The deck's own GPS is a small patch antenna indoors; a phone has a far
+/// better one and usually already has a fix. Meshtastic's app sends its
+/// position to the radio for exactly this reason, so accepting it costs
+/// nothing and is what an ordinary client already expects to be able to do.
+void parseDataForPosition(const std::uint8_t *bytes, std::size_t length,
+                          ApiToRadio &out) noexcept
+{
+    Reader reader{bytes, bytes + length};
+    bool have_lat = false;
+    bool have_lon = false;
+    std::int32_t latitude_i = 0;
+    std::int32_t longitude_i = 0;
+    std::uint32_t field = 0;
+    std::uint32_t wire = 0;
+    const std::uint8_t *sub = nullptr;
+    std::size_t sub_length = 0;
+    while (reader.next(field, wire, sub, sub_length)) {
+        if (field == 1U && wire == kWireFixed32) {
+            latitude_i = static_cast<std::int32_t>(static_cast<std::uint32_t>(sub_length));
+            have_lat = true;
+        }
+        if (field == 2U && wire == kWireFixed32) {
+            longitude_i = static_cast<std::int32_t>(static_cast<std::uint32_t>(sub_length));
+            have_lon = true;
+        }
+    }
+    if (!reader.ok || !have_lat || !have_lon) return;
+    // 0,0 is a real place in the Gulf of Guinea and also what an uninitialised
+    // struct looks like. Meshtastic's own clients treat it as "no fix", and a
+    // deck that believed it would put every unfixed phone on Null Island.
+    if (latitude_i == 0 && longitude_i == 0) return;
+    // Out-of-range values are a malformed or mis-scaled sender, not a place.
+    if (latitude_i > 900000000 || latitude_i < -900000000) return;
+    if (longitude_i > 1800000000 || longitude_i < -1800000000) return;
+    out.latitude_i = latitude_i;
+    out.longitude_i = longitude_i;
+    out.kind = ApiToRadio::Kind::Position;
+}
+
 void parseDataForText(const std::uint8_t *bytes, std::size_t length,
                       ApiToRadio &out) noexcept
 {
@@ -188,7 +229,12 @@ void parseDataForText(const std::uint8_t *bytes, std::size_t length,
         if (field == 1U && wire == kWireVarint) portnum = sub_length;
         if (field == 2U && wire == kWireLen) { payload = sub; payload_length = sub_length; }
     }
-    if (!reader.ok || portnum != kPortText || payload == nullptr) return;
+    if (!reader.ok || payload == nullptr) return;
+    if (portnum == kPortPosition) {
+        parseDataForPosition(payload, payload_length, out);
+        return;
+    }
+    if (portnum != kPortText) return;
     if (payload_length >= sizeof(out.text)) payload_length = sizeof(out.text) - 1U;
     std::memcpy(out.text, payload, payload_length);
     out.text[payload_length] = '\0';

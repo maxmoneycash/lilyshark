@@ -16,6 +16,67 @@ final class MeshtasticProtoTests: XCTestCase {
 
     // MARK: - ToRadio
 
+    func testPositionPacketIsTheVectorTheFirmwareParses() {
+        // The other half of the pairing check: these exact bytes appear in
+        // test/meshtastic_api/test_meshtastic_api.cpp, so if either side's
+        // idea of the Position message drifts, one of the two suites fails on
+        // a desk instead of the deck silently never learning where it is.
+        //
+        // 37.7785 N, 122.4218 W -- the Bay, in Meshtastic's 1e-7 degrees.
+        let bytes = MeshtasticProto.encodePositionPacket(
+            latitude: 37.7785,
+            longitude: -122.4218,
+            packetID: 0
+        )
+        XCTAssertEqual(
+            Array(bytes),
+            [
+                0x0a, 0x15,                          // ToRadio.packet, 21 bytes
+                0x15, 0xff, 0xff, 0xff, 0xff,        // MeshPacket.to = broadcast
+                0x22, 0x0e,                          // MeshPacket.decoded, 14
+                0x08, 0x03,                          // Data.portnum = POSITION
+                0x12, 0x0a,                          // Data.payload, 10 bytes
+                0x0d, 0xa8, 0x8a, 0x84, 0x16,        // Position.latitude_i
+                0x15, 0x70, 0xea, 0x07, 0xb7,        // Position.longitude_i
+            ]
+        )
+    }
+
+    func testPositionKeepsWesternLongitudesNegative() {
+        // A longitude west of Greenwich is negative, and writing it through
+        // an UNSIGNED fixed32 would put the deck on the other side of the
+        // planet. The sign lives in the bit pattern; this pins it.
+        let bytes = Array(
+            MeshtasticProto.encodePositionPacket(
+                latitude: 37.7785, longitude: -122.4218, packetID: 0
+            )
+        )
+        // The last four bytes are the longitude, little-endian two's complement.
+        let lonBits = UInt32(bytes[bytes.count - 4])
+            | UInt32(bytes[bytes.count - 3]) << 8
+            | UInt32(bytes[bytes.count - 2]) << 16
+            | UInt32(bytes[bytes.count - 1]) << 24
+        XCTAssertEqual(Int32(bitPattern: lonBits), -1_224_218_000)
+    }
+
+    func testPositionWritesAZeroCoordinateRatherThanOmittingIt() {
+        // Protobuf omits a zero-valued field by default, which would turn a
+        // position on the equator or the prime meridian into a Position with
+        // a field missing -- not a fix at all to a reader that needs both.
+        let bytes = Array(
+            MeshtasticProto.encodePositionPacket(
+                latitude: 0, longitude: -122.4218, packetID: 0
+            )
+        )
+        // Latitude tag (field 1, wire 5) is present with four zero bytes.
+        XCTAssertTrue(
+            bytes.contains(where: { $0 == 0x0d }),
+            "the latitude field must be written even when it is zero"
+        )
+        XCTAssertEqual(bytes.count, 23, "both coordinates present")
+    }
+
+
     func testWantConfigEncodesToTheFirmwaresExpectedBytes() {
         // ToRadio.want_config_id (field 3 varint) = 42: 0x18 0x2a.
         XCTAssertEqual(Array(MeshtasticProto.encodeWantConfig(nonce: 42)), [0x18, 0x2a])

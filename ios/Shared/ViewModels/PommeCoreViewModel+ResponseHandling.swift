@@ -654,6 +654,11 @@ extension PommeCoreViewModel {
         #if os(iOS)
         syncWidget()
         #endif
+        // The deck now knows who we are; tell it where we are. Its own GPS
+        // wins whenever it has one, so this only fills the gap that leaves a
+        // deck unplaceable on every other operator's map -- and it is gated
+        // on the same location-sharing policy as everything else.
+        connectionManager.shareLocationWithDeck()
     }
 
     /// Merge what one message says about a node into the contact list.

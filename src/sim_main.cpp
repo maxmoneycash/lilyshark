@@ -265,6 +265,38 @@ struct NetRumourNode {
 };
 std::array<NetRumourNode, 16> net_rumour_nodes{};
 
+// Where the PHONE says it is.
+//
+// The deck's GPS is a patch antenna behind a plastic case; indoors it often
+// never fixes, and a deck with no fix beacons no position, so nobody on the
+// mesh can place it. The phone in the same pocket almost always has a fix
+// and a far better antenna, and Meshtastic's own app already sends its
+// position to the radio -- so an ordinary client expects this to work.
+//
+// It is a FALLBACK, never an override: the deck's own receiver is the better
+// evidence about where the DECK is, and a phone left on a desk while the deck
+// walks away would otherwise quietly beacon the desk. Used only while the
+// deck has no fix of its own, and it goes stale on its own schedule so a
+// disconnected phone stops speaking for the deck within the hour.
+struct PhoneFix {
+    bool valid = false;
+    double latitude_degrees = 0.0;
+    double longitude_degrees = 0.0;
+    std::uint32_t received_ms = 0;
+};
+PhoneFix phone_fix{};
+
+/// A phone fix is good for an hour. Long enough that a phone that briefly
+/// drops Bluetooth keeps the deck placed, short enough that a deck carried
+/// away from its phone stops claiming the phone's last known corner.
+constexpr std::uint32_t kPhoneFixStaleMs = 3600000U;
+
+bool phone_fix_usable(std::uint32_t now_ms) noexcept
+{
+    if (!phone_fix.valid) return false;
+    return now_ms - phone_fix.received_ms < kPhoneFixStaleMs;
+}
+
 // Our Curve25519 identity, and the public keys peers have published in their
 // NodeInfo. A direct message can only be sealed to someone whose key we hold;
 // everyone else still gets the channel-key message they can read, because a
@@ -16434,6 +16466,14 @@ bool transmit_meshtastic(MeshtasticPort port, const char *text, std::uint32_t to
     if (gps.state == GpsState::Fix && gps.position_valid) {
         request.latitude_degrees = gps.latitude_degrees;
         request.longitude_degrees = gps.longitude_degrees;
+    } else if (phone_fix_usable(millis())) {
+        // No fix of our own. The phone's is a real measurement of a place
+        // within arm's reach of this radio, which is a better answer than
+        // broadcasting no position at all and being unplaceable on every
+        // other operator's map. The deck's own GPS always wins when it has
+        // one -- see PhoneFix.
+        request.latitude_degrees = phone_fix.latitude_degrees;
+        request.longitude_degrees = phone_fix.longitude_degrees;
     }
     if (!transmit_meshtastic_request(request)) return false;
     if (text != nullptr && text[0] != '\0') {
@@ -16816,6 +16856,19 @@ void service_ble_api() noexcept
             ble_config_active = true;
             ble_config_index = 0;
             ble_config_id = message.want_config_id;
+        } else if (message.kind == ApiToRadio::Kind::Position) {
+            // Recorded, not acted on immediately: whether it is USED depends
+            // on whether the deck's own GPS has anything better, and that is
+            // decided at the moment of transmitting, not here.
+            const bool first = !phone_fix.valid;
+            phone_fix.valid = true;
+            phone_fix.latitude_degrees = static_cast<double>(message.latitude_i) / 1e7;
+            phone_fix.longitude_degrees = static_cast<double>(message.longitude_i) / 1e7;
+            phone_fix.received_ms = millis();
+            if (first) {
+                record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::System,
+                                     "Phone shared its GPS position");
+            }
         } else if (message.kind == ApiToRadio::Kind::Text) {
             // The phone is a second keyboard for the same radio: the message
             // goes on the air, into the deck's own chat log, and earns

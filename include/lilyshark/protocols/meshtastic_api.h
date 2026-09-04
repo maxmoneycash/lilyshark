@@ -46,6 +46,10 @@ struct ApiToRadio {
         Disconnect,
         /// A text message to put on the air.
         Text,
+        /// The phone told us where IT is. The deck's own GPS is a patch
+        /// antenna indoors and a phone's is not, so this is usually the
+        /// better fix -- and it is what Meshtastic's own app already sends.
+        Position,
     } kind = Kind::None;
     std::uint32_t want_config_id = 0;
     std::uint32_t to_node = 0xffffffffU;
@@ -55,6 +59,11 @@ struct ApiToRadio {
     bool want_ack = false;
     /// Meshtastic texts are at most 237 bytes on the wire; NUL-terminated.
     char text[238]{};
+    /// Set only for Kind::Position, in Meshtastic's 1e-7 degree units.
+    /// 0,0 never arrives here: the parser rejects it as "no fix" rather than
+    /// placing an unfixed phone in the Gulf of Guinea.
+    std::int32_t latitude_i = 0;
+    std::int32_t longitude_i = 0;
 };
 
 /// Parse one ToRadio protobuf. Returns false only for malformed bytes; a

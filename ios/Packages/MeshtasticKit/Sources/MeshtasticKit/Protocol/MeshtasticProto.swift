@@ -85,6 +85,43 @@ public enum MeshtasticProto {
         return Data(toRadio.bytes)
     }
 
+    /// Tell the deck where the PHONE is.
+    ///
+    /// The deck's GPS is a patch antenna behind a plastic case and often
+    /// never fixes indoors; a deck with no fix beacons no position and is
+    /// unplaceable on every other operator's map. The phone in the same
+    /// pocket almost always has a fix. Meshtastic's own app sends its
+    /// position to the radio for this reason, and the Lilyshark firmware
+    /// treats it as a FALLBACK -- its own GPS wins whenever it has one, so
+    /// this can never move a deck that knows better where it is.
+    ///
+    /// Coordinates are Meshtastic's own unit: 1e-7 degrees, signed. A caller
+    /// with no fix must not call this -- 0,0 is a real place in the Gulf of
+    /// Guinea, and the firmware rejects it as "no fix" precisely because it
+    /// is also what an uninitialised struct looks like.
+    public static func encodePositionPacket(
+        latitude: Double,
+        longitude: Double,
+        packetID: UInt32
+    ) -> Data {
+        var position = ProtoWriter()
+        position.sfixed32Always(1, Int32((latitude * 1e7).rounded()))
+        position.sfixed32Always(2, Int32((longitude * 1e7).rounded()))
+
+        var data = ProtoWriter()
+        data.uint(1, UInt32(portPosition))
+        data.bytesField(2, position.bytes)
+
+        var packet = ProtoWriter()
+        packet.fixed32(2, broadcast)
+        packet.message(4, data)
+        packet.fixed32(6, packetID)
+
+        var toRadio = ProtoWriter()
+        toRadio.message(1, packet)
+        return Data(toRadio.bytes)
+    }
+
     // MARK: - FromRadio (deck -> phone)
 
     /// One node as the deck describes it, in the config dump or on arrival.
@@ -381,6 +418,23 @@ private struct ProtoWriter {
         guard value != 0 else { return }
         tag(field, Self.wireVarint)
         varint(value)
+    }
+
+    /// A SIGNED fixed32 that is written even when it is zero.
+    ///
+    /// Both exceptions matter here. Signed, because a longitude west of
+    /// Greenwich is negative and reinterpreting it as unsigned puts the deck
+    /// on the far side of the planet. Always, because protobuf's
+    /// omit-the-default rule would silently drop a latitude of exactly 0 --
+    /// the equator is a place, and a Position missing a field is not a fix at
+    /// all to a reader that requires both.
+    mutating func sfixed32Always(_ field: UInt32, _ value: Int32) {
+        tag(field, ProtoWriter.wireFixed32)
+        let bits = UInt32(bitPattern: value)
+        bytes.append(UInt8(bits & 0xff))
+        bytes.append(UInt8((bits >> 8) & 0xff))
+        bytes.append(UInt8((bits >> 16) & 0xff))
+        bytes.append(UInt8((bits >> 24) & 0xff))
     }
 
     mutating func fixed32(_ field: UInt32, _ value: UInt32) {

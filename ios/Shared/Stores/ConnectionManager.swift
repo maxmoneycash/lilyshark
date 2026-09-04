@@ -268,6 +268,55 @@ final class ConnectionManager {
     /// `MeshtasticProto`, not `MeshCoreProtocol`, and confusing the two is the
     /// one mistake this transport pair makes easy. Returns false when the
     /// payload was refused outright — no deck, or too large for its inbox.
+    /// Give a connected deck the phone's position, if the user has agreed to
+    /// share it.
+    ///
+    /// The deck's GPS is a patch antenna behind plastic and often never fixes
+    /// indoors. A deck with no fix beacons no position and is unplaceable on
+    /// every other operator's map, which is the difference between being on
+    /// the mesh and being on it and findable. The firmware treats this as a
+    /// FALLBACK -- its own GPS wins whenever it has one -- so this can never
+    /// move a deck that knows better where it is.
+    ///
+    /// Gated on exactly the same policy and privacy radius as the MeshCore
+    /// advert path above. Location sharing is one decision the operator makes
+    /// once; a second protocol is not a second chance to ask, and certainly
+    /// not a way around a `no`.
+    ///
+    /// Returns false when nothing was sent, including the ordinary cases: no
+    /// permission, no fix yet, no deck.
+    @discardableResult
+    func shareLocationWithDeck() -> Bool {
+        #if os(watchOS)
+        return false
+        #else
+        guard deviceConfig?.advertLocPolicy == 1 else { return false }
+        guard let location = SharedLocation.manager.location else { return false }
+
+        var latitude = location.coordinate.latitude
+        var longitude = location.coordinate.longitude
+        if UserDefaults.standard.double(forKey: "locationPrivacyRadius") > 0 {
+            (latitude, longitude) = PommeCoreViewModel.fudgeLocation(
+                lat: latitude, lon: longitude
+            )
+        }
+        // 0,0 is a real place in the Gulf of Guinea and also what an
+        // uninitialised coordinate looks like. The firmware rejects it as
+        // "no fix" for that reason; there is no point spending airtime on a
+        // packet we know the other end will throw away.
+        guard latitude != 0 || longitude != 0 else { return false }
+
+        return sendToRadio(
+            MeshtasticProto.encodePositionPacket(
+                latitude: latitude,
+                longitude: longitude,
+                packetID: UInt32.random(in: 1...UInt32.max)
+            ),
+            label: "POSITION"
+        )
+        #endif
+    }
+
     @discardableResult
     func sendToRadio(_ data: Data, label: String) -> Bool {
         guard isMeshtasticReady else {
