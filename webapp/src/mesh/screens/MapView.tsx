@@ -572,8 +572,19 @@ export default function MapView({
 	 *           SIMULATE mode and is invented, not received.
 	 *   nodes   the store's contacts. A viaNet contact is the internet's
 	 *           report of a node; nobody here heard it, so it carries no
-	 *           signal figure and must never gain one. The demo mesh is
-	 *           invented wholesale, so under isDemo() every contact is sim.
+	 *           signal figure and must never gain one. A viaSim contact was
+	 *           built from a frame the deck GENERATED -- the store records
+	 *           that per node, from the firmware's own `sim` flag.
+	 *
+	 *           This used to ask the global isDemo() instead, which
+	 *           applyAnalyzerLink clears the moment a deck links. A deck
+	 *           running SIMULATE therefore filled the map with invented
+	 *           nodes and, on linking, had every one of them redrawn as
+	 *           `radio`: invented positions presented as received ones, in
+	 *           the one view whose entire job is to say where signal was
+	 *           actually found. isDemo() still covers the bundled demo mesh,
+	 *           which has no frames and no deck behind it, so the two are
+	 *           OR-ed rather than one replacing the other.
 	 *
 	 * The dB fields are passed only for radio samples. buildCoverage drops
 	 * them from any other provenance anyway; stating it at the call site too
@@ -600,7 +611,11 @@ export default function MapView({
 		}
 		for (const node of s.nodes.values()) {
 			if (!isPlausibleFix(node.lat, node.lon)) continue;
-			const provenance = node.viaNet ? "net" : synthetic ? "sim" : "radio";
+			const provenance = node.viaNet
+				? "net"
+				: node.viaSim || synthetic
+					? "sim"
+					: "radio";
 			observations.push({
 				lat: node.lat as number,
 				lon: node.lon as number,

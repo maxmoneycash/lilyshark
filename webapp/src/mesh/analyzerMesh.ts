@@ -101,6 +101,8 @@ export function applyAnalyzerTelemetry(sample: DeviceTelemetry): void {
     lat: sample.lat,
     lon: sample.lon,
     hopsAway: 0,
+    // The deck says whether it is making this up; the node keeps saying so.
+    viaSim: sample.sim,
   });
 }
 
@@ -117,6 +119,7 @@ export function applyHeardFrame(frame: HeardFrame): void {
     hopsAway: frame.hops,
     lat: frame.lat,
     lon: frame.lon,
+    viaSim: frame.sim,
   });
 
   if (!frame.text || frame.src === ANALYZER_SELF_NUM) return;

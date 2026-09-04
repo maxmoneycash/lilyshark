@@ -43,6 +43,19 @@ export interface NodeEntry {
   fav?: boolean; // local: first in the list
   /** Heard through the internet bridge, not this deck's radio. */
   viaNet?: boolean;
+  /**
+   * Built from a frame the deck GENERATED rather than received -- SIMULATE
+   * mode, or the bundled demo mesh.
+   *
+   * Carried per node because provenance is a property of the node, not of the
+   * app's current mode. The map used to ask the global `isDemo()`, which
+   * `applyAnalyzerLink` clears the instant a deck links: a deck running
+   * SIMULATE would fill the map with invented nodes, link, and every one of
+   * them would then be drawn as `radio` -- invented positions presented as
+   * received ones. The firmware states `"sim"` on every frame it makes up,
+   * and this is where that statement is kept.
+   */
+  viaSim?: boolean;
   ignored?: boolean; // local: its messages are discarded
 }
 
