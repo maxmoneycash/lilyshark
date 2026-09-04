@@ -22,6 +22,9 @@ namespace lilyshark {
 
 /// One row of the node list handed to the phone. `label` is whatever the
 /// deck knows the node as -- a claimed short name or the hex fallback.
+/// Meshtastic's own limit on a channel name.
+inline constexpr std::size_t kApiChannelNameCapacity = 12U;
+
 struct ApiNodeEntry {
     std::uint32_t num = 0;
     char label[12]{};
@@ -53,6 +56,16 @@ struct ApiToRadio {
     } kind = Kind::None;
     std::uint32_t want_config_id = 0;
     std::uint32_t to_node = 0xffffffffU;
+    /// Which channel the phone chose, as an index into the config dump's
+    /// channel list. 0 is the primary -- the default-PSK channel every
+    /// Meshtastic radio shares -- and higher indices are this deck's own
+    /// stored keys, in slot order.
+    ///
+    /// The phone picks a channel by INDEX and never holds the key: the deck
+    /// has it, and the deck does the sealing. That is deliberately unlike
+    /// stock Meshtastic, where the app carries the PSK. A key that never
+    /// leaves the radio cannot leak from a phone.
+    std::uint32_t channel = 0;
     /// The id the phone stamped on its own packet. The app shows "Sending..."
     /// until a Routing result names this id, so it must survive the parse.
     std::uint32_t packet_id = 0;
@@ -79,9 +92,25 @@ bool parseApiToRadio(const std::uint8_t *bytes, std::size_t length,
 ///
 /// `firmware_version` is what the phone displays and gates features on; the
 /// nodes array must put the deck itself first with is_self set.
+/// One channel the deck can seal on, as the phone should see it.
+///
+/// Carries the NAME and not the key. The phone selects a channel by its index
+/// in this list and the deck does the sealing, so a key never leaves the
+/// radio. Stock Meshtastic puts the PSK in this message; we do not, because
+/// the phone gains nothing from holding one and a phone is a much easier
+/// thing to lose than a deck.
+struct ApiChannelEntry {
+    char name[kApiChannelNameCapacity]{};
+    /// True for index 0, the shared default-PSK channel every Meshtastic
+    /// radio listens on. False for this deck's own stored keys.
+    bool is_default = false;
+};
+
 std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
                                    const char *firmware_version,
                                    const ApiNodeEntry *nodes, std::size_t node_count,
+                                   const ApiChannelEntry *channels,
+                                   std::size_t channel_count,
                                    std::uint8_t *out, std::size_t capacity) noexcept;
 
 /// Encode one FromRadio{node_info} on its own, for the node that just

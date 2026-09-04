@@ -254,6 +254,9 @@ void parseMeshPacket(const std::uint8_t *bytes, std::size_t length,
         case 2U:  // to, fixed32
             if (wire == kWireFixed32) out.to_node = static_cast<std::uint32_t>(sub_length);
             break;
+        case 3U:  // channel index the phone chose
+            if (wire == kWireVarint) out.channel = static_cast<std::uint32_t>(sub_length);
+            break;
         case 4U:  // decoded Data
             if (wire == kWireLen) parseDataForText(sub, sub_length, out);
             break;
@@ -347,8 +350,14 @@ bool parseApiToRadio(const std::uint8_t *bytes, std::size_t length,
 std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
                                    const char *firmware_version,
                                    const ApiNodeEntry *nodes, std::size_t node_count,
+                                   const ApiChannelEntry *channels,
+                                   std::size_t channel_count,
                                    std::uint8_t *out, std::size_t capacity) noexcept
 {
+    // At least the primary, always: a deck with no stored keys still listens
+    // on the default channel, and a phone shown an empty channel list would
+    // have nothing to send on.
+    if (channels == nullptr || channel_count == 0U) channel_count = 1U;
     if (out == nullptr || capacity == 0U) return 0;
     Writer from_radio{out, capacity};
     std::uint8_t scratch[192]{};
@@ -367,18 +376,37 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
         from_radio.field_message(13, child);
     } else if (index < 2U + node_count) {
         writeNodeInfoMessage(from_radio, nodes[index - 2U]);
-    } else if (index == 2U + node_count) {
-        // FromRadio.channel: the primary channel. A one-byte psk of 0x01 is
-        // Meshtastic's own shorthand for "the published default key", which
-        // is the channel this deck actually listens on.
-        std::uint8_t settings_scratch[16]{};
+    } else if (index < 2U + node_count + channel_count) {
+        // FromRadio.channel, one per channel this deck can seal on.
+        //
+        // Index 0 is the primary. A one-byte psk of 0x01 is Meshtastic's own
+        // shorthand for "the published default key", which is the channel
+        // this deck actually listens on.
+        //
+        // The others carry a NAME and no psk. The phone selects by index and
+        // the deck seals -- see ApiChannelEntry. A stock Meshtastic client
+        // would read a keyless secondary channel as unencrypted, which is why
+        // this is a Lilyshark-to-Lilyshark arrangement and not a claim about
+        // what any Meshtastic app will do with it.
+        const std::size_t channel_index = index - (2U + node_count);
+        std::uint8_t settings_scratch[32]{};
         Writer settings{settings_scratch, sizeof(settings_scratch)};
-        const std::uint8_t default_psk[1] = {0x01};
-        settings.field_bytes(2, default_psk, sizeof(default_psk));
+        const bool primary = channels == nullptr || channel_index == 0U ||
+                             channels[channel_index].is_default;
+        if (primary) {
+            const std::uint8_t default_psk[1] = {0x01};
+            settings.field_bytes(2, default_psk, sizeof(default_psk));
+        }
+        if (channels != nullptr && channels[channel_index].name[0] != '\0') {
+            settings.field_string(3, channels[channel_index].name);
+        }
+        child.field_uint(1, static_cast<std::uint32_t>(channel_index));
         child.field_message(2, settings);
-        child.field_uint(3, 1);  // Channel.Role.PRIMARY
+        // Role: PRIMARY for index 0, SECONDARY for the rest. A dump with two
+        // PRIMARY channels is malformed to every Meshtastic client.
+        child.field_uint(3, channel_index == 0U ? 1U : 2U);
         from_radio.field_message(10, child);
-    } else if (index == 3U + node_count) {
+    } else if (index == 2U + node_count + channel_count) {
         // FromRadio.config.lora -- enough for the app to state the region and
         // preset instead of showing UNSET everywhere.
         std::uint8_t lora_scratch[16]{};
@@ -389,7 +417,7 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
         lora.field_uint(9, 1);  // tx_enabled
         child.field_message(6, lora);
         from_radio.field_message(5, child);
-    } else if (index == 4U + node_count) {
+    } else if (index == 3U + node_count + channel_count) {
         // FromRadio.config_complete_id -- the nonce back, closing the dump.
         from_radio.field_uint(7, config_id);
         if (config_id == 0U) {

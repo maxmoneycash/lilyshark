@@ -8629,6 +8629,46 @@ bool channel_key_for_fingerprint(const char *fingerprint, const std::uint8_t *&k
     return false;
 }
 
+/// The seal for a channel the PHONE selected, by index into the list the
+/// config dump advertised.
+///
+/// Index 0 is the primary -- the default-PSK channel every Meshtastic radio
+/// shares -- and is returned as an empty seal, which is how the transmit path
+/// already spells "use the default". Indices above that are this deck's own
+/// stored keys in slot order, matching writeApiChannelList.
+///
+/// The phone chooses by index and never holds a key. The deck has them and
+/// the deck seals; a key that never leaves the radio cannot leak from a
+/// phone, and the phone being the user's own does not make it a good place to
+/// keep one.
+///
+/// An index past the end returns false rather than silently falling back to
+/// the default channel. Sending a message in the clear because the channel
+/// the operator picked no longer exists is the kind of quiet downgrade that
+/// this file has had to be corrected for before.
+/// `fingerprint_out` must outlive the seal: MeshtasticChannelSeal holds a
+/// pointer, not a copy, and a buffer local to this function would dangle the
+/// moment it returned.
+bool channel_seal_for_api_index(std::uint32_t index, MeshtasticChannelSeal &seal,
+                                char *fingerprint_out,
+                                std::size_t fingerprint_capacity) noexcept
+{
+    seal = MeshtasticChannelSeal{};
+    if (index == 0U) return true;
+    const std::size_t slot = static_cast<std::size_t>(index - 1U);
+    if (slot >= channel_keys.size()) return false;
+    const std::uint8_t *key = channel_keys.channelKeyBytes(slot);
+    const char *name = channel_keys.name(slot);
+    if (key == nullptr || name == nullptr) return false;
+    seal.key = key;
+    seal.name = name;
+    if (fingerprint_out != nullptr && fingerprint_capacity > 0U &&
+        channel_keys.fingerprint(slot, fingerprint_out, fingerprint_capacity)) {
+        seal.fingerprint = fingerprint_out;
+    }
+    return true;
+}
+
 /// Revision of the key list the thread tabs were last built from. Rebuilding
 /// on every redraw would mean eight SHA-256 fingerprints per keystroke while a
 /// message is being typed, and Chat redraws on every keystroke.
@@ -16906,8 +16946,18 @@ void service_ble_api() noexcept
             // The phone is a second keyboard for the same radio: the message
             // goes on the air, into the deck's own chat log, and earns
             // DELIVERED the same way a message typed on this keyboard does.
-            const bool sent = transmit_meshtastic(MeshtasticPort::TextMessage,
-                                                  message.text, message.to_node);
+            //
+            // It also picks the channel. An index the deck cannot resolve is
+            // REFUSED rather than sent on the default: a message the operator
+            // meant for a keyed channel must never go out in the clear
+            // because the key was removed since they chose it.
+            MeshtasticChannelSeal seal{};
+            char seal_fingerprint[kChannelKeyFingerprintDigits + 1]{};
+            const bool have_channel = channel_seal_for_api_index(
+                message.channel, seal, seal_fingerprint, sizeof(seal_fingerprint));
+            const bool sent =
+                have_channel && transmit_meshtastic(MeshtasticPort::TextMessage,
+                                                    message.text, message.to_node, seal);
             // The app shows "Sending..." until a Routing result names its
             // packet id; the radio, not the phone, decides when a message has
             // left. 4 is NO_INTERFACE -- the radio refused or is not there.
@@ -16961,13 +17011,31 @@ void service_ble_api() noexcept
         }
     }
 
+    // The channels the phone may send on, in the order channel_seal_for_api_index
+    // resolves them: the primary first, then this deck's stored keys by slot.
+    // Names only -- the keys stay on the deck and the deck does the sealing.
+    std::array<ApiChannelEntry, kChannelKeyCapacity + 1U> api_channels{};
+    std::size_t api_channel_count = 1U;
+    std::snprintf(api_channels[0].name, sizeof(api_channels[0].name), "%s",
+                  meshtasticDefaultChannelName(shell_active_profile().spreading_factor,
+                                               shell_active_profile().bandwidth_hz));
+    api_channels[0].is_default = true;
+    for (std::size_t slot = 0; slot < channel_keys.size() &&
+                               api_channel_count < api_channels.size(); ++slot) {
+        const char *name = channel_keys.name(slot);
+        if (name == nullptr || name[0] == '\0') continue;
+        std::snprintf(api_channels[api_channel_count].name,
+                      sizeof(api_channels[api_channel_count].name), "%s", name);
+        ++api_channel_count;
+    }
+
     std::uint8_t frame[512]{};
     while (ble_config_active) {
         // The version gates app features, so the leading 2.6.0 keeps a stock
         // app from refusing us; the suffix is what this firmware really is.
         const std::size_t frame_length = encodeApiConfigMessage(
             ble_config_index, ble_config_id, "2.6.0-lilyshark.8", nodes, node_count,
-            frame, sizeof(frame));
+            api_channels.data(), api_channel_count, frame, sizeof(frame));
         if (frame_length == 0U) {
             ble_config_active = false;
             break;

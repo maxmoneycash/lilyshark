@@ -22,7 +22,7 @@ void testMyInfoExactBytes()
     setLocalMeshtasticNodeNum(1);
     std::uint8_t out[64]{};
     const std::size_t length = encodeApiConfigMessage(0, 0x42, "2.6.0", nullptr, 0,
-                                                      out, sizeof(out));
+                               nullptr, 0, out, sizeof(out));
     // FromRadio.my_info (field 3, len-delimited): tag 0x1a, length 6.
     // MyNodeInfo.my_node_num (field 1 varint) = 1: 0x08 0x01.
     // MyNodeInfo.min_app_version (field 11 varint) = 30200: 0x58 0xf8 0xeb 0x01.
@@ -36,14 +36,14 @@ void testConfigCompleteEchoesNonce()
     std::uint8_t out[16]{};
     // With no nodes the sequence is my_info, metadata, channel, lora, complete.
     const std::size_t length = encodeApiConfigMessage(4, 0xa5, "2.6.0", nullptr, 0,
-                                                      out, sizeof(out));
+                               nullptr, 0, out, sizeof(out));
     // FromRadio.config_complete_id (field 7 varint) = 0xa5: 0x38 0xa5 0x01.
     const std::uint8_t expected[] = {0x38, 0xa5, 0x01};
     assert(length == sizeof(expected));
     assert(std::memcmp(out, expected, length) == 0);
     // A zero nonce must still be echoed, or the app waits forever.
     const std::size_t zero_length = encodeApiConfigMessage(4, 0, "2.6.0", nullptr, 0,
-                                                           out, sizeof(out));
+                               nullptr, 0, out, sizeof(out));
     const std::uint8_t zero_expected[] = {0x38, 0x00};
     assert(zero_length == sizeof(zero_expected));
     assert(std::memcmp(out, zero_expected, zero_length) == 0);
@@ -65,16 +65,19 @@ void testSequenceShapeAndTermination()
     // my_info, metadata, two node_info, channel, lora, complete = 7 messages.
     for (std::size_t index = 0; index < 7U; ++index) {
         const std::size_t length = encodeApiConfigMessage(index, 7, "2.6.0-lilyshark",
-                                                          nodes, 2, out, sizeof(out));
+                                                          nodes, 2, nullptr, 0,
+                                                          out, sizeof(out));
         assert(length > 0);
         assert(length <= sizeof(out));
     }
-    assert(encodeApiConfigMessage(7, 7, "2.6.0-lilyshark", nodes, 2, out,
+    assert(encodeApiConfigMessage(7, 7, "2.6.0-lilyshark", nodes, 2,
+                               nullptr, 0, out,
                                   sizeof(out)) == 0);
 
     // The self node_info carries the user id string "!cda172e0" and T_DECK.
     const std::size_t self_length =
-        encodeApiConfigMessage(2, 7, "2.6.0-lilyshark", nodes, 2, out, sizeof(out));
+        encodeApiConfigMessage(2, 7, "2.6.0-lilyshark", nodes, 2,
+                               nullptr, 0, out, sizeof(out));
     assert(self_length > 0);
     assert(std::memcmp(out, "\x22", 1) == 0);  // FromRadio.node_info tag
     bool found_id = false;
@@ -215,6 +218,101 @@ void testHalfAPositionIsNotAFix()
     assert(message.kind == ApiToRadio::Kind::None);
 }
 
+void testChannelListIsAdvertisedWithNamesAndNoKeys()
+{
+    ApiChannelEntry channels[3]{};
+    std::snprintf(channels[0].name, sizeof(channels[0].name), "LongFast");
+    channels[0].is_default = true;
+    std::snprintf(channels[1].name, sizeof(channels[1].name), "NORTH RIDGE");
+    std::snprintf(channels[2].name, sizeof(channels[2].name), "RIVER");
+
+    std::uint8_t out[512]{};
+    // my_info, metadata, three channels, lora, complete = 7 with no nodes.
+    for (std::size_t index = 0; index < 7U; ++index) {
+        assert(encodeApiConfigMessage(index, 9, "2.6.0", nullptr, 0, channels, 3,
+                                      out, sizeof(out)) > 0);
+    }
+    assert(encodeApiConfigMessage(7, 9, "2.6.0", nullptr, 0, channels, 3, out,
+                                  sizeof(out)) == 0);
+
+    // Separate buffers: the two messages are compared against each other, and
+    // reusing one would have the second encode quietly overwrite the first.
+    std::uint8_t secondary_bytes[512]{};
+    std::uint8_t primary_bytes[512]{};
+
+    // The secondary channels carry their names...
+    const std::size_t second =
+        encodeApiConfigMessage(3, 9, "2.6.0", nullptr, 0, channels, 3,
+                               secondary_bytes, sizeof(secondary_bytes));
+    bool found_name = false;
+    for (std::size_t i = 0; i + 11U <= second; ++i) {
+        if (std::memcmp(secondary_bytes + i, "NORTH RIDGE", 11) == 0) found_name = true;
+    }
+    assert(found_name);
+
+    // ...and NOT the key. Only the primary carries a psk, and only the
+    // one-byte 0x01 that names the published default. A phone that never
+    // holds a key cannot leak one.
+    const std::size_t primary =
+        encodeApiConfigMessage(2, 9, "2.6.0", nullptr, 0, channels, 3,
+                               primary_bytes, sizeof(primary_bytes));
+    bool primary_has_psk = false;
+    for (std::size_t i = 0; i + 3U <= primary; ++i) {
+        // Settings.psk is field 2, wire 2: tag 0x12, length 1, value 0x01.
+        if (primary_bytes[i] == 0x12 && primary_bytes[i + 1] == 0x01 &&
+            primary_bytes[i + 2] == 0x01) {
+            primary_has_psk = true;
+        }
+    }
+    assert(primary_has_psk);
+    for (std::size_t i = 0; i + 3U <= second; ++i) {
+        // No psk on a secondary channel, of any length.
+        assert(!(secondary_bytes[i] == 0x12 && secondary_bytes[i + 1] == 0x01 &&
+                 secondary_bytes[i + 2] == 0x01));
+    }
+}
+
+void testADeckWithNoStoredKeysStillAdvertisesTheDefault()
+{
+    // A phone shown an empty channel list would have nothing to send on, so
+    // the primary is emitted even when the caller passes none.
+    std::uint8_t out[512]{};
+    assert(encodeApiConfigMessage(2, 9, "2.6.0", nullptr, 0, nullptr, 0, out,
+                                  sizeof(out)) > 0);
+}
+
+void testPhoneChannelSelectionParses()
+{
+    // MeshPacket.channel is field 3, varint. It used to be dropped, so every
+    // message the phone sent went out on the default channel whatever the
+    // operator picked.
+    const std::uint8_t bytes[] = {
+        0x0a, 0x0a,                          // ToRadio.packet, 10 bytes
+        0x18, 0x02,                          // MeshPacket.channel = 2
+        0x22, 0x06,                          // MeshPacket.decoded, 6 bytes
+        0x08, 0x01,                          // Data.portnum = TEXT
+        0x12, 0x02, 0x68, 0x69,              // Data.payload "hi"
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::Text);
+    assert(message.channel == 2U);
+    assert(std::strcmp(message.text, "hi") == 0);
+}
+
+void testChannelDefaultsToThePrimary()
+{
+    // A phone that names no channel means the primary, which is what index 0
+    // already is -- not "unset" and not a refusal.
+    const std::uint8_t bytes[] = {
+        0x0a, 0x08, 0x22, 0x06, 0x08, 0x01, 0x12, 0x02, 'h', 'i',
+    };
+    ApiToRadio message{};
+    assert(parseApiToRadio(bytes, sizeof(bytes), message));
+    assert(message.kind == ApiToRadio::Kind::Text);
+    assert(message.channel == 0U);
+}
+
 void testMalformedBytesRefuse()
 {
     // A length-delimited field promising more bytes than exist.
@@ -263,7 +361,8 @@ void testLiveNodeInfoMatchesTheDump()
 
     std::uint8_t from_dump[256]{};
     const std::size_t dump_length =
-        encodeApiConfigMessage(3, 7, "2.6.0", nodes, 2, from_dump, sizeof(from_dump));
+        encodeApiConfigMessage(3, 7, "2.6.0", nodes, 2,
+                               nullptr, 0, from_dump, sizeof(from_dump));
     std::uint8_t standalone[256]{};
     const std::size_t live_length =
         encodeApiNodeInfo(nodes[1], standalone, sizeof(standalone));
@@ -377,7 +476,8 @@ void testPhonePacketIdSurvivesTheParse()
 void testEncodeRefusesTinyBuffers()
 {
     std::uint8_t out[4]{};
-    assert(encodeApiConfigMessage(0, 1, "2.6.0", nullptr, 0, out, sizeof(out)) == 0);
+    assert(encodeApiConfigMessage(0, 1, "2.6.0", nullptr, 0,
+                               nullptr, 0, out, sizeof(out)) == 0);
     assert(encodeApiTextPacket(1, 2, 3, "hello", 0, 0, out, sizeof(out)) == 0);
 }
 
@@ -396,6 +496,10 @@ int main()
     testNullIslandIsNotAFix();
     testOutOfRangePositionRefused();
     testHalfAPositionIsNotAFix();
+    testChannelListIsAdvertisedWithNamesAndNoKeys();
+    testADeckWithNoStoredKeysStillAdvertisesTheDefault();
+    testPhoneChannelSelectionParses();
+    testChannelDefaultsToThePrimary();
     testMalformedBytesRefuse();
     testHeardTextRoundTripsThroughParse();
     testLiveNodeInfoMatchesTheDump();
