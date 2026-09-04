@@ -3465,13 +3465,30 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
         }
     }
 
+    // The map controls carry NO outline.
+    //
+    // They used to be drawn like every other chip in the shell -- a fill and
+    // then draw_outline_rect, which is four separate rule_lines. Over a
+    // satellite photo that read as four white boxes stuck on the imagery, and
+    // it cost six LVGL objects per chip where four will do. The map redraws
+    // these on every refresh, so the two are the same complaint: the white
+    // box is the ugly part AND four of the six objects.
+    //
+    // A solid chip on a photograph does not need a border to be found; it
+    // needs to not be the same colour as the photograph. So the fill is a
+    // near-black that stays distinct from dark imagery rather than
+    // disappearing into it the way pure black did, and a one-pixel black edge
+    // on the right and bottom lifts it off the map the way a shadow does --
+    // two lines instead of four, and nothing white anywhere.
     const auto chip = [parent](lv_coord_t x, lv_coord_t y, const char *label, bool selected,
                                bool enabled = true) {
         const lv_color_t ink = !enabled ? theme::text_muted() :
                                (selected ? theme::pink() : theme::text());
         theme::rect(parent, x, y, kMapCtrlW, kMapCtrlH,
-                    selected && enabled ? lv_color_hex(0x180810) : lv_color_hex(0x000000));
-        draw_outline_rect(parent, x, y, kMapCtrlW, kMapCtrlH, ink);
+                    selected && enabled ? lv_color_hex(0x180810) : lv_color_hex(0x0A0A0E));
+        const lv_color_t edge = lv_color_hex(0x000000);
+        theme::rule_line(parent, x + kMapCtrlW - 1, y, 1, kMapCtrlH, edge);
+        theme::rule_line(parent, x, y + kMapCtrlH - 1, kMapCtrlW, 1, edge);
         const lv_coord_t text_w = static_cast<lv_coord_t>(std::strlen(label) * 6);
         put_label(parent, label, x + (kMapCtrlW - text_w) / 2, y + 7, ink, &font_pixel_6x8);
     };
@@ -3490,9 +3507,12 @@ void plot_field_map(lv_obj_t *parent, const MapMark *marks, std::size_t mark_cou
         put_clipped_label(parent, map_popup.name[0] != '\0' ? map_popup.name : "NODE",
                           kPopX + 10, kPopY + 8, kPopCloseX - kPopX - 18, theme::pink(),
                           &font_condensed_bold_16);
-        // Close is a real target, not a decoration: 22x18 with the glyph centred.
-        draw_outline_rect(parent, kPopCloseX, kPopCloseY, kPopCloseW, 18, theme::text_muted());
-        put_label(parent, "X", kPopCloseX + 8, kPopCloseY + 5, theme::text_muted(),
+        // Close is a real target, not a decoration: 22x18 with the glyph
+        // centred. The box around it is gone -- the tap area is decided by
+        // the hit test below, not by whether a rectangle is drawn, so the
+        // outline bought nothing except another pale box on the map. The
+        // glyph is brighter now to carry the affordance on its own.
+        put_label(parent, "X", kPopCloseX + 8, kPopCloseY + 5, theme::text(),
                   &font_pixel_6x8);
 
         char id_line[24]{};
@@ -14436,7 +14456,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0xa9a8caf8710d718cULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
         0x932ca408b25d655fULL, 0x585c646383e0891bULL, 0x3d61199a6d61d28cULL,
-        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x4631c9cb6f356c44ULL,
+        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x098fd1e6e6e19e17ULL,
         0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xae5f04f11f7d4fb1ULL,
         0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
     }};
@@ -14671,7 +14691,7 @@ bool run_simulator_render_test() noexcept
         // Hashed as well as written: the marks used to draw over the card,
         // and no behavioural test noticed because every assertion about it
         // passed while it was being painted through.
-        constexpr std::uint64_t kMapNodeCardHash = 0x05517ec23aad4883ULL;
+        constexpr std::uint64_t kMapNodeCardHash = 0xa83c21febb9eebc5ULL;
         const std::uint64_t card_hash = hash_simulator_frame();
         std::fprintf(stderr, "Lilyshark render MAP NODE CARD: fnv1a=%016llx\n",
                      static_cast<unsigned long long>(card_hash));
