@@ -31,6 +31,26 @@ struct State {
     bool fail_file_open = false;
     bool fail_file_write = false;
     bool fail_file_flush = false;
+    /// The card itself, modelled rather than switched.
+    ///
+    /// These used to be three "make this call fail" booleans, which is why the
+    /// firmware could not tell a full card from a pulled one: every fault
+    /// reached the code as the same false, so no test could ask for a
+    /// different message. The deck now diagnoses a failed write by asking the
+    /// card two more questions -- how much room is left, and is the directory
+    /// still readable -- so the fake has to be able to answer them
+    /// differently. A full card answers both; a pulled card answers neither.
+    std::uint64_t sd_total_bytes = 64ULL * 1024ULL * 1024ULL;
+    std::uint64_t sd_used_bytes = 0;
+    /// f_getfree failing. Both SD.totalBytes() and SD.usedBytes() return 0 in
+    /// that case on real hardware -- the reading is ABSENT, not zero, and the
+    /// firmware must not read it as a full card.
+    bool sd_free_space_query_fails = false;
+    /// Mounted and answering, and refusing writes: a read-only mount or a bad
+    /// block.
+    bool sd_write_refused = false;
+    /// Pulled from the slot. Writes fail, and so does every follow-up read.
+    bool sd_removed = false;
     std::uint32_t battery_adc_mv = 2000;
 
     std::string serial_log{};
