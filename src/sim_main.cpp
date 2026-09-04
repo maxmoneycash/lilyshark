@@ -391,6 +391,30 @@ void format_key_provenance(char *out, std::size_t capacity,
 // telemetry lines the analyzer renders live. Plain text on purpose — a human
 // with a serial monitor reads the same protocol the web app does.
 bool analyzer_link_active = false;
+
+// Frames the radio decoded cleanly and the analyzer link still did not
+// report, counted rather than merely not sent.
+//
+// emit_analyzer_heard_frame drops anything that fails contributesToNodeSummary:
+// a bad CRC, a malformed decode, or -- the one that surprises people -- a
+// frame carrying no SOURCE at all. That last is not a bug: Reticulum names a
+// destination and no sender, and MeshCore names neither, so there is
+// genuinely nobody to attribute those to and inventing an attribution would
+// be worse than dropping them.
+//
+// What WAS a bug is that the drop left no trace. The radio would count
+// eighty received frames while the analyzer showed two, and every screen and
+// script downstream reported "heard nothing" -- which reads as a dead band
+// rather than as a band full of traffic this build cannot attribute. An
+// instrument that discards evidence has to say how much.
+struct HeardButUnreported {
+    std::uint32_t crc_failed = 0;
+    std::uint32_t malformed = 0;
+    std::uint32_t no_source = 0;
+
+    std::uint32_t total() const noexcept { return crc_failed + malformed + no_source; }
+};
+HeardButUnreported heard_but_unreported{};
 std::uint32_t analyzer_link_last_telemetry_ms = 0;
 std::uint32_t analyzer_link_last_position_ms = 0;
 // Mesh beacons run off the radio, independent of any USB link.
@@ -10246,7 +10270,18 @@ void json_copy_ascii(char *out, std::size_t cap, const char *in) noexcept
 
 void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
 {
-    if (!analyzer_link_active || !contributesToNodeSummary(record)) return;
+    if (!analyzer_link_active) return;
+    if (!contributesToNodeSummary(record)) {
+        // Say WHY, so a quiet analyzer can be told apart from a quiet band.
+        if (record.raw.rf.crc == CrcStatus::Invalid) {
+            ++heard_but_unreported.crc_failed;
+        } else if (record.decoded.state == DecodeState::Malformed) {
+            ++heard_but_unreported.malformed;
+        } else {
+            ++heard_but_unreported.no_source;
+        }
+        return;
+    }
     const DecodedPacket &packet = record.decoded;
     char text[88]{};
     char long_name[40]{};
@@ -17190,7 +17225,8 @@ void loop()
                 "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
                 "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s,\"lat\":%.6f,\"lon\":%.6f,"
                 "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"
-                "\"rx\":%lu,\"crc\":%lu}\n",
+                "\"rx\":%lu,\"crc\":%lu,\"drop_crc\":%lu,\"drop_bad\":%lu,"
+                "\"drop_nosrc\":%lu}\n",
                 hardware.battery_label, hardware.gps_label, link_profile.name,
                 static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
                 newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
@@ -17204,13 +17240,17 @@ void loop()
                 static_cast<unsigned>(link_profile.spreading_factor),
                 static_cast<unsigned long>(link_profile.bandwidth_hz),
                 static_cast<unsigned long>(radio_service.status().received_frames),
-                static_cast<unsigned long>(radio_service.status().crc_errors));
+                static_cast<unsigned long>(radio_service.status().crc_errors),
+                static_cast<unsigned long>(heard_but_unreported.crc_failed),
+                static_cast<unsigned long>(heard_but_unreported.malformed),
+                static_cast<unsigned long>(heard_but_unreported.no_source));
         } else {
             Serial.printf(
                 "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
                 "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s,"
                 "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"
-                "\"rx\":%lu,\"crc\":%lu}\n",
+                "\"rx\":%lu,\"crc\":%lu,\"drop_crc\":%lu,\"drop_bad\":%lu,"
+                "\"drop_nosrc\":%lu}\n",
                 hardware.battery_label, hardware.gps_label, link_profile.name,
                 static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
                 newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
@@ -17223,7 +17263,10 @@ void loop()
                 static_cast<unsigned>(link_profile.spreading_factor),
                 static_cast<unsigned long>(link_profile.bandwidth_hz),
                 static_cast<unsigned long>(radio_service.status().received_frames),
-                static_cast<unsigned long>(radio_service.status().crc_errors));
+                static_cast<unsigned long>(radio_service.status().crc_errors),
+                static_cast<unsigned long>(heard_but_unreported.crc_failed),
+                static_cast<unsigned long>(heard_but_unreported.malformed),
+                static_cast<unsigned long>(heard_but_unreported.no_source));
         }
     }
     // Synthetic traffic exercises the real decoder, analyzer and native

@@ -43,6 +43,7 @@ def main():
     sources = collections.Counter()
     kinds = {}
     local = firmware = gps = position = None
+    dropped = {}
     rx = crc = None
 
     while time.time() < end:
@@ -87,6 +88,12 @@ def main():
             position = "%.6f,%.6f" % (record["lat"], record["lon"])
         if "rx" in record:
             rx, crc = record.get("rx"), record.get("crc")
+        # Frames the radio decoded and the analyzer link chose not to report.
+        # Without these, a deck hearing plenty and attributing none looks
+        # exactly like a deck hearing nothing at all.
+        for key in ("drop_crc", "drop_bad", "drop_nosrc"):
+            if key in record:
+                dropped[key] = record[key]
         if kind == "S" and "db" in record:
             # A finished spectrum sweep pass. Start one from the deck's
             # SPECTRUM screen while this script is attached to see it.
@@ -120,8 +127,25 @@ def main():
         pass
     print("local=%s fw=%s rx=%s crc=%s gps=%s pos=%s" % (
         local, firmware, rx, crc, gps, position))
+    if dropped and dropped.get("drop_crc", 0) + dropped.get("drop_bad", 0) + dropped.get(
+        "drop_nosrc", 0
+    ):
+        print(
+            "heard but not reported: %d bad CRC, %d malformed, %d with no sender"
+            % (
+                dropped.get("drop_crc", 0),
+                dropped.get("drop_bad", 0),
+                dropped.get("drop_nosrc", 0),
+            )
+        )
+        print(
+            "  (a frame with no sender is normal for MeshCore and Reticulum,"
+            " which do not name one)"
+        )
     if not sources:
-        print("heard nothing — check the profile matches the network in range")
+        print("no frame could be attributed to a sender.")
+        print("  If the line above shows frames heard, the band is NOT quiet --")
+        print("  this build simply cannot attribute what is on it.")
     return 0
 
 
