@@ -320,13 +320,33 @@ struct DeviceInfoSection: View {
         }
     }
 
+    /// The voltage with this device's calibration applied.
+    ///
+    /// A sibling row further down this file has the same helper. Duplicated
+    /// rather than shared because the two live in different structs with
+    /// different config sources; if a third appears, that is the moment to
+    /// lift it out rather than copy it again.
+    private var correctedBatteryVoltage: Double {
+        guard let calibration = config.batteryCalibration else { return config.batteryVoltage }
+        return calibration.correctedVoltage(config.batteryVoltage)
+    }
+
     private var batteryRow: some View {
-        // Resolved before the body — see batteryRowContent. The voltage shown
-        // is the radio's raw report; the calibration correction belongs to the
-        // percentage, and batteryReading() has already applied it.
+        // Resolved before the body — see batteryRowContent.
+        //
+        // The voltage and the percentage must BOTH be corrected or neither.
+        // This showed the radio's raw voltage beside a calibrated percentage,
+        // which is not one reading: with a correction factor of 1.077 a deck
+        // reporting 3.90 V drew "3.90V (99%)", where the voltage says
+        // three-fifths and the percentage says nearly full. A reader has no
+        // way to tell which half to believe.
+        //
+        // The sibling row further down this file already used
+        // correctedBatteryVoltage; this one did not, so the same deck read
+        // differently on two screens.
         let content = batteryRowContent(
             config.batteryReading(chemistry: batteryChemistry),
-            voltage: config.batteryVoltage
+            voltage: correctedBatteryVoltage
         )
         return HStack {
             Label("Battery", systemImage: content.icon)

@@ -41,14 +41,48 @@ final class MeshCoreKitTests: XCTestCase {
     }
 
     func testTheRadiosOwnPercentWinsOverTheVoltageCurve() {
-        // 3.92 V interpolates to 64% off the LiPo table, but the radio said
-        // 87%. Its own number wins, and the case says which one is on screen —
-        // the two disagree because they are different tables, and only ours
-        // gets the per-device calibration.
+        // A radio that reports its own percentage is measuring a cell we can
+        // only guess at from voltage, so its number wins.
+        //
+        // The 87 here is arbitrary, chosen only so it CANNOT be the value the
+        // curve would produce — 3.92 V interpolates to 64 — which is what
+        // makes the assertion prove that `.reported` was taken rather than
+        // `.estimated`.
+        //
+        // An earlier version of this comment claimed the firmware's LiPo table
+        // and the app's "disagree because they are different tables". That was
+        // invented. src/device/battery_model.cpp:15-18 and
+        // BatteryProfile.swift:139-149 are the SAME curve — the app's is the
+        // firmware's with 3750/3850/3950 dropped, and those points sit exactly
+        // on the app's interpolation. Both give 64 at 3.92 V. The real
+        // divergence is per-device calibration, which exists only on the
+        // MeshCore path.
         let config = DeviceConfig()
         config.batteryMillivolts = 3920
         config.reportedBatteryPercent = 87
         XCTAssertEqual(config.batteryReading(), .reported(87))
+    }
+
+    func testAVoltageThatStopsBeingReportedGoesBackToUnknown() {
+        // The bug this exists to prevent. The firmware stops sending a battery
+        // once the cell falls below its `present` floor, and the handler used
+        // to assign batteryMillivolts only when a voltage arrived — so the
+        // last good reading stayed on screen, redated on every packet, for a
+        // deck that had stopped reporting one.
+        //
+        // Zero is the sentinel for "not reported", and it must read as unknown
+        // rather than as a flat battery, which is the one number an operator
+        // would act on.
+        let config = DeviceConfig()
+        config.batteryMillivolts = 3920
+        XCTAssertEqual(config.batteryReading(), .estimated(64))
+
+        config.batteryMillivolts = 0
+        XCTAssertEqual(
+            config.batteryReading(),
+            .unknown,
+            "a battery that stopped being reported is unknown, not empty"
+        )
     }
 
     func testVoltageAloneIsAnEstimate() {

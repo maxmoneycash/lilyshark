@@ -26,3 +26,7 @@ src/assets/map_tiles_baked.cpp
 # would otherwise arrive in a worktree merge looking like source.
 ios/DerivedData*/
 ios/*.log
+
+# Swift Package Manager build output. `swift test` writes it inside the
+# package, and a worktree merge brought 200+ of these in looking like source.
+ios/Packages/*/.build/

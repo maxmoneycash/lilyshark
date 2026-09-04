@@ -78,6 +78,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.flash-page a {
+  color: var(--fg);
+}
+
 .flash-page {
   position: relative;
   min-height: 100dvh;
@@ -176,7 +180,7 @@ body {
   font-size: 11px;
   letter-spacing: 0.04em;
 }
-.flash-page .lede .code-note b {
+.flash-page .code-note b {
   color: var(--fg);
   font-weight: 400;
 }
@@ -265,10 +269,17 @@ body {
 }
 
 /* ── hero ── */
+/* Fixed stage: the device render is much taller than the two window mocks, so
+   the panel is sized for the tallest and everything is centred in it. Without
+   this the page jumps by ~200px as you move between tiles. */
 .flash-page .hero {
   position: relative;
   margin-top: 12px;
-  padding: 20px 12px 14px;
+  padding: 26px 12px 14px;
+  min-height: 430px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   border: 1px solid var(--border);
   background:
     radial-gradient(ellipse 70% 55% at 50% 40%, var(--glow), transparent 72%),
@@ -287,9 +298,17 @@ body {
 .flash-page .device-mock {
   display: block;
   margin: 0 auto;
-  width: min(300px, 74%);
+  width: min(300px, 76%);
   height: auto;
   filter: drop-shadow(0 16px 34px rgba(0, 0, 0, 0.45));
+}
+/* The window mocks are line art on the page's own ground, not an object
+   sitting above it: no cast shadow, and they draw in the theme's ink-pink
+   rather than inheriting the body's near-black --ink. */
+.flash-page .window-mock {
+  width: 100%;
+  color: var(--fg);
+  filter: none;
 }
 .flash-page .deck-screen {
   image-rendering: auto;
@@ -579,10 +598,6 @@ body {
   font-size: 12px;
   color: var(--ink);
 }
-.flash-page a {
-  color: var(--fg);
-}
-
 /* ── tablet ── */
 @media (min-width: 620px) {
   .flash-page {
@@ -605,8 +620,14 @@ body {
   .flash-page .hero {
     padding: 28px 20px 18px;
   }
+  .flash-page .hero {
+    min-height: 542px;
+  }
   .flash-page .device-mock {
-    width: min(360px, 62%);
+    width: min(340px, 58%);
+  }
+  .flash-page .window-mock {
+    width: min(600px, 88%);
   }
   .flash-page .cta,
   .flash-page .secondary {
@@ -640,7 +661,13 @@ body {
   .flash-page .product h2 {
     font-size: 26px;
   }
+  .flash-page .hero {
+    min-height: 600px;
+  }
   .flash-page .device-mock {
-    width: min(400px, 42%);
+    width: min(370px, 40%);
+  }
+  .flash-page .window-mock {
+    width: min(740px, 72%);
   }
 }

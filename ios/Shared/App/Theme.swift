@@ -496,9 +496,15 @@ func batteryRowContent(_ reading: BatteryReading, voltage: Double = 0) -> (text:
     case .externalPower:
         return (String(localized: "USB power"), "bolt.fill", .green)
     case .reported(let pct):
-        // Named as the radio's own number because this app's estimate can
-        // disagree with it: both are guesses from voltage, off different
-        // tables, and per-device calibration is applied only to ours.
+        // Named as the radio's own number, because it is a different KIND of
+        // reading: the radio measures its cell, while this app can only
+        // interpolate a percentage from the voltage the radio happened to
+        // report.
+        //
+        // Not "different tables" — an earlier comment here claimed that and it
+        // was invented. src/device/battery_model.cpp and BatteryProfile.swift
+        // are the same curve, and agree. What differs is per-device
+        // calibration, which is applied on the MeshCore path only.
         let text = voltage > 0
             ? String(format: String(localized: "%.2fV (%d%% from radio)"), voltage, pct)
             : String(format: String(localized: "%d%% from radio"), pct)

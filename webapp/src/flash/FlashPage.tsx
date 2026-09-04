@@ -1,6 +1,6 @@
 import * as RadioGroup from "@radix-ui/react-radio-group";
 import { AnimatePresence, motion } from "framer-motion";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 /**
  * Browser flasher for the T-Deck family, plus the two other ways to run
@@ -289,7 +289,13 @@ function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
  *  it follows the reader's theme instead of freezing one. */
 function BrowserMock() {
   const tabs = ["TRAFFIC", "NODES", "MAP", "SPECTRUM"];
-  const cols = [14, 96, 176, 250, 316];
+  const cols = [
+    { label: "TIME", x: 14, w: 54 },
+    { label: "SRC", x: 96, w: 58 },
+    { label: "DST", x: 176, w: 58 },
+    { label: "KIND", x: 250, w: 40 },
+    { label: "SNR", x: 316, w: 30 },
+  ];
   return (
     <svg
       viewBox="0 0 420 286"
@@ -334,9 +340,9 @@ function BrowserMock() {
       ))}
       {/* traffic table: real column names, abstract values */}
       <line x1="14" y1="70" x2="406" y2="70" stroke="currentColor" opacity="0.35" />
-      {["TIME", "SRC", "DST", "KIND", "SNR"].map((h, i) => (
-        <text key={h} x={cols[i]} y={67} fontSize="7.5" letterSpacing="0.9" fill="currentColor" opacity="0.6">
-          {h}
+      {cols.map((c) => (
+        <text key={c.label} x={c.x} y={67} fontSize="7.5" letterSpacing="0.9" fill="currentColor" opacity="0.6">
+          {c.label}
         </text>
       ))}
       {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((row) => {
@@ -346,12 +352,12 @@ function BrowserMock() {
           <g key={row}>
             {on ? <rect x="14" y={y - 9} width="392" height="15" fill="currentColor" opacity="0.14" /> : null}
             {on ? <rect x="14" y={y - 9} width="2" height="15" fill="currentColor" /> : null}
-            {cols.map((x, i) => (
+            {cols.map((c, i) => (
               <rect
-                key={i}
-                x={x}
+                key={c.label}
+                x={c.x}
                 y={y - 4.5}
-                width={[54, 58, 58, 40, 30][i] - (row % 3) * 5}
+                width={c.w - (row % 3) * 5}
                 height="5"
                 fill="currentColor"
                 opacity={on ? 0.75 : 0.3 + ((row + i) % 3) * 0.08}
@@ -459,6 +465,7 @@ const PLATFORMS = [
     chip: "ESP32-S3 · SX1262 · GPS",
     gps: true,
     heroLabel: "01 / Handheld analyzer",
+    caption: `running ${FIRMWARE.version}`,
     heading: "Lilyshark for T-Deck Plus.",
     tagline:
       "LILYGO's pocket computer with a GPS on board — the full analyzer, with a fix for the nodes map.",
@@ -470,6 +477,7 @@ const PLATFORMS = [
     chip: "ESP32-S3 · SX1262",
     gps: false,
     heroLabel: "02 / Handheld analyzer",
+    caption: `running ${FIRMWARE.version}`,
     heading: "Lilyshark for T-Deck.",
     tagline:
       "The same image on the original board. Every radio and capture tool works; only the GPS fix is absent.",
@@ -481,6 +489,7 @@ const PLATFORMS = [
     chip: "ANALYZER · NO INSTALL",
     gps: false,
     heroLabel: "03 / Analyzer, no install",
+    caption: "web serial / bluetooth",
     heading: "Lilyshark in the browser.",
     tagline:
       "The same analyzer as a web page. Plug a flashed deck into a computer over USB, or pair one over Bluetooth — nothing to install, and it keeps working with no internet.",
@@ -492,6 +501,7 @@ const PLATFORMS = [
     chip: "GPL-3.0 · PLATFORMIO",
     gps: false,
     heroLabel: "04 / Build it yourself",
+    caption: "reproducible build",
     heading: "Build it yourself.",
     tagline:
       "Clone the repository and build the same image this page serves. The release build is reproducible, so your checksum should match ours byte for byte.",
@@ -560,14 +570,8 @@ const REPO = "https://github.com/maxmoneycash/lilyshark";
 
 export function FlashPage() {
   const [platform, setPlatform] = useState<PlatformId>("tdeck-plus");
-  const ctaRef = useRef<HTMLDivElement>(null);
   const selected = PLATFORMS.find((p) => p.id === platform) ?? PLATFORMS[0];
   const kind = selected.kind;
-
-  const pick = (id: PlatformId) => {
-    setPlatform(id);
-    ctaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
   const art = (id: PlatformId, gps: boolean) =>
     id === "browser" ? <BrowserIcon /> : id === "source" ? <SourceIcon /> : <DeckIcon gps={gps} />;
@@ -604,7 +608,7 @@ export function FlashPage() {
         <RadioGroup.Root
           className="devices"
           value={platform}
-          onValueChange={(v) => pick(v as PlatformId)}
+          onValueChange={(v) => setPlatform(v as PlatformId)}
           aria-label="Choose a platform"
           loop
         >
@@ -639,15 +643,14 @@ export function FlashPage() {
               )}
               <div className="hero-caption">
                 <span>
-                  <b>{selected.name}</b> ·{" "}
-                  {kind === "source" ? "reproducible build" : `running ${FIRMWARE.version}`}
+                  <b>{selected.name}</b> · {selected.caption}
                 </span>
               </div>
             </motion.div>
           </AnimatePresence>
         </div>
 
-        <div className="product" ref={ctaRef}>
+        <div className="product">
           <h2>{selected.heading}</h2>
           <p className="tagline">{selected.tagline}</p>
 

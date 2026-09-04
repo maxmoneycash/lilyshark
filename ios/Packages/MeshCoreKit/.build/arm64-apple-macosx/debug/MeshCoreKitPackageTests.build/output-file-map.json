@@ -1,12 +1,12 @@
 {
   "": {
-    "swift-dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/primary.swiftdeps"
+    "swift-dependencies": "/Users/maxmohammadi/lilyshark/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/primary.swiftdeps"
   },
-  "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.derived/runner.swift": {
-    "dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.d",
-    "object": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.swift.o",
-    "swiftmodule": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner~partial.swiftmodule",
-    "swift-dependencies": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.swiftdeps",
-    "diagnostics": "/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.dia"
+  "/Users/maxmohammadi/lilyshark/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.derived/runner.swift": {
+    "dependencies": "/Users/maxmohammadi/lilyshark/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.d",
+    "object": "/Users/maxmohammadi/lilyshark/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/maxmohammadi/lilyshark/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/maxmohammadi/lilyshark/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/maxmohammadi/lilyshark/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.build/runner.dia"
   }
 }

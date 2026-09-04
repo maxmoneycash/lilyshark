@@ -606,15 +606,25 @@ extension PommeCoreViewModel {
                 )
                 return
             }
-            if let voltage = metrics.voltage {
-                deviceConfig.batteryMillivolts = UInt16(
-                    max(0, min(65535, (voltage * 1000).rounded()))
-                )
-            }
-            // Straight across, nil included. A deck on USB sends uptime and
-            // nothing else, so coalescing a missing percent to zero — or to
-            // whatever the last packet said — would put a flat battery on
-            // screen for a radio that is plugged in and fine.
+            // Straight across, nil included — and that has to hold for the
+            // VOLTAGE too, which is where this first went wrong.
+            //
+            // Assigning batteryMillivolts only inside `if let voltage` left
+            // the previous reading in place while the timestamp below was
+            // stamped fresh. The firmware stops sending a battery the moment
+            // snapshot.battery.present goes false (below 2500 mV, see
+            // battery_model.cpp), so a cell falling off the bottom of its
+            // range produced a Settings row reading "3.92V (64%)" captioned
+            // "as of 0 seconds ago" — the last good reading, redated on every
+            // packet, for a deck that had stopped reporting one. Worse, it
+            // could never return to unknown: batteryMillivolts is cleared
+            // only in reset(), which runs on disconnect.
+            //
+            // Zero is this field's "not reported" — batteryReading() already
+            // treats it as .unknown rather than as a flat battery.
+            deviceConfig.batteryMillivolts = metrics.voltage.map {
+                UInt16(max(0, min(65535, ($0 * 1000).rounded())))
+            } ?? 0
             deviceConfig.isExternallyPowered = metrics.isPluggedIn
             deviceConfig.reportedBatteryPercent = metrics.reportedPercent
             deviceConfig.reportedUptimeSeconds = metrics.uptimeSeconds

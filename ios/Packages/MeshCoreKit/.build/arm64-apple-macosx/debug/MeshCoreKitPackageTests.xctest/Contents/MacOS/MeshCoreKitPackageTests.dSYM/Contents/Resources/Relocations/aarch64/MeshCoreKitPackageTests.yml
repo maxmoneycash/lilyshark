@@ -1,5 +1,5 @@
 ---
 triple:          'arm64-apple-darwin'
-binary-path:     '/Users/maxmohammadi/lilyshark/.claude/worktrees/wf_539ebbec-771-11/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.xctest/Contents/MacOS/MeshCoreKitPackageTests'
+binary-path:     '/Users/maxmohammadi/lilyshark/ios/Packages/MeshCoreKit/.build/arm64-apple-macosx/debug/MeshCoreKitPackageTests.xctest/Contents/MacOS/MeshCoreKitPackageTests'
 relocations:     []
 ...
