@@ -39,9 +39,13 @@
 #include "lilyshark/core/builtin_profiles.h"
 #include "lilyshark/core/diagnostic_tools.h"
 #include "lilyshark/core/spectrum.h"
+#include "lilyshark/export/capture_storage.h"
 #include "lilyshark/ui/app_shell.h"
 #include "lilyshark/ui/assets/lilyshark_wordmark_a8.h"
 #if !defined(LILYSHARK_DEVICE)
+#include "lilyshark/device/simulate_source.h"
+#include "lilyshark/export/lilyshark_capture.h"
+#include "lilyshark/export/posix_capture_sink.h"
 #include "lilyshark/protocols/meshcore_decoder.h"
 #include "lilyshark/protocols/meshtastic_decoder.h"
 #include "lilyshark/protocols/meshtastic_encode.h"
@@ -339,6 +343,65 @@ void remember_peer_public_key(std::uint32_t node, const std::uint8_t *key) noexc
     slot->node = node;
     std::memcpy(slot->key, key, sizeof(slot->key));
 }
+// Why the capture path is not writing, right now. Held next to the counters
+// below because a count with no cause is half an answer: "eleven frames did
+// not reach the card" is only actionable once it also says the card was full.
+lilyshark::CaptureStorageStatus capture_storage_status =
+    lilyshark::CaptureStorageStatus::CaptureDisabled;
+
+// Frames that arrived while the operator had capture switched ON and no LSCAP
+// file was taking them.
+//
+// The deck already logs one event when a write fails and stops recording.
+// What it did not do is account for everything that arrived afterwards: the
+// radio kept decoding, the screens kept filling, and the .lscap on the card
+// ended at a clean record boundary, so it read back as a complete, valid
+// capture of a quiet hour. Nothing anywhere said the hour had not been quiet.
+//
+// This is the same shape as heard_but_unreported below, and for the same
+// reason: an instrument that discards evidence has to say how much it
+// discarded and why. Bucketed by cause because "the card was full" and "the
+// card was pulled" cost the operator different things.
+struct CaptureUnwritten {
+    std::uint32_t no_card = 0;
+    std::uint32_t card_full = 0;
+    std::uint32_t write_refused = 0;
+    std::uint32_t card_gone = 0;
+    std::uint32_t other = 0;
+
+    std::uint32_t total() const noexcept
+    {
+        return no_card + card_full + write_refused + card_gone + other;
+    }
+};
+CaptureUnwritten capture_unwritten{};
+
+// Count one frame the capture file did not get, under whatever the storage
+// path last said was wrong with it.
+void count_unwritten_frame() noexcept
+{
+    switch(capture_storage_status) {
+    case lilyshark::CaptureStorageStatus::NoCard:
+        ++capture_unwritten.no_card;
+        break;
+    case lilyshark::CaptureStorageStatus::CardFull:
+        ++capture_unwritten.card_full;
+        break;
+    case lilyshark::CaptureStorageStatus::WriteRefused:
+        ++capture_unwritten.write_refused;
+        break;
+    case lilyshark::CaptureStorageStatus::CardStoppedAnswering:
+        ++capture_unwritten.card_gone;
+        break;
+    default:
+        // Every other status is a real cause too -- a refused folder, 9999
+        // used names -- and lumping them into one bucket is honest as long as
+        // the label beside the count still names the specific status.
+        ++capture_unwritten.other;
+        break;
+    }
+}
+
 lv_obj_t * root = nullptr;
 #if defined(LILYSHARK_DEVICE)
 static uint8_t * spectrum_buffer = nullptr;
@@ -9443,7 +9506,12 @@ void build_storage(lv_obj_t * parent)
 {
     add_gear_status(parent, "CAPTURE");
 #if defined(LILYSHARK_DEVICE)
-    const char *sd_value = sd_io_error ? "I/O ERROR" : (sd_mounted ? "READY" : "NO CARD");
+    // "I/O ERROR" stood for a full card, a write-protected card, a card
+    // pulled out of the slot, and a folder the card refused -- four different
+    // things to go and do about it, one label. The status now names which.
+    const char *sd_value = sd_io_error
+        ? lilyshark::captureStorageStatusLabel(capture_storage_status)
+        : (sd_mounted ? "READY" : "NO CARD");
     const char *native_value = app_settings.simulate_mode
         ? (native_capture_recording ? "SIM RECORDING" : "OFF")
         : (native_capture_recording ? "RECORDING" : "OFF");
@@ -9503,14 +9571,23 @@ void build_storage(lv_obj_t * parent)
                          ? pcap_path : "NO ACTIVE WIRESHARK FILE"),
               51, 164, theme::text(), &font_pixel_6x8);
 #else
+    // The simulator has no card slot and writes no capture file, and this
+    // screen used to print "/LILYSHARK/CAPTURE-0001.LSCAP" anyway -- an
+    // invented filename, in the build a person is most likely to be looking
+    // at, for a file that does not exist. The writer itself IS exercised on
+    // this build: run the simulator with --capture-test DIR and it puts real
+    // frames through the real encoder into a real file.
     put_label(parent, app_settings.capture_enabled
-                          ? "LSCAP  /LILYSHARK/CAPTURE-0001.LSCAP" : "LSCAP  NO ACTIVE FILE",
+                          ? "LSCAP  SIMULATED - NO FILE ON THIS BUILD"
+                          : "LSCAP  NO ACTIVE FILE",
               8, 148, theme::text(), &font_pixel_6x8);
     put_label(parent, app_settings.capture_enabled
-                          ? "PCAP   /LILYSHARK/CAPTURE-0001.PCAP" : "PCAP   NO ACTIVE FILE",
+                          ? "PCAP   SIMULATED - NO FILE ON THIS BUILD"
+                          : "PCAP   NO ACTIVE FILE",
               8, 164, theme::text(), &font_pixel_6x8);
 #endif
     const char *capture_note = "LSCAP KEEPS FULL RF METADATA AT EVERY BANDWIDTH.";
+    lv_color_t note_color = theme::text_muted();
     if(app_settings.simulate_mode) {
 #if defined(LILYSHARK_DEVICE)
         capture_note = native_capture_recording
@@ -9524,8 +9601,21 @@ void build_storage(lv_obj_t * parent)
             : "CAPTURE IS OFF; ANALYSIS STAYS IN MEMORY.";
 #endif
     }
-    put_label(parent, capture_note, 8, 183,
-              theme::text_muted(), &font_pixel_6x8);
+#if defined(LILYSHARK_DEVICE)
+    // Frames that no capture file received outrank every standing note on
+    // this line, simulate mode included. A count of missing evidence is the
+    // one thing the .lscap on the card cannot tell anybody later: it ends at
+    // a record boundary and reads back as a complete capture of a quiet band.
+    char unwritten_note[56]{};
+    if(capture_unwritten.total() != 0U) {
+        std::snprintf(unwritten_note, sizeof(unwritten_note), "%u FRAMES NOT WRITTEN - %s",
+                      static_cast<unsigned>(capture_unwritten.total()),
+                      lilyshark::captureStorageStatusLabel(capture_storage_status));
+        capture_note = unwritten_note;
+        note_color = theme::fault();
+    }
+#endif
+    put_label(parent, capture_note, 8, 183, note_color, &font_pixel_6x8);
 #if defined(LILYSHARK_DEVICE)
     draw_back_strip(parent, capture_settings_save_failed ? "SAVE FAILED" : "SCREENSHOT");
 #else
@@ -9552,7 +9642,9 @@ void build_device_status(lv_obj_t * parent)
                      (radio.initialized ? "RECOVERING" : "OFFLINE")),
          app_settings.simulate_mode ? theme::amber() :
              (radio.receiving ? theme::lime() : theme::fault())},
-        {"MICROSD", sd_io_error ? "I/O ERROR" : (sd_mounted ? "READY" : "NOT FOUND"),
+        {"MICROSD", sd_io_error
+                        ? lilyshark::captureStorageStatusLabel(capture_storage_status)
+                        : (sd_mounted ? "READY" : "NOT FOUND"),
          sd_mounted && !sd_io_error ? theme::lime() : theme::amber()},
         {"PSRAM SPECTRUM", spectrum_buffer != nullptr ? "READY" : "UNAVAILABLE",
          spectrum_buffer != nullptr ? theme::lime() : theme::amber()},
@@ -10780,10 +10872,24 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
         if(last_native_capture_result == LilysharkCaptureWriteResult::SinkError) {
             native_capture_recording = false;
             sd_io_error = true;
+            // Read the cause before close(), which clears the sink's status.
+            capture_storage_status = native_capture_sink.status();
             native_capture_sink.close();
-            record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Capture,
-                                 "Native capture write failed; recording stopped");
+            // The frame that hit the failure is the first one the file will
+            // not contain. Counting it here is what keeps the tally equal to
+            // the number of frames genuinely missing from the capture.
+            count_unwritten_frame();
+            char message[kRuntimeEventMessageCapacity]{};
+            std::snprintf(message, sizeof(message), "LSCAP recording stopped: %s",
+                          lilyshark::captureStorageStatusSentence(capture_storage_status));
+            record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Capture, message);
         }
+    } else if(allow_capture && app_settings.capture_enabled) {
+        // Capture is switched on and no LSCAP file is taking frames. Every
+        // frame from here is evidence the capture does not contain, and the
+        // file cannot say so on its own: it ends at a clean record boundary
+        // and reads back as a complete capture of a quiet band.
+        count_unwritten_frame();
     }
     if(allow_capture && pcap_recording) {
         last_pcap_result = pcap_writer.write(frame);
@@ -15473,6 +15579,106 @@ void handle_pointer_click(lv_event_t *)
 }
 #endif
 
+#if !defined(LILYSHARK_DEVICE)
+/// Put real frames through the real capture writer into a real file.
+///
+/// Before this, nothing anywhere ran that path end to end. The encoder had
+/// byte-exact unit tests against an in-memory sink, the T-Deck sink had tests
+/// against a fake SD card, scripts/lscap.py had tests against a golden record
+/// pasted in from the encoder -- and no test took a frame from the generator,
+/// wrote it to a filesystem, and read the file back. So the numbering, the
+/// directory creation, the flush and the byte stream had never been checked
+/// against each other, on any machine, and the deck's card slot was the only
+/// place they would ever have met.
+///
+/// The gate runs this into a temp directory and then runs
+/// `scripts/lscap.py validate` over what it produced, which is also the first
+/// time the C++ writer and the Python reader have been compared on bytes
+/// neither of them was handed.
+///
+/// The frames are synthetic and say so: SimulateSource marks every frame
+/// FrameOrigin::Synthetic, the record carries the synthetic metadata bit, and
+/// the reader reports it. A capture produced by this mode can never be
+/// mistaken for one produced by a radio.
+bool run_simulator_capture_test(const char *directory)
+{
+    constexpr unsigned kCaptureTestFrames = 24U;
+    const RadioProfile &profile = builtinProfiles()[0];
+    lilyshark::device::SimulateSource source{};
+
+    for(unsigned pass = 1; pass <= 2U; ++pass) {
+        lilyshark::PosixCaptureSink sink{};
+        LilysharkCaptureWriter writer{sink};
+        char path[512]{};
+        if(!sink.openNextCapture(directory, path, sizeof(path), kLilysharkCaptureExtension)) {
+            std::fprintf(stderr, "Lilyshark capture test could not open a file: %s\n",
+                         captureStorageStatusSentence(sink.status()));
+            return false;
+        }
+        // Two passes because the numbering is what stops a second session
+        // overwriting the first one on a card, and a sink that reopened
+        // capture-0001 would lose the earlier capture without a word.
+        char expected[512]{};
+        std::snprintf(expected, sizeof(expected), "%s/lilyshark/capture-%04u%s", directory, pass,
+                      kLilysharkCaptureExtension);
+        if(std::strcmp(path, expected) != 0) {
+            std::fprintf(stderr, "Lilyshark capture test expected %s and opened %s\n", expected,
+                         path);
+            return false;
+        }
+        if(writer.begin() != LilysharkCaptureWriteResult::Ok) {
+            std::fprintf(stderr, "Lilyshark capture test could not write the file header: %s\n",
+                         captureStorageStatusSentence(sink.status()));
+            return false;
+        }
+        for(unsigned index = 0; index < kCaptureTestFrames; ++index) {
+            const RawFrame frame = source.next(index * lilyshark::device::kSimulateFrameIntervalMs,
+                                               profile.center_frequency_hz, profile.bandwidth_hz,
+                                               profile.spreading_factor,
+                                               profile.coding_rate_denominator, profile.id,
+                                               profile.protocol_hint);
+            if(writer.write(frame) != LilysharkCaptureWriteResult::Ok) {
+                std::fprintf(stderr, "Lilyshark capture test failed on frame %u: %s\n", index,
+                             captureStorageStatusSentence(sink.status()));
+                return false;
+            }
+        }
+        if(!sink.flush()) {
+            std::fprintf(stderr, "Lilyshark capture test could not flush: %s\n",
+                         captureStorageStatusSentence(sink.status()));
+            return false;
+        }
+        sink.close();
+        std::printf("Lilyshark capture test wrote %u frames: %s\n", kCaptureTestFrames, path);
+    }
+
+    // A refused directory must arrive as a refused directory. This is the one
+    // storage fault an ordinary filesystem can be made to produce on demand,
+    // and it proves the status is carried out of the sink rather than
+    // flattened into "unavailable" on the way.
+    char blocker[512]{};
+    std::snprintf(blocker, sizeof(blocker), "%s/blocked", directory);
+    std::FILE *occupied = std::fopen(blocker, "wb");
+    if(occupied == nullptr) {
+        std::fprintf(stderr, "Lilyshark capture test could not stage a blocked directory\n");
+        return false;
+    }
+    std::fclose(occupied);
+    lilyshark::PosixCaptureSink blocked_sink{};
+    char blocked_path[512]{};
+    if(blocked_sink.openNextCapture(blocker, blocked_path, sizeof(blocked_path),
+                                    kLilysharkCaptureExtension) ||
+       blocked_sink.status() != CaptureStorageStatus::DirectoryRefused) {
+        std::fprintf(stderr, "Lilyshark capture test misreported a refused directory as: %s\n",
+                     captureStorageStatusSentence(blocked_sink.status()));
+        return false;
+    }
+
+    std::printf("Lilyshark simulator capture test passed\n");
+    return true;
+}
+#endif
+
 } // namespace
 
 #if !defined(LILYSHARK_DEVICE)
@@ -15488,8 +15694,19 @@ int main(int argc, char ** argv)
         argc > 1 && std::strcmp(argv[1], "--animation-test") == 0;
     const bool readme_frames_mode =
         argc > 1 && std::strcmp(argv[1], "--readme-frames") == 0;
+    const bool capture_test_mode =
+        argc > 1 && std::strcmp(argv[1], "--capture-test") == 0;
     const bool named_screen_mode =
         argc > 1 && std::strcmp(argv[1], "--screen") == 0;
+    if(capture_test_mode && (argc != 3 || argv[2][0] == '\0')) {
+        std::fprintf(stderr, "Usage: %s --capture-test OUTPUT_DIRECTORY\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+    // Before LVGL: writing a capture file needs no display, and the gate runs
+    // this on machines with no window server at all.
+    if(capture_test_mode) {
+        return run_simulator_capture_test(argv[2]) ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
     const bool named_chat = named_screen_mode && argc == 3 &&
         std::strcmp(argv[2], "chat") == 0;
     const bool named_home = named_screen_mode && argc == 3 &&
@@ -16011,10 +16228,19 @@ void stop_capture_session() noexcept
     last_native_capture_result = LilysharkCaptureWriteResult::NotStarted;
     pcap_bandwidth_warning_recorded = false;
     pcap_synthetic_warning_recorded = false;
+    // Read the reason before close(), which resets the sink for the next card.
+    const lilyshark::CaptureStorageStatus flush_status = native_capture_sink.status();
     if(!flushed) {
         sd_io_error = true;
-        record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Storage,
-                             "Capture stopped, but final SD flush failed");
+        capture_storage_status = flush_status;
+        char message[kRuntimeEventMessageCapacity]{};
+        std::snprintf(message, sizeof(message), "Capture stopped; final SD flush failed: %s",
+                      lilyshark::captureStorageStatusSentence(flush_status));
+        record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Storage, message);
+    } else {
+        capture_storage_status = app_settings.capture_enabled
+            ? lilyshark::CaptureStorageStatus::NotOpen
+            : lilyshark::CaptureStorageStatus::CaptureDisabled;
     }
 }
 
@@ -16028,10 +16254,16 @@ bool start_capture_session() noexcept
         sd_mounted = false;
         sd_io_error = false;
     }
-    if(!sd_mounted) sd_mounted = mountTDeckSd(SPI);
     if(!sd_mounted) {
-        record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Storage,
-                             "Capture requested, but no SD card was found");
+        const lilyshark::CaptureStorageStatus mount_status = mountTDeckSdStatus(SPI);
+        sd_mounted = mount_status == lilyshark::CaptureStorageStatus::Ok;
+        if(!sd_mounted) capture_storage_status = mount_status;
+    }
+    if(!sd_mounted) {
+        char message[kRuntimeEventMessageCapacity]{};
+        std::snprintf(message, sizeof(message), "Capture requested, but %s",
+                      lilyshark::captureStorageStatusSentence(capture_storage_status));
+        record_runtime_event(RuntimeEventSeverity::Warning, RuntimeEventType::Storage, message);
         return false;
     }
 
@@ -16051,7 +16283,15 @@ bool start_capture_session() noexcept
         last_native_capture_result = native_capture_writer.begin();
         native_capture_recording =
             last_native_capture_result == LilysharkCaptureWriteResult::Ok;
+        // The file header is the first thing the card is asked to hold, so a
+        // card that is full or unwritable fails here. Take the reason before
+        // close() clears it, or the screen is back to "unavailable".
+        capture_storage_status = native_capture_recording
+            ? lilyshark::CaptureStorageStatus::Ok
+            : native_capture_sink.status();
         if(!native_capture_recording) native_capture_sink.close();
+    } else {
+        capture_storage_status = native_capture_sink.status();
     }
 
     if(app_settings.simulate_mode) {
@@ -16062,10 +16302,13 @@ bool start_capture_session() noexcept
                                      ? "Synthetic LSCAP started; PCAP will skip simulated frames"
                                      : "Synthetic LSCAP session started");
         } else {
+            char message[kRuntimeEventMessageCapacity]{};
+            std::snprintf(message, sizeof(message), "Synthetic LSCAP not opened: %s",
+                          lilyshark::captureStorageStatusSentence(capture_storage_status));
             record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Capture,
                                  pcap_recording
                                      ? "PCAP cannot store simulation; native LSCAP unavailable"
-                                     : "Synthetic capture files could not be opened on SD");
+                                     : message);
         }
         return native_capture_recording;
     }
@@ -16084,8 +16327,13 @@ bool start_capture_session() noexcept
                              "PCAP started; native LSCAP unavailable");
     } else {
         sd_io_error = true;
-        record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Capture,
-                             "Capture files could not be opened on SD");
+        // Four different card faults used to arrive here as one sentence, so
+        // the event log said "could not be opened" whether the card was full,
+        // write-protected, or gone. Name the one that happened.
+        char message[kRuntimeEventMessageCapacity]{};
+        std::snprintf(message, sizeof(message), "No capture file opened: %s",
+                      lilyshark::captureStorageStatusSentence(capture_storage_status));
+        record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Capture, message);
     }
     return native_capture_recording || pcap_recording;
 }
@@ -16304,13 +16552,30 @@ void setup()
     lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(touch, device_touch_read);
 
-    sd_mounted = mountTDeckSd(SPI);
+    const lilyshark::CaptureStorageStatus boot_mount_status = mountTDeckSdStatus(SPI);
+    sd_mounted = boot_mount_status == lilyshark::CaptureStorageStatus::Ok;
+    capture_storage_status = sd_mounted
+        ? (app_settings.capture_enabled ? lilyshark::CaptureStorageStatus::NotOpen
+                                        : lilyshark::CaptureStorageStatus::CaptureDisabled)
+        : boot_mount_status;
     if(app_settings.capture_enabled) (void)start_capture_session();
-    Serial.printf("Lilyshark SD capture: %s%s%s\n", pcap_recording ? "recording " : "unavailable",
-                  pcap_recording ? pcap_path : "", sd_mounted ? "" : " (no card)");
-    Serial.printf("Lilyshark native capture: %s%s\n",
-                  native_capture_recording ? "recording " : "unavailable",
-                  native_capture_recording ? native_capture_path : "");
+    // Both boot lines used to end at "unavailable", which was the same word
+    // for a card that was never inserted, a card that refused the file, and a
+    // setting the operator had turned off. That is the line a person reads off
+    // a serial monitor when the deck comes back from the field with an empty
+    // card, so it now names which of those happened.
+    if(pcap_recording) {
+        Serial.printf("Lilyshark SD capture: recording %s\n", pcap_path);
+    } else {
+        Serial.printf("Lilyshark SD capture: unavailable (%s)\n",
+                      lilyshark::captureStorageStatusSentence(capture_storage_status));
+    }
+    if(native_capture_recording) {
+        Serial.printf("Lilyshark native capture: recording %s\n", native_capture_path);
+    } else {
+        Serial.printf("Lilyshark native capture: unavailable (%s)\n",
+                      lilyshark::captureStorageStatusSentence(capture_storage_status));
+    }
     if(!app_settings.capture_enabled) {
         record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::Capture,
                              "Capture disabled in Settings; analysis remains in memory");
@@ -17271,7 +17536,7 @@ void loop()
                 "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s,\"lat\":%.6f,\"lon\":%.6f,"
                 "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"
                 "\"rx\":%lu,\"crc\":%lu,\"drop_crc\":%lu,\"drop_bad\":%lu,"
-                "\"drop_nosrc\":%lu}\n",
+                "\"drop_nosrc\":%lu,\"drop_sd\":%lu,\"sd\":\"%s\"}\n",
                 hardware.battery_label, hardware.gps_label, link_profile.name,
                 static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
                 newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
@@ -17288,14 +17553,16 @@ void loop()
                 static_cast<unsigned long>(radio_service.status().crc_errors),
                 static_cast<unsigned long>(heard_but_unreported.crc_failed),
                 static_cast<unsigned long>(heard_but_unreported.malformed),
-                static_cast<unsigned long>(heard_but_unreported.no_source));
+                static_cast<unsigned long>(heard_but_unreported.no_source),
+                static_cast<unsigned long>(capture_unwritten.total()),
+                lilyshark::captureStorageStatusLabel(capture_storage_status));
         } else {
             Serial.printf(
                 "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
                 "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s,"
                 "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"
                 "\"rx\":%lu,\"crc\":%lu,\"drop_crc\":%lu,\"drop_bad\":%lu,"
-                "\"drop_nosrc\":%lu}\n",
+                "\"drop_nosrc\":%lu,\"drop_sd\":%lu,\"sd\":\"%s\"}\n",
                 hardware.battery_label, hardware.gps_label, link_profile.name,
                 static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
                 newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
@@ -17311,7 +17578,9 @@ void loop()
                 static_cast<unsigned long>(radio_service.status().crc_errors),
                 static_cast<unsigned long>(heard_but_unreported.crc_failed),
                 static_cast<unsigned long>(heard_but_unreported.malformed),
-                static_cast<unsigned long>(heard_but_unreported.no_source));
+                static_cast<unsigned long>(heard_but_unreported.no_source),
+                static_cast<unsigned long>(capture_unwritten.total()),
+                lilyshark::captureStorageStatusLabel(capture_storage_status));
         }
     }
     // Synthetic traffic exercises the real decoder, analyzer and native
@@ -17420,9 +17689,16 @@ void loop()
             native_capture_recording = false;
             sd_io_error = true;
             last_native_capture_result = LilysharkCaptureWriteResult::SinkError;
+            capture_storage_status = native_capture_sink.status();
             native_capture_sink.close();
-            record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Storage,
-                                 "Native capture flush failed; recording stopped");
+            // Bytes this sink accepted never reached the card, so the file on
+            // it is short by an unknown amount. Say which fault, and leave the
+            // count to the frames that arrive after this: inventing a number
+            // for the bytes already lost would be worse than naming the cause.
+            char message[kRuntimeEventMessageCapacity]{};
+            std::snprintf(message, sizeof(message), "LSCAP flush failed: %s",
+                          lilyshark::captureStorageStatusSentence(capture_storage_status));
+            record_runtime_event(RuntimeEventSeverity::Error, RuntimeEventType::Storage, message);
             live_data_dirty = true;
         }
     }

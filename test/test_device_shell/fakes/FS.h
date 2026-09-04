@@ -27,8 +27,16 @@ class File {
 
     std::size_t write(const std::uint8_t *source, std::size_t length)
     {
-        if(!*this || (source == nullptr && length != 0) ||
-           device_shell_fake::state().fail_file_write) return 0;
+        auto &card = device_shell_fake::state();
+        if(!*this || (source == nullptr && length != 0) || card.fail_file_write) return 0;
+        // A pulled card and a read-only one both refuse the bytes. They are
+        // told apart by what happens NEXT -- see SDClass::exists and
+        // totalBytes -- not by the write itself, which is exactly the
+        // situation the firmware has to diagnose.
+        if(card.sd_removed || card.sd_write_refused) return 0;
+        // A full card takes nothing and stays exactly as full as it was.
+        if(card.sd_used_bytes + length > card.sd_total_bytes) return 0;
+        card.sd_used_bytes += length;
         if(position_ + length > data_->bytes.size()) data_->bytes.resize(position_ + length);
         if(length != 0) std::memcpy(data_->bytes.data() + position_, source, length);
         position_ += length;
