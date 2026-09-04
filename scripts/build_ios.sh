@@ -42,6 +42,12 @@ fail() { echo "" >&2; echo "ERROR: $*" >&2; exit 1; }
 [ "$(uname -s)" = "Darwin" ] || fail "iOS builds require macOS; this is $(uname -s)."
 command -v xcodebuild >/dev/null 2>&1 || fail "xcodebuild not found. Install Xcode from the App Store, then: sudo xcode-select -s /Applications/Xcode.app"
 
+# An SDK older than a target's own deployment floor is a WARNING to Xcode, so
+# the build would otherwise succeed while compiling against headers that do
+# not describe the system the target declares. Checked here as well as in CI,
+# because the toolchain is a property of the machine and not of the runner.
+python3 "$REPO_ROOT/scripts/check_ios_toolchain.py" || fail "the selected Xcode cannot build every target this project declares (see above)"
+
 XCODE_PATH="$(xcode-select -p 2>/dev/null || true)"
 case "$XCODE_PATH" in
     *CommandLineTools*)

@@ -113,6 +113,11 @@ python3 scripts/check_ble_uuids.py
 
 python3 scripts/check_baked_tile_fallbacks.py
 
+# Only meaningful where Xcode exists; elsewhere there is no toolchain to judge.
+if command -v xcodebuild >/dev/null 2>&1; then
+  python3 scripts/check_ios_toolchain.py
+fi
+
 build_and_run lxmf \
   src/core/lxmf_decoder.cpp \
   test/lxmf/test_lxmf.cpp

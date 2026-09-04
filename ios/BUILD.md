@@ -15,11 +15,24 @@ where a human still has to step in.
 | Requirement | Why | Check |
 |---|---|---|
 | macOS | Xcode is macOS-only. There is no Linux or CI-container path for this build. | `uname -s` → `Darwin` |
-| Xcode 16 or newer, full install | The Command Line Tools alone cannot build an app target. | `xcodebuild -version` |
+| Xcode 26.4 or newer, full install | The Command Line Tools alone cannot build an app target — and the `PommeCore WidgetsExtension` target sets `IPHONEOS_DEPLOYMENT_TARGET = 26.4`, which `xcodebuild -scheme PommeCore` builds. Xcode reports a deployment target above its SDK as a **warning**, so an older Xcode produces a green build that compiled the widget against headers for a system it does not claim to run on. | `python3 scripts/check_ios_toolchain.py` |
 | `xcode-select` pointing at Xcode | Fails far downstream, and obscurely, if it points at the CLT. | `xcode-select -p` → `/Applications/Xcode.app/Contents/Developer` |
 | An iOS 18+ simulator runtime | Both `Packages/MeshCoreKit/Package.swift` and `Packages/MeshtasticKit/Package.swift` set floors of iOS 18 / macOS 15 / watchOS 11. An older runtime fails package resolution before any source compiles. | `xcrun simctl list runtimes` |
 
-`scripts/build_ios.sh` checks all four before it starts and names the fix for each, because
+> **The package floors are not the whole story.** An earlier version of this
+> file justified running CI on the `macos-15` image by checking those three
+> Swift-package floors and concluding the image "should satisfy the floors".
+> It did satisfy them — and it was still wrong, because the Xcode *project*
+> carries its own deployment targets and the widget extension's is `26.4`.
+> `macos-15` defaults to Xcode 16.4 / iOS 18.5, five majors below it, and the
+> resulting mismatch is a warning rather than an error. The job went green.
+>
+> `scripts/check_ios_toolchain.py` reads the deployment targets out of
+> `PommeCore.xcodeproj` and fails when the selected SDK cannot honour them.
+> `build_ios.sh` and the CI job both run it, so a runner image quietly
+> changing its default Xcode is now a red build rather than a silent one.
+
+`scripts/build_ios.sh` checks all of these before it starts and names the fix for each, because
 every one of them otherwise surfaces as an unrelated-looking error thousands of log lines in.
 
 There are no third-party dependencies to install. `MeshCoreKit` and `MeshtasticKit` are local
