@@ -480,9 +480,9 @@ test("without annotations the CSV and JSON are exactly what they always were", (
 	assert.deepEqual(exportColumns({ frames }), EXPORT_COLUMNS);
 });
 
-test("annotations add one column, keyed by sequence number", () => {
+test("annotations add one column, keyed by the frame itself", () => {
 	const frames = [frame(), frame({ sequence: 2n })];
-	const annotations = new Map([[1, 'interferer starts, "loud"']]);
+	const annotations = new Map([[frames[0], 'interferer starts, "loud"']]);
 	assert.deepEqual(
 		exportColumns({ frames, annotations }),
 		ANNOTATED_EXPORT_COLUMNS,
@@ -512,9 +512,12 @@ test("annotations add one column, keyed by sequence number", () => {
 });
 
 test("a note for a frame outside the export simply does not appear", () => {
+	// A note held against a frame that is not being exported. Keyed by object,
+	// "not being exported" is simply "not a key anything looks up".
+	const absent = frame({ sequence: 999n });
 	const rows = buildExportRows({
 		frames: [frame()],
-		annotations: new Map([[999, "about a frame that is not here"]]),
+		annotations: new Map([[absent, "about a frame that is not here"]]),
 	});
 	assert.equal(rows.length, 1);
 	assert.equal(rows[0].note, null);
@@ -527,7 +530,7 @@ test("pcap carries no note channel, so annotations change nothing", () => {
 	const plain = buildLoraTapPcap({ frames });
 	const annotated = buildLoraTapPcap({
 		frames,
-		annotations: new Map([[1, "interferer starts"]]),
+		annotations: new Map([[frames[0], "interferer starts"]]),
 	});
 	assert.deepEqual(annotated.bytes, plain.bytes);
 	assert.equal(annotated.written, plain.written);

@@ -19,15 +19,25 @@ export interface ExportOptions {
 	/** Frames to export, already filtered by the caller. */
 	frames: LscapFrame[];
 	/**
-	 * Per-frame notes, keyed by SEQUENCE NUMBER — the frame's own identity,
-	 * not a row index. Supplying this adds one `note` column to the CSV and
+	 * Per-frame notes, keyed by the FRAME OBJECT being exported.
+	 *
+	 * Not by sequence number. A sequence number is unique only within one run
+	 * of one radio, and the sniffer ring deliberately survives unplugging the
+	 * deck, so two frames in one export can carry the same sequence and be
+	 * entirely different bytes. Keyed by sequence, a note written on the first
+	 * was written into BOTH rows -- an operator's words exported against bytes
+	 * they never saw, which is the one thing an evidence export must not do.
+	 * annotations.ts checks each frame's witness; an object key is what makes
+	 * that check survive to here.
+	 *
+	 * Supplying this adds one `note` column to the CSV and
 	 * JSON; omitting it leaves both formats byte-identical to what they wrote
 	 * without notes, so an un-annotated export never grows a column of empty
 	 * cells. pcap takes no notes at all: LoRaTap v0 has no channel to carry
 	 * one, exactly as it has none for the synthetic marker (see loratap.ts),
 	 * and inventing one would break the format.
 	 */
-	annotations?: ReadonlyMap<number, string>;
+	annotations?: ReadonlyMap<LscapFrame, string>;
 	/**
 	 * Timestamp the `time` column is measured from. Defaults to the first
 	 * frame's timestamp, matching the on-screen relative clock. Pass the
@@ -160,7 +170,7 @@ export function buildExportRows(options: ExportOptions): ExportRow[] {
 		// Present only in an annotated export, and null — never "" — on a frame
 		// that carries no note, the same way an unreported radio field is null.
 		...(annotations !== undefined
-			? { note: annotations.get(Number(f.sequence)) ?? null }
+			? { note: annotations.get(f) ?? null }
 			: null),
 	}));
 }

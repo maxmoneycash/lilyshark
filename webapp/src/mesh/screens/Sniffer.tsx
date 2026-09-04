@@ -1,6 +1,20 @@
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+	EMPTY_NOTES,
+	type FrameNote,
+	MAX_NOTE_LENGTH,
+	type NoteBook,
+	noteFor,
+	noteStanding,
+	notesForFrames,
+	setNote,
+	capturedNoteTarget,
+	SNIFFER_SCOPE,
+	snifferNoteTarget,
+	toNoteRow,
+} from "../../lib/annotations";
+import {
 	useDeviceLink,
 	type HeardFrame,
 	type RawFrameFields,
@@ -43,6 +57,7 @@ import {
 	useRowWindow,
 } from "../../lib/useRowWindow";
 import { rowWindowPositions } from "../../lib/virtualRows";
+import { deleteFrameNote, loadFrameNotes, saveFrameNote } from "../db";
 import { stamp } from "../export";
 import { hhmm, snrClass } from "../fmt";
 import {
@@ -290,13 +305,21 @@ function frameCount(n: number): string {
 }
 
 /** Columns in the live table, so a spacer row spans exactly the table. */
-const TABLE_COLUMNS = 8;
+// TIME, FROM, TO, PROTOCOL, TYPE, RSSI, SNR, BYTES -- and NOTE. The spacer
+// rows that stand in for unmounted frames span this, so it has to match the
+// header or the virtualized list stops lining up.
+const TABLE_COLUMNS = 9;
 
 interface FrameTableProps {
 	/** The session's own order: oldest first. */
 	frames: HeardFrame[];
 	sel: HeardFrame | undefined;
 	onPick: (frame: HeardFrame | undefined) => void;
+	/**
+	 * The note standing against each frame, by frame identity — not by
+	 * sequence number, which repeats across runs. See notesForFrames.
+	 */
+	notes: Map<HeardFrame, { standing: "same" | "other"; text: string }>;
 }
 
 /**
@@ -312,7 +335,7 @@ interface FrameTableProps {
  * The reversal is done by INDEX, not by reversing a copy of the list: position
  * 0 is the newest frame, which is `frames[frames.length - 1]`.
  */
-function FrameTable({ frames, sel, onPick }: FrameTableProps) {
+function FrameTable({ frames, sel, onPick, notes }: FrameTableProps) {
 	const rows = useRowWindow(frames.length);
 	const win = rows.win;
 	const newest = frames.length - 1;
@@ -322,6 +345,10 @@ function FrameTable({ frames, sel, onPick }: FrameTableProps) {
 			<table className="grid">
 				<thead ref={rows.headRef}>
 					<tr>
+						{/* Always present, even with no notes: a column that came
+						    and went would shift every other one under the
+						    operator's cursor mid-read. */}
+						<th title="Frames carrying a note">NOTE</th>
 						<th>TIME</th>
 						<th>FROM</th>
 						<th>TO</th>
@@ -350,6 +377,10 @@ function FrameTable({ frames, sel, onPick }: FrameTableProps) {
 								className={f === sel ? "sel" : ""}
 								onClick={() => onPick(f === sel ? undefined : f)}
 							>
+								<NoteCell
+									marker={notes.get(f)?.standing}
+									text={notes.get(f)?.text}
+								/>
 								<td>{hhmm(f.atMs)}</td>
 								<td title={nodeId(f.src)}>{f.short ?? nodeId(f.src)}</td>
 								<td>{f.dst === BROADCAST ? "ALL" : nodeId(f.dst)}</td>
@@ -393,12 +424,15 @@ function FrameTable({ frames, sel, onPick }: FrameTableProps) {
  * What a pcap of this session will leave behind, in words, or "" when it
  * leaves nothing behind.
  *
- * Both omissions are properties of the format rather than faults in the
- * session: LoRaTap v0 has no channel to mark a frame as synthetic, and it
- * cannot encode a bandwidth that is not a whole number of 125 kHz steps —
- * MeshCore's 62.5 kHz profile is the one operators meet.
+ * Every omission is a property of the format rather than a fault in the
+ * session: LoRaTap v0 has no channel to mark a frame as synthetic, it cannot
+ * encode a bandwidth that is not a whole number of 125 kHz steps — MeshCore's
+ * 62.5 kHz profile is the one operators meet — and it has nowhere to put an
+ * operator's note either. A note that a pcap silently swallowed would be a
+ * note the operator believes they exported, so the count is said out loud
+ * along with where the notes DO survive.
  */
-function pcapOmissions(counts: LoraTapCounts): string {
+function pcapOmissions(counts: LoraTapCounts, notes: number): string {
 	const parts: string[] = [];
 	if (counts.excludedSynthetic > 0) {
 		parts.push(`${counts.excludedSynthetic} SYNTHETIC`);
@@ -406,7 +440,10 @@ function pcapOmissions(counts: LoraTapCounts): string {
 	if (counts.excludedUnencodable > 0) {
 		parts.push(`${counts.excludedUnencodable} THE FORMAT CANNOT CARRY`);
 	}
-	return parts.length === 0 ? "" : `PCAP LEAVES OUT ${parts.join(" AND ")}`;
+	if (notes > 0) parts.push(`${notes} NOTE${notes === 1 ? "" : "S"}`);
+	if (parts.length === 0) return "";
+	const kept = notes > 0 ? " · CSV AND JSON KEEP THE NOTES" : "";
+	return `PCAP LEAVES OUT ${parts.join(" AND ")}${kept}`;
 }
 
 /**
@@ -419,15 +456,51 @@ function pcapOmissions(counts: LoraTapCounts): string {
  */
 function ExportButtons({
 	records,
+	notes,
 	onSaved,
 }: {
 	records: readonly RawFrameFields[];
+	/**
+	 * Sequence number → note, already narrowed to the notes that were written
+	 * on these very frames. A note left over from an earlier run of the radio
+	 * never reaches here, so no export can put an operator's words against
+	 * bytes they did not see.
+	 */
+	/**
+	 * The whole note book, not a resolved map.
+	 *
+	 * The export writes `sessionFrames(records)` -- LscapFrames rebuilt from
+	 * the ring -- while the screen's markers are about the HeardFrames on
+	 * display. A map resolved against one and written beside the other checks
+	 * a different object from the one going into the file, which is how a note
+	 * ended up in a CSV against bytes the operator never saw. So the panel is
+	 * handed the book and resolves it against the frames it is actually
+	 * writing, at the moment it writes them.
+	 */
+	notes: NoteBook;
 	onSaved: (message: string) => void;
 }) {
 	// Counting goes through the same predicate the writer uses, so the number
 	// on the button and the number of records in the file cannot drift apart.
 	const pcap = useMemo(() => sessionPcapCounts(records), [records]);
-	const omitted = pcapOmissions(pcap);
+	// What will actually be written, resolved the same way `save` resolves it,
+	// so the count on the button cannot promise notes the file does not carry.
+	const exportable = useMemo(() => {
+		const decoded = sessionFrames(records);
+		return notesForFrames(
+			notes,
+			SNIFFER_SCOPE,
+			decoded.map((f) => {
+				const target = capturedNoteTarget(f);
+				return { frame: target.address.frame, witness: target.witness, f };
+			}),
+		);
+	}, [notes, records]);
+	const omitted = pcapOmissions(pcap, exportable.size);
+	const noteCount =
+		exportable.size === 0
+			? ""
+			: ` AND ${exportable.size} NOTE${exportable.size === 1 ? "" : "S"}`;
 
 	const save = (format: "pcap" | "csv" | "json") => {
 		// The session's raw records become decoded frames by way of the capture
@@ -436,42 +509,61 @@ function ExportButtons({
 		const decoded = sessionFrames(records);
 		const name = `lilyshark-sniffer-${stamp()}`;
 		if (format === "pcap") {
+			// No notes are handed to the pcap writer at all: LoRaTap v0 has no
+			// field for one, and the button's own warning line says so.
 			const built = buildLoraTapPcap({ frames: decoded });
 			downloadFile(`${name}.pcap`, built.bytes, PCAP_MIME);
 			onSaved(`SAVED ${frameCount(built.written)} TO ${name}.pcap`);
 			return;
 		}
+		// Resolved against the frames being written, keyed by those frames.
+		// An unannotated session hands over no map, so its CSV and JSON stay
+		// byte-identical to what they were before notes existed.
+		const resolved = notesForFrames(
+			notes,
+			SNIFFER_SCOPE,
+			decoded.map((f) => {
+				const target = capturedNoteTarget(f);
+				return { frame: target.address.frame, witness: target.witness, f };
+			}),
+		);
+		const annotations =
+			resolved.size > 0
+				? new Map([...resolved].map(([t, text]) => [t.f, text]))
+				: undefined;
 		const text =
 			format === "csv"
-				? buildCsv({ frames: decoded })
-				: buildJson({ frames: decoded });
+				? buildCsv({ frames: decoded, annotations })
+				: buildJson({ frames: decoded, annotations });
 		downloadFile(
 			`${name}.${format}`,
 			text,
 			format === "csv" ? CSV_MIME : JSON_MIME,
 		);
-		onSaved(`SAVED ${frameCount(decoded.length)} TO ${name}.${format}`);
+		onSaved(
+			`SAVED ${frameCount(decoded.length)}${noteCount} TO ${name}.${format}`,
+		);
 	};
 
 	return (
 		<>
 			<button
 				disabled={pcap.written === 0}
-				title="Download these frames as a LoRaTap pcap — the file Wireshark opens"
+				title="Download these frames as a LoRaTap pcap — the file Wireshark opens. The format has no field for a note, so notes are not written into it."
 				onClick={() => save("pcap")}
 			>
 				⭳ PCAP ({frameCount(pcap.written)})
 			</button>
 			<button
 				disabled={records.length === 0}
-				title="Download one row per frame, with the columns of the table above — for a spreadsheet"
+				title="Download one row per frame, with the columns of the table above — for a spreadsheet. Notes come along in a note column."
 				onClick={() => save("csv")}
 			>
 				⭳ CSV ({frameCount(records.length)})
 			</button>
 			<button
 				disabled={records.length === 0}
-				title="Download those same columns as a JSON array — for a script"
+				title="Download those same columns as a JSON array — for a script. Notes come along in a note field."
 				onClick={() => save("json")}
 			>
 				⭳ JSON ({frameCount(records.length)})
@@ -539,6 +631,142 @@ function CopyFrameLink({ seq }: { seq: number | undefined }) {
 	);
 }
 
+/**
+ * The frame list's note marker.
+ *
+ * "same" is a note written on this very frame. "other" is a note filed under
+ * this frame's sequence number but written on a DIFFERENT frame — the radio
+ * restarted its count — and it is marked apart rather than shown as this
+ * frame's, because the two frames have nothing to do with each other.
+ */
+function NoteCell({
+	marker,
+	text,
+}: {
+	marker: "same" | "other" | undefined;
+	text: string | undefined;
+}) {
+	return (
+		<td
+			className={marker === "other" ? "warn" : marker === "same" ? "ok" : "dim"}
+			title={
+				marker === "other"
+					? `A note is filed under this frame's number, but it was written on a different frame — the radio has restarted its count since. It is not about these bytes and is not exported${text ? `: "${text}"` : ""}`
+					: marker === "same"
+						? (text ?? "This frame carries a note — open it to read or change it")
+						: undefined
+			}
+		>
+			{marker === "same" ? "✎" : marker === "other" ? "✎?" : ""}
+		</td>
+	);
+}
+
+/**
+ * The note on the selected frame.
+ *
+ * A note is the operator's own words, so the box never edits itself under
+ * them: the stored text is followed only while the draft still matches what
+ * was stored, which is how a note arriving from the browser's store — or one
+ * just written — reaches an untouched box without overwriting a sentence
+ * somebody is in the middle of typing.
+ */
+function FrameNoteEditor({
+	seq,
+	note,
+	standing,
+	message,
+	onCommit,
+}: {
+	/** The frame's sequence number, or undefined when it arrived without one. */
+	seq: number | undefined;
+	note: FrameNote | null;
+	/** Whether the stored note was written on THIS frame. */
+	standing: "same" | "other";
+	/** What the last save did, or why it could not be done. */
+	message: string;
+	onCommit: (text: string) => void;
+}) {
+	const stored = note?.text ?? "";
+	const [draft, setDraft] = useState(stored);
+	const storedRef = useRef(stored);
+	useEffect(() => {
+		if (stored === storedRef.current) return;
+		setDraft((current) => (current === storedRef.current ? stored : current));
+		storedRef.current = stored;
+	}, [stored]);
+
+	if (seq === undefined) {
+		return (
+			<p className="dim" style={{ fontSize: 11, margin: "6px 0 0" }}>
+				This frame arrived without its raw record, so it carries no frame
+				number a note could be filed against.
+			</p>
+		);
+	}
+
+	const trimmed = draft.trim();
+	return (
+		<>
+			{note !== null && standing === "other" && (
+				<p className="warn" style={{ fontSize: 11, margin: "6px 0" }}>
+					This note was written on a different frame that also carried number{" "}
+					{seq} — the radio has restarted its count since. It is not this
+					frame's note, it stays out of every export, and saving it here files
+					it against the frame on screen.
+				</p>
+			)}
+			<textarea
+				aria-label={`Note on frame ${seq}`}
+				value={draft}
+				rows={2}
+				maxLength={MAX_NOTE_LENGTH}
+				placeholder="What was happening when this frame arrived_"
+				onChange={(event) => setDraft(event.target.value)}
+				style={{
+					width: "100%",
+					boxSizing: "border-box",
+					fontFamily: "inherit",
+					fontSize: 12,
+					background: "var(--bg)",
+					color: "var(--fg)",
+					border: "1px solid var(--border)",
+					borderRadius: 0,
+					padding: "5px 8px",
+					resize: "vertical",
+				}}
+			/>
+			<div
+				style={{
+					display: "flex",
+					gap: 8,
+					alignItems: "center",
+					flexWrap: "wrap",
+					marginTop: 5,
+				}}
+			>
+				<button
+					disabled={trimmed === stored}
+					title="Keep this note in this browser, beside the capture — the frame's own bytes are never touched"
+					style={{ fontSize: 10, letterSpacing: 1 }}
+					onClick={() => onCommit(draft)}
+				>
+					SAVE NOTE
+				</button>
+				<span className="dim" style={{ fontSize: 10 }}>
+					{trimmed.length}/{MAX_NOTE_LENGTH} · SAVE AN EMPTY BOX TO REMOVE THE
+					NOTE
+				</span>
+			</div>
+			{message && (
+				<p className="dim" style={{ fontSize: 10, letterSpacing: 1, margin: "5px 0 0" }}>
+					{message}
+				</p>
+			)}
+		</>
+	);
+}
+
 export default function Sniffer() {
 	const link = useDeviceLink();
 	const session = useSnifferSession();
@@ -552,6 +780,12 @@ export default function Sniffer() {
 	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
 	const [selPath, setSelPath] = useState<string | null>(null);
 	const [hoverPath, setHoverPath] = useState<string | null>(null);
+	// The operator's notes. They live in this browser's own store, keyed by the
+	// frame address a permalink would use, and never inside a frame: a capture's
+	// bytes stay exactly what the radio wrote.
+	const [notes, setNotes] = useState<NoteBook>(EMPTY_NOTES);
+	const [noteMsg, setNoteMsg] = useState("");
+	const [noteStoreMsg, setNoteStoreMsg] = useState("");
 
 	const linked = link.status === "linked";
 	const frames = session.frames;
@@ -628,12 +862,111 @@ export default function Sniffer() {
 		dispatch({ kind: "frames", seqs });
 	}, [seqs, dispatch]);
 
-	// Every path belongs to one frame's tree; a new frame starts over.
+	// Every path belongs to one frame's tree; a new frame starts over, and so
+	// does whatever the note box last reported.
 	useEffect(() => {
 		setCollapsed(new Set());
 		setSelPath(null);
 		setHoverPath(null);
+		setNoteMsg("");
 	}, [sel]);
+
+	// Notes written in an earlier session are read once, at mount. A store that
+	// will not open, or a row that will not read, is said out loud: a note the
+	// operator believes is kept and is not would be worse than no note at all.
+	useEffect(() => {
+		let live = true;
+		loadFrameNotes(SNIFFER_SCOPE)
+			.then(({ book, skipped }) => {
+				if (!live) return;
+				setNotes(book);
+				if (skipped.length > 0)
+					setNoteStoreMsg(
+						`${skipped.length} STORED NOTE(S) COULD NOT BE READ — ${skipped[0]}`,
+					);
+			})
+			.catch(() => {
+				if (live)
+					setNoteStoreMsg(
+						"THIS BROWSER WOULD NOT OPEN ITS NOTE STORE — NOTES WRITTEN NOW WILL NOT SURVIVE A RELOAD",
+					);
+			});
+		return () => {
+			live = false;
+		};
+	}, []);
+
+	// Every listed frame that carries a sequence number, with the witness that
+	// says which frame it is. Both the table's markers and the exports are built
+	// from this one list, so a marker can never mean something the export does
+	// not honour.
+	const noteTargets = useMemo(
+		() =>
+			frames.flatMap((f) => {
+				const target = snifferNoteTarget(f);
+				// `f` rides along so everything downstream is keyed by the frame
+				// itself. Keyed by sequence number, two frames from either side
+				// of an unplug share a key: the note rendered on both rows, and
+				// last-write-wins could hand it to the wrong one and mark the
+				// frame that legitimately owns it as belonging to another run.
+				return target === null
+					? []
+					: [{ frame: target.address.frame, witness: target.witness, f }];
+			}),
+		[frames],
+	);
+
+	const rowNotes = useMemo(() => {
+		const out = new Map<HeardFrame, { standing: "same" | "other"; text: string }>();
+		for (const target of noteTargets) {
+			const note = noteFor(notes, {
+				scope: SNIFFER_SCOPE,
+				frame: target.frame,
+			});
+			if (note === null) continue;
+			const standing = noteStanding(note, target.witness);
+			if (standing !== "absent") out.set(target.f, { standing, text: note.text });
+		}
+		return out;
+	}, [notes, noteTargets]);
+
+	const selTarget = useMemo(
+		() => (sel ? snifferNoteTarget(sel) : null),
+		[sel],
+	);
+	const selNote = selTarget === null ? null : noteFor(notes, selTarget.address);
+	const selStanding: "same" | "other" =
+		selNote !== null &&
+		selTarget !== null &&
+		noteStanding(selNote, selTarget.witness) === "other"
+			? "other"
+			: "same";
+
+	const commitNote = useCallback(
+		(text: string) => {
+			if (selTarget === null) return;
+			const result = setNote(notes, selTarget.address, text, selTarget.witness);
+			if (!result.ok) {
+				setNoteMsg(result.error);
+				return;
+			}
+			setNotes(result.book);
+			setNoteMsg(result.removed ? "NOTE REMOVED" : "NOTE SAVED");
+			const written = result.book.get(result.key);
+			const stored =
+				written === undefined
+					? deleteFrameNote(result.key)
+					: saveFrameNote(toNoteRow(written));
+			// The screen already shows the note; if the store refuses it, saying
+			// so is the only way the operator learns it is not kept.
+			stored.catch(() =>
+				setNoteMsg(
+					"This browser refused to keep the note — it is on screen only and will not survive a reload.",
+				),
+			);
+		},
+		[notes, selTarget],
+	);
 
 	const dissection = useMemo(() => {
 		const raw = sel?.raw;
@@ -751,7 +1084,11 @@ export default function Sniffer() {
 				>
 					⭳ CAPTURE ({frameCount(rawRecords.length)})
 				</button>
-				<ExportButtons records={rawRecords} onSaved={setExportMsg} />
+				<ExportButtons
+					records={rawRecords}
+					notes={notes}
+					onSaved={setExportMsg}
+				/>
 				{exportMsg && (
 					<span className="dim" style={{ fontSize: 11 }}>
 						{exportMsg}
@@ -777,11 +1114,17 @@ export default function Sniffer() {
 								: "Nothing captured yet — connect a T-Deck over USB with the CONNECT button, and every frame its radio hears lands here_"}
 						</p>
 					) : (
-						<FrameTable frames={frames} sel={sel} onPick={pickFrame} />
+<FrameTable
+							frames={frames}
+							sel={sel}
+							onPick={pickFrame}
+							notes={rowNotes}
+						/>
 					)}
 					<div className="panel-foot">
 						<span>RSSI IN dBm · SNR IN dB</span>
 						<span className="spacer" />
+						{noteStoreMsg && <span className="warn">{noteStoreMsg}</span>}
 						{rawRecords.length < frames.length && (
 							<span>
 								{rawRecords.length} OF {frames.length} FRAMES CARRY THE RAW
@@ -864,6 +1207,34 @@ export default function Sniffer() {
 									LINK
 								</span>
 								<CopyFrameLink seq={sel.raw?.seq} />
+							</div>
+							{/* The note is filed under the same frame address that link
+							    names, and is kept beside the capture rather than in it. */}
+							<div
+								style={{
+									display: "flex",
+									gap: 10,
+									lineHeight: 1.8,
+									alignItems: "flex-start",
+									flexWrap: "wrap",
+								}}
+							>
+								<span
+									className="dim"
+									style={{ width: 92, flexShrink: 0, fontSize: 10, letterSpacing: 1 }}
+								>
+									NOTE
+								</span>
+								<div style={{ flex: "1 1 220px", minWidth: 0 }}>
+									<FrameNoteEditor
+										key={sel.raw?.seq ?? "no-sequence-number"}
+										seq={sel.raw?.seq}
+										note={selNote}
+										standing={selStanding}
+										message={noteMsg}
+										onCommit={commitNote}
+									/>
+								</div>
 							</div>
 							{sel.text && (
 								<div style={{ margin: "8px 0" }}>
