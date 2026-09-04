@@ -21,6 +21,7 @@ interface View {
 	filterText: string;
 	note: string | null;
 	containsSynthetic: boolean;
+	brush: unknown;
 }
 
 /**
@@ -76,6 +77,7 @@ test("the simulated stream never writes into the operator's capture", () => {
 			filterText: "",
 			note: null,
 			containsSynthetic: false,
+			brush: null,
 		},
 	});
 	const before = opened.slots[0];
@@ -158,6 +160,7 @@ test("a closed sim slot is reopened, not replaced by whatever is on screen", () 
 			filterText: "",
 			note: null,
 			containsSynthetic: false,
+			brush: null,
 		},
 	});
 	const closed = slotsReducer(withFile, { type: "close", id: sim.id });

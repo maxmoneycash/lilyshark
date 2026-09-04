@@ -40,6 +40,14 @@ export interface SimLiveSlotView {
   filterText: string;
   note: string | null;
   containsSynthetic: boolean;
+  /**
+   * The IO graph's time brush. A brush is a range on one capture's clock, so
+   * a slot opening now has none -- typed here only so the object this module
+   * builds is a complete view rather than one the cast happens to accept.
+   * `unknown` because this module has no business knowing what a brush is --
+   * only that a new slot starts without one.
+   */
+  brush: unknown;
 }
 
 /**
@@ -86,6 +94,7 @@ export function simLiveTick<V extends SimLiveSlotView>(
         selected: 0,
         filterText: '',
         note: null,
+        brush: null,
         // Every frame this slot will ever hold is generated, so it is
         // synthetic from the moment it exists — not once a frame lands. An
         // empty SIM tab still says SIM.

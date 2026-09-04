@@ -105,6 +105,58 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/**
+ * Original SVG render of a T-Deck front — body, screen, trackball, keyboard —
+ * with our own simulator screenshot as the screen content. Crisp pixels via
+ * image-rendering: pixelated on .deck-screen.
+ */
+function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
+  return (
+    <svg
+      viewBox="0 0 320 380"
+      width="320"
+      height="380"
+      role="img"
+      aria-label={alt}
+      className="device-mock"
+    >
+      {/* body */}
+      <rect x="10" y="6" width="300" height="368" rx="26" fill="#141215" stroke="#3a3439" strokeWidth="1.5" />
+      <rect x="10" y="6" width="300" height="368" rx="26" fill="none" stroke="#000" strokeWidth="0.5" opacity="0.6" />
+      {/* screen bezel + our firmware UI */}
+      <rect x="28" y="24" width="264" height="208" rx="10" fill="#000" />
+      <image
+        href={screen}
+        x="34"
+        y="30"
+        width="252"
+        height="189"
+        preserveAspectRatio="xMidYMid slice"
+        className="deck-screen"
+      />
+      {/* trackball strip */}
+      <circle cx="160" cy="256" r="11" fill="#1e1b1f" stroke="#3a3439" strokeWidth="1.5" />
+      <circle cx="160" cy="256" r="5" fill="#0c0a0d" stroke="#554c52" strokeWidth="1" />
+      {/* keyboard: 4 rows of rounded keys */}
+      {[0, 1, 2, 3].map((row) =>
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((col) => (
+          <rect
+            key={`${row}-${col}`}
+            x={38 + col * 25.5}
+            y={282 + row * 21}
+            width="20"
+            height="15"
+            rx="4"
+            fill="#1e1b1f"
+            stroke="#3a3439"
+            strokeWidth="1"
+          />
+        )),
+      )}
+    </svg>
+  );
+}
+
 const DEVICES = [
   {
     id: "tdeck-plus",
@@ -197,13 +249,13 @@ export function FlashPage() {
       </section>
 
       <div className="hero">
-        <img
-          src="/flash/hero-tdeck.png"
-          alt="A T-Deck Plus running Lilyshark's guided first run, beside the web analyzer"
+        <DeviceMock
+          screen={selected.gps ? "/flash/home-simulator.png" : "/flash/onboarding-simulator.png"}
+          alt={`A T-Deck running Lilyshark — ${selected.name}`}
         />
         <div className="hero-caption">
           <span>
-            <b>{selected.name}</b> · first run, on hardware
+            <b>{selected.name}</b> · running {FIRMWARE.version}
           </span>
         </div>
       </div>

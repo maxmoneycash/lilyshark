@@ -30,10 +30,54 @@ export function frameTimeS(frame: ViewFrame, t0Us: bigint): number {
 
 /* ── time brush ──────────────────────────────────────────────────────── */
 
-/** A brushed time range on the capture clock, seconds, start <= end. */
+/**
+ * A brushed time range on the capture clock, seconds, start <= end.
+ *
+ * `bin` is set only when the brush came from clicking ONE bar of the IO
+ * graph, and it carries the arithmetic that drew that bar. Without it a bar
+ * click had to be expressed as a pair of float edges, and float edges do not
+ * agree with the binning: buildIoGraph puts a frame in bucket
+ * `Math.floor(t / bucketS)`, while the bar's right edge was built as
+ * `(firstBucket + index) * bucketS - epsilon`. When bucketS is not a binary
+ * fraction the two disagree -- 0.3 / 0.1 is 2.9999999999999996, so a frame at
+ * t = 0.3 s is COUNTED into bar 2 and then EXCLUDED by bar 2's range. On a
+ * 10 s capture at 100 ms buckets that was 15 bars in 100 selecting the wrong
+ * frames, 14 of them selecting nothing at all for a bar the graph had drawn
+ * as non-empty: the footer would say "Nothing was heard in 0.600-0.700 s.
+ * That silence is the reading" while pointing at a visibly occupied bar.
+ *
+ * So a bar click no longer describes itself with edges. It carries the bucket
+ * it means, and the filter re-derives each frame's bucket with the same
+ * expression the graph used, which cannot disagree with itself. The float
+ * edges stay for display -- the label still reads "0.600-0.700 s" -- and for
+ * a dragged brush, which is a genuine range and has no bucket.
+ */
 export interface BrushRange {
 	startS: number;
 	endS: number;
+	bin?: BrushBin;
+}
+
+/** The binning one bar was drawn with, enough to reproduce it exactly. */
+export interface BrushBin {
+	/** Bucket width in seconds, as chooseBucketS returned it. */
+	bucketS: number;
+	/** The graph's leftmost bucket, `Math.floor(firstFrameS / bucketS)`. */
+	firstBucket: number;
+	/** Which bar, as an offset from `firstBucket`. */
+	index: number;
+}
+
+/**
+ * Which bucket a time falls in, as an offset from `firstBucket`.
+ *
+ * THE one expression that decides this. buildIoGraph, bucketAt and the brush
+ * filter all call it, so a frame cannot be counted into one bar and selected
+ * by another -- which is exactly what happened when three places each wrote
+ * their own version of this line.
+ */
+export function bucketIndexOf(tS: number, bucketS: number, firstBucket: number): number {
+	return Math.floor(tS / bucketS) - firstBucket;
 }
 
 /**
@@ -60,6 +104,14 @@ export function applyBrush<F extends ViewFrame>(
 	brush: BrushRange | null,
 ): number[] {
 	if (!brush) return shown;
+	const bin = brush.bin;
+	// A bar click asks for the frames THAT BAR COUNTED, so it is answered with
+	// the binning, not with the bar's drawn edges. See BrushRange.bin.
+	if (bin) {
+		return shown.filter(
+			(i) => bucketIndexOf(frameTimeS(frames[i], t0Us), bin.bucketS, bin.firstBucket) === bin.index,
+		);
+	}
 	return shown.filter((i) => {
 		const t = frameTimeS(frames[i], t0Us);
 		return t >= brush.startS && t <= brush.endS;
