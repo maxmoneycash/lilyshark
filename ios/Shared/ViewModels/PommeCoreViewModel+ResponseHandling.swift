@@ -593,6 +593,28 @@ extension PommeCoreViewModel {
                 longitude: position.longitude
             )
 
+        case .deviceMetrics(let metrics):
+            // The deck's own health, into the same field the MeshCore path
+            // fills, so every screen that already shows a battery shows this
+            // one too rather than growing a second Meshtastic-only readout.
+            guard metrics.from == messageStoreManager.meshtasticNodeNum else {
+                // Telemetry from some OTHER node on the mesh. Interesting, but
+                // it is not the battery of the radio in your bag, and putting
+                // it in deviceConfig would say it was.
+                Self.logger.info(
+                    "MT TELEMETRY from \(metrics.from) — not this deck, not shown as ours"
+                )
+                return
+            }
+            if let voltage = metrics.voltage {
+                deviceConfig.batteryMillivolts = UInt16(
+                    max(0, min(65535, (voltage * 1000).rounded()))
+                )
+            }
+            let batteryText = metrics.batteryPercent.map(String.init) ?? "—"
+            let uptimeText = metrics.uptimeSeconds.map(String.init) ?? "—"
+            Self.logger.info("MT TELEMETRY: battery=\(batteryText)% uptime=\(uptimeText)s")
+
         case .text(let text):
             handleMeshtasticText(text)
 

@@ -77,8 +77,14 @@ def main():
             continue
         if "gps" in record:
             gps = record["gps"]
-        if "pos" in record:
-            position = record["pos"]
+        # The firmware sends "lat" and "lon", and only when it has a fix --
+        # there is no "pos" key and never was, so this read `record["pos"]`
+        # and reported pos=None whether or not the deck was located. A
+        # diagnostic that always says "no position" is worse than one that
+        # says nothing: it sent this session hunting a GPS bug that did not
+        # exist, in a deck that was reporting a perfectly good fix.
+        if "lat" in record and "lon" in record:
+            position = "%.6f,%.6f" % (record["lat"], record["lon"])
         if "rx" in record:
             rx, crc = record.get("rx"), record.get("crc")
         if kind == "S" and "db" in record:
