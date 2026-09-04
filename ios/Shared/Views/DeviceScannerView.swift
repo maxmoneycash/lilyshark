@@ -332,6 +332,10 @@ struct DeviceScannerView: View {
         }
         .meshListStyle()
         .navigationTitle("Scanner")
+        // Inline: a large title scrolls under the translucent bar and the
+        // Done button rides on top of it, so the heading slid through the
+        // button as the list moved.
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             // Don't start BLE scanning if already connecting/connected via any transport
             guard connectionManager.connectionState == .disconnected else { return }

@@ -199,6 +199,22 @@ struct MeshThemeModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .tint(MeshTheme.accent)
+            // BOTH mechanisms, deliberately.
+            //
+            // preferredColorScheme travels with the view, so anything SwiftUI
+            // presents from here -- a sheet, a popover, a full-screen cover --
+            // inherits it at the moment it is created.
+            //
+            // applyToAllWindows reaches the windows that already exist, which
+            // is what a theme CHANGE has to update; the modifier is not
+            // re-evaluated for a sheet that is already on screen.
+            //
+            // Neither alone is enough, and the gap between them was visible:
+            // applyToAllWindows only touches windows present when it runs, so
+            // a sheet presented afterwards kept the system appearance while
+            // the main window carried the override. The scanner and settings
+            // sheets came up dark over a light app, status bar and all.
+            .preferredColorScheme(selectedTheme.colorScheme)
             .onAppear { applyToAllWindows() }
             .onChange(of: appTheme) { applyToAllWindows() }
     }

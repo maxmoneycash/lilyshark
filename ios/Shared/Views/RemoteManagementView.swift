@@ -194,6 +194,9 @@ struct RemoteManagementView: View {
                         return freqMHz * 1000  // MHz → kHz
                     }()
                 ))
+                // Inline, like every other sheet: a large title scrolls under
+                // the translucent bar and the Done button sits on top of it.
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Done") { showNameWizard = false }
