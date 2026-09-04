@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { activityGrid } from "../activityGrid";
 import { loadActivity, loadAllTraceroutes, loadNeighbors } from "../db";
 import { demoNeighbors } from "../demo";
 import { ago, dateTime } from "../fmt";
@@ -129,9 +130,16 @@ export default function Mesh() {
 	const [sel, setSel] = useState<number | undefined>();
 	const [reload, setReload] = useState(0);
 	const [view, setView] = useState<"graph" | "activity">("graph");
-	const [act, setAct] = useState<{ node: number; hhmm: number; n: number }[]>(
-		[],
-	);
+	// `hourBucket`, spelled the way loadActivity and the sightings store spell
+	// it. This was declared as `hhmm` and the grid below read `r.hhmm`, which
+	// is not a field any row has: every count landed under the single key
+	// `undefined`, and the render, which looks a row up by hour, found nothing
+	// there and drew 0. The heatmap said no node had been heard in any hour
+	// while the totals beside it -- summed from the map's values, not its keys
+	// -- were right, so it looked like a mesh nobody was talking on.
+	const [act, setAct] = useState<
+		{ node: number; hourBucket: number; n: number }[]
+	>([]);
 	const [actHours, setActHours] = useState(48);
 
 	useEffect(() => {
@@ -191,30 +199,13 @@ export default function Mesh() {
 	// s.version changes with every packet: recomputing the snapshot is cheap
 	const sum = useMemo(() => summarize(s.nodes.values()), [s]);
 
-	// activity grid: rows = nodes, columns = hours
-	const grid = useMemo(() => {
-		const nowMs = Math.floor(Date.now() / 3_600_000);
-		const hours = Array.from(
-			{ length: actHours },
-			(_, i) => nowMs - actHours + 1 + i,
-		);
-		const byNode = new Map<number, Map<number, number>>();
-		let max = 1;
-		for (const r of act) {
-			const m = byNode.get(r.node) ?? new Map<number, number>();
-			m.set(r.hhmm, (m.get(r.hhmm) ?? 0) + r.n);
-			byNode.set(r.node, m);
-			if (r.n > max) max = r.n;
-		}
-		const rows = [...byNode.entries()]
-			.map(([node, m]) => ({
-				node,
-				cells: m,
-				total: [...m.values()].reduce((a, b) => a + b, 0),
-			}))
-			.sort((a, b) => b.total - a.total);
-		return { hours, rows, max };
-	}, [act, actHours]);
+	// activity grid: rows = nodes, columns = hours. The binning lives in
+	// activityGrid.ts so it can be tested against a total; it used to be here,
+	// and a wrong bin key drew an empty heatmap for months.
+	const grid = useMemo(
+		() => activityGrid(act, actHours, Math.floor(Date.now() / 3_600_000)),
+		[act, actHours],
+	);
 
 	const tile = (label: string, value: string | number, cls = "") => (
 		<div key={label} className="panel stat-tile" style={{ minWidth: 96 }}>

@@ -114,6 +114,14 @@ export default function MapView({
 		const map = mapRef.current;
 		if (!map) return;
 		if (tileRef.current) map.removeLayer(tileRef.current);
+		// Every branch below builds the layer into `layer` and only then stores
+		// it, so the basemap is provably non-null at the addTo. It used to
+		// assign tileRef.current in each branch and call
+		// `tileRef.current.addTo(map)` after -- which the compiler could not
+		// prove, because a ref's field is not narrowed across the calls in
+		// between. Getting that wrong leaves the map with no basemap at all,
+		// which on this project reads as the blank map we have chased before.
+		let layer: L.Layer;
 		if (basemap === "chart") {
 			const Chart = L.GridLayer.extend({
 				createTile(coords: L.Coords) {
@@ -124,9 +132,11 @@ export default function MapView({
 					return tile;
 				},
 			});
-			tileRef.current = new Chart({ attribution: "FIELD CHART" });
+			layer = new (Chart as unknown as new (o: L.GridLayerOptions) => L.GridLayer)({
+				attribution: "FIELD CHART",
+			});
 		} else if (basemap === "sat") {
-			tileRef.current = L.tileLayer(
+			layer = L.tileLayer(
 				"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
 				{ attribution: "Esri" },
 			);
@@ -193,10 +203,13 @@ export default function MapView({
 					return tile;
 				},
 			});
-			new Contours({ opacity: 0.9 }).addTo(group);
-			tileRef.current = group;
+			new (Contours as unknown as new (o: L.GridLayerOptions) => L.GridLayer)({
+				opacity: 0.9,
+			}).addTo(group);
+			layer = group;
 		}
-		tileRef.current.addTo(map);
+		tileRef.current = layer;
+		layer.addTo(map);
 	}, [basemap]);
 
 	useEffect(() => {

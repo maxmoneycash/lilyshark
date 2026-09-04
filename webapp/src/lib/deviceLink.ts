@@ -416,6 +416,24 @@ function set(next: Partial<DeviceLinkState>): void {
   for (const l of listeners) l();
 }
 
+/**
+ * Has the operator disconnected since we last looked?
+ *
+ * A function, not `state.status === 'off'` written out at each call site. The
+ * retry loop checks this before and after an await, and `set` REASSIGNS
+ * `state`, so the second read must be a fresh one. Written inline, the
+ * compiler narrows `'off'` away at the first check and reports the second as
+ * a comparison that can never be true -- it cannot see that awaiting
+ * openAndWait or teardown may have replaced the object. The narrowing was
+ * wrong about the runtime but right that the code was relying on something
+ * it never stated. Behind a call there is nothing to narrow, and what the
+ * loop means -- re-read the status, it may have changed under us -- is what
+ * it now says.
+ */
+function operatorDisconnected(): boolean {
+  return state.status === 'off';
+}
+
 export function useDeviceLink(): DeviceLinkState {
   return useSyncExternalStore(
     (cb) => {
@@ -540,7 +558,11 @@ async function readAvailable(candidate: SerialPort): Promise<void> {
       }
     } catch {
       try {
-        activeReader.releaseLock();
+        // Optional, because the branch above may already have cleared it: a
+        // throw after that point made this a TypeError on `undefined`, which
+        // the inner catch then swallowed as "already released". It worked,
+        // but by raising an error to stand in for a check.
+        activeReader?.releaseLock();
       } catch {
         /* already released */
       }
@@ -625,11 +647,11 @@ async function openAndWait(candidate: SerialPort): Promise<HandshakeResult> {
  *  that almost always happens on the first open. */
 async function attemptPort(candidate: SerialPort): Promise<boolean> {
   for (let attempt = 0; attempt < HANDSHAKE_MAX_ATTEMPTS; attempt++) {
-    if (state.status === 'off') return false;
+    if (operatorDisconnected()) return false;
     const result = await openAndWait(candidate);
     if (result === 'linked') return true;
     await teardown();
-    if (state.status === 'off') return false;
+    if (operatorDisconnected()) return false;
     const action = nextSerialAction({
       event: result === 'timeout' ? 'timeout' : 'stream-drop',
       deliberate: false,
