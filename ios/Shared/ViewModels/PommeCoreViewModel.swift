@@ -19,6 +19,7 @@ import WidgetKit
 import WatchKit
 #endif
 import MeshCoreKit
+import MeshtasticKit
 #if canImport(CoreSpotlight)
 import CoreSpotlight
 #endif
@@ -574,13 +575,25 @@ final class PommeCoreViewModel: ObservableObject {
     private static var locationFudgeAngle: Double = Double.random(in: 0..<(2 * .pi))
     private static var locationFudgeFraction: Double = Double.random(in: 0...1)
 
+    /// Offset a position by the operator's privacy radius.
+    ///
+    /// **Apply exactly once**, to a true position, immediately before sharing
+    /// it. The offset is stored and stable rather than re-rolled per call, so
+    /// applying it to an already-fudged position moves the point a second
+    /// time along the same bearing instead of scattering it -- see
+    /// LocationPrivacy, where the arithmetic and that property now live and
+    /// are tested. This used to happen on the phone-GPS path.
     static func fudgeLocation(lat: Double, lon: Double) -> (Double, Double) {
-        let radius = UserDefaults.standard.double(forKey: "locationPrivacyRadius")
-        guard radius > 0 else { return (lat, lon) }
-        let distance = Self.locationFudgeFraction * radius
-        let latOffset = (distance * cos(Self.locationFudgeAngle)) / 111_320.0
-        let lonOffset = (distance * sin(Self.locationFudgeAngle)) / (111_320.0 * cos(lat * .pi / 180))
-        return (lat + latOffset, lon + lonOffset)
+        let result = LocationPrivacy.apply(
+            latitude: lat,
+            longitude: lon,
+            radiusMetres: UserDefaults.standard.double(forKey: "locationPrivacyRadius"),
+            fudge: LocationFudge(
+                angle: Self.locationFudgeAngle,
+                fraction: Self.locationFudgeFraction
+            )
+        )
+        return (result.latitude, result.longitude)
     }
 
     static func regenerateLocationFudge() {

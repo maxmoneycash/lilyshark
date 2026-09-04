@@ -629,17 +629,39 @@ final class ConnectionManager {
     private func setLocationFromPhoneGPS() {
         #if !os(watchOS)
         guard let location = SharedLocation.manager.location else { return }
-        let (fLat, fLon) = PommeCoreViewModel.fudgeLocation(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
-        // Skip send if phone hasn't moved more than threshold since last update.
-        if let prevLat = lastSentLatitude, let prevLon = lastSentLongitude {
-            let dLat = (fLat - prevLat) * 111_000
-            let dLon = (fLon - prevLon) * 111_000 * cos(prevLat * .pi / 180)
-            let distanceMeters = (dLat * dLat + dLon * dLon).squareRoot()
-            guard distanceMeters >= Self.locationSendThresholdMeters else { return }
+        let rawLatitude = location.coordinate.latitude
+        let rawLongitude = location.coordinate.longitude
+
+        // Thresholded on the TRUE position, and the raw position is what is
+        // remembered. Comparing fudged coordinates measured the same thing
+        // -- the fudge is a fixed offset, not a per-call jitter -- but it
+        // made the stored pair a fudged one, and passing that on was how the
+        // offset came to be applied twice. See below.
+        if let previousLatitude = lastSentLatitude, let previousLongitude = lastSentLongitude {
+            let northMetres = (rawLatitude - previousLatitude) * 111_000
+            let eastMetres = (rawLongitude - previousLongitude) * 111_000
+                * cos(previousLatitude * .pi / 180)
+            let moved = (northMetres * northMetres + eastMetres * eastMetres).squareRoot()
+            guard moved >= Self.locationSendThresholdMeters else { return }
         }
-        lastSentLatitude = fLat
-        lastSentLongitude = fLon
-        setAdvertLatLon(latitude: fLat, longitude: fLon)
+        lastSentLatitude = rawLatitude
+        lastSentLongitude = rawLongitude
+
+        // Raw coordinates, deliberately. Every send path below applies the
+        // privacy fudge exactly once and expects to be handed the true
+        // position.
+        //
+        // This used to fudge here and then call setAdvertLatLon, which fudges
+        // again. locationFudgeAngle and locationFudgeFraction are STORED and
+        // stable -- regenerated only when the operator asks -- so the second
+        // application moved the point a second time along the very same
+        // bearing. The reported position was up to twice the configured
+        // privacy radius away, consistently in one direction, which is worse
+        // than either honest choice: it is not where you are, and the error
+        // has a fixed heading that repeated sightings would average out
+        // rather than obscure.
+        setAdvertLatLon(latitude: rawLatitude, longitude: rawLongitude)
+        shareLocationWithDeck()
         #endif
     }
 
