@@ -321,6 +321,28 @@ python3 -m unittest discover -s test/tdeck_preflight -p 'test_*.py'
 echo "Testing ios6_lab"
 python3 -m unittest discover -s test/ios6_lab -p 'test_*.py'
 
+# The webapp. This gate ran none of it until now -- not its tests and not its
+# typecheck -- so `./scripts/test_all.sh` passed while lilyshark.com carried
+# eighteen compile errors, one of which drew an empty activity heatmap for
+# every node. The build uses esbuild, which strips types without checking
+# them, so nothing else was ever going to catch them.
+#
+# tsc runs FIRST and separately from the tests, because the two find different
+# things: the tests would not have noticed a field renamed on one side of an
+# assignment, and tsc will not notice a wrong answer. Skipped with a stated
+# reason rather than silently when node_modules is absent, since a gate that
+# quietly covers less than it appears to is the failure this is fixing.
+if [[ -d webapp/node_modules ]]; then
+  echo "Typechecking webapp"
+  (cd webapp && npx --no-install tsc --noEmit -p tsconfig.json)
+
+  echo "Testing webapp"
+  (cd webapp && npm test --silent)
+else
+  echo "SKIPPING webapp tests and typecheck: webapp/node_modules is absent." >&2
+  echo "  Run 'npm install --prefix webapp' to include them in this gate." >&2
+fi
+
 if [[ "${host_only}" == true ]]; then
   echo "All host tests passed"
   exit 0
