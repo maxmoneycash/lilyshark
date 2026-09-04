@@ -16427,6 +16427,17 @@ void announce_local_mesh_identity() noexcept
 /// packet inspector show them like anything else that crossed this radio. Every
 /// protocol's transmit path goes through here: a capture that omitted our own
 /// frames would be a dishonest record of the channel.
+///
+/// Our own frames used to arrive here with no timestamp and no airtime, and
+/// that was not cosmetic. Three things followed. build_utilization() skips
+/// anything older than its sixty-second window, and an unset timestamp is
+/// zero, so after a minute of uptime the airtime screen silently excluded
+/// every frame this deck sent -- the one contributor it is directly
+/// responsible for, and the one that was fifteen times over budget three
+/// commits ago. Both capture writers serialise the timestamp verbatim, so
+/// every .pcap and .lscap recorded our beacons at 1970-01-01, decades before
+/// the traffic around them. And the rolling diagnostics refuse a record with
+/// no timestamp outright, so our transmissions never reached those either.
 void ingest_own_transmission(const std::uint8_t *frame, std::size_t length) noexcept
 {
     RawFrame raw{};
@@ -16444,8 +16455,17 @@ void ingest_own_transmission(const std::uint8_t *frame, std::size_t length) noex
     raw.rf.tx_power_dbm = profile.tx_power_dbm;
     raw.rf.profile_id = profile.id;
     raw.rf.crc = CrcStatus::Valid;
-    raw.rf.present_fields = RfFieldFrequency | RfFieldBandwidth | RfFieldSpreadingFactor |
-                            RfFieldCodingRate | RfFieldSyncWord | RfFieldPreamble | RfFieldProfile;
+    raw.rf.timestamp_us = static_cast<std::uint64_t>(esp_timer_get_time());
+    raw.rf.present_fields = RfFieldTimestamp | RfFieldFrequency | RfFieldBandwidth |
+                            RfFieldSpreadingFactor | RfFieldCodingRate | RfFieldSyncWord |
+                            RfFieldPreamble | RfFieldProfile;
+    // Zero means the profile cannot support the calculation -- FSK, or an
+    // uninitialised modem. Leave the field absent in that case instead of
+    // recording no airtime for a frame that plainly occupied the channel.
+    raw.rf.airtime_us = radio_service.airtimeUsFor(length);
+    if (raw.rf.airtime_us != 0U) {
+        raw.rf.present_fields |= RfFieldAirtime;
+    }
     ingest_analyzer_frame(raw, profile, true);
     live_data_dirty = true;
 }

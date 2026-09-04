@@ -41,6 +41,9 @@ INELIGIBLE_EMPTY = "empty_payload"
 INELIGIBLE_TRUNCATED = "truncated"
 INELIGIBLE_FIELDS_ABSENT = "required_fields_absent"
 INELIGIBLE_NO_WALL_CLOCK = "no_wall_clock"
+INELIGIBLE_SELF_TRANSMITTED = "self_transmitted"
+
+DIRECTION_TRANSMIT = 2
 
 
 def round_frequency_hz(freq_hz: int) -> int:
@@ -68,10 +71,18 @@ def witness_key(payload: bytes, freq_hz: int, unix_seconds: int) -> bytes:
 def frame_ineligibility(record: dict[str, object], has_wall_clock: bool) -> str | None:
     """Return the spec's reason a record yields no key, or None if eligible.
 
-    Synthetic is checked first: those frames are refused, not skipped.
+    Synthetic is checked first: those frames are refused, not skipped. A frame
+    the capturing deck sent is refused next, for the same reason -- a witness
+    key asserts that somebody heard a transmission they did not make, so one
+    computed over our own beacon attests to nothing. Captures written before
+    the firmware timestamped its own transmissions have those records at tick
+    zero, and they were skipped here as field-absent by accident; this refuses
+    them on purpose, and by the same rule the firmware uses.
     """
     if record["synthetic"]:
         return INELIGIBLE_SYNTHETIC
+    if int(record["direction"]) == DIRECTION_TRANSMIT:
+        return INELIGIBLE_SELF_TRANSMITTED
     if int(record["crc_state"]) != CRC_VALID:
         return INELIGIBLE_CRC
     captured = int(record["captured_length"])

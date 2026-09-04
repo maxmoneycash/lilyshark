@@ -22,6 +22,14 @@ struct RadioStatus {
     std::uint32_t profile_switch_failures = 0;
     std::uint32_t last_frame_ms = 0;
     std::int16_t last_profile_error = 0;
+    /// Completed receptions the radio had flagged on DIO1 but poll() had not
+    /// read out yet, thrown away because a transmit, profile change or
+    /// spectrum sweep needed the modem. These frames were genuinely on the
+    /// air and this deck genuinely heard them; nothing downstream will ever
+    /// see them. Counted for the same reason as heard_but_unreported: an
+    /// instrument that discards evidence has to say how much, or "nothing
+    /// heard" reads as a quiet band instead of a busy one we walked over.
+    std::uint32_t receive_preempted = 0;
 };
 
 struct LoRaRxMetadata {
@@ -131,6 +139,19 @@ class TDeckRadioService
     void poll() noexcept;
     void stop() noexcept;
 
+    /// Airtime one frame of `length` bytes costs on the profile currently
+    /// configured, in microseconds. Zero when the profile cannot support the
+    /// calculation, which callers must record as "no airtime" rather than as
+    /// zero airtime.
+    ///
+    /// The transmit path needs this because nothing else can supply it: a
+    /// received frame carries a header the radio reads its coding rate out
+    /// of, and a frame we are about to send has no such header until we build
+    /// it. Without this the deck's own transmissions reached the airtime
+    /// screen with no airtime at all, which is how the utilization figure came
+    /// to exclude the one contributor this deck is responsible for.
+    std::uint32_t airtimeUsFor(std::size_t length) const noexcept;
+
     const RadioProfile &activeProfile() const noexcept { return profile_; }
     const RadioStatus &status() const noexcept { return status_; }
     const SpectrumSweepStatus &spectrumStatus() const noexcept { return spectrum_status_; }
@@ -138,6 +159,11 @@ class TDeckRadioService
 
   private:
     static void onDio1() noexcept;
+    /// Clear a DIO1 edge that poll() will now never read, counting it first.
+    /// Every caller is about to seize the modem for something else, so the
+    /// reception behind that edge is lost either way; the only choice is
+    /// whether the loss is recorded or silent.
+    void discardPendingReceive() noexcept;
     static std::uint8_t radioLibSyncWord(std::uint16_t profile_sync_word) noexcept;
     bool configure(const RadioProfile &profile) noexcept;
     void resumeReceive() noexcept;
