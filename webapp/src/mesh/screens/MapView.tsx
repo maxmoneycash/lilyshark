@@ -1,5 +1,5 @@
 import L from "leaflet";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import "leaflet/dist/leaflet.css";
 import { DEMO_CENTER, isDemo } from "../demo";
 import {
@@ -10,11 +10,133 @@ import {
 } from "../fieldChart";
 import { ago, asciiBattery, dateTime, fmtHemisphere, useHourTick } from "../fmt";
 import { t, useLangTick } from "../i18n";
+import {
+	buildCoverage,
+	type CoverageCell,
+	type CoverageObservation,
+	GRADE_LEGEND,
+	GRADE_ORDER,
+	geohashLengthForZoom,
+	gradeFillOpacity,
+	isPlausibleFix,
+} from "../../lib/coverage";
+import { encodeGeohash } from "../../lib/geohash";
 import { useDeviceLink } from "../../lib/deviceLink";
 import { deleteWaypoint, sendWaypoint } from "../radio";
 import { getSnapshot, subscribe } from "../store";
 import { SimulateBadge } from "../ThisDevice";
 import { accent, fg, useThemeTick } from "../theme";
+
+/** The provenance colour this map already uses for anything bridged in from
+ *  the internet: node markers, and now coverage cells. */
+const NET_AMBER = "#d99000";
+
+/** A 0-1 opacity as the two hex digits fg() appends to its colour, so a
+ *  legend swatch is filled at exactly the opacity the map draws. */
+function alphaHex(opacity: number): string {
+	return Math.round(opacity * 255)
+		.toString(16)
+		.padStart(2, "0");
+}
+
+/** What a cell is allowed to say it is, in the reader's words. */
+const CELL_PROVENANCE_LABEL: Record<CoverageCell["provenance"], string> = {
+	measured: "MEASURED BY THIS RADIO",
+	reported: "INTERNET LAYER · THIS RADIO HEARD NOTHING HERE",
+	synthetic: "SYNTHETIC · INVENTED, NOT RECEIVED",
+};
+
+const GRADE_LABEL: Record<NonNullable<CoverageCell["grade"]>, string> = {
+	strong: "STRONG",
+	fair: "FAIR",
+	weak: "WEAK",
+	marginal: "MARGINAL",
+};
+
+/**
+ * A box next to somewhere this radio has heard the mesh, that it has heard
+ * nothing from. The wording is deliberate: this is an absence of evidence.
+ * Nobody may have transmitted from there at all, and the map has no way to
+ * tell that apart from a place the radio cannot reach.
+ */
+function gapPopup(geohash: string, adjacentMeasured: number): string {
+	return (
+		`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("COVERAGE CELL")} ${geohash}</div>` +
+		`<div style="font-weight:700;margin:4px 0;">${t("NO EVIDENCE")}</div>` +
+		`<div>${t(
+			"Nothing has been heard from this box. It touches {0} that this radio has measured.",
+			adjacentMeasured === 1
+				? t("one box")
+				: t("{0} boxes", adjacentMeasured),
+		)}</div>` +
+		`<div style="opacity:.85;margin-top:4px;">${t(
+			"That is not a dead spot: it may be a box nobody has transmitted from. This map cannot tell the two apart.",
+		)}</div>`
+	);
+}
+
+/**
+ * The cell's whole evidence, stated in the units it was measured in. Every
+ * count is shown even when it is inconvenient: a measured cell that also
+ * holds internet rows says so, because "this radio heard here" and "the
+ * internet says a node is here" are different claims about the same box.
+ */
+function cellPopup(
+	cell: CoverageCell,
+	span: { widthKm: number; heightKm: number } | null,
+): string {
+	const dim = (label: string, value: string) =>
+		`<span style="opacity:.85;">${label}</span><span>${value}</span>`;
+	const stats = (
+		s: CoverageCell["snrDb"],
+		unit: string,
+	): string =>
+		s === null
+			? "—"
+			: `${t("med")} ${s.median.toFixed(1)} · ${t("min")} ${s.min.toFixed(1)} · ${t("max")} ${s.max.toFixed(1)} ${unit} (n=${s.count})`;
+	const rows: string[] = [
+		dim(
+			t("BEST SNR"),
+			cell.provenance !== "measured"
+				? t("NOT MEASURED")
+				: cell.bestSnrDb === null || cell.grade === null
+					? t("no figure reported")
+					: `${cell.bestSnrDb.toFixed(1)} dB · ${GRADE_LABEL[cell.grade]}`,
+		),
+		dim("SNR", cell.provenance === "measured" ? stats(cell.snrDb, "dB") : "—"),
+		dim(
+			"RSSI",
+			cell.provenance === "measured" ? stats(cell.rssiDbm, "dBm") : "—",
+		),
+		dim(
+			t("SAMPLES"),
+			`${cell.observations} · ${t("{0} nodes", cell.sources)}`,
+		),
+		dim(t("HEARD DIRECT"), `${cell.directObservations} (0 ${t("hops")})`),
+	];
+	if (cell.netObservations > 0)
+		rows.push(
+			dim(
+				t("INTERNET ROWS"),
+				`${cell.netObservations} · ${t("no signal of ours")}`,
+			),
+		);
+	if (cell.simObservations > 0)
+		rows.push(dim(t("SYNTHETIC ROWS"), String(cell.simObservations)));
+	rows.push(
+		dim(
+			t("LAST HEARD"),
+			`${t("{0} ago", ago(cell.lastHeardMs / 1000))} · ${dateTime(cell.lastHeardMs)}`,
+		),
+	);
+	return (
+		`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("COVERAGE CELL")} ${cell.geohash}` +
+		(span ? ` · ${span.widthKm.toFixed(1)}×${span.heightKm.toFixed(1)} km` : "") +
+		`</div>` +
+		`<div style="font-weight:700;margin:4px 0;">${CELL_PROVENANCE_LABEL[cell.provenance]}</div>` +
+		`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;">${rows.join("")}</div>`
+	);
+}
 
 interface Draft {
 	id?: number; // defined = editing
@@ -56,7 +178,12 @@ export default function MapView({
 	const [wpMsg, setWpMsg] = useState("");
 	const [filter, setFilter] = useState<"all" | "fav" | "active">("all");
 	const [basemap, setBasemap] = useState<"sat" | "map" | "chart">("sat");
+	// The map is already busy, so the coverage layer starts off and the reader
+	// asks for it. The zoom is tracked because the cell size follows it.
+	const [coverageOn, setCoverageOn] = useState(false);
+	const [zoom, setZoom] = useState(12);
 	const tileRef = useRef<L.Layer | null>(null);
+	const coverageRef = useRef<L.LayerGroup | null>(null);
 	// The parent passes a fresh arrow on every render; going through a ref keeps
 	// it out of the marker effect's deps without ever calling a stale one.
 	const openNodeRef = useRef(onOpenNode);
@@ -79,7 +206,17 @@ export default function MapView({
 			{ attribution: "Esri" },
 		).addTo(map);
 		tileRef.current = tiles;
+		// Coverage cells belong under every marker: they are the ground the
+		// nodes stand on, not another thing to click past. Their own pane sits
+		// between the tiles (200) and the overlay pane the markers use (400),
+		// and Leaflet gives a pane its own canvas renderer automatically.
+		map.createPane("coverage");
+		const coveragePane = map.getPane("coverage");
+		if (coveragePane) coveragePane.style.zIndex = "350";
+		coverageRef.current = L.layerGroup().addTo(map);
 		layerRef.current = L.layerGroup().addTo(map);
+		setZoom(map.getZoom());
+		map.on("zoomend", () => setZoom(map.getZoom()));
 		map.on("contextmenu", (e: L.LeafletMouseEvent) => {
 			setWpMsg("");
 			setDraft({
@@ -103,6 +240,7 @@ export default function MapView({
 			map.remove();
 			mapRef.current = null;
 			tileRef.current = null;
+			coverageRef.current = null;
 			fittedRef.current = false;
 			// the new map starts blank: whatever was centered/fitted has to happen
 			// again (StrictMode remounts twice in dev, and this ref outlives the map)
@@ -219,12 +357,13 @@ export default function MapView({
 		layer.clearLayers();
 
 		const nowS = Date.now() / 1000;
+		// isPlausibleFix is the one place the junk-GPS rule lives (positions
+		// stuck at 0,0, and now also NaN or off-globe coordinates, which used
+		// to reach Leaflet). The coverage pass reads the same function, so the
+		// two layers cannot disagree about which fixes are real.
 		const positioned = [...s.nodes.values()].filter(
 			(n) =>
-				n.lat !== undefined &&
-				n.lon !== undefined &&
-				// junk GPS: positions stuck at (0,0)
-				(Math.abs(n.lat) > 0.1 || Math.abs(n.lon) > 0.1) &&
+				isPlausibleFix(n.lat, n.lon) &&
 				(filter === "all" ||
 					(filter === "fav" && n.fav) ||
 					(filter === "active" && nowS - n.lastHeard < 3600)),
@@ -423,19 +562,168 @@ export default function MapView({
 		if (focusNode !== undefined) setFilter("all");
 	}, [focusNode]);
 
+	/**
+	 * The evidence behind the coverage layer, with each piece labelled by
+	 * where it came from. Two sources reach this screen and they are not the
+	 * same kind of thing:
+	 *
+	 *   frames  the deck's own receiver decoded them and reported the RSSI
+	 *           and SNR it measured. A frame flagged `sim` was generated by
+	 *           SIMULATE mode and is invented, not received.
+	 *   nodes   the store's contacts. A viaNet contact is the internet's
+	 *           report of a node; nobody here heard it, so it carries no
+	 *           signal figure and must never gain one. The demo mesh is
+	 *           invented wholesale, so under isDemo() every contact is sim.
+	 *
+	 * The dB fields are passed only for radio samples. buildCoverage drops
+	 * them from any other provenance anyway; stating it at the call site too
+	 * means a reader of this file does not have to go and check.
+	 */
+	const coverage = useMemo(() => {
+		if (!coverageOn) return null;
+		const synthetic = isDemo();
+		const observations: CoverageObservation[] = [];
+		for (const frame of deviceLink.frames) {
+			if (!isPlausibleFix(frame.lat, frame.lon)) continue;
+			const measured = !frame.sim;
+			observations.push({
+				lat: frame.lat as number,
+				lon: frame.lon as number,
+				atMs: frame.atMs,
+				provenance: measured ? "radio" : "sim",
+				// The firmware sends both figures as fixed point ×10.
+				snrDb: measured ? frame.snrX10 / 10 : undefined,
+				rssiDbm: measured ? frame.rssiX10 / 10 : undefined,
+				hops: frame.hops,
+				id: frame.src,
+			});
+		}
+		for (const node of s.nodes.values()) {
+			if (!isPlausibleFix(node.lat, node.lon)) continue;
+			const provenance = node.viaNet ? "net" : synthetic ? "sim" : "radio";
+			observations.push({
+				lat: node.lat as number,
+				lon: node.lon as number,
+				atMs: node.lastHeard * 1000,
+				provenance,
+				snrDb: provenance === "radio" ? node.snr : undefined,
+				rssiDbm: provenance === "radio" ? node.rssi : undefined,
+				hops: node.hopsAway,
+				id: node.num,
+			});
+		}
+		return buildCoverage(observations, {
+			precision: geohashLengthForZoom(zoom),
+			gaps: true,
+		});
+	}, [coverageOn, s.nodes, deviceLink.frames, zoom]);
+
+	// Cells and gaps, drawn in their own pane under the markers. Kept in a
+	// separate effect from the marker pass so toggling the layer, or a zoom
+	// that only changes the cell size, does not rebuild every node marker and
+	// close a popup the reader had open.
+	//
+	// The cells are drawn non-interactive on purpose. They sit under the
+	// marker canvas, and the topmost canvas is the one the browser hands a
+	// mouse event to, so a popup bound to a cell could never open — the
+	// markers would swallow every click over the whole map. Instead the map's
+	// own click is caught below, the clicked coordinate is turned back into a
+	// cell name, and the popup is opened there. A click that lands on a marker
+	// never reaches it: Leaflet stops that event at the marker.
+	useEffect(() => {
+		const map = mapRef.current;
+		const group = coverageRef.current;
+		if (!map || !group) return;
+		group.clearLayers();
+		if (!coverage) return;
+		for (const cell of coverage.cells) {
+			const bounds = L.latLngBounds(
+				[cell.box.latMin, cell.box.lonMin],
+				[cell.box.latMax, cell.box.lonMax],
+			);
+			// Three looks, one per provenance, because the reader has to be able
+			// to tell a measured cell from a cell the internet reported without
+			// opening anything: solid + graded fill is this radio's own
+			// measurement, dashed amber is the rumour layer (the same amber the
+			// node markers use for bridged nodes), and dotted is invented.
+			const measured = cell.provenance === "measured";
+			const color =
+				cell.provenance === "measured"
+					? fg()
+					: cell.provenance === "reported"
+						? NET_AMBER
+						: accent();
+			L.rectangle(bounds, {
+				pane: "coverage",
+				interactive: false,
+				color,
+				weight: 1,
+				opacity: measured ? 0.8 : 0.65,
+				dashArray:
+					cell.provenance === "measured"
+						? undefined
+						: cell.provenance === "reported"
+							? "5 4"
+							: "1 5",
+				fillColor: color,
+				fillOpacity: measured
+					? cell.grade === null
+						? 0.06
+						: gradeFillOpacity(cell.grade)
+					: 0.06,
+			}).addTo(group);
+		}
+		for (const gap of coverage.gaps) {
+			L.rectangle(
+				L.latLngBounds(
+					[gap.box.latMin, gap.box.lonMin],
+					[gap.box.latMax, gap.box.lonMax],
+				),
+				{
+					pane: "coverage",
+					interactive: false,
+					color: fg(),
+					weight: 1,
+					opacity: 0.28,
+					dashArray: "2 6",
+					fill: false,
+				},
+			).addTo(group);
+		}
+
+		const byCell = new Map(coverage.cells.map((cell) => [cell.geohash, cell]));
+		const byGap = new Map(coverage.gaps.map((gap) => [gap.geohash, gap]));
+		const onClick = (event: L.LeafletMouseEvent) => {
+			const name = encodeGeohash(
+				event.latlng.lat,
+				event.latlng.lng,
+				coverage.precision,
+			);
+			const cell = byCell.get(name);
+			const gap = byGap.get(name);
+			if (!cell && !gap) return;
+			L.popup({ maxHeight: 260 })
+				.setLatLng(event.latlng)
+				.setContent(
+					cell
+						? cellPopup(cell, coverage.cellSpanKm)
+						: gapPopup(name, gap?.adjacentMeasured ?? 0),
+				)
+				.openOn(map);
+		};
+		map.on("click", onClick);
+		return () => {
+			map.off("click", onClick);
+		};
+		// themeTick: the cells are painted with fg() and accent(), so a theme
+		// change has to repaint them, exactly as it does the markers above.
+	}, [coverage, themeTick]);
+
 	const all = [...s.nodes.values()];
-	const withFix = all.filter(
-		(n) =>
-			n.lat !== undefined &&
-			n.lon !== undefined &&
-			(Math.abs(n.lat) > 0.1 || Math.abs(n.lon) > 0.1),
-	).length;
+	const withFix = all.filter((n) => isPlausibleFix(n.lat, n.lon)).length;
 	const junk = all.filter(
 		(n) =>
-			n.lat !== undefined &&
-			n.lon !== undefined &&
-			Math.abs(n.lat) <= 0.1 &&
-			Math.abs(n.lon) <= 0.1,
+			n.lat !== undefined && n.lon !== undefined && !isPlausibleFix(n.lat, n.lon),
 	).length;
 
 	// What the marker pass just drew, stated on the map itself. The firmware
@@ -444,9 +732,7 @@ export default function MapView({
 	const nowS = Date.now() / 1000;
 	const drawn = all.filter(
 		(n) =>
-			n.lat !== undefined &&
-			n.lon !== undefined &&
-			(Math.abs(n.lat) > 0.1 || Math.abs(n.lon) > 0.1) &&
+			isPlausibleFix(n.lat, n.lon) &&
 			(filter === "all" ||
 				(filter === "fav" && n.fav) ||
 				(filter === "active" && nowS - n.lastHeard < 3600)),
@@ -500,6 +786,17 @@ export default function MapView({
 									{label}
 								</button>
 							))}
+						</span>
+						<span className="map-chip-row">
+							<button
+								className={coverageOn ? "primary" : ""}
+								onClick={() => setCoverageOn((on) => !on)}
+								title={t(
+									"Shade the boxes this mesh has been heard in, and outline the ones next to them that nothing has been heard from.",
+								)}
+							>
+								{t("COVERAGE")}
+							</button>
 						</span>
 					</span>
 				</div>
@@ -570,13 +867,159 @@ export default function MapView({
 								<SimulateBadge on={deviceLink.telemetry?.sim} />
 							</>
 						)}
+						{coverage && (
+							<>
+								{" · "}
+								{t(
+									"COVERAGE {0} MEASURED · {1} INTERNET · {2} SYNTHETIC · {3} UNHEARD",
+									coverage.measuredCells,
+									coverage.reportedCells,
+									coverage.syntheticCells,
+									coverage.gaps.length,
+								)}
+							</>
+						)}
 					</div>
 					<div className="map-hud" style={{ left: 10, bottom: 10 }}>
 						{wpMsg ||
 							(deviceLink.status === "linked" && drawn.length === 0
 								? "Listening. Your T-Deck plots when GPS has a fix. Other nodes plot when they transmit a position."
-								: t("RIGHT CLICK = NEW WAYPOINT"))}
+								: coverage
+									? t("CLICK A CELL FOR ITS EVIDENCE · RIGHT CLICK = NEW WAYPOINT")
+									: t("RIGHT CLICK = NEW WAYPOINT"))}
 					</div>
+					{coverage && (
+						<div
+							className="panel"
+							style={{
+								position: "absolute",
+								zIndex: 1000,
+								right: 10,
+								bottom: 10,
+								width: 268,
+								fontSize: 11,
+							}}
+						>
+							<div className="panel-title">
+								<span>{t("COVERAGE")}</span>
+								<span className="dim">
+									{coverage.cellSpanKm
+										? `${coverage.cellSpanKm.widthKm.toFixed(1)}×${coverage.cellSpanKm.heightKm.toFixed(1)} km`
+										: t("no cells")}
+								</span>
+							</div>
+							<div
+								style={{
+									padding: 10,
+									display: "flex",
+									flexDirection: "column",
+									gap: 6,
+								}}
+							>
+								<span className="dim">
+									{t(
+										"Fill: the best SNR measured in the box, in dB. One box is one geohash-{0} cell.",
+										coverage.precision,
+									)}
+								</span>
+								{GRADE_ORDER.map((grade) => (
+									<span
+										key={grade}
+										style={{ display: "flex", gap: 8, alignItems: "center" }}
+									>
+										<span
+											style={{
+												width: 18,
+												height: 12,
+												flex: "0 0 auto",
+												border: `1px solid ${fg()}`,
+												background: fg(alphaHex(gradeFillOpacity(grade))),
+											}}
+										/>
+										<span>{GRADE_LEGEND[grade]}</span>
+									</span>
+								))}
+								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+									<span
+										style={{
+											width: 18,
+											height: 12,
+											flex: "0 0 auto",
+											border: `1px solid ${fg()}`,
+											background: fg(alphaHex(0.06)),
+										}}
+									/>
+									<span>
+										{t(
+											"heard, but no SNR figure came with it — a node fix, not a measured reception",
+										)}
+									</span>
+								</span>
+								<span className="dim" style={{ marginTop: 2 }}>
+									{t("Outline: where the evidence came from.")}
+								</span>
+								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+									<span
+										style={{
+											width: 18,
+											height: 12,
+											flex: "0 0 auto",
+											border: `1px solid ${fg()}`,
+										}}
+									/>
+									<span>{t("this radio demodulated a frame from the box")}</span>
+								</span>
+								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+									<span
+										style={{
+											width: 18,
+											height: 12,
+											flex: "0 0 auto",
+											border: `1px dashed ${NET_AMBER}`,
+										}}
+									/>
+									<span>
+										{t(
+											"internet layer only — somebody's radio heard it, not this one, so there is no dB figure and never will be",
+										)}
+									</span>
+								</span>
+								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+									<span
+										style={{
+											width: 18,
+											height: 12,
+											flex: "0 0 auto",
+											border: `1px dotted ${accent()}`,
+										}}
+									/>
+									<span>{t("synthetic: demo mesh or SIMULATE, invented")}</span>
+								</span>
+								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+									<span
+										style={{
+											width: 18,
+											height: 12,
+											flex: "0 0 auto",
+											border: `1px dashed ${fg("55")}`,
+										}}
+									/>
+									<span>
+										{t(
+											"next to a measured box, nothing heard from it — absence of evidence, not proof of a dead spot",
+										)}
+									</span>
+								</span>
+								{coverage.cells.length === 0 && (
+									<span className="dim">
+										{t(
+											"Nothing to draw: no frame or node with a position has been heard yet.",
+										)}
+									</span>
+								)}
+							</div>
+						</div>
+					)}
 					{draft && (
 						<div
 							className="panel"
