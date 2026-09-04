@@ -74,7 +74,15 @@ for source in "${sources[@]}"; do
 
     [ ${check_only} -eq 1 ] && continue
 
-    node "${archify}" render "${type}" "${source}" "${output}" --repo-root "${repo_dir}" >/dev/null \
+    # --repo-root is architecture-only; passing it to a sequence render is a
+    # hard error rather than an ignored flag.
+    # Guarded expansion: under `set -u`, "${arr[@]}" on an EMPTY array is an
+    # unbound-variable error in the bash macOS ships, so the array cannot
+    # simply be expanded when there is nothing in it.
+    render_args=()
+    [ "${type}" = "architecture" ] && render_args+=(--repo-root "${repo_dir}")
+    node "${archify}" render "${type}" "${source}" "${output}" \
+        ${render_args[@]+"${render_args[@]}"} >/dev/null \
         || { echo "    render failed" >&2; failures=$((failures + 1)); continue; }
 
     # The renderer can emit a file that does not stand up on its own; check it

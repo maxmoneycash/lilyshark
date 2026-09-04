@@ -2,8 +2,15 @@
 
 **[The system on one page →](../webapp/public/docs/diagrams/lilyshark-architecture.html)**
 An interactive map of the whole thing: the air, the radio, the three protocol
-decoders, and the three places you can read them from. Source in
-`diagrams/`, rebuilt with `scripts/build_diagrams.sh`.
+decoders, and the three places you can read them from.
+
+**[Pairing a phone to a deck →](../webapp/public/docs/diagrams/pairing-sequence.html)**
+The Meshtastic BLE conversation in the order it actually happens — the config
+dump, the channel list that carries names and no keys, and which messages the
+deck refuses to forward.
+
+Both are generated from typed sources in `diagrams/` by
+`scripts/build_diagrams.sh`.
 
 Everything below is grouped by what you are trying to do, because that is how
 people arrive at documentation. If you already know the file you want, the

@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Pairing a phone to a deck",
+    "subtitle": "The Meshtastic BLE conversation, in the order it actually happens",
+    "output": "webapp/public/docs/diagrams/pairing-sequence.html",
+    "viewBox": [
+      1200,
+      1220
+    ]
+  },
+  "participants": [
+    {
+      "id": "phone",
+      "type": "frontend",
+      "label": "iPhone",
+      "sublabel": "MeshtasticKit"
+    },
+    {
+      "id": "ble",
+      "type": "cloud",
+      "label": "BLE",
+      "sublabel": "6ba1b218-\u2026"
+    },
+    {
+      "id": "deck",
+      "type": "backend",
+      "label": "T-Deck",
+      "sublabel": "meshtastic_api.cpp"
+    },
+    {
+      "id": "air",
+      "type": "external",
+      "label": "The air",
+      "sublabel": "913.125 MHz"
+    }
+  ],
+  "messages": [
+    {
+      "id": "m1",
+      "from": "phone",
+      "to": "ble",
+      "y": 180,
+      "label": "connect + subscribe FromNum"
+    },
+    {
+      "id": "m2",
+      "from": "phone",
+      "to": "deck",
+      "y": 248,
+      "label": "ToRadio.want_config_id = nonce",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m3",
+      "from": "deck",
+      "to": "phone",
+      "y": 316,
+      "label": "my_info \u00b7 metadata",
+      "variant": "return"
+    },
+    {
+      "id": "m4",
+      "from": "deck",
+      "to": "phone",
+      "y": 384,
+      "label": "node_info \u00d7 N (heard peers)",
+      "variant": "return"
+    },
+    {
+      "id": "m5",
+      "from": "deck",
+      "to": "phone",
+      "y": 452,
+      "label": "channel \u00d7 N \u2014 names, no keys",
+      "variant": "security",
+      "note": "Only the primary carries a psk, and only the one-byte 0x01 that names the published default. A secondary channel's key never leaves the deck."
+    },
+    {
+      "id": "m6",
+      "from": "deck",
+      "to": "phone",
+      "y": 520,
+      "label": "config.lora (region, preset)",
+      "variant": "return"
+    },
+    {
+      "id": "m7",
+      "from": "deck",
+      "to": "phone",
+      "y": 588,
+      "label": "config_complete_id = nonce",
+      "variant": "emphasis",
+      "note": "The echo ends the dump. Without it the app waits forever on \"connecting\"."
+    },
+    {
+      "id": "m8",
+      "from": "phone",
+      "to": "deck",
+      "y": 656,
+      "label": "Position \u2014 where the PHONE is",
+      "note": "Only if the operator allowed it. The deck's own GPS always wins; this fills the gap when its patch antenna has no fix indoors."
+    },
+    {
+      "id": "m9",
+      "from": "phone",
+      "to": "deck",
+      "y": 724,
+      "label": "text on channel index N",
+      "variant": "security",
+      "note": "The phone picks a channel by INDEX. The deck holds the key and does the sealing. An index it cannot resolve is refused, never sent in the clear."
+    },
+    {
+      "id": "m10",
+      "from": "deck",
+      "to": "air",
+      "y": 792,
+      "label": "sealed LoRa frame"
+    },
+    {
+      "id": "m11",
+      "from": "deck",
+      "to": "phone",
+      "y": 860,
+      "label": "Routing result naming the packet id",
+      "variant": "return",
+      "note": "The app shows \"Sending\u2026\" until this arrives. The radio decides when a message has left, not the phone."
+    },
+    {
+      "id": "m12",
+      "from": "air",
+      "to": "deck",
+      "y": 928,
+      "label": "a stranger's frame"
+    },
+    {
+      "id": "m13",
+      "from": "deck",
+      "to": "phone",
+      "y": 996,
+      "label": "text \u2014 unless a stored key opened it",
+      "variant": "security",
+      "note": "Text opened with an operator's own channel key is NOT forwarded. The link's JSON has no field saying which key opened a payload, so borrowed plaintext would arrive looking like anything within earshot could read it."
+    },
+    {
+      "id": "m14",
+      "from": "deck",
+      "to": "phone",
+      "y": 1064,
+      "label": "DeviceMetrics every 5 min",
+      "variant": "dashed"
+    }
+  ]
+}
