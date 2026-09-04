@@ -96,11 +96,7 @@ struct ToolsView: View {
         .sheet(isPresented: $showRadioCalc) {
             NavigationStack {
                 RadioCalculatorView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showRadioCalc = false }
-                        }
-                    }
+                    .lilysharkSheet { showRadioCalc = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -110,11 +106,7 @@ struct ToolsView: View {
         .sheet(isPresented: $showAirtime) {
             NavigationStack {
                 LoRaAirtimeView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showAirtime = false }
-                        }
-                    }
+                    .lilysharkSheet { showAirtime = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -124,11 +116,7 @@ struct ToolsView: View {
         .sheet(isPresented: $showSensitivity) {
             NavigationStack {
                 SensitivityTableView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showSensitivity = false }
-                        }
-                    }
+                    .lilysharkSheet { showSensitivity = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -138,11 +126,7 @@ struct ToolsView: View {
         .sheet(isPresented: $showFreqScanner) {
             NavigationStack {
                 FrequencyScannerView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showFreqScanner = false }
-                        }
-                    }
+                    .lilysharkSheet { showFreqScanner = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -157,14 +141,7 @@ struct ToolsView: View {
                 }
                 .background(MeshTheme.background)
                 .navigationTitle("RF Monitor")
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { showNoiseFloor = false }
-                    }
-                }
+                .lilysharkSheet { showNoiseFloor = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)

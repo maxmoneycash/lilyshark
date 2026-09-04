@@ -805,3 +805,75 @@ struct LilysharkWordmark: View {
             .accessibilityLabel("Lilyshark")
     }
 }
+
+
+// MARK: - Sheet chrome
+//
+// Here for the same reason the wordmark is: Shared/Views is not a
+// file-system synchronized group, so a new .swift file there compiles
+// nowhere until someone edits the pbxproj.
+
+
+extension View {
+    /// Give a sheet its dismiss button and stop its heading sliding under it.
+    ///
+    /// A large navigation title scrolls UNDER the translucent bar while the
+    /// dismiss button sits on top of it, so as the content moves the sheet's
+    /// own heading travels through the button -- the contact detail sheet
+    /// showed a peer name emerging from behind "Done". A sheet is a short,
+    /// single-purpose surface: it does not need a large title, and with one
+    /// it cannot have a clean toolbar.
+    ///
+    /// Apply this at the sheet's presentation site, not inside the presented
+    /// view. `SettingsView` and `RemoteManagementView` are each ALSO pushed
+    /// as a detail destination, where the large title is wanted; pinning
+    /// inside them would flatten a screen that is not a sheet at all.
+    ///
+    /// - Parameter label: what the button says. Defaults to "Done" because
+    ///   most sheets only close; pass "Cancel" where dismissing abandons work
+    ///   the sheet was collecting, so the button does not promise otherwise.
+    func lilysharkSheet(
+        _ label: LocalizedStringKey = "Done",
+        onDone: @escaping () -> Void
+    ) -> some View {
+        modifier(LilysharkSheetModifier(label: label, onDone: onDone))
+    }
+}
+
+private struct LilysharkSheetModifier: ViewModifier {
+    let label: LocalizedStringKey
+    let onDone: () -> Void
+
+    func body(content: Content) -> some View {
+        // This guard is the API's own availability, copied exactly rather
+        // than approximated. In the iOS 26.5 SDK the declaration reads
+        // @available(iOS 14.0, watchOS 8.0, *) / @available(macOS,
+        // unavailable) / @available(tvOS, unavailable), so watchOS DOES get
+        // the pin and macOS must not. Guarding on os(iOS) instead would have
+        // silently dropped it on the watch.
+        //
+        // Getting this wrong is not something the build would catch: the
+        // macOS target has no scheme (`xcodebuild -list`), build_ios.sh
+        // builds PommeCore, and CI leaves the macOS and watch targets out to
+        // save 10x-billed runner minutes. Two lines in this tree already had
+        // the unguarded version for exactly that reason.
+        #if !os(macOS) && !os(tvOS)
+        content
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { dismissButton }
+        #else
+        // No large-title problem to solve here, but the sheet still needs a
+        // way out, so the button is placed either way. This toolbar MERGES
+        // with one the call site already declares -- the primaryAction items
+        // on the Safe Zones and editor sheets stay where they are.
+        content
+            .toolbar { dismissButton }
+        #endif
+    }
+
+    private var dismissButton: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button(label, action: onDone)
+        }
+    }
+}

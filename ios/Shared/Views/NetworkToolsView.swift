@@ -158,11 +158,11 @@ struct ContactDetailSheet: View {
             }
             .background(MeshTheme.background)
             .navigationTitle(contactStore.displayName(for: contact))
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            // The title here is a peer's display name, so this was the worst
+            // of the overlaps: a long Bay Area node name is exactly what slid
+            // out from behind "Done". Only ever presented as a sheet
+            // (ChatView 257, ChatView+Channels 442, ContactListView 249).
+            .lilysharkSheet { dismiss() }
             .sheet(isPresented: $showPathEditor) {
                 ManualPathEditor(contact: contact)
             }
