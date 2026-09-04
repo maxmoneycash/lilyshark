@@ -12,6 +12,7 @@
  * from those would look complete while carrying nothing the radio heard.
  */
 import { useSyncExternalStore } from 'react';
+import { CAPTURE_FRAME_LIMIT } from './captureSlots';
 import type { HeardFrame, RawFrameFields } from './deviceLink';
 import { buildLscap, lscapByteLength } from './lscapWrite';
 
@@ -19,6 +20,13 @@ export interface CaptureSessionState {
   recording: boolean;
   /** Records kept so far, or the completed set once stopped. */
   frames: RawFrameFields[];
+  /**
+   * Bumped on every kept frame. `frames` is appended to IN PLACE — copying the
+   * array on each arrival is O(n²) over a session that may run to
+   * CAPTURE_FRAME_LIMIT frames — so this counter, and not the array's
+   * identity, is what tells a view that the recording grew.
+   */
+  framesVersion: number;
   startedAtMs?: number;
   stoppedAtMs?: number;
   /** Frames seen while recording that carried no payload to store. */
@@ -27,14 +35,17 @@ export interface CaptureSessionState {
   containsSynthetic: boolean;
 }
 
-/** A session is bounded so a forgotten recording cannot exhaust memory. */
-export const CAPTURE_FRAME_LIMIT = 5000;
+/** A session is bounded so a forgotten recording cannot exhaust memory; the
+ *  bound and the arithmetic behind it live with the slot budget in
+ *  captureSlots.ts, which spends the same per-frame cost. */
+export { CAPTURE_FRAME_LIMIT };
 
 const SYNTHETIC_FLAG = 1 << 2;
 
 const empty: CaptureSessionState = {
   recording: false,
   frames: [],
+  framesVersion: 0,
   skippedNoPayload: 0,
   containsSynthetic: false,
 };
@@ -66,6 +77,7 @@ export function startCapture(nowMs = Date.now()): void {
   set({
     recording: true,
     frames: [],
+    framesVersion: 0,
     startedAtMs: nowMs,
     stoppedAtMs: undefined,
     skippedNoPayload: 0,
@@ -94,8 +106,11 @@ export function recordFrame(frame: HeardFrame): void {
     set({ recording: false, stoppedAtMs: Date.now() });
     return;
   }
+  // Appended in place: see framesVersion. The state object around it is still
+  // replaced, so useSyncExternalStore still sees the change.
+  state.frames.push(frame.raw);
   set({
-    frames: [...state.frames, frame.raw],
+    framesVersion: state.framesVersion + 1,
     containsSynthetic:
       state.containsSynthetic || (frame.raw.metadataFlags & SYNTHETIC_FLAG) !== 0,
   });

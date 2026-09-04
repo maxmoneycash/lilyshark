@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import {
   captureEndpoints,
   conversationCoverage,
@@ -14,14 +14,28 @@ import {
   offsetLabel,
   witnessSummary,
 } from '../lib/captureDiff';
-import { type LscapCapture, type LscapFrame, LscapParseError, parseLscap } from '../lib/lscap';
+import type { LscapFrame } from '../lib/lscap';
+import {
+  SPACER_CELL_STYLE,
+  SPACER_ROW_STYLE,
+  useRowWindow,
+} from '../lib/useRowWindow';
+import { mapRowWindow } from '../lib/virtualRows';
 
 /**
  * DIFF — two captures of the same air, side by side.
  *
- * The question this answers is "what changed when I moved the antenna": open
- * the capture taken before as A (it is whatever TRAFFIC already has open),
- * the capture taken after as B, and read what only one of them heard.
+ * The question this answers is "what changed when I moved the antenna": the
+ * capture taken before is A (whatever tab TRAFFIC is showing), the capture
+ * taken after is B (any other tab), and the table reads what only one of them
+ * heard.
+ *
+ * B comes from the capture slots rather than from a file picker of its own.
+ * lib/captureDiff has been able to compare two captures for a while; what it
+ * had no way to get was a second capture, because the analyzer held exactly
+ * one. Now that several are open, "the other one" is a tab, and the panel
+ * never has to load or hold a capture that the rest of the screen cannot see
+ * and name.
  *
  * Two devices never share a clock — a .lscap timestamp is that board's own
  * boot-relative microseconds — so lib/captureDiff estimates the offset from
@@ -37,63 +51,63 @@ import { type LscapCapture, type LscapFrame, LscapParseError, parseLscap } from 
  * could not be decoded rather than one that went quiet.
  */
 
+/** One capture this diff could compare against: another open tab. */
+export interface DiffCandidate {
+  id: string;
+  name: string;
+  frameCount: number;
+}
+
 interface CaptureDiffPanelProps {
   /** Capture A: whatever the TRAFFIC table currently has open. */
   aName: string;
   aFrames: LscapFrame[];
+  /** Capture B: another open capture, or null while none is picked. */
+  bName: string;
+  bFrames: LscapFrame[] | null;
+  /** The other open captures, in tab order. */
+  candidates: DiffCandidate[];
+  /** Slot id of B, "" for none. */
+  bId: string;
+  onPickB: (id: string) => void;
   /** Select this frame in the main table — a diff row is a way into A. */
   onSelectA: (index: number) => void;
   onClose: () => void;
 }
 
-/** Rows past this are not drawn; a two-capture diff can run to thousands. */
-const ROW_CAP = 400;
-
 /** Stable empties, so a render with no B does not churn identities. */
 const EMPTY_FRAMES: LscapFrame[] = [];
 const EMPTY_ROWS: DiffRow[] = [];
 
+/** Columns in the row table, so a spacer row spans exactly the table. */
+const COLUMNS = 7;
+
 export function CaptureDiffPanel({
   aName,
   aFrames,
+  bName,
+  bFrames,
+  candidates,
+  bId,
+  onPickB,
   onSelectA,
   onClose,
 }: CaptureDiffPanelProps) {
-  const [b, setB] = useState<{ name: string; capture: LscapCapture } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const openB = async (file: File) => {
-    setBusy(true);
-    try {
-      setB({ name: file.name, capture: parseLscap(await file.arrayBuffer()) });
-      setError(null);
-    } catch (e) {
-      setB(null);
-      setError(e instanceof LscapParseError ? e.message : 'not a .lscap capture');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const bFrames = b?.capture.frames ?? EMPTY_FRAMES;
   // One memo for the whole comparison: the matching, the rows it produces and
   // the endpoint sets all read the same two frame lists, and splitting them
   // apart only invites a dependency list that re-runs the matching whenever
   // this panel re-renders for an unrelated reason.
   const comparison = useMemo(() => {
-    if (!b) return null;
-    const frames = b.capture.frames;
-    const diff = diffCaptures(aFrames, frames);
+    if (!bFrames) return null;
+    const diff = diffCaptures(aFrames, bFrames);
     const addressA = aFrames.map((fr) => frameAddressing(fr.bytes, fr.profileId));
-    const addressB = frames.map((fr) => frameAddressing(fr.bytes, fr.profileId));
+    const addressB = bFrames.map((fr) => frameAddressing(fr.bytes, fr.profileId));
     const endpointsA = captureEndpoints(addressA);
     const endpointsB = captureEndpoints(addressB);
     const onlyA = endpointsOnlyIn(endpointsA, endpointsB);
     return {
       diff,
-      rows: diffRows(aFrames, frames, diff),
+      rows: diffRows(aFrames, bFrames, diff),
       summary: witnessSummary(diff),
       nodes: {
         onlyA,
@@ -104,11 +118,17 @@ export function CaptureDiffPanel({
         )}`,
       },
     };
-  }, [aFrames, b]);
+  }, [aFrames, bFrames]);
   const diff = comparison?.diff ?? null;
   const rows = comparison?.rows ?? EMPTY_ROWS;
   const summary = comparison?.summary ?? null;
   const nodes = comparison?.nodes ?? null;
+  const shownB = bFrames ?? EMPTY_FRAMES;
+
+  // A diff of two full captures runs to hundreds of thousands of rows. The
+  // table used to draw the first 400 and say so; it draws a window now and
+  // every row is reachable by scrolling to it.
+  const table = useRowWindow(rows.length);
 
   const nodeList = (addresses: string[]) =>
     addresses.length === 0 ? (
@@ -122,41 +142,51 @@ export function CaptureDiffPanel({
       <div className="panel-title">
         DIFF // A ↔ B
         <span className="spacer" />
-        <button onClick={() => fileRef.current?.click()} disabled={busy}>
-          {b ? 'CHANGE B' : 'OPEN B'}
-        </button>
         <button onClick={onClose}>CLOSE</button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".lscap,application/octet-stream"
-          hidden
-          onChange={(e) => {
-            const x = e.target.files?.[0];
-            if (x) void openB(x);
-          }}
-        />
       </div>
-
-      {error && <div className="panel-foot err">{error}</div>}
 
       <div className="kv">
         <span className="k">A</span>
         <span className="v">
-          {aName || 'the open capture'} · {aFrames.length} frame(s)
+          {aName || 'the open capture'} · {aFrames.length.toLocaleString()} frame(s)
         </span>
         <span className="k">B</span>
         <span className="v">
-          {b ? (
-            `${b.name} · ${bFrames.length} frame(s)`
+          {bFrames ? (
+            `${bName} · ${shownB.length.toLocaleString()} frame(s)`
           ) : (
             <span className="dim">
-              {busy
-                ? 'reading…'
-                : 'none open — OPEN B to compare this capture against another .lscap, e.g. the same minutes recorded after the antenna moved'}
+              none picked — B is another open capture, so open the second .lscap
+              with OPEN, SAMPLE or FETCH and it becomes a tab you can pick here.
             </span>
           )}
         </span>
+      </div>
+
+      {/* Every other open capture, as a choice. A is not offered: comparing a
+          capture with itself answers nothing. */}
+      <div
+        className="panel-foot"
+        style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}
+      >
+        <span className="k">COMPARE WITH</span>
+        {candidates.length === 0 ? (
+          <span className="dim">
+            no other capture is open — the analyzer holds several at once, and a
+            diff needs two of them
+          </span>
+        ) : (
+          candidates.map((c) => (
+            <button
+              key={c.id}
+              className={c.id === bId ? 'primary' : ''}
+              title={`Compare against ${c.name} · ${c.frameCount.toLocaleString()} frame(s)`}
+              onClick={() => onPickB(c.id === bId ? '' : c.id)}
+            >
+              {c.name}
+            </button>
+          ))
+        )}
       </div>
 
       {diff && summary && nodes && (
@@ -213,10 +243,10 @@ export function CaptureDiffPanel({
             <span className="v dim">{nodes.note}</span>
           </div>
 
-          <div className="scroll-y">
+          <div className="scroll-y" ref={table.scrollRef}>
             <div className="scroll-x">
               <table className="grid">
-                <thead>
+                <thead ref={table.headRef}>
                   <tr>
                     <th>TIME</th>
                     <th>HEARD BY</th>
@@ -228,9 +258,18 @@ export function CaptureDiffPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.slice(0, ROW_CAP).map((row) => (
+                  {table.win.topPadPx > 0 && (
+                    <tr aria-hidden="true" style={SPACER_ROW_STYLE}>
+                      <td
+                        colSpan={COLUMNS}
+                        style={{ ...SPACER_CELL_STYLE, height: table.win.topPadPx }}
+                      />
+                    </tr>
+                  )}
+                  {mapRowWindow(rows, table.win, (row, position) => (
                     <tr
                       key={`${row.kind}:${row.aIndex ?? 'x'}:${row.bIndex ?? 'x'}`}
+                      ref={position === table.win.start ? table.rowRef : undefined}
                       onClick={() => row.aIndex !== null && onSelectA(row.aIndex)}
                       style={{ cursor: row.aIndex !== null ? 'pointer' : 'default' }}
                       title={
@@ -248,7 +287,7 @@ export function CaptureDiffPanel({
                           ? row.pair.payloadLength
                           : row.aIndex !== null
                             ? aFrames[row.aIndex].capturedLength
-                            : bFrames[row.bIndex ?? 0].capturedLength}
+                            : shownB[row.bIndex ?? 0].capturedLength}
                       </td>
                       <td>{row.pair?.a.rssiDbm?.toFixed(1) ?? '—'}</td>
                       <td>{row.pair?.b.rssiDbm?.toFixed(1) ?? '—'}</td>
@@ -264,15 +303,22 @@ export function CaptureDiffPanel({
                       </td>
                     </tr>
                   ))}
+                  {table.win.bottomPadPx > 0 && (
+                    <tr aria-hidden="true" style={SPACER_ROW_STYLE}>
+                      <td
+                        colSpan={COLUMNS}
+                        style={{ ...SPACER_CELL_STYLE, height: table.win.bottomPadPx }}
+                      />
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
           <div className="panel-foot">
-            {rows.length > ROW_CAP
-              ? `FIRST ${ROW_CAP} OF ${rows.length} ROWS · TIME IS SECONDS ON THE COMMON CLOCK, FROM A'S FIRST FRAME`
-              : `${rows.length} ROWS · TIME IS SECONDS ON THE COMMON CLOCK, FROM A'S FIRST FRAME`}
+            {rows.length.toLocaleString()} ROWS · TIME IS SECONDS ON THE COMMON
+            CLOCK, FROM A'S FIRST FRAME
           </div>
         </>
       )}
