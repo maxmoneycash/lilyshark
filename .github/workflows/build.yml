@@ -44,6 +44,56 @@ jobs:
         working-directory: webapp
         run: pnpm run build
 
+  ios:
+    # COST: this is the only job here that needs a macOS runner, and GitHub bills
+    # GitHub-hosted macOS minutes at 10x the Linux rate. On a public repository
+    # that is free; on a private one this job alone drains the included allowance
+    # ten times faster than the ubuntu jobs above, which is why it is scoped to
+    # the two checks that would actually have caught a regression -- the
+    # simulator app compiling, and MeshtasticKit's framing tests -- and not to
+    # the macOS or watch targets.
+    #
+    # The watch target is deliberately absent. It cannot be built from this
+    # checkout at all: it references PommeCoreWatchKit, a private upstream
+    # package that was never vendored here. ios/BUILD.md records the evidence.
+    #
+    # Nothing in the release path depends on this job. publish-alpha still gates
+    # on the firmware jobs only, so a broken app build cannot block a firmware
+    # release, and a green firmware release does not imply the app compiles.
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Record the toolchain this run actually used
+        # The build was verified locally on Xcode 26.6 with the iOS 26.5 runtime;
+        # the runner image ships a different Xcode. When this job fails for a
+        # reason that reproduces nowhere else, this is the first thing to read.
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      - name: Build the iOS simulator app
+        run: ./scripts/build_ios.sh
+
+      - name: Test MeshtasticKit
+        working-directory: ios/Packages/MeshtasticKit
+        run: swift test
+
+      - name: Upload the Xcode log when the build fails
+        # build_ios.sh prints only the deduplicated errors and the last 40 lines;
+        # a CI-only failure usually needs the rest of the log to diagnose.
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-build-log-${{ github.sha }}
+          path: ios/DerivedData/build_ios.log
+          if-no-files-found: ignore
+          retention-days: 14
+
   test-and-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
