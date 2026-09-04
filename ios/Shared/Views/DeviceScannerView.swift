@@ -335,7 +335,17 @@ struct DeviceScannerView: View {
         // Inline: a large title scrolls under the translucent bar and the
         // Done button rides on top of it, so the heading slid through the
         // button as the list moved.
+        //
+        // Not lilysharkSheet, because this view supplies no Done of its own:
+        // the iOS presentation (PommeCoreApp 426) now carries the modifier,
+        // and the watchOS one (PommeCoreApp 246) deliberately has no Done at
+        // all. The guard matches the API -- navigationBarTitleDisplayMode is
+        // @available(macOS, unavailable) and this file is in the macOS
+        // target's sources, which nothing builds, so the compiler was never
+        // going to say so.
+        #if !os(macOS) && !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onAppear {
             // Don't start BLE scanning if already connecting/connected via any transport
             guard connectionManager.connectionState == .disconnected else { return }

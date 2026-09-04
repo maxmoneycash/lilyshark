@@ -60,12 +60,14 @@ struct GeofencesView: View {
         .background(MeshTheme.background)
         .meshTheme()
         .navigationTitle("Safe Zones")
+        // Kept behind os(iOS) rather than handed to lilysharkSheet's #else
+        // arm: macOS reaches this screen differently and deliberately has no
+        // Done, and the #else would quietly add one. The plus button below
+        // stays -- the two toolbars merge.
+        #if os(iOS)
+        .lilysharkSheet { dismiss() }
+        #endif
         .toolbar {
-            #if os(iOS)
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Done") { dismiss() }
-            }
-            #endif
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     geofenceStore.requestAlwaysAuthorization()

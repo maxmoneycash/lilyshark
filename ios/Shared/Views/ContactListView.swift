@@ -269,11 +269,7 @@ struct ContactListView: View {
         .sheet(item: $channelSheetAction) { action in
             NavigationStack {
                 ChannelManagementView(action: action)
-                        .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { channelSheetAction = nil }
-                        }
-                    }
+                    .lilysharkSheet { channelSheetAction = nil }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)

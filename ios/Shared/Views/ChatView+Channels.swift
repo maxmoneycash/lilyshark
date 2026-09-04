@@ -450,11 +450,7 @@ struct RoomChatView: View {
                     contact: contact,
                     session: session
                 )
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { showManagement = false }
-                    }
-                }
+                .lilysharkSheet { showManagement = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)

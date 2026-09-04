@@ -426,11 +426,7 @@ struct ContentView: View {
         .sheet(isPresented: $showScanner) {
             NavigationStack {
                 DeviceScannerView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showScanner = false }
-                        }
-                    }
+                    .lilysharkSheet { showScanner = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -440,11 +436,7 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) {
             NavigationStack {
                 SettingsView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showSettings = false }
-                        }
-                    }
+                    .lilysharkSheet { showSettings = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -454,11 +446,7 @@ struct ContentView: View {
         .sheet(isPresented: $showDiscover) {
             NavigationStack {
                 DiscoverView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showDiscover = false }
-                        }
-                    }
+                    .lilysharkSheet { showDiscover = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -469,11 +457,7 @@ struct ContentView: View {
             if let (contact, session) = activeManagementTarget {
                 NavigationStack {
                     RemoteManagementView(contact: contact, session: session)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Done") { showRemoteManagement = false }
-                            }
-                        }
+                        .lilysharkSheet { showRemoteManagement = false }
                 }
                 .meshTheme()
                 #if os(macOS) || targetEnvironment(macCatalyst)
@@ -488,11 +472,7 @@ struct ContentView: View {
                     currentAdvertName: deviceConfig.deviceName,
                     onApplyName: { name in connectionManager.setAdvertName(name) }
                 )
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showSetupWizard = false }
-                        }
-                    }
+                    .lilysharkSheet { showSetupWizard = false }
             }
             .meshTheme()
             #if os(macOS) || targetEnvironment(macCatalyst)

@@ -113,10 +113,41 @@ python3 scripts/check_ble_uuids.py
 
 python3 scripts/check_baked_tile_fallbacks.py
 
+# Sheet chrome is pure SwiftUI layout, so no unit test can see it. This is the
+# only automated check that a sheet's title cannot slide under its own Done
+# button, and the only one that catches a navigationBarTitleDisplayMode left
+# reachable from the macOS target -- which cannot be built from this checkout
+# at all, so the compiler will never report it.
+python3 scripts/check_sheet_chrome.py
+
 # The app icon is generated from the brand wordmark; this catches an icon that
 # was edited by hand and no longer matches the logo the web app and the deck
 # both draw.
 python3 scripts/generate_app_icon.py --check
+
+# The macOS target, which nothing else builds.
+#
+# navigationBarTitleDisplayMode is @available(macOS, unavailable), so an
+# unguarded call compiles fine for iOS and breaks only here -- and
+# build_ios.sh builds the iOS simulator, while CI leaves macOS out to save
+# 10x-billed runner minutes. Two unguarded lines already reached this tree
+# that way. The sheet-chrome lint cannot catch them either: it only sees
+# dismiss buttons declared inside a `.sheet` closure, and three of the
+# affected views declare theirs in their own body.
+#
+# Skipped with a reason where Xcode is absent, rather than silently.
+if command -v xcodebuild >/dev/null 2>&1 && [[ "$(uname -s)" == "Darwin" ]]; then
+  echo "Building the macOS target"
+  xcodebuild -project ios/PommeCore.xcodeproj -scheme PommeCore-macOS \
+    -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build \
+    >"${test_dir}/macos-build.log" 2>&1 || {
+      echo "macOS target failed to build. Errors:" >&2
+      grep -E "error:" "${test_dir}/macos-build.log" | sort -u | head -10 >&2
+      exit 1
+    }
+else
+  echo "SKIPPING the macOS target build: xcodebuild is not available here." >&2
+fi
 
 # Only meaningful where Xcode exists; elsewhere there is no toolchain to judge.
 if command -v xcodebuild >/dev/null 2>&1; then

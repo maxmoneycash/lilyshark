@@ -34,11 +34,10 @@ struct FirmwareUpdateView: View {
             #if os(macOS) || targetEnvironment(macCatalyst)
             .navigationSubtitle(latestVersion.isEmpty ? "" : "v\(latestVersion)")
             #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            // This view owns its NavigationStack and is only ever presented
+            // as a sheet (SettingsView 240/311, RemoteManagementView 170), so
+            // the pin belongs here rather than at all three call sites.
+            .lilysharkSheet { dismiss() }
         }
         .meshTheme()
         #if os(macOS) || targetEnvironment(macCatalyst)

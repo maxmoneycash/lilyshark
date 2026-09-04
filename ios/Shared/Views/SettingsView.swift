@@ -221,19 +221,7 @@ struct SettingsView: View {
                     case .radioStats: RadioStatsView()
                     }
                 }
-                // Inline, not large. A large title scrolls UNDER the
-                // translucent navigation bar, and the Done button sits on top
-                // of it -- so the sheet's own heading slid through the button
-                // as the content moved, showing "...sponder" behind "Done".
-                // A sheet is a short, single-purpose surface; it does not
-                // need a large title, and with one it cannot have a clean
-                // toolbar.
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { iosDeviceSheet = nil }
-                    }
-                }
+                .lilysharkSheet { iosDeviceSheet = nil }
             }
             .meshTheme()
         }
@@ -263,11 +251,7 @@ struct SettingsView: View {
                                 currentAdvertName: deviceConfig.deviceName,
                                 onApplyName: { name in connectionManager.setAdvertName(name) }
                             )
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showSetupWizard = false }
-                        }
-                    }
+                    .lilysharkSheet { showSetupWizard = false }
             }
             .meshTheme()
         }
@@ -537,11 +521,10 @@ struct RadioDataSection: View {
                     }
                     .padding()
                     .navigationTitle("Migrate Radio Data")
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") { showMigrateSheet = false }
-                        }
-                    }
+                    // "Cancel", not "Done": leaving here abandons a migration
+                    // the sheet was about to run, and "Done" would say the
+                    // opposite of what happened.
+                    .lilysharkSheet("Cancel") { showMigrateSheet = false }
                 }
             }
         }
