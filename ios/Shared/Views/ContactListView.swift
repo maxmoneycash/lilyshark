@@ -96,7 +96,15 @@ struct ContactListView: View {
 
     var body: some View {
         mainListWithGroupSheets
-        .navigationTitle("Lilyshark")
+        // The wordmark rather than the word. The web app's header and the
+        // deck's splash both draw this same SVG, so a system-font "Lilyshark"
+        // here was the one place the three surfaces disagreed about what the
+        // product looks like.
+        //
+        // The accessibility label carries the name, because a screen reader
+        // must still hear "Lilyshark" and not silence -- the image is the
+        // brand, the text is the meaning, and both have to be present.
+        .lilysharkNavigationTitle()
         // navigationDestination is only needed on iOS (not macOS/Catalyst) because on
         // macOS the NavigationSplitView's detail: block drives the detail column exclusively.
         // Leaving navigationDestination active on macOS creates a conflicting navigation

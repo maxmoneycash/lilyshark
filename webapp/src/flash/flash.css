@@ -2,7 +2,8 @@
  * Geometry matched to measured reference values (tile 212×213 r14 gap 14,
  * hero r20, cards r18 pad 32/36/30, CTA h60 r11 15.5px/600, headings
  * Outfit 700 at 60/36px, code in JetBrains Mono). Lilyshark brand: pink on
- * dark plum, our own copy, artwork, and photos. */
+ * dark plum. Every asset here is ours: our copy, our line art, our SVG device
+ * render, and screens rendered straight from our own simulator. */
 
 @font-face {
   font-family: "Outfit";
@@ -155,11 +156,13 @@ body {
 .flash-page .device-mock {
   display: block;
   margin: 0 auto;
-  width: min(380px, 80%);
+  width: min(420px, 78%);
   height: auto;
-  filter: drop-shadow(0 18px 44px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 22px 52px rgba(0, 0, 0, 0.62));
 }
-.flash-page .deck-screen { image-rendering: pixelated; }
+/* Screen source is a 4x nearest-neighbour blow-up of the simulator frame, so
+ * the browser's own downscale keeps the pixel grid readable at any width. */
+.flash-page .deck-screen { image-rendering: auto; }
 .flash-page .hero-caption {
   display: flex;
   justify-content: center;

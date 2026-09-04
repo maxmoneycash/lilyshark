@@ -113,6 +113,11 @@ python3 scripts/check_ble_uuids.py
 
 python3 scripts/check_baked_tile_fallbacks.py
 
+# The app icon is generated from the brand wordmark; this catches an icon that
+# was edited by hand and no longer matches the logo the web app and the deck
+# both draw.
+python3 scripts/generate_app_icon.py --check
+
 # Only meaningful where Xcode exists; elsewhere there is no toolchain to judge.
 if command -v xcodebuild >/dev/null 2>&1; then
   python3 scripts/check_ios_toolchain.py

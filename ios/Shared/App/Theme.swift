@@ -729,3 +729,63 @@ func copyToClipboard(_ text: String, expireAfter: TimeInterval = 60) {
     )
     #endif
 }
+
+
+// MARK: - Lilyshark wordmark header
+//
+// Lives here rather than in its own file because Shared/Views is not a
+// file-system synchronized group in this project: a new .swift file there
+// is not compiled until it is added to the pbxproj by hand, and a source
+// file that silently is not built is a worse trap than a slightly long
+// theme file.
+
+
+extension View {
+    /// Put the Lilyshark wordmark in the navigation bar.
+    ///
+    /// The accessibility label still says "Lilyshark": the image is the brand
+    /// and the text is the meaning, and a screen reader needs the second. An
+    /// image-only title would leave VoiceOver announcing nothing at the top of
+    /// the app's first screen.
+    func lilysharkNavigationTitle() -> some View {
+        modifier(LilysharkHeaderModifier())
+    }
+}
+
+private struct LilysharkHeaderModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        content
+            .navigationTitle("Lilyshark")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    LilysharkWordmark()
+                }
+            }
+        #else
+        // macOS and watchOS have no principal toolbar placement worth using
+        // here; the plain title is correct on both, and pretending otherwise
+        // would put the mark somewhere it does not belong.
+        content.navigationTitle("Lilyshark")
+        #endif
+    }
+}
+
+/// The wordmark asset at a size that reads in a navigation bar.
+///
+/// The asset carries a black variant and a white one for dark mode, chosen by
+/// the catalog rather than by code -- so this must NOT be a template image.
+/// Rendering it as a template would tint it with the accent colour and throw
+/// away the variant that was picked.
+struct LilysharkWordmark: View {
+    var height: CGFloat = 20
+
+    var body: some View {
+        Image("LilysharkWordmark")
+            .resizable()
+            .scaledToFit()
+            .frame(height: height)
+            .accessibilityLabel("Lilyshark")
+    }
+}

@@ -52,20 +52,49 @@ fi
 
 mkdir -p "${derived}"
 
+# The device is looked up BEFORE the build, not after, because the build has
+# to name it. Building for 'generic/platform=iOS' produces a profile with no
+# device in it, and the install then fails with
+#   0xe8008012 (This provisioning profile cannot be installed on this device)
+# which reads like a signing problem and is really "you never told Xcode which
+# phone". Naming the device is also what registers its UDID with the team.
+devices="$(xcrun devicectl list devices 2>/dev/null || true)"
+# Match the UUID itself rather than counting columns: the line reads
+# "max's iPhone  maxs-iPhone.coredevice.local  <UUID>  connected  iPhone 16 Pro
+# Max (iPhone17,2)", so a positional field grabs "Pro" out of the model name.
+identifier="$(echo "${devices}" \
+    | grep -iE "iphone|ipad" \
+    | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' \
+    | head -1)"
+
+if [ ${build_only} -eq 1 ] || [ -z "${identifier}" ]; then
+    destination='generic/platform=iOS'
+else
+    destination="id=${identifier}"
+fi
+
 echo "==> Building Lilyshark for a physical iPhone"
 echo "    team:   ${team}"
+echo "    device: ${identifier:-none attached, building generic}"
 echo "    log:    ${log}"
 
 # -allowProvisioningUpdates lets Xcode register the App IDs and create the
 # profiles. It needs the signed-in account checked for above; without one it
 # reports "No Accounts" rather than doing nothing quietly.
+#
+# -allowProvisioningDeviceRegistration is separate and also required: adding a
+# NEW phone to the team is a deliberate act, so Xcode will not do it merely
+# because updates are allowed. Without it the build fails with "Device ... 
+# isn't registered in your developer account", which reads like something that
+# needs a trip to developer.apple.com and does not.
 set +e
 xcodebuild \
     -project "${project}" \
     -scheme PommeCore \
-    -destination 'generic/platform=iOS' \
+    -destination "${destination}" \
     -derivedDataPath "${derived}" \
     -allowProvisioningUpdates \
+    -allowProvisioningDeviceRegistration \
     DEVELOPMENT_TEAM="${team}" \
     build >"${log}" 2>&1
 status=$?
@@ -98,24 +127,19 @@ echo "app: ${app}"
 [ ${build_only} -eq 1 ] && exit 0
 
 echo ""
-echo "==> Looking for an attached iPhone"
-devices="$(xcrun devicectl list devices 2>/dev/null || true)"
-if ! echo "${devices}" | grep -qiE "iphone|ipad"; then
+if [ -z "${identifier}" ]; then
     echo "No iPhone found over USB." >&2
     echo "" >&2
     echo "Plug the phone in, unlock it, and tap Trust if asked. The app is" >&2
     echo "built and waiting at:" >&2
     echo "  ${app}" >&2
     echo "" >&2
-    echo "Then re-run this script, or drag that bundle onto the device in" >&2
-    echo "Xcode > Window > Devices and Simulators." >&2
+    echo "Then re-run this script -- note the rebuild matters, because the" >&2
+    echo "profile has to name the phone." >&2
     exit 1
 fi
 
-identifier="$(echo "${devices}" | awk '/[Ii]([Pp])hone|iPad/ {print $(NF-2); exit}')"
-[ -n "${identifier}" ] || fail "found a device but could not read its identifier from devicectl"
-
-echo "    device: ${identifier}"
+echo "==> Installing on ${identifier}"
 xcrun devicectl device install app --device "${identifier}" "${app}"
 
 echo ""
