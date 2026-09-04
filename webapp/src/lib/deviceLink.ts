@@ -90,6 +90,19 @@ export interface DeviceTelemetry {
   bwHz?: number;
   rx?: number;
   crc?: number;
+  /**
+   * Frames the deck decoded and its analyzer link did NOT report, split by
+   * reason. Without these a deck hearing plenty and attributing none looks
+   * exactly like a deck hearing nothing, and the second reading is the one
+   * that makes an operator stop looking.
+   *
+   * `dropNoSource` is the ordinary case rather than a fault: Reticulum names
+   * a destination and no sender, MeshCore names neither, so those frames have
+   * nobody to attribute them to.
+   */
+  dropCrc?: number;
+  dropMalformed?: number;
+  dropNoSource?: number;
   atMs: number;
 }
 
@@ -281,6 +294,15 @@ export function parseLskLine(line: string): ParsedLsk | undefined {
         ...(optionalNum(body.bw_hz) !== undefined ? { bwHz: optionalNum(body.bw_hz) } : {}),
         ...(optionalNum(body.rx) !== undefined ? { rx: optionalNum(body.rx) } : {}),
         ...(optionalNum(body.crc) !== undefined ? { crc: optionalNum(body.crc) } : {}),
+        ...(optionalNum(body.drop_crc) !== undefined
+          ? { dropCrc: optionalNum(body.drop_crc) }
+          : {}),
+        ...(optionalNum(body.drop_bad) !== undefined
+          ? { dropMalformed: optionalNum(body.drop_bad) }
+          : {}),
+        ...(optionalNum(body.drop_nosrc) !== undefined
+          ? { dropNoSource: optionalNum(body.drop_nosrc) }
+          : {}),
         atMs: Date.now(),
       },
     };

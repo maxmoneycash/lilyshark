@@ -42,6 +42,21 @@ const DECK_METRICS: DeckMetric[] = [
 		pick: (s) => s.rx,
 	},
 	{
+		// The gap between FRAMES HEARD and what the node list shows. A deck
+		// hearing plenty and attributing none reads exactly like a deck
+		// hearing nothing, and the second reading is the one that makes an
+		// operator stop looking. Reticulum names a destination and no sender,
+		// MeshCore names neither, so a high count here is ordinary rather
+		// than a fault -- it is traffic this build cannot attribute, not
+		// traffic that was not there.
+		id: "unattributed",
+		label: "HEARD, NOT ATTRIBUTED",
+		pick: (s) =>
+			s.dropCrc === undefined && s.dropMalformed === undefined && s.dropNoSource === undefined
+				? undefined
+				: (s.dropCrc ?? 0) + (s.dropMalformed ?? 0) + (s.dropNoSource ?? 0),
+	},
+	{
 		id: "rssi",
 		label: "LAST PACKET RSSI (dBm)",
 		pick: (s) => ((s.rx ?? 0) > 0 || s.frames > 0 ? s.rssiX10 / 10 : undefined),

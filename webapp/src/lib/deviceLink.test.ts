@@ -181,3 +181,32 @@ test('appendTelemetryHistory keeps a bounded ring of samples', () => {
   assert.equal(history[0].frames, 25);
   assert.equal(history[history.length - 1].frames, TELEMETRY_HISTORY_LIMIT + 24);
 });
+
+test("the telemetry line carries the frames the deck heard and did not report", () => {
+	// Without these a deck hearing plenty and attributing none is
+	// indistinguishable from a deck hearing nothing at all — and that second
+	// reading is the one that makes an operator stop looking. The firmware
+	// spells them drop_crc / drop_bad / drop_nosrc.
+	const line =
+		'LSK T {"bat":"BAT 87%","gps":"GPS ON  12 SAT","profile":"MESHTASTIC BAY MF",' +
+		'"frames":3,"rssi_x10":-1010,"snr_x10":55,"sim":false,"rx":80,"crc":28,' +
+		'"drop_crc":28,"drop_bad":0,"drop_nosrc":50}';
+	const parsed = parseLskLine(line);
+	assert.ok(parsed && parsed.kind === 'T' && parsed.telemetry, "the line parses");
+	assert.equal(parsed.telemetry.rx, 80);
+	assert.equal(parsed.telemetry.dropCrc, 28);
+	assert.equal(parsed.telemetry.dropMalformed, 0);
+	assert.equal(parsed.telemetry.dropNoSource, 50);
+});
+
+test("older firmware without the drop counters still parses", () => {
+	// A deck flashed before these existed reports nothing about them, which
+	// must read as "did not say" rather than as zero frames dropped.
+	const line =
+		'LSK T {"bat":"BAT 87%","gps":"GPS ON","profile":"P","frames":0,' +
+		'"rssi_x10":0,"snr_x10":0,"sim":false,"rx":5,"crc":1}';
+	const parsed = parseLskLine(line);
+	assert.ok(parsed && parsed.kind === 'T' && parsed.telemetry);
+	assert.equal(parsed.telemetry.dropCrc, undefined);
+	assert.equal(parsed.telemetry.dropNoSource, undefined);
+});
