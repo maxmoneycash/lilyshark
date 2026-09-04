@@ -67,3 +67,72 @@ class DocsSyncTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DocsIndexTest(unittest.TestCase):
+    """docs/README.md must list every document in docs/.
+
+    The index had drifted to listing eight of eighteen files, plus neither of
+    the two subdirectories. That is worse than having no index: a page that
+    presents itself as a table of contents is read as complete, so the nine
+    unlisted documents were effectively invisible rather than merely
+    unindexed. Nothing catches that by itself -- a new file is simply never
+    mentioned -- so this does.
+    """
+
+    INDEX = REPO_ROOT / "docs" / "README.md"
+
+    def test_every_markdown_document_is_named_in_the_index(self):
+        index_text = self.INDEX.read_text(encoding="utf-8")
+        missing = []
+        for path in sorted((REPO_ROOT / "docs").rglob("*.md")):
+            if path == self.INDEX:
+                continue
+            relative = path.relative_to(REPO_ROOT / "docs")
+            # Named anywhere on the page: as a link, or in the closing list.
+            # Either counts -- the point is that a reader can find out it
+            # exists, not that it appears in a particular table.
+            if str(relative) not in index_text and path.name not in index_text:
+                missing.append(str(relative))
+        self.assertEqual(
+            missing,
+            [],
+            "docs/README.md does not mention these files; add a row for each:\n  "
+            + "\n  ".join(missing),
+        )
+
+    def test_every_link_in_the_index_resolves(self):
+        import re
+
+        index_text = self.INDEX.read_text(encoding="utf-8")
+        broken = []
+        for target in re.findall(r"\]\(([^)#]+\.md)\)", index_text):
+            if target.startswith(("http://", "https://")):
+                continue
+            if not (self.INDEX.parent / target).resolve().exists():
+                broken.append(target)
+        self.assertEqual(broken, [], f"dead links in docs/README.md: {broken}")
+
+
+class DiagramSourceTest(unittest.TestCase):
+    """A rendered diagram must have a source in the repo.
+
+    The HTML is committed so a reader needs no toolchain, which also means it
+    can outlive the source it came from. A rendered file with nothing to
+    regenerate it from is not documentation, it is a picture.
+    """
+
+    def test_each_rendered_diagram_has_a_source(self):
+        rendered = REPO_ROOT / "webapp" / "public" / "docs" / "diagrams"
+        sources = REPO_ROOT / "docs" / "diagrams"
+        if not rendered.exists():
+            self.skipTest("no diagrams rendered yet")
+        orphans = []
+        for html in sorted(rendered.glob("*.html")):
+            # "lilyshark-architecture.html" -> "lilyshark.architecture.json"
+            stem, _, kind = html.stem.rpartition("-")
+            if not (sources / f"{stem}.{kind}.json").exists():
+                orphans.append(html.name)
+        self.assertEqual(
+            orphans, [], f"rendered with no source in docs/diagrams/: {orphans}"
+        )

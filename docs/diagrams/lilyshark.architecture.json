@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Lilyshark",
+    "subtitle": "One radio, three protocols, and the three places you can read it from",
+    "output": "webapp/public/docs/diagrams/lilyshark-architecture.html"
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      40,
+      90
+    ],
+    "cols": 6,
+    "gapX": 64,
+    "gapY": 54,
+    "cellW": 132,
+    "cellH": 64
+  },
+  "components": [
+    {
+      "id": "air",
+      "type": "external",
+      "label": "The air",
+      "sublabel": "913.125 MHz \u00b7 SF9",
+      "row": 1,
+      "col": 0
+    },
+    {
+      "id": "sx1262",
+      "type": "backend",
+      "label": "SX1262",
+      "sublabel": "radio_service.cpp",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": "registry",
+      "type": "messagebus",
+      "label": "Decoder registry",
+      "sublabel": "decoder_registry.cpp",
+      "row": 1,
+      "col": 2
+    },
+    {
+      "id": "meshtastic",
+      "type": "backend",
+      "label": "Meshtastic",
+      "sublabel": "AES-CTR \u00b7 PKC",
+      "row": 0,
+      "col": 3
+    },
+    {
+      "id": "meshcore",
+      "type": "backend",
+      "label": "MeshCore",
+      "sublabel": "Ed25519 adverts",
+      "row": 1,
+      "col": 3
+    },
+    {
+      "id": "reticulum",
+      "type": "backend",
+      "label": "Reticulum",
+      "sublabel": "LXMF",
+      "row": 2,
+      "col": 3
+    },
+    {
+      "id": "shell",
+      "type": "frontend",
+      "label": "T-Deck UI",
+      "sublabel": "320x240 \u00b7 LVGL",
+      "row": 1,
+      "col": 4
+    },
+    {
+      "id": "keys",
+      "type": "security",
+      "label": "Channel keys",
+      "sublabel": "NVS \u00b7 8 slots",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "ble",
+      "type": "cloud",
+      "label": "Meshtastic BLE",
+      "sublabel": "meshtastic_api.cpp",
+      "row": 0,
+      "col": 4
+    },
+    {
+      "id": "lsk",
+      "type": "cloud",
+      "label": "LSK over USB",
+      "sublabel": "line protocol",
+      "row": 3,
+      "col": 4
+    },
+    {
+      "id": "phone",
+      "type": "frontend",
+      "label": "iPhone app",
+      "sublabel": "MeshtasticKit",
+      "row": 0,
+      "col": 5
+    },
+    {
+      "id": "webapp",
+      "type": "frontend",
+      "label": "lilyshark.com",
+      "sublabel": "analyzer \u00b7 PWA",
+      "row": 3,
+      "col": 5
+    },
+    {
+      "id": "capture",
+      "type": "database",
+      "label": ".lscap",
+      "sublabel": "microSD \u00b7 Shelby",
+      "row": 2,
+      "col": 5
+    }
+  ],
+  "connections": [
+    {
+      "from": "air",
+      "to": "sx1262",
+      "label": "RX"
+    },
+    {
+      "from": "sx1262",
+      "to": "air",
+      "label": "TX"
+    },
+    {
+      "from": "sx1262",
+      "to": "registry",
+      "label": "raw frames"
+    },
+    {
+      "from": "registry",
+      "to": "meshtastic"
+    },
+    {
+      "from": "registry",
+      "to": "meshcore"
+    },
+    {
+      "from": "registry",
+      "to": "reticulum"
+    },
+    {
+      "from": "meshtastic",
+      "to": "shell"
+    },
+    {
+      "from": "meshcore",
+      "to": "shell"
+    },
+    {
+      "from": "reticulum",
+      "to": "shell"
+    },
+    {
+      "from": "keys",
+      "to": "meshtastic",
+      "label": "seals"
+    },
+    {
+      "from": "shell",
+      "to": "ble"
+    },
+    {
+      "from": "shell",
+      "to": "lsk"
+    },
+    {
+      "from": "ble",
+      "to": "phone",
+      "label": "protobuf",
+      "labelDy": -16
+    },
+    {
+      "from": "phone",
+      "to": "ble",
+      "label": "text \u00b7 pos",
+      "labelDy": 28
+    },
+    {
+      "from": "lsk",
+      "to": "webapp",
+      "label": "Web Serial"
+    },
+    {
+      "from": "shell",
+      "to": "capture",
+      "label": "writes"
+    },
+    {
+      "from": "capture",
+      "to": "webapp",
+      "label": "opens",
+      "labelDy": 26
+    }
+  ]
+}
