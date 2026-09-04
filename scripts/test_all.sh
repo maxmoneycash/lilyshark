@@ -267,6 +267,32 @@ build_and_run shelby_registry \
   src/shelby/shelby_pointer_decoder.cpp \
   test/shelby_registry/test_shelby_registry.cpp
 
+build_and_run capture_storage \
+  src/export/capture_storage.cpp \
+  test/capture_storage/test_capture_storage.cpp
+
+build_and_run posix_capture_sink \
+  src/export/posix_capture_sink.cpp \
+  src/export/capture_storage.cpp \
+  src/export/lilyshark_capture.cpp \
+  test/posix_capture_sink/test_posix_capture_sink.cpp
+
+build_and_run lora_airtime \
+  src/core/lora_airtime.cpp \
+  src/core/builtin_profiles.cpp \
+  src/core/profile_tuning.cpp \
+  src/core/meshcore_encode.cpp \
+  src/core/meshtastic_encode.cpp \
+  src/core/meshtastic_payload.cpp \
+  src/core/meshtastic_pkc.cpp \
+  src/core/mesh_identity.cpp \
+  src/crypto/aes128.cpp \
+  src/crypto/aes_ccm.cpp \
+  src/crypto/curve25519.cpp \
+  src/crypto/sha256.cpp \
+  src/crypto/ed25519.cpp \
+  test/lora_airtime/test_lora_airtime.cpp
+
 build_and_run spectrum \
   src/core/spectrum.cpp \
   test/spectrum/test_spectrum.cpp
@@ -275,6 +301,7 @@ build_and_run radio_service_integration \
   -DLILYSHARK_DEVICE=1 \
   -I"${repo_dir}/test/radio_service_integration/fakes" \
   src/core/spectrum.cpp \
+  src/core/lora_airtime.cpp \
   src/device/radio_service.cpp \
   test/radio_service_integration/test_radio_service_integration.cpp
 

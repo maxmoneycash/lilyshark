@@ -121,7 +121,8 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px var(--pad);
+  padding: 7px calc(var(--pad) + env(safe-area-inset-right)) 7px
+    calc(var(--pad) + env(safe-area-inset-left));
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -133,6 +134,7 @@ body {
   border-bottom: none;
   border-top: 1px solid var(--border);
   margin-top: auto;
+  padding-bottom: calc(7px + env(safe-area-inset-bottom));
 }
 .flash-page .statusbar .lit {
   color: var(--fg);
@@ -157,7 +159,8 @@ body {
   width: 100%;
   max-width: 1116px;
   margin: 0 auto;
-  padding: 22px var(--pad) 40px;
+  padding: 22px calc(var(--pad) + env(safe-area-inset-right)) 40px
+    calc(var(--pad) + env(safe-area-inset-left));
 }
 
 /* ── lede ── */
@@ -650,7 +653,8 @@ body {
 /* ── desktop ── */
 @media (min-width: 960px) {
   .flash-page .page {
-    padding: 34px var(--pad) 64px;
+    padding: 34px calc(var(--pad) + env(safe-area-inset-right)) 64px
+      calc(var(--pad) + env(safe-area-inset-left));
   }
   .flash-page .lede h1 {
     font-size: 46px;

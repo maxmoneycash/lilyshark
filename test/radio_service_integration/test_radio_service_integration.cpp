@@ -117,7 +117,21 @@ void testConfigureInterruptReadAndRearm()
     assert(capture.frame.rf.coding_rate_denominator == 8U);
     assert(capture.frame.rf.crc == CrcStatus::Invalid);
     assert(capture.frame.rf.radio_status == RADIOLIB_ERR_CRC_MISMATCH);
-    assert(capture.frame.rf.airtime_us == fake.airtime_us);
+    // Computed here, not taken from the radio driver.
+    //
+    // This used to assert equality with the fake's airtime_us, an arbitrary
+    // 24680 -- a number chosen to be recognisable, not an airtime. Received
+    // frames took RadioLib's figure while transmitted frames got none, so the
+    // moment this deck counted its own transmissions there were two rulers
+    // for one number on one screen.
+    //
+    // The receive path prices a frame with the CODING RATE FROM ITS OWN
+    // HEADER (8 here), not the profile's (5): the profile says what WE
+    // transmit with, and this frame was sent by somebody else. By hand, at
+    // SF11 / 250 kHz the symbol time is 2^11/250000 = 8.192 ms; preamble is
+    // 16 + 4.25 = 20.25 symbols; payload is 8 + ceil((32 - 44 + 28 + 16)/36)
+    // * 8 = 16 symbols; 36.25 symbols total = 296.96 ms.
+    assert(capture.frame.rf.airtime_us == 296960U);
     assert(capture.frame.rf.hasField(RfFieldCodingRate));
     assert(capture.frame.rf.hasField(RfFieldAirtime));
     assert(service.status().received_frames == 1U);

@@ -1,14 +1,36 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Flash Lilyshark — LILYGO T-Deck</title>
-<meta name="description" content="Install Lilyshark firmware on a LILYGO T-Deck from the browser. No toolchain, no downloads — plug in, click install.">
-<script type="module" src="/flash/install-button.js"></script>
-</head>
-<body>
-<div id="root"></div>
-<script type="module" src="/src/flash/main.tsx"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) non-zero on
+         iOS, which the two status bars pad against. Same as index.html. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F2E2EC" />
+    <title>Flash Lilyshark — LILYGO T-Deck</title>
+    <meta name="description" content="Install Lilyshark firmware on a LILYGO T-Deck from the browser. No toolchain, no downloads — plug in, click install." />
+
+    <link rel="icon" type="image/svg+xml" href="/lilyshark-wordmark-pink.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Flash Lilyshark — LILYGO T-Deck" />
+    <meta property="og:description" content="Turn a LILYGO T-Deck into a handheld LoRa packet sniffer and RF analyzer. Flash it from the browser, run the analyzer as a web page, or build it from source." />
+    <meta property="og:image" content="https://lilyshark.com/og-card.png" />
+    <meta property="og:url" content="https://lilyshark.com/flash/" />
+    <meta property="og:site_name" content="Lilyshark" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Flash Lilyshark — LILYGO T-Deck" />
+    <meta name="twitter:description" content="Turn a LILYGO T-Deck into a handheld LoRa packet sniffer and RF analyzer. Flash it from the browser." />
+    <meta name="twitter:image" content="https://lilyshark.com/og-card.png" />
+
+    <!-- No font requests: JetBrains Mono is self-hosted via @font-face in
+         flash.css, the same files the analyzer uses. -->
+    <script type="module" src="/flash/install-button.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/flash/main.tsx"></script>
+  </body>
 </html>
