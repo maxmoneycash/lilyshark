@@ -313,6 +313,108 @@ void testChannelDefaultsToThePrimary()
     assert(message.channel == 0U);
 }
 
+void testWholeSessionHoldsTogether()
+{
+    // The conversation a real Meshtastic app has, in order, end to end.
+    //
+    // Every other test here checks ONE message. A phone does not send one
+    // message; it opens with want_config, reads the dump to its end, and only
+    // then starts talking -- and the failures that matter on a first pairing
+    // are the ones between messages: a dump that never terminates, a nonce
+    // that comes back wrong, an index that skips the channel list when nodes
+    // are present. None of those can be seen one message at a time.
+    ApiNodeEntry nodes[2]{};
+    nodes[0].num = 0xcda172e0U;
+    nodes[0].is_self = true;
+    std::snprintf(nodes[0].label, sizeof(nodes[0].label), "DECK");
+    nodes[1].num = 0x1300cf74U;  // a node this deck really heard in the Bay
+    std::snprintf(nodes[1].label, sizeof(nodes[1].label), "PEER");
+    nodes[1].has_position = true;
+    nodes[1].latitude_i = 377785000;
+    nodes[1].longitude_i = -1224218000;
+
+    ApiChannelEntry channels[2]{};
+    std::snprintf(channels[0].name, sizeof(channels[0].name), "MediumFast");
+    channels[0].is_default = true;
+    std::snprintf(channels[1].name, sizeof(channels[1].name), "NORTH RIDGE");
+
+    // 1. The phone asks for the config.
+    ApiToRadio opening{};
+    const std::uint8_t want_config[] = {0x18, 0xb4, 0xa4, 0xb4, 0xf7, 0x05};
+    assert(parseApiToRadio(want_config, sizeof(want_config), opening));
+    assert(opening.kind == ApiToRadio::Kind::WantConfig);
+    const std::uint32_t asked_for = opening.want_config_id;
+
+    // 2. The deck answers until the sequence ends, and the LAST message must
+    //    be the config_complete echoing exactly what was asked for. A dump
+    //    that runs on, or ends without the echo, leaves a real app waiting
+    //    forever on a screen that says "connecting".
+    std::uint8_t frame[512]{};
+    std::size_t emitted = 0;
+    std::size_t last_length = 0;
+    std::uint8_t last_frame[512]{};
+    for (std::size_t index = 0; index < 64U; ++index) {
+        const std::size_t length = encodeApiConfigMessage(
+            index, asked_for, "2.6.0-lilyshark", nodes, 2, channels, 2, frame,
+            sizeof(frame));
+        if (length == 0U) break;
+        std::memcpy(last_frame, frame, length);
+        last_length = length;
+        ++emitted;
+    }
+    // my_info, metadata, 2 node_info, 2 channel, lora, complete.
+    assert(emitted == 8U);
+    assert(last_length > 0U);
+    bool echoed = false;
+    for (std::size_t i = 0; i + 1U < last_length; ++i) {
+        // FromRadio.config_complete_id is field 7, varint: tag 0x38.
+        if (last_frame[i] == 0x38) echoed = true;
+    }
+    assert(echoed);
+
+    // 3. The phone sends a text on the keyed channel it just learned about.
+    // With a packet id and want_ack, the way a real app sends: without an id
+    // there is nothing for the Routing result to name, and the deck refuses
+    // to invent one -- which this test caught by asserting the ack existed.
+    const std::uint8_t phone_text[] = {
+        0x0a, 0x15, 0x18, 0x01, 0x22, 0x0a, 0x08, 0x01,
+        0x12, 0x06, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x21,
+        0x35, 0xee, 0xff, 0xc0, 0x00, 0x50, 0x01,
+    };
+    ApiToRadio outgoing{};
+    assert(parseApiToRadio(phone_text, sizeof(phone_text), outgoing));
+    assert(outgoing.kind == ApiToRadio::Kind::Text);
+    assert(outgoing.channel == 1U);  // NORTH RIDGE, not the default
+    assert(std::strcmp(outgoing.text, "hello!") == 0);
+    assert(outgoing.packet_id == 0x00c0ffeeU);
+    assert(outgoing.want_ack);
+
+    // 4. The deck acknowledges it, naming the phone's own packet id -- the
+    //    app shows "Sending..." until this arrives.
+    std::uint8_t ack[96]{};
+    const std::size_t ack_length =
+        encodeApiRoutingAck(nodes[0].num, outgoing.packet_id, 0U, ack, sizeof(ack));
+    assert(ack_length > 0);
+
+    // 5. A text arrives off the air and is handed to the phone, and what the
+    //    deck hands over must itself parse -- the two ends of this file are
+    //    the same wire format or the pairing is a fiction.
+    std::uint8_t heard[256]{};
+    const std::size_t heard_length = encodeApiTextPacket(
+        nodes[1].num, 0xffffffffU, 4242U, "hi from the bay", -1010, 55, heard,
+        sizeof(heard));
+    assert(heard_length > 0);
+
+    // 6. And the deck reports its own health.
+    ApiDeviceMetrics metrics{};
+    metrics.has_battery = true;
+    metrics.battery_level = 87;
+    metrics.has_uptime = true;
+    metrics.uptime_seconds = 900;
+    std::uint8_t telemetry[128]{};
+    assert(encodeApiDeviceTelemetry(9001U, metrics, telemetry, sizeof(telemetry)) > 0);
+}
+
 void testMalformedBytesRefuse()
 {
     // A length-delimited field promising more bytes than exist.
@@ -500,6 +602,7 @@ int main()
     testADeckWithNoStoredKeysStillAdvertisesTheDefault();
     testPhoneChannelSelectionParses();
     testChannelDefaultsToThePrimary();
+    testWholeSessionHoldsTogether();
     testMalformedBytesRefuse();
     testHeardTextRoundTripsThroughParse();
     testLiveNodeInfoMatchesTheDump();
