@@ -16,6 +16,26 @@ import MeshCoreKit
 
 extension ContactListView {
 
+    /// The battery an operator sees without opening anything, so it shows only
+    /// what is actually known: a percentage, a bolt for external power, or
+    /// nothing at all. Kept out of the connection row's body because that body
+    /// is already long enough to trip the SwiftUI type-checker.
+    @ViewBuilder
+    var deckBatteryPill: some View {
+        switch deviceConfig.batteryReading() {
+        case .reported(let pct), .estimated(let pct):
+            Text(String(format: "• %d%%", pct))
+                .font(.caption2)
+                .foregroundStyle(batteryTint(forPercent: pct))
+        case .externalPower:
+            Image(systemName: "bolt.fill")
+                .font(.caption2)
+                .foregroundStyle(.green)
+        case .unknown:
+            EmptyView()
+        }
+    }
+
     @ViewBuilder
     var connectionSection: some View {
         Section {
@@ -59,12 +79,7 @@ extension ContactListView {
                             Text(shortName)
                                 .font(.caption)
                                 .foregroundStyle(MeshTheme.textSecondary)
-                            if deviceConfig.batteryPercent() > 0 {
-                                let pct = deviceConfig.batteryPercent()
-                                Text(String(format: "• %d%%", pct))
-                                    .font(.caption2)
-                                    .foregroundStyle(pct > 50 ? .green : pct > 20 ? .yellow : .red)
-                            }
+                            deckBatteryPill
                         }
                     } else {
                         Image(systemName: "chevron.right")

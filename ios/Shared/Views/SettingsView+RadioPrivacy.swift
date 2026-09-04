@@ -948,7 +948,7 @@ extension SettingsView {
             DisclosureGroup(isExpanded: $statsExpanded) {
                 // Core
                 infoRow(icon: "battery.75", label: "Battery (stats)", value: statsBatteryDisplay, valueColor: statsBatteryColor)
-                infoRow(icon: "clock.arrow.circlepath", label: "Uptime", value: config.statsUptime > 0 ? formatUptime(config.statsUptime) : "\u{2014}")
+                infoRow(icon: "clock.arrow.circlepath", label: "Uptime", value: formatUptime(config.displayUptimeSeconds))
                 infoRow(icon: "exclamationmark.triangle", label: "Error Flags", value: config.statsErrorFlags > 0 ? "0x\(String(format: "%04x", config.statsErrorFlags))" : "None", valueColor: config.statsErrorFlags > 0 ? .red : .green)
                 infoRow(icon: "tray", label: "Queue Length", value: "\(config.statsQueueLength)")
 

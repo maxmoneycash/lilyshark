@@ -480,6 +480,55 @@ func formatUptime(_ seconds: UInt32) -> String {
     return "\(s % 60)s"
 }
 
+/// The three things a battery row needs — text, glyph, colour — resolved from
+/// a reading in one place.
+///
+/// Two reasons this is not written inline in each row. A `switch` over
+/// `BatteryReading` inside a SwiftUI body is the shape that trips "unable to
+/// type-check this expression in reasonable time", and the error names the
+/// whole body rather than the line. And every row that has grown its own
+/// battery logic here has forgotten the absent case and ended up drawing an
+/// empty red battery beside its own em dash.
+///
+/// `voltage` qualifies a percentage; pass 0 when the radio reported none.
+func batteryRowContent(_ reading: BatteryReading, voltage: Double = 0) -> (text: String, icon: String, color: Color) {
+    switch reading {
+    case .externalPower:
+        return (String(localized: "USB power"), "bolt.fill", .green)
+    case .reported(let pct):
+        // Named as the radio's own number because this app's estimate can
+        // disagree with it: both are guesses from voltage, off different
+        // tables, and per-device calibration is applied only to ours.
+        let text = voltage > 0
+            ? String(format: String(localized: "%.2fV (%d%% from radio)"), voltage, pct)
+            : String(format: String(localized: "%d%% from radio"), pct)
+        return (text, batteryGlyph(forPercent: pct), batteryTint(forPercent: pct))
+    case .estimated(let pct):
+        let text = voltage > 0
+            ? String(format: "%.2fV (%d%%)", voltage, pct)
+            : String(format: "%d%%", pct)
+        return (text, batteryGlyph(forPercent: pct), batteryTint(forPercent: pct))
+    case .unknown:
+        // Deliberately not a battery glyph. Every battery glyph reads as a
+        // charge level, and the point of this case is that there isn't one.
+        return ("\u{2014}", "questionmark.circle", MeshTheme.textSecondary)
+    }
+}
+
+func batteryGlyph(forPercent pct: Int) -> String {
+    if pct > 75 { return "battery.100" }
+    if pct > 50 { return "battery.75" }
+    if pct > 25 { return "battery.50" }
+    if pct > 0 { return "battery.25" }
+    return "battery.0"
+}
+
+func batteryTint(forPercent pct: Int) -> Color {
+    if pct > 50 { return .green }
+    if pct > 20 { return .yellow }
+    return .red
+}
+
 func formatDuration(_ ms: Double) -> String {
     if ms >= 1000 {
         return String(format: "%.2f s", ms / 1000)

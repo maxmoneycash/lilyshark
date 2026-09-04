@@ -846,8 +846,22 @@ struct BatteryEditorSheet: View {
     @Environment(DeviceConfig.self) private var deviceConfig
     @Environment(\.dismiss) private var dismiss
     @Binding var batteryChemistryRaw: String
-    @State private var voltageText = ""
-    @State private var percentText = ""
+
+    private var chemistry: BatteryChemistry {
+        BatteryChemistry(rawValue: batteryChemistryRaw) ?? .lipo
+    }
+
+    /// Was "0.00V" whenever nothing had been reported, which is a reading, not
+    /// an absence. A deck on USB reports no voltage at all.
+    private var voltageText: String {
+        deviceConfig.batteryMillivolts > 0
+            ? String(format: "%.2fV", deviceConfig.batteryVoltage)
+            : "\u{2014}"
+    }
+
+    private var percentText: String {
+        batteryRowContent(deviceConfig.batteryReading(chemistry: chemistry)).text
+    }
 
     var body: some View {
         Form {
@@ -872,12 +886,9 @@ struct BatteryEditorSheet: View {
         #if !os(macOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .onAppear {
-            let battV = String(format: "%.2f", Double(deviceConfig.batteryMillivolts) / 1000.0)
-            let battPct = deviceConfig.batteryPercent()
-            voltageText = "\(battV)V"
-            percentText = battPct > 0 ? String(format: "%d%%", battPct) : "\u{2014}"
-        }
+        // No .onAppear snapshot: these read deviceConfig directly, so the
+        // sheet's own header claim -- "live reading" -- is now true. It used
+        // to freeze whatever was known the moment it opened.
     }
 }
 

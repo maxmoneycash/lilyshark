@@ -157,6 +157,34 @@ public final class DeviceConfig {
     public var statsRecvDirect: UInt32 = 0
     public var statsReceiveErrors: UInt32 = 0
 
+    // MARK: - Health the radio reported about itself
+
+    // Meshtastic decks send DeviceMetrics over BLE every five minutes. These
+    // are what the RADIO said, kept apart from the MeshCore CMD_GET_STATS
+    // fields above and from this app's own guess from voltage, because a
+    // screen that mixes them cannot tell an operator which numbers are real.
+    // nil/false means "the radio has not said" — never zero, never "no".
+
+    /// Charge level the radio reported, 0-100. nil when it reported none.
+    public var reportedBatteryPercent: Int?
+    /// The radio said it is running on external power, so there is no charge
+    /// level to show at all.
+    public var isExternallyPowered: Bool = false
+    /// Seconds since the radio booted, as the radio counts them. nil when it
+    /// has not said.
+    public var reportedUptimeSeconds: UInt32?
+    /// When the last such report arrived. A five-minute cadence plus BLE
+    /// reconnects means a stale reading otherwise looks exactly like a fresh
+    /// one.
+    public var healthReportedAt: Date?
+
+    /// Uptime to show: what the radio's telemetry said, else what MeshCore's
+    /// stats said. Zero when neither has spoken, which every caller renders
+    /// through `formatUptime` as an em dash.
+    public var displayUptimeSeconds: UInt32 {
+        reportedUptimeSeconds ?? statsUptime
+    }
+
     // MARK: - Loading State
 
     public var isLoading: Bool = false
@@ -217,6 +245,10 @@ public final class DeviceConfig {
         statsRecvFlood = 0
         statsRecvDirect = 0
         statsReceiveErrors = 0
+        reportedBatteryPercent = nil
+        isExternallyPowered = false
+        reportedUptimeSeconds = nil
+        healthReportedAt = nil
         isLoading = false
         loadedSections = []
         batteryCalibration = nil
@@ -229,6 +261,23 @@ public final class DeviceConfig {
     /// Battery percentage using the given chemistry profile.
     public func batteryPercent(chemistry: BatteryChemistry = .lipo) -> Int {
         chemistry.profile.percentage(forMillivolts: Int(batteryMillivolts))
+    }
+
+    /// Everything the app actually knows about the battery, resolved once so
+    /// no view re-derives it and no view can confuse the cases.
+    ///
+    /// Order matters. External power first: a charging rail sits near a full
+    /// cell's voltage, so running it through the curve would print 100% for a
+    /// deck that may have no cell in it at all. Then the radio's own number,
+    /// because it is a measurement and this app's is a guess. The guess only
+    /// when there is a voltage to guess from — `percentage(forMillivolts: 0)`
+    /// returns 0, and 0% is the one reading an operator would act on.
+    public func batteryReading(chemistry: BatteryChemistry = .lipo) -> BatteryReading {
+        if isExternallyPowered { return .externalPower }
+        if let reported = reportedBatteryPercent { return .reported(reported) }
+        guard batteryMillivolts > 0 else { return .unknown }
+        let mv = batteryCalibration?.correctedMillivolts(batteryMillivolts) ?? Int(batteryMillivolts)
+        return .estimated(chemistry.profile.percentage(forMillivolts: mv))
     }
 
     public var frequencyMHz: Double {

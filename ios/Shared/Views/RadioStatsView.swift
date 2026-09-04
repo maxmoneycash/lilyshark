@@ -20,7 +20,9 @@ struct RadioStatsView: View {
         List {
             Section {
                 statRow("Battery Voltage", value: batteryVoltage)
-                statRow("Uptime", value: formatUptime(deviceConfig.statsUptime))
+                // Falls back to Meshtastic telemetry so this screen and the
+                // Settings rows never disagree about the same deck's uptime.
+                statRow("Uptime", value: formatUptime(deviceConfig.displayUptimeSeconds))
                 statRow("Queue Depth", value: "\(deviceConfig.statsQueueLength)")
                 errorFlagsRow
             } header: { Text("Core") }

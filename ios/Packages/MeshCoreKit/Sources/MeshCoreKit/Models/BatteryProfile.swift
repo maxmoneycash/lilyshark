@@ -83,6 +83,26 @@ public struct BatteryCalibration: Codable, Sendable {
     }
 }
 
+/// What is known about a radio's battery, as four distinct things rather than
+/// one Int.
+///
+/// A percentage the radio measured and a percentage this app interpolated off
+/// a voltage curve are not the same claim, and neither is "nothing has been
+/// reported". Collapsing them into an Int is how absent becomes 0% — the one
+/// reading an operator would act on — so the cases stay apart all the way to
+/// the row that draws them.
+public enum BatteryReading: Equatable, Sendable {
+    /// The radio sent this charge level itself.
+    case reported(Int)
+    /// Derived here from the radio's voltage through a chemistry curve.
+    case estimated(Int)
+    /// The radio said it is on external power. There is no charge level, and
+    /// showing a full battery would be a lie.
+    case externalPower
+    /// Nothing has been reported. Not zero.
+    case unknown
+}
+
 /// Voltage-to-percentage lookup table for a specific battery chemistry.
 public struct BatteryProfile: Sendable {
     /// Voltage/percentage points sorted descending by voltage.
