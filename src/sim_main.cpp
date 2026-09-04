@@ -6265,8 +6265,30 @@ void build_map(lv_obj_t * parent)
     const std::size_t count = collect_live_nodes(live_nodes);
     double origin_lat = 0.0;
     double origin_lon = 0.0;
+    // Where the map is centred, best evidence first:
+    //   1. this deck's own GPS -- it is the deck being placed, so its own
+    //      receiver is the authority whenever it has a fix;
+    //   2. the phone's, shared over Bluetooth. Indoors the deck's patch
+    //      antenna frequently never fixes at all, and the map then had
+    //      nothing better than the average of whatever nodes happened to
+    //      report a position -- which is not where you are, and is why this
+    //      screen could sit over the middle of the bay while you stood in a
+    //      building;
+    //   3. that average, still, when there is no fix anywhere.
+    // The HUD says which of the three it is; a map that will not say where
+    // its centre came from is guessing at the reader's expense.
     bool have_origin = gps.state == GpsState::Fix && gps.position_valid;
-    if (have_origin) {
+    const bool origin_from_phone = !have_origin && phone_fix_usable(millis());
+    if (origin_from_phone) {
+        map_smooth_position(phone_fix.latitude_degrees, phone_fix.longitude_degrees,
+                            origin_lat, origin_lon);
+        have_origin = true;
+        if (map_panned) {
+            const double pan_rad = origin_lat * 0.017453292519943295;
+            origin_lat += map_pan_north_m / 110540.0;
+            origin_lon += map_pan_east_m / (111320.0 * std::cos(pan_rad));
+        }
+    } else if (have_origin) {
         map_smooth_position(gps.latitude_degrees, gps.longitude_degrees,
                             origin_lat, origin_lon);
         if (map_panned) {
@@ -6294,7 +6316,11 @@ void build_map(lv_obj_t * parent)
     std::size_t mark_count = 0;
     std::size_t unfixed = 0;
     if (have_origin) {
-        marks[mark_count++] = {"YOU", 0.0, 0.0, true, false, -1};
+        // Named for where the fix came from. "YOU" on a phone fix is close
+        // enough to be useful and wrong enough to matter -- it is the phone
+        // that is there, and the deck only probably.
+        marks[mark_count++] = {origin_from_phone ? "PHONE" : "YOU",
+                               0.0, 0.0, true, false, -1};
         const double lat_rad = origin_lat * 0.017453292519943295;
         const double m_per_lat = 110540.0;
         const double m_per_lon = 111320.0 * std::cos(lat_rad);
@@ -6322,7 +6348,14 @@ void build_map(lv_obj_t * parent)
     char detail[24]{};
     if (have_origin) {
         format_hemisphere_fix(fix_line, sizeof(fix_line), origin_lat, origin_lon);
-        if (gps.state == GpsState::Fix && gps.position_valid) {
+        if (origin_from_phone) {
+            // Said outright. These coordinates are the PHONE's, and a reader
+            // deciding whether to walk somewhere is owed the difference
+            // between a fix this radio took and one it was handed.
+            const std::size_t used = std::strlen(fix_line);
+            std::snprintf(fix_line + used, sizeof(fix_line) - used, "  VIA PHONE");
+            std::snprintf(detail, sizeof(detail), "PHONE GPS");
+        } else if (gps.state == GpsState::Fix && gps.position_valid) {
             if (unfixed > 0U) {
                 std::snprintf(detail, sizeof(detail), "SAT %u +%u",
                               static_cast<unsigned>(gps.satellites),
