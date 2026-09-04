@@ -1,9 +1,12 @@
+import * as RadioGroup from "@radix-ui/react-radio-group";
+import { AnimatePresence, motion } from "framer-motion";
 import { useRef, useState } from "react";
 
 /**
- * Browser flasher for the T-Deck family. The esp-web-tools element is loaded
- * by flash/index.html from /flash/install-button.js; the firmware image,
- * manifest, fonts, and hero photo stay as static files under public/flash/.
+ * Browser flasher for the T-Deck family, plus the two other ways to run
+ * Lilyshark. The esp-web-tools element is loaded by flash/index.html from
+ * /flash/install-button.js; the firmware image, manifest, fonts and the
+ * simulator screens stay as static files under public/flash/.
  *
  * The version/size/hash below describe the exact binary this page serves.
  * They are updated by hand today — if the image in public/flash/ changes,
@@ -282,251 +285,571 @@ function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
   );
 }
 
-const DEVICES = [
+/** A browser window holding the analyzer, drawn rather than screenshotted so
+ *  it follows the reader's theme instead of freezing one. */
+function BrowserMock() {
+  const tabs = ["TRAFFIC", "NODES", "MAP", "SPECTRUM"];
+  const cols = [14, 96, 176, 250, 316];
+  return (
+    <svg
+      viewBox="0 0 420 286"
+      role="img"
+      aria-label="The Lilyshark analyzer running as a web page"
+      className="device-mock window-mock"
+    >
+      <rect x="1" y="1" width="418" height="284" fill="none" stroke="currentColor" opacity="0.5" />
+      {/* title bar */}
+      <line x1="1" y1="27" x2="419" y2="27" stroke="currentColor" opacity="0.4" />
+      {[13, 25, 37].map((cx) => (
+        <rect key={cx} x={cx - 3} y="11" width="6" height="6" fill="currentColor" opacity="0.55" />
+      ))}
+      <rect x="132" y="8" width="156" height="12" fill="none" stroke="currentColor" opacity="0.35" />
+      <text x="210" y="17.5" textAnchor="middle" fontSize="8" letterSpacing="1.2" fill="currentColor" opacity="0.75">
+        LILYSHARK.COM
+      </text>
+      {/* tab strip */}
+      {tabs.map((t, i) => (
+        <g key={t}>
+          <rect
+            x={14 + i * 74}
+            y={39}
+            width="66"
+            height="16"
+            fill={i === 0 ? "currentColor" : "none"}
+            stroke="currentColor"
+            opacity={i === 0 ? 0.85 : 0.35}
+          />
+          <text
+            x={47 + i * 74}
+            y={50.5}
+            textAnchor="middle"
+            fontSize="7.5"
+            letterSpacing="0.9"
+            fill={i === 0 ? "var(--panel)" : "currentColor"}
+            opacity={i === 0 ? 1 : 0.75}
+          >
+            [{t}]
+          </text>
+        </g>
+      ))}
+      {/* traffic table: real column names, abstract values */}
+      <line x1="14" y1="70" x2="406" y2="70" stroke="currentColor" opacity="0.35" />
+      {["TIME", "SRC", "DST", "KIND", "SNR"].map((h, i) => (
+        <text key={h} x={cols[i]} y={67} fontSize="7.5" letterSpacing="0.9" fill="currentColor" opacity="0.6">
+          {h}
+        </text>
+      ))}
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((row) => {
+        const y = 82 + row * 17;
+        const on = row === 3;
+        return (
+          <g key={row}>
+            {on ? <rect x="14" y={y - 9} width="392" height="15" fill="currentColor" opacity="0.14" /> : null}
+            {on ? <rect x="14" y={y - 9} width="2" height="15" fill="currentColor" /> : null}
+            {cols.map((x, i) => (
+              <rect
+                key={i}
+                x={x}
+                y={y - 4.5}
+                width={[54, 58, 58, 40, 30][i] - (row % 3) * 5}
+                height="5"
+                fill="currentColor"
+                opacity={on ? 0.75 : 0.3 + ((row + i) % 3) * 0.08}
+              />
+            ))}
+          </g>
+        );
+      })}
+      {/* status bar */}
+      <line x1="1" y1="258" x2="419" y2="258" stroke="currentColor" opacity="0.4" />
+      <text x="14" y="272" fontSize="7.5" letterSpacing="1.1" fill="currentColor" opacity="0.7">
+        CHANNEL 0 · LISTENING
+      </text>
+      <text x="406" y="272" textAnchor="end" fontSize="7.5" letterSpacing="1.1" fill="currentColor" opacity="0.7">
+        USB LINK
+      </text>
+    </svg>
+  );
+}
+
+/** A terminal running the build this page serves. The commands are the ones in
+ *  the README, not invented ones. */
+function SourceMock() {
+  const lines: [string, string][] = [
+    ["$", "git clone github.com/maxmoneycash/lilyshark"],
+    ["$", "cd lilyshark"],
+    ["$", "./scripts/build_release.sh"],
+    ["", "dist/lilyshark-tdeck.factory.bin"],
+    ["", "dist/SHA256SUMS"],
+    ["$", "./scripts/flash_tdeck.sh --auto"],
+    ["", "verified against SHA256SUMS"],
+  ];
+  return (
+    <svg
+      viewBox="0 0 420 286"
+      role="img"
+      aria-label="A terminal building Lilyshark from source"
+      className="device-mock window-mock"
+    >
+      <rect x="1" y="1" width="418" height="284" fill="none" stroke="currentColor" opacity="0.5" />
+      <line x1="1" y1="27" x2="419" y2="27" stroke="currentColor" opacity="0.4" />
+      {[13, 25, 37].map((cx) => (
+        <rect key={cx} x={cx - 3} y="11" width="6" height="6" fill="currentColor" opacity="0.55" />
+      ))}
+      <text x="210" y="17.5" textAnchor="middle" fontSize="8" letterSpacing="1.2" fill="currentColor" opacity="0.75">
+        LILYSHARK — BUILD
+      </text>
+      {lines.map(([prompt, text], i) => {
+        const y = 54 + i * 26;
+        return (
+          <g key={text}>
+            {prompt ? (
+              <text x="16" y={y} fontSize="10.5" fill="currentColor" opacity="0.55">
+                {prompt}
+              </text>
+            ) : null}
+            <text x={prompt ? 30 : 30} y={y} fontSize="10.5" fill="currentColor" opacity={prompt ? 0.95 : 0.55}>
+              {text}
+            </text>
+          </g>
+        );
+      })}
+      <rect x="30" y={54 + lines.length * 26 - 8} width="7" height="11" fill="currentColor" opacity="0.8">
+        <animate attributeName="opacity" values="0.8;0.8;0;0" dur="1.1s" repeatCount="indefinite" />
+      </rect>
+    </svg>
+  );
+}
+
+/** Line art for the two non-hardware tiles, in the same weight as DeckIcon. */
+function BrowserIcon() {
+  return (
+    <svg width="120" height="80" viewBox="0 0 120 80" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <rect x="10" y="10" width="100" height="60" />
+      <line x1="10" y1="26" x2="110" y2="26" />
+      {[18, 26, 34].map((cx) => (
+        <circle key={cx} cx={cx} cy="18" r="1.8" fill="currentColor" stroke="none" />
+      ))}
+      {[36, 46, 56].map((y) => (
+        <line key={y} x1="20" y1={y} x2={y === 46 ? 88 : 100} y2={y} strokeWidth="3" />
+      ))}
+    </svg>
+  );
+}
+
+function SourceIcon() {
+  return (
+    <svg width="120" height="80" viewBox="0 0 120 80" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="10" y="10" width="100" height="60" />
+      <line x1="10" y1="26" x2="110" y2="26" />
+      <path d="M26 40l10 8-10 8" />
+      <line x1="44" y1="56" x2="70" y2="56" />
+    </svg>
+  );
+}
+
+/** What the page offers. Only platforms that work today are listed: there is no
+ *  Lilyshark build for other boards yet, and a tile that cannot be clicked
+ *  through is worse than no tile. */
+const PLATFORMS = [
   {
     id: "tdeck-plus",
+    kind: "firmware",
     name: "T-Deck Plus",
     chip: "ESP32-S3 · SX1262 · GPS",
     gps: true,
+    heroLabel: "01 / Handheld analyzer",
     heading: "Lilyshark for T-Deck Plus.",
     tagline:
       "LILYGO's pocket computer with a GPS on board — the full analyzer, with a fix for the nodes map.",
   },
   {
     id: "tdeck",
+    kind: "firmware",
     name: "T-Deck",
     chip: "ESP32-S3 · SX1262",
     gps: false,
+    heroLabel: "02 / Handheld analyzer",
     heading: "Lilyshark for T-Deck.",
     tagline:
       "The same image on the original board. Every radio and capture tool works; only the GPS fix is absent.",
   },
+  {
+    id: "browser",
+    kind: "browser",
+    name: "Browser",
+    chip: "ANALYZER · NO INSTALL",
+    gps: false,
+    heroLabel: "03 / Analyzer, no install",
+    heading: "Lilyshark in the browser.",
+    tagline:
+      "The same analyzer as a web page. Plug a flashed deck into a computer over USB, or pair one over Bluetooth — nothing to install, and it keeps working with no internet.",
+  },
+  {
+    id: "source",
+    kind: "source",
+    name: "From source",
+    chip: "GPL-3.0 · PLATFORMIO",
+    gps: false,
+    heroLabel: "04 / Build it yourself",
+    heading: "Build it yourself.",
+    tagline:
+      "Clone the repository and build the same image this page serves. The release build is reproducible, so your checksum should match ours byte for byte.",
+  },
 ] as const;
 
-type DeviceId = (typeof DEVICES)[number]["id"];
+type PlatformId = (typeof PLATFORMS)[number]["id"];
+type PlatformKind = (typeof PLATFORMS)[number]["kind"];
 
-const CHECKLIST = [
-  "Live LoRa traffic feed",
-  "Packet inspector, raw bytes included",
-  "Spectrum scan and band surveys",
-  "Node tracking with signal history",
-  "Capture to microSD — .lscap and PCAP",
-  "No account, no cloud, works offline",
-  "Open source, GPL-3.0",
-];
+const CHECKLISTS: Record<PlatformKind, string[]> = {
+  firmware: [
+    "Live LoRa traffic feed",
+    "Packet inspector, raw bytes included",
+    "Spectrum scan and band surveys",
+    "Node tracking with signal history",
+    "Capture to microSD — .lscap and PCAP",
+    "No account, no cloud, works offline",
+    "Open source, GPL-3.0",
+  ],
+  browser: [
+    "Live traffic from a deck you have flashed",
+    "Packet inspector, raw bytes included",
+    "Nodes, map, spectrum and telemetry",
+    "USB on desktop Chrome or Edge",
+    "Bluetooth pairing where the browser allows it",
+    "No account, no cloud, works offline",
+    "Open source, GPL-3.0",
+  ],
+  source: [
+    "The exact image this page flashes",
+    "Deterministic build, checksums to compare",
+    "Pinned PlatformIO and toolchain",
+    "A desktop simulator that runs the firmware",
+    "One script to flash a connected deck",
+    "Open source, GPL-3.0",
+  ],
+};
 
-const STEPS = [
-  { glyph: Glyph.download, name: "Pick a build", hint: "the image below is the current alpha" },
-  { glyph: Glyph.usb, name: "Connect USB", hint: "data cable, device powered on" },
-  { glyph: Glyph.bolt, name: "Flash", hint: "one click, about a minute" },
-];
+const STEPS: Record<PlatformKind, { glyph: JSX.Element; name: string; hint: string }[]> = {
+  firmware: [
+    { glyph: Glyph.download, name: "Pick a build", hint: "the image below is the current alpha" },
+    { glyph: Glyph.usb, name: "Connect USB", hint: "data cable, device powered on" },
+    { glyph: Glyph.bolt, name: "Flash", hint: "one click, about a minute" },
+  ],
+  browser: [
+    { glyph: Glyph.bolt, name: "Flash a deck", hint: "any of the boards above" },
+    { glyph: Glyph.usb, name: "Open and connect", hint: "CONNECT, then pick the link" },
+    { glyph: Glyph.code, name: "Watch the mesh", hint: "traffic, nodes, map, spectrum" },
+  ],
+  source: [
+    { glyph: Glyph.code, name: "Clone", hint: "GPL-3.0, no sign-up" },
+    { glyph: Glyph.download, name: "Build", hint: "pinned toolchain, reproducible" },
+    { glyph: Glyph.usb, name: "Flash", hint: "one script, one cable" },
+  ],
+};
+
+const STEP_HEADING: Record<PlatformKind, string> = {
+  firmware: "Three steps, one cable.",
+  browser: "Three steps, no install.",
+  source: "Three steps, from a clean clone.",
+};
+
+const CLONE_CMD = "git clone https://github.com/maxmoneycash/lilyshark && cd lilyshark";
+const BUILD_CMD = "./scripts/build_release.sh";
+const REPO = "https://github.com/maxmoneycash/lilyshark";
 
 export function FlashPage() {
-  const [device, setDevice] = useState<DeviceId>("tdeck-plus");
+  const [platform, setPlatform] = useState<PlatformId>("tdeck-plus");
   const ctaRef = useRef<HTMLDivElement>(null);
-  const selected = DEVICES.find((d) => d.id === device) ?? DEVICES[0];
+  const selected = PLATFORMS.find((p) => p.id === platform) ?? PLATFORMS[0];
+  const kind = selected.kind;
 
-  const pick = (id: DeviceId) => {
-    setDevice(id);
+  const pick = (id: PlatformId) => {
+    setPlatform(id);
     ctaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const art = (id: PlatformId, gps: boolean) =>
+    id === "browser" ? <BrowserIcon /> : id === "source" ? <SourceIcon /> : <DeckIcon gps={gps} />;
+
   return (
     <main className="flash-page">
-      <div className="topbar">
-        <div className="brand">
-          <a href="/">◊ LILYSHARK</a>
+      <div className="statusbar">
+        <span>
+          <a href="/">
+            <span className="lit">◊ LILYSHARK</span> ·· FLASHER
+          </a>
+        </span>
+        <span className="sb-right">
+          <span className="hide-narrow">{FIRMWARE.version}</span>
+          <a href="/">ANALYZER</a>
+          <a href={REPO}>SOURCE</a>
+        </span>
+      </div>
+
+      <div className="page">
+        <div className="lede">
+          <h1>Flash your board.</h1>
+          <p className="sub">
+            Lilyshark turns a LILYGO T-Deck into a handheld LoRa packet sniffer
+            and RF analyzer. Pick a board, plug it in, click once — no
+            toolchain, nothing to compile.
+          </p>
+          <p className="code-note">
+            In-browser flashing needs <b>Chrome</b> or <b>Edge</b> on a
+            computer. The direct download works in any browser.
+          </p>
         </div>
-        <nav className="toplinks">
-          <a href="/">Analyzer</a>
-          <a href="https://github.com/maxmoneycash/lilyshark">Source</a>
-        </nav>
-      </div>
 
-      <div className="lede">
-        <h1>Flash your board.</h1>
-        <p className="sub">
-          Lilyshark turns a LILYGO T-Deck into a handheld LoRa packet sniffer
-          and RF analyzer. Pick a board, plug it in, click once — no toolchain,
-          nothing to compile.
-        </p>
-        <p className="code-note">
-          In-browser flashing needs <b>Chrome</b> or <b>Edge</b> on a computer.
-          The direct download works in any browser.
-        </p>
-      </div>
-
-      <section className="devices" aria-label="Supported devices">
-        {DEVICES.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            className={`device-card ${d.id === device ? "selected" : ""}`}
-            onClick={() => pick(d.id)}
-          >
-            <span className="art">
-              <DeckIcon gps={d.gps} />
-            </span>
-            <span className="device-name">{d.name}</span>
-            <span className="device-chip">{d.chip}</span>
-          </button>
-        ))}
-      </section>
-
-      <div className="hero">
-        <DeviceMock
-          screen={selected.gps ? "/flash/deck-screen-plus.png" : "/flash/deck-screen-base.png"}
-          alt={`A T-Deck running Lilyshark — ${selected.name}`}
-        />
-        <div className="hero-caption">
-          <span>
-            <b>{selected.name}</b> · running {FIRMWARE.version}
-          </span>
-        </div>
-      </div>
-
-      <div className="product" ref={ctaRef}>
-        <h2>{selected.heading}</h2>
-        <p className="tagline">{selected.tagline}</p>
-
-        <ul className="checklist">
-          {CHECKLIST.map((item) => (
-            <li key={item}>
-              <span className="tick">✓</span>
-              {item}
-            </li>
+        <RadioGroup.Root
+          className="devices"
+          value={platform}
+          onValueChange={(v) => pick(v as PlatformId)}
+          aria-label="Choose a platform"
+          loop
+        >
+          {PLATFORMS.map((p) => (
+            <RadioGroup.Item key={p.id} value={p.id} className="device-card">
+              <span className="art">{art(p.id, p.gps)}</span>
+              <span className="device-name">{p.name}</span>
+              <span className="device-chip">{p.chip}</span>
+            </RadioGroup.Item>
           ))}
-        </ul>
+        </RadioGroup.Root>
 
-        <div className="cta">
-          <esp-web-install-button manifest={FIRMWARE.manifest}>
-            <button slot="activate" className="flash-btn" type="button">
-              {Glyph.bolt}
-              <span className="cta-text">
-                Flash in browser
-                <span className="cta-sub">Web Serial · Chrome / Edge</span>
-              </span>
-            </button>
-            <span slot="unsupported" className="unsupported">
-              In-browser flashing needs Web Serial — open this page in Chrome or
-              Edge on a computer. The download links below work anywhere.
-            </span>
-            <span slot="not-allowed" className="not-allowed">
-              Serial access is blocked here; check the browser's site
-              permissions.
-            </span>
-          </esp-web-install-button>
+        <div className="hero">
+          <span className="hero-label">{selected.heroLabel}</span>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={selected.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
+              {kind === "firmware" ? (
+                <DeviceMock
+                  screen={selected.gps ? "/flash/deck-screen-plus.png" : "/flash/deck-screen-base.png"}
+                  alt={`A T-Deck running Lilyshark — ${selected.name}`}
+                />
+              ) : kind === "browser" ? (
+                <BrowserMock />
+              ) : (
+                <SourceMock />
+              )}
+              <div className="hero-caption">
+                <span>
+                  <b>{selected.name}</b> ·{" "}
+                  {kind === "source" ? "reproducible build" : `running ${FIRMWARE.version}`}
+                </span>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
-        <div className="secondary">
-          <a className="outline-btn" href={`/flash/${FIRMWARE.file}`}>
-            {Glyph.download} Download .bin
-          </a>
-          <a
-            className="outline-btn"
-            href="https://github.com/maxmoneycash/lilyshark"
-          >
-            {Glyph.code} Source
-          </a>
+        <div className="product" ref={ctaRef}>
+          <h2>{selected.heading}</h2>
+          <p className="tagline">{selected.tagline}</p>
+
+          <ul className="checklist">
+            {CHECKLISTS[kind].map((item) => (
+              <li key={item}>
+                <span className="tick">✓</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+
+          {kind === "firmware" ? (
+            <>
+              <div className="cta">
+                <esp-web-install-button manifest={FIRMWARE.manifest}>
+                  <button slot="activate" className="flash-btn" type="button">
+                    {Glyph.bolt}
+                    <span className="cta-text">
+                      Flash in browser
+                      <span className="cta-sub">Web Serial · Chrome / Edge</span>
+                    </span>
+                  </button>
+                  <span slot="unsupported" className="unsupported">
+                    In-browser flashing needs Web Serial — open this page in
+                    Chrome or Edge on a computer. The download links below work
+                    anywhere.
+                  </span>
+                  <span slot="not-allowed" className="not-allowed">
+                    Serial access is blocked here; check the browser's site
+                    permissions.
+                  </span>
+                </esp-web-install-button>
+              </div>
+
+              <div className="secondary">
+                <a className="outline-btn" href={`/flash/${FIRMWARE.file}`}>
+                  {Glyph.download} Download .bin
+                </a>
+                <a className="outline-btn" href={REPO}>
+                  {Glyph.code} Source
+                </a>
+              </div>
+
+              <p className="meta">
+                {selected.name} · {FIRMWARE.version} · image <b>{FIRMWARE.file}</b> ·{" "}
+                {FIRMWARE.bytes} bytes · written at {FIRMWARE.offset}
+                <br />
+                sha256 <b className="hash">{FIRMWARE.sha256}</b>
+              </p>
+            </>
+          ) : kind === "browser" ? (
+            <>
+              <div className="cta">
+                <a className="flash-btn" href="/">
+                  {Glyph.bolt}
+                  <span className="cta-text">
+                    Open the analyzer
+                    <span className="cta-sub">no install · works offline</span>
+                  </span>
+                </a>
+              </div>
+              <div className="secondary">
+                <a className="outline-btn" href="/docs">
+                  {Glyph.code} Read the docs
+                </a>
+                <a className="outline-btn" href="/demo">
+                  {Glyph.download} Try the demo
+                </a>
+              </div>
+              <p className="meta">
+                The analyzer links to a deck over USB with Web Serial, or over
+                Bluetooth where the browser supports it. Nothing is uploaded:
+                every capture stays in the tab until you export it.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="cta">
+                <a className="flash-btn" href={REPO}>
+                  {Glyph.code}
+                  <span className="cta-text">
+                    View the source
+                    <span className="cta-sub">GPL-3.0 · github</span>
+                  </span>
+                </a>
+              </div>
+              <div className="cmd-label">CLONE</div>
+              <div className="cmd-row">
+                <code className="verify-cmd">{CLONE_CMD}</code>
+                <CopyButton text={CLONE_CMD} />
+              </div>
+              <div className="cmd-label">BUILD THE RELEASE ARTIFACTS</div>
+              <div className="cmd-row">
+                <code className="verify-cmd">{BUILD_CMD}</code>
+                <CopyButton text={BUILD_CMD} />
+              </div>
+              <p className="meta">
+                Writes <b>dist/lilyshark-tdeck.factory.bin</b>, the application
+                image, the ELF and <b>dist/SHA256SUMS</b>. GitHub Actions on
+                ubuntu-24.04 is the canonical release environment — a build on
+                another OS can embed different tool paths.
+              </p>
+            </>
+          )}
         </div>
 
-        <p className="meta">
-          {selected.name} · {FIRMWARE.version} · image <b>{FIRMWARE.file}</b> ·{" "}
-          {FIRMWARE.bytes} bytes · written at {FIRMWARE.offset}
-          <br />
-          sha256 <b className="hash">{FIRMWARE.sha256}</b>
-        </p>
-      </div>
+        <div className="card">
+          <div className="eyebrow">How it goes</div>
+          <h3>{STEP_HEADING[kind]}</h3>
+          <div className="steps">
+            {STEPS[kind].map((s) => (
+              <div className="step" key={s.name}>
+                <div className="glyph">{s.glyph}</div>
+                <div className="name">{s.name}</div>
+                <div className="hint">{s.hint}</div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-      <div className="card">
-        <div className="eyebrow">How it goes</div>
-        <h3>Three steps, one cable.</h3>
-        <div className="steps">
-          {STEPS.map((s) => (
-            <div className="step" key={s.name}>
-              <div className="glyph">{s.glyph}</div>
-              <div className="name">{s.name}</div>
-              <div className="hint">{s.hint}</div>
+        {kind === "firmware" ? (
+          <>
+            <div className="card">
+              <div className="eyebrow">Verify</div>
+              <h3>Check your image.</h3>
+              <p className="card-sub">
+                The checksum in the install panel is computed from the exact
+                file this page flashes. To confirm a copy you downloaded
+                separately — or to audit what was flashed — run:
+              </p>
+              <div className="cmd-label">DOWNLOADED IMAGE</div>
+              <div className="cmd-row">
+                <code className="verify-cmd">shasum -a 256 {FIRMWARE.file}</code>
+                <CopyButton text={`shasum -a 256 ${FIRMWARE.file}`} />
+              </div>
+              <div className="cmd-label">AGAINST THE PUBLISHED SUMS</div>
+              <div className="cmd-row">
+                <code className="verify-cmd">
+                  curl -sL {REPO}/raw/main/dist/SHA256SUMS
+                </code>
+                <CopyButton text={`curl -sL ${REPO}/raw/main/dist/SHA256SUMS`} />
+              </div>
+              <p className="verify-note">
+                The output must match the sha256 above. Prefer proof over
+                trust? Build the image yourself with the{" "}
+                <a href={REPO}>reproducible-build instructions</a> and compare
+                hashes.
+              </p>
             </div>
-          ))}
-        </div>
+
+            <details>
+              <summary>If the device never appears</summary>
+              <div>
+                <span>
+                  · Swap the cable first — most "broken" flashes are
+                  charge-only cables.
+                </span>
+                <span>
+                  · Force the bootloader: hold the trackball center down, press
+                  the reset button, release both, then click install again.
+                </span>
+                <span>
+                  · Close other tabs or serial monitors using the port; only
+                  one program can hold it.
+                </span>
+                <span>
+                  · The image is unbrickable to experiment with: it writes the
+                  full flash from byte zero, so a failed attempt is cured by
+                  flashing again.
+                </span>
+              </div>
+            </details>
+
+            <details>
+              <summary>What gets installed</summary>
+              <div>
+                <span>
+                  The same factory image the repository builds: the complete
+                  Lilyshark firmware — live traffic, packet inspector, spectrum
+                  scan, node tracking, surveys, capture to microSD, and the
+                  Shelby off-grid pointer pipeline.
+                </span>
+                <span>
+                  After flashing, open <a href="/">the analyzer</a>, press
+                  CONNECT → LILYSHARK T-DECK · USB, and the device links to
+                  this site over the same cable.
+                </span>
+              </div>
+            </details>
+          </>
+        ) : null}
       </div>
 
-      <div className="card">
-        <div className="eyebrow">Verify</div>
-        <h3>Check your image.</h3>
-        <p className="card-sub">
-          The checksum in the install panel is computed from the exact file
-          this page flashes. To confirm a copy you downloaded separately — or
-          to audit what was flashed — run:
-        </p>
-        <div className="cmd-label">DOWNLOADED IMAGE</div>
-        <div className="cmd-row">
-          <code className="verify-cmd">shasum -a 256 {FIRMWARE.file}</code>
-          <CopyButton text={`shasum -a 256 ${FIRMWARE.file}`} />
-        </div>
-        <div className="cmd-label">AGAINST THE PUBLISHED SUMS</div>
-        <div className="cmd-row">
-          <code className="verify-cmd">
-            curl -sL https://github.com/maxmoneycash/lilyshark/raw/main/dist/SHA256SUMS
-          </code>
-          <CopyButton text="curl -sL https://github.com/maxmoneycash/lilyshark/raw/main/dist/SHA256SUMS" />
-        </div>
-        <p className="verify-note">
-          The output must match the sha256 above. Prefer proof over trust?
-          Build the image yourself with the{" "}
-          <a href="https://github.com/maxmoneycash/lilyshark">
-            reproducible-build instructions
-          </a>{" "}
-          and compare hashes.
-        </p>
+      <div className="statusbar bottom">
+        <span>
+          GPL-3.0 · <a href={REPO}>SOURCE</a> · <a href="/">LILYSHARK.COM</a>
+        </span>
+        <span className="sb-right">
+          <span className="lit">{PLATFORMS.length} PLATFORMS</span>
+        </span>
       </div>
-
-      <details>
-        <summary>IF THE DEVICE NEVER APPEARS</summary>
-        <div>
-          <span>
-            · Swap the cable first — most "broken" flashes are charge-only
-            cables.
-          </span>
-          <span>
-            · Force the bootloader: hold the trackball center down, press the
-            reset button, release both, then click install again.
-          </span>
-          <span>
-            · Close other tabs or serial monitors using the port; only one
-            program can hold it.
-          </span>
-          <span>
-            · The image is unbrickable to experiment with: it writes the full
-            flash from byte zero, so a failed attempt is cured by flashing
-            again.
-          </span>
-        </div>
-      </details>
-
-      <details>
-        <summary>WHAT GETS INSTALLED</summary>
-        <div>
-          <span>
-            The same factory image the repository builds: the complete
-            Lilyshark firmware — live traffic, packet inspector, spectrum scan,
-            node tracking, surveys, capture to microSD, and the Shelby off-grid
-            pointer pipeline.
-          </span>
-          <span>
-            After flashing, open <a href="/">the analyzer</a>, press CONNECT →
-            LILYSHARK T-DECK · USB, and the device links to this site over the
-            same cable.
-          </span>
-        </div>
-      </details>
-
-      <footer>
-        GPL-3.0 ·{" "}
-        <a href="https://github.com/maxmoneycash/lilyshark">source</a> ·{" "}
-        <a href="/">lilyshark.com</a>
-      </footer>
     </main>
   );
 }

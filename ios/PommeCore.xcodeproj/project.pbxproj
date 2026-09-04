@@ -97,11 +97,13 @@
 		8EF971496F064F1AD761B796 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21606E2B959E6496D3B0230D /* ContactListView.swift */; };
 		9144822AD9EB38340AF2317E /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFFE2BF3488F0C0647632CD /* ChatView.swift */; };
 		96059FF0363E830C376C23ED /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		A11D66DABEC74A949C910232 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E1FF945E90B4655BF957020 /* DesignSystem.swift */; };
 		9A92FFC5BE2A781BEC80720C /* DeviceScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2377BED4FF5A7170783BA649 /* DeviceScannerView.swift */; };
 		9D7EAB7850F077EF373AC84F /* NetworkToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB24E21D8CDBE0500C92E469 /* NetworkToolsView.swift */; };
 		A3B4C5D6E7F8A9B0C1D2E3F4 /* NavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */; };
 		A3C4EC30F51CEF0E73260DD5 /* RadioPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E616344CEDCD1ADC41548B7 /* RadioPreset.swift */; };
 		A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		53E1D52B282146CFA5F33BC8 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E1FF945E90B4655BF957020 /* DesignSystem.swift */; };
 		ACE3CB6D6A26E73511B3CB92 /* WatchUnlockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4226DA6FB1C6225C757D16 /* WatchUnlockManager.swift */; };
 		B2C3D4E5F6071829A3B4C5D6 /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* ShareView.swift */; };
 		B4C5D6E7F8A9B0C1D2E3F4A5 /* NavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */; };
@@ -141,6 +143,7 @@
 		F70142BB0E4E485FAA189AD7 /* alert.caf in Resources */ = {isa = PBXBuildFile; fileRef = 38CA824A6E6A4B7D9DD6A055 /* alert.caf */; };
 		F90000EB8EC8EB28EA724AC8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 43931BD12312D05F62A9E3B3 /* Assets.xcassets */; };
 		FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		C385EABC3E05445DAF00070A /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E1FF945E90B4655BF957020 /* DesignSystem.swift */; };
 		FC6474A70CF5B233AB283928 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D859AE9C98610F71C2FBAAF /* SettingsView.swift */; };
 		FE123217A6AD32B385F9ACBC /* MeshCoreKit in Frameworks */ = {isa = PBXBuildFile; productRef = FBBB0BD5BAFCC905A8DC17D3 /* MeshCoreKit */; };
 		FWC10000000100000000002 /* Services/FirmwareUpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FWC10000000000000000000 /* Services/FirmwareUpdateChecker.swift */; };
@@ -335,6 +338,7 @@
 		E09A1F63605E4CA4ACDE7634 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStore.swift; sourceTree = "<group>"; };
 		F6BA0593D517B1467DBC1C42 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		2E1FF945E90B4655BF957020 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		FWC10000000000000000000 /* Services/FirmwareUpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/FirmwareUpdateChecker.swift; sourceTree = "<group>"; };
 		GFN10000000000000000000 /* GeofenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeofenceStore.swift; sourceTree = "<group>"; };
 		GFV10000000000000000000 /* GeofencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeofencesView.swift; sourceTree = "<group>"; };
@@ -658,6 +662,7 @@
 			children = (
 				A259126AAB80661010C6A336 /* PommeCoreApp.swift */,
 				F6BA0593D517B1467DBC1C42 /* Theme.swift */,
+				2E1FF945E90B4655BF957020 /* DesignSystem.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -935,6 +940,7 @@
 			files = (
 				894905739E99B7E425A27485 /* PommeCoreApp.swift in Sources */,
 				A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */,
+				53E1D52B282146CFA5F33BC8 /* DesignSystem.swift in Sources */,
 				0F4E79552F9561C200307C73 /* PhoneWatchRelay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -976,6 +982,7 @@
 				SVT10000000100000000002 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000002 /* SettingsView+Editors.swift in Sources */,
 				96059FF0363E830C376C23ED /* Theme.swift in Sources */,
+				A11D66DABEC74A949C910232 /* DesignSystem.swift in Sources */,
 				XUOVAQ6Y1NIWH1G3OMK55ENV /* RemoteManagementView.swift in Sources */,
 				RMC10000000100000000002 /* RemoteManagementView+ConfigSections.swift in Sources */,
 				RMD10000000100000000002 /* RemoteManagementView+DeviceSections.swift in Sources */,
@@ -1067,6 +1074,7 @@
 				SVT10000000100000000003 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000003 /* SettingsView+Editors.swift in Sources */,
 				FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */,
+				C385EABC3E05445DAF00070A /* DesignSystem.swift in Sources */,
 				CATKUXG25PTVMENJWXQZY49X /* RemoteManagementView.swift in Sources */,
 				RMC10000000100000000003 /* RemoteManagementView+ConfigSections.swift in Sources */,
 				RMD10000000100000000003 /* RemoteManagementView+DeviceSections.swift in Sources */,

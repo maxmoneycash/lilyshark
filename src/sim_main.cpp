@@ -17023,6 +17023,31 @@ void service_ble_api() noexcept
             const bool sent =
                 have_channel && transmit_meshtastic(MeshtasticPort::TextMessage,
                                                     message.text, message.to_node, seal);
+            // WHY it failed, not merely that it did.
+            //
+            // Every failure used to be reported as 4, NO_INTERFACE, which
+            // means "there is no radio". The app could only say "not
+            // delivered", so a message refused because the operator picked a
+            // channel this deck no longer holds a key for looked exactly like
+            // a dead radio -- and the one thing an operator could actually do
+            // about it was invisible.
+            //
+            // These are Meshtastic's own Routing.Error values, so a stock
+            // client shows the right words without knowing anything about us.
+            const std::uint32_t routing_error =
+                sent                                     ? 0U   // NONE
+                : !have_channel                          ? 6U   // NO_CHANNEL
+                : app_settings.simulate_mode             ? 33U  // NOT_AUTHORIZED
+                : !radio_service.status().initialized    ? 4U   // NO_INTERFACE
+                : std::strlen(message.text) > 200U       ? 7U   // TOO_LARGE
+                                                         : 5U;  // MAX_RETRANSMIT
+            if (!sent) {
+                char why[96]{};
+                std::snprintf(why, sizeof(why), "TX refused (routing %lu): %.40s",
+                              static_cast<unsigned long>(routing_error), message.text);
+                record_runtime_event(RuntimeEventSeverity::Warning,
+                                     RuntimeEventType::Radio, why);
+            }
             // The app shows "Sending..." until a Routing result names its
             // packet id; the radio, not the phone, decides when a message has
             // left. 4 is NO_INTERFACE -- the radio refused or is not there.
@@ -17030,7 +17055,7 @@ void service_ble_api() noexcept
                 std::uint8_t ack_frame[96]{};
                 const std::size_t ack_length = encodeApiRoutingAck(
                     localMeshtasticNodeNum(), message.packet_id,
-                    sent ? 0U : 4U, ack_frame, sizeof(ack_frame));
+                    routing_error, ack_frame, sizeof(ack_frame));
                 if (ack_length > 0U) (void)queueBleFromRadio(ack_frame, ack_length);
             }
         }

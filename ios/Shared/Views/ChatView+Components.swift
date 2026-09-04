@@ -119,11 +119,20 @@ struct MessageBubble: View {
                             MessageMapCard(coordinate: coord)
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
+                    // The message is the product, and it was the smallest
+                    // text on the screen -- 15pt in a 9pt-tall bubble, which
+                    // is the size of a caption. Sized from Design now, so a
+                    // message read at arm's length outdoors does not need a
+                    // second look.
+                    .font(.system(size: Design.Text.message))
+                    .padding(.horizontal, Design.Space.regular)
+                    .padding(.vertical, Design.Space.snug)
                     .background(message.isOutgoing ? MeshTheme.outgoingBubble : MeshTheme.incomingBubble)
                     .foregroundStyle(MeshTheme.textOnAccent)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    // Continuous curvature, not a circular corner: at this
+                    // radius the difference is visible, and the squircle is
+                    // what every other rounded shape on iOS uses.
+                    .clipShape(RoundedRectangle(cornerRadius: Design.Radius.bubble, style: .continuous))
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(bubbleAccessibilityLabel)
                     .padding(.top, message.reactions.isEmpty ? 0 : 22)
@@ -380,11 +389,20 @@ struct ChannelMessageBubble: View {
                             MessageMapCard(coordinate: coord)
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
+                    // The message is the product, and it was the smallest
+                    // text on the screen -- 15pt in a 9pt-tall bubble, which
+                    // is the size of a caption. Sized from Design now, so a
+                    // message read at arm's length outdoors does not need a
+                    // second look.
+                    .font(.system(size: Design.Text.message))
+                    .padding(.horizontal, Design.Space.regular)
+                    .padding(.vertical, Design.Space.snug)
                     .background(message.isOutgoing ? MeshTheme.outgoingBubble : MeshTheme.incomingBubble)
                     .foregroundStyle(MeshTheme.textOnAccent)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    // Continuous curvature, not a circular corner: at this
+                    // radius the difference is visible, and the squircle is
+                    // what every other rounded shape on iOS uses.
+                    .clipShape(RoundedRectangle(cornerRadius: Design.Radius.bubble, style: .continuous))
                     .padding(.top, message.reactions.isEmpty ? 0 : 22)
 
                     if !message.reactions.isEmpty {

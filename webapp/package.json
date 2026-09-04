@@ -17,6 +17,7 @@
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
     "@liamcottle/meshcore.js": "^1.14.0",
+    "@radix-ui/react-radio-group": "^1.4.7",
     "framer-motion": "^13.1.0",
     "leaflet": "^1.9.4",
     "mqtt": "^5.15.2",

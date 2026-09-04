@@ -513,6 +513,31 @@ final class MessageStoreManager {
         }
     }
 
+    /// Meshtastic's Routing.Error, in words an operator can act on.
+    ///
+    /// The numbers are Meshtastic's own, so a value that arrives from any
+    /// radio -- not just a Lilyshark deck -- reads correctly. Anything
+    /// unrecognised keeps its number rather than being flattened into
+    /// "failed": a code we cannot name is still evidence, and hiding it is
+    /// how "not delivered" came to mean nothing in particular.
+    static func routingErrorText(_ error: UInt32) -> String {
+        switch error {
+        case 0: return "sent"
+        case 1: return "no route to that node"
+        case 2: return "the far end rejected it"
+        case 3: return "timed out"
+        case 4: return "the deck has no working radio"
+        case 5: return "the radio would not transmit"
+        case 6: return "that channel is not on the deck"
+        case 7: return "message too long for one packet"
+        case 8: return "no response"
+        case 9: return "duty cycle limit reached — wait and retry"
+        case 32: return "the deck rejected the request"
+        case 33: return "not allowed (the deck is in simulate mode)"
+        default: return "refused, routing error \(error)"
+        }
+    }
+
     /// Apply a deck's Routing result to the message waiting on it. `error` is
     /// Meshtastic's `Routing.Error`, where zero means the radio transmitted.
     func handleMeshtasticRouting(packetID: UInt32, error: UInt32) {
@@ -522,6 +547,19 @@ final class MessageStoreManager {
         }
         // `.sent`, never `.delivered`: the deck answers for its own radio, not
         // for the far end, so claiming delivery would be a promise nobody made.
+        if error != 0 {
+            // Log WHY. Every refusal used to arrive as 4 and every one showed
+            // as "not delivered", so a message refused because the operator
+            // picked a channel the deck no longer holds a key for looked
+            // identical to a dead radio -- and only one of those is something
+            // an operator can act on.
+            Self.logger.warning(
+                "MT ROUTING: id \(packetID) refused — \(Self.routingErrorText(error))"
+            )
+            DebugLogger.shared.log(
+                "MT REFUSED: \(Self.routingErrorText(error))", level: .error
+            )
+        }
         markMeshtasticMessage(
             pending.messageID,
             in: pending.conversationKey,

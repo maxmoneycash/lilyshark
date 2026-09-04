@@ -460,12 +460,27 @@ struct ChatView: View {
                 .padding(.vertical, 6)
                 .background(MeshTheme.surfaceLight)
             }
-            HStack(spacing: 10) {
-                TextField("Type a message...", text: $messageText)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+            // The composer.
+            //
+            // Sized from Design rather than by hand: the message field is the
+            // control this app exists for, and it was set at 15pt in a 40pt
+            // row -- the size of a search box in a settings screen. The send
+            // button was a 28pt glyph with no padding, well under the 44pt
+            // minimum, on the edge of the screen where the thumb lands.
+            //
+            // The button also now says something when it is disabled. It used
+            // to go grey and stay the same size, which reads as "broken"
+            // rather than "type something first".
+            HStack(spacing: Design.Space.snug) {
+                TextField("Type a message...", text: $messageText, axis: .vertical)
+                    // Up to five lines before it scrolls. A long message
+                    // typed into a one-line field is written blind.
+                    .lineLimit(1...5)
+                    .font(.system(size: Design.Text.message))
+                    .padding(.horizontal, Design.Space.regular)
+                    .padding(.vertical, Design.Space.snug)
                     .background(MeshTheme.surfaceLight)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .clipShape(RoundedRectangle(cornerRadius: Design.Radius.bubble, style: .continuous))
                     .foregroundStyle(MeshTheme.textPrimary)
                     .onChange(of: messageText) { _, newValue in
                         if newValue.count > maxMessageLength {
@@ -476,20 +491,25 @@ struct ChatView: View {
                     .onSubmit { send() }
                     #endif
 
-
                 Button(action: send) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(
-                            messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                ? MeshTheme.textSecondary
-                                : MeshTheme.accent
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: Design.Text.controlGlyph, weight: .semibold))
+                        .foregroundStyle(canSend ? Color.white : MeshTheme.textSecondary)
+                        .frame(width: Design.sendButton, height: Design.sendButton)
+                        .background(
+                            Circle().fill(canSend ? MeshTheme.accent : MeshTheme.surfaceLight)
                         )
+                        // Grows into its filled state as the first character
+                        // is typed, so the control tells you it is ready
+                        // before you reach for it.
+                        .scaleEffect(canSend ? 1 : 0.88)
                 }
-                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .buttonStyle(.pressable)
+                .meshAnimation(Design.Motion.quick, value: canSend)
+                .disabled(!canSend)
                 .accessibilityLabel("Send")
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Design.Space.snug)
 
             if !messageText.isEmpty {
                 HStack {
@@ -507,6 +527,12 @@ struct ChatView: View {
         }
         .padding(.vertical, 8)
         .background(MeshTheme.surface)
+    }
+
+    /// Whether there is anything to send. Named because the composer asks
+    /// three times and an inline trim in each is three chances to disagree.
+    private var canSend: Bool {
+        !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func send() {

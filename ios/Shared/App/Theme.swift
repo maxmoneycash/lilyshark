@@ -776,7 +776,7 @@ private struct LilysharkHeaderModifier: ViewModifier {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    LilysharkWordmark()
+                    LilysharkLockup()
                 }
             }
         #else
@@ -803,5 +803,88 @@ struct LilysharkWordmark: View {
             .scaledToFit()
             .frame(height: height)
             .accessibilityLabel("Lilyshark")
+    }
+}
+
+
+// MARK: - The brand wordmark lockup
+
+import CoreText
+
+/// JetBrains Mono Bold, the face the web app's header is set in.
+///
+/// Shipped as a DATA ASSET and registered at runtime rather than listed in
+/// UIAppFonts. Only the two widget folders are file-system synchronized groups
+/// in this project, so a font dropped into Shared/Resources would need a hand
+/// edit to project.pbxproj to reach the Copy Bundle Resources phase -- and a
+/// resource that silently is not bundled fails at runtime as a font that
+/// quietly falls back to the system face, which looks like a styling mistake
+/// rather than a missing file. The asset catalog is already built into every
+/// target, so this cannot half-happen.
+enum BrandFont {
+    /// The PostScript name, which is what Font.custom matches on -- not the
+    /// family name "JetBrains Mono".
+    static let postScriptName = "JetBrainsMono-Bold"
+
+    private static let registered: Bool = {
+        guard let asset = NSDataAsset(name: "JetBrainsMonoBold"),
+              let provider = CGDataProvider(data: asset.data as CFData),
+              let font = CGFont(provider)
+        else { return false }
+        var error: Unmanaged<CFError>?
+        // A second registration of the same font returns false with
+        // kCTFontManagerErrorAlreadyRegistered; that is success, not failure,
+        // and treating it as failure would drop the brand face on any code
+        // path that asked twice.
+        if CTFontManagerRegisterGraphicsFont(font, &error) { return true }
+        let code = (error?.takeUnretainedValue() as Error?).map {
+            ($0 as NSError).code
+        }
+        return code == CTFontManagerError.alreadyRegistered.rawValue
+    }()
+
+    /// The brand face at `size`, or the system's bold monospace if the asset
+    /// could not be registered. Falling back to a monospace face keeps the
+    /// wordmark's proportions roughly right instead of collapsing it into a
+    /// proportional font.
+    static func wordmark(size: CGFloat) -> Font {
+        registered
+            ? .custom(postScriptName, size: size)
+            : .system(size: size, weight: .bold, design: .monospaced)
+    }
+}
+
+/// The header lockup: the mark, then "lily" in ink and "shark" in pink.
+///
+/// The colours and the tracking are the web app's, from meshterm.css: the
+/// wordmark is JetBrains Mono 700 at -0.035em, "shark" is #fa2e88 (the brand
+/// pink nudged dark enough to clear 3:1 on paper) and "lily" is #16090f on
+/// light and white on dark. Repeating those values here rather than inventing
+/// near-misses is the whole point -- a header that is ALMOST the brand reads
+/// as a different product.
+struct LilysharkLockup: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var size: CGFloat = 19
+
+    private var lilyColour: Color {
+        colorScheme == .dark ? .white : Color(red: 0x16 / 255, green: 0x09 / 255, blue: 0x0f / 255)
+    }
+
+    private static let sharkPink = Color(red: 0xfa / 255, green: 0x2e / 255, blue: 0x88 / 255)
+
+    var body: some View {
+        HStack(spacing: size * 0.34) {
+            Image("LilysharkWordmark")
+                .resizable()
+                .scaledToFit()
+                .frame(height: size * 1.05)
+            (Text("lily").foregroundColor(lilyColour)
+                + Text("shark").foregroundColor(Self.sharkPink))
+                .font(BrandFont.wordmark(size: size))
+                .tracking(-0.035 * size)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Lilyshark")
     }
 }
