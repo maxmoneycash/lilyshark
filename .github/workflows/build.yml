@@ -49,8 +49,7 @@ jobs:
     # GitHub-hosted macOS minutes at 10x the Linux rate. On a public repository
     # that is free; on a private one this job alone drains the included allowance
     # ten times faster than the ubuntu jobs above, which is why it is scoped to
-    # the two checks that would actually have caught a regression -- the
-    # simulator app compiling, and MeshtasticKit's framing tests -- and not to
+    # the simulator app compiling and both protocol packages' tests, not to
     # the macOS or watch targets.
     #
     # The watch target is deliberately absent. It cannot be built from this
@@ -96,6 +95,10 @@ jobs:
         working-directory: ios/Packages/MeshtasticKit
         run: swift test
 
+      - name: Test MeshCoreKit models and protocol
+        working-directory: ios/Packages/MeshCoreKit
+        run: swift test
+
       - name: Upload the Xcode log when the build fails
         # build_ios.sh prints only the deduplicated errors and the last 40 lines;
         # a CI-only failure usually needs the rest of the log to diagnose.
@@ -121,7 +124,7 @@ jobs:
       - name: Install simulator build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes libsdl2-dev
+          sudo apt-get install --yes libsdl2-dev python3-pil librsvg2-bin
           sdl2-config --version
 
       - name: Adapt the simulator target for Linux

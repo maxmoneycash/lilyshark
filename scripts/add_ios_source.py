@@ -23,9 +23,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -65,10 +67,11 @@ def tracked_swift_files() -> list[Path]:
 
 def check() -> int:
     text = PBXPROJ.read_text()
+    compiled = compiled_swift_paths(text, PBXPROJ.parent.parent)
     missing = [
         p.relative_to(REPO_ROOT).as_posix()
         for p in tracked_swift_files()
-        if p.name not in text
+        if p.resolve() not in compiled
     ]
     if missing:
         print("These Swift files are NOT referenced by the Xcode project,", file=sys.stderr)
@@ -81,17 +84,68 @@ def check() -> int:
     return 0
 
 
+def compiled_swift_paths(text: str, source_root: Path) -> set[Path]:
+    """Resolve group paths and Sources membership, not filename mentions."""
+    objects = dict(re.findall(r"\b([0-9A-Z]{16,32}) /\* [^\n]+? \*/ = \{(.*?)\};", text, re.S))
+
+    def field(body: str, name: str) -> str | None:
+        match = re.search(r"\b" + re.escape(name) + r"\s*=\s*(\"[^\"]*\"|[^;]+);", body)
+        if not match:
+            return None
+        value = match.group(1).strip()
+        return json.loads(value) if value.startswith('"') else value
+
+    parents: dict[str, str] = {}
+    for key, body in objects.items():
+        if field(body, "isa") != "PBXGroup":
+            continue
+        children = re.search(r"children\s*=\s*\((.*?)\);", body, re.S)
+        if children:
+            for child in re.findall(r"\b[0-9A-Z]{16,32}\b", children.group(1)):
+                parents[child] = key
+
+    def resolve(key: str, seen: frozenset[str] = frozenset()) -> Path:
+        if key in seen:
+            raise ValueError("cyclic Xcode group hierarchy")
+        body = objects[key]
+        tree = field(body, "sourceTree")
+        if tree == "SOURCE_ROOT" or key not in parents:
+            base = source_root
+        else:
+            base = resolve(parents[key], seen | {key})
+        return (base / (field(body, "path") or "")).resolve()
+
+    compiled: set[Path] = set()
+    for body in objects.values():
+        if field(body, "isa") != "PBXSourcesBuildPhase":
+            continue
+        files = re.search(r"files\s*=\s*\((.*?)\);", body, re.S)
+        if not files:
+            continue
+        for build_id in re.findall(r"\b[0-9A-Z]{16,32}\b", files.group(1)):
+            reference = re.search(r"fileRef\s*=\s*([0-9A-Z]{16,32})", objects.get(build_id, ""))
+            if reference and reference.group(1) in objects:
+                compiled.add(resolve(reference.group(1)))
+    return compiled
+
+
 def add(target: Path) -> int:
     if not target.exists():
         return fail(f"{target} does not exist")
     if target.suffix != ".swift":
         return fail("only .swift files are handled")
+    try:
+        source_path = target.relative_to(PBXPROJ.parent.parent).as_posix()
+    except ValueError:
+        return fail("the source must be inside ios/")
 
     text = PBXPROJ.read_text()
     name = target.name
-    if name in text:
+    if target.resolve() in compiled_swift_paths(text, PBXPROJ.parent.parent):
         print(f"{name} is already in the project")
         return 0
+    if name in text:
+        return fail(f"{name} is mentioned but its path or Sources membership is wrong; repair that reference first")
 
     existing_ids = set(re.findall(r"\b([0-9A-F]{24})\b", text))
 
@@ -113,7 +167,7 @@ def add(target: Path) -> int:
     # 1. The file reference.
     new_ref = (
         f"\t\t{new_ref_id} /* {name} */ = {{isa = PBXFileReference; "
-        f"lastKnownFileType = sourcecode.swift; path = {name}; sourceTree = \"<group>\"; }};"
+        f"lastKnownFileType = sourcecode.swift; path = {json.dumps(source_path)}; sourceTree = SOURCE_ROOT; }};"
     )
     text = text.replace(file_ref_match.group(0), file_ref_match.group(0) + "\n" + new_ref, 1)
 
@@ -152,18 +206,20 @@ def add(target: Path) -> int:
         group_entry, group_entry + f"\n\t\t\t\t{new_ref_id} /* {name} */,", 1
     )
 
-    PBXPROJ.write_text(text)
-
     # Verify the file still parses as a plist. A pbxproj that does not is a
     # lost project, and finding that out at the next build is too late.
-    result = subprocess.run(
-        ["plutil", "-lint", str(PBXPROJ)], capture_output=True, text=True
-    )
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".pbxproj") as candidate:
+        candidate.write(text)
+        candidate.flush()
+        result = subprocess.run(
+            ["plutil", "-lint", candidate.name], capture_output=True, text=True
+        )
     if result.returncode != 0:
         return fail(
-            "the edit left project.pbxproj unparseable — restore it with "
-            f"`git checkout {PBXPROJ.relative_to(REPO_ROOT)}`\n{result.stdout}{result.stderr}"
+            f"the candidate project did not parse; the original was kept\n{result.stdout}{result.stderr}"
         )
+
+    PBXPROJ.write_text(text)
 
     print(f"Added {name} to the project (ref {new_ref_id})")
     return 0

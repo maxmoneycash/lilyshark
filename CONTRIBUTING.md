@@ -36,6 +36,11 @@
 
 ## Everyday commands
 
+The icon checks require Pillow and `rsvg-convert`. On Ubuntu, install
+`python3-pil librsvg2-bin` along with `libsdl2-dev`. On macOS, install
+`librsvg` with Homebrew and Pillow in the Python environment used for tests.
+The host gate also builds the macOS app when Xcode is available.
+
 ```sh
 ./scripts/test_all.sh --host-only        # host tests only (fast)
 ./scripts/test_all.sh                    # + simulator & t-deck builds, factory check

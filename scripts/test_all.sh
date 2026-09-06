@@ -115,10 +115,11 @@ python3 scripts/check_baked_tile_fallbacks.py
 
 # Sheet chrome is pure SwiftUI layout, so no unit test can see it. This is the
 # only automated check that a sheet's title cannot slide under its own Done
-# button, and the only one that catches a navigationBarTitleDisplayMode left
-# reachable from the macOS target -- which cannot be built from this checkout
-# at all, so the compiler will never report it.
+# button. The macOS compilation below also catches an iOS-only modifier left
+# reachable from a shared view.
 python3 scripts/check_sheet_chrome.py
+python3 scripts/add_ios_source.py --check
+python3 scripts/check_ios_design.py
 
 # The app icon is generated from the brand wordmark; this catches an icon that
 # was edited by hand and no longer matches the logo the web app and the deck
@@ -382,6 +383,7 @@ python3 -m unittest discover -s test/serial_smoke -p 'test_*.py'
 
 echo "Testing logo_asset"
 python3 -m unittest discover -s test/logo_asset -p 'test_*.py'
+python3 -m unittest discover -s test/ios_tooling -p 'test_*.py'
 
 echo "Testing tdeck_preflight"
 python3 -m unittest discover -s test/tdeck_preflight -p 'test_*.py'
@@ -462,9 +464,19 @@ fi
 
 echo "Testing deterministic pixels for all analyzer and shell screens"
 render_log="${test_dir}/simulator-render.log"
-if ! "${timeout_command}" 10 .pio/build/simulator/program --render-test >"${render_log}" 2>&1 || \
+render_result=0
+"${timeout_command}" 10 .pio/build/simulator/program --render-test >"${render_log}" 2>&1 || render_result=$?
+if [[ ${render_result} -ne 0 ]] || \
    ! grep -q '^Lilyshark simulator render test passed$' "${render_log}"; then
-  echo "Simulator pixel-output test did not complete" >&2
+  if [[ ${render_result} -eq 124 ]]; then
+    echo "Simulator pixel-output test timed out after 10 seconds" >&2
+  elif grep -q '^Simulator render failed: .* expected ' "${render_log}"; then
+    echo "Simulator pixel-output test failed: golden pixel mismatch" >&2
+  elif [[ ${render_result} -ne 0 ]]; then
+    echo "Simulator pixel-output test failed (exit ${render_result})" >&2
+  else
+    echo "Simulator pixel-output test exited without its success marker" >&2
+  fi
   cat "${render_log}" >&2
   exit 1
 fi
