@@ -98,14 +98,14 @@ function BrowserPreview() {
     <figure className="analyzer-preview">
       <div className="preview-titlebar" aria-hidden="true"><span>◦ ◦ ◦</span><span>LILYSHARK / TRAFFIC</span></div>
       <img className="analyzer-preview-image" src="/flash/analyzer-preview.png" width={1440} height={894} loading="lazy" alt="Lilyshark traffic analyzer showing a synthetic sample capture, airtime graph, and decoded LoRa frame" />
-      <figcaption>Traffic view · sample capture</figcaption>
+      <figcaption>Actual analyzer · synthetic sample capture</figcaption>
     </figure>
   );
 }
 
 function SourceMock() {
   const lines: [string, string][] = [
-    ["$", "git clone https://github.com/maxmoneycash/lilyshark"],
+    ["$", "git clone github.com/maxmoneycash/lilyshark"],
     ["$", "cd lilyshark"],
     ["$", "./scripts/build_release.sh"],
     ["", "dist/lilyshark-tdeck.factory.bin"],
@@ -126,7 +126,7 @@ function SourceMock() {
         <rect key={cx} x={cx - 3} y="11" width="6" height="6" fill="currentColor" opacity="0.55" />
       ))}
       <text x="210" y="17.5" textAnchor="middle" fontSize="8" letterSpacing="1.2" fill="currentColor" opacity="0.75">
-        LILYSHARK / BUILD
+        LILYSHARK — BUILD
       </text>
       {lines.map(([prompt, text], i) => {
         const y = 54 + i * 26;
@@ -187,11 +187,11 @@ const PLATFORMS = [
     name: "T-Deck Plus",
     chip: "ESP32-S3 · SX1262 · GPS",
     gps: true,
-    heroLabel: "T-Deck Plus",
+    heroLabel: "01 / Handheld analyzer",
     caption: `running ${FIRMWARE.version}`,
-    heading: "T-Deck Plus firmware",
+    heading: "Lilyshark for T-Deck Plus.",
     tagline:
-      "For the LILYGO T-Deck Plus with an SX1262 LoRa radio and built-in GPS.",
+      "LILYGO's pocket computer with a GPS on board — the full analyzer, with a fix for the nodes map.",
   },
   {
     id: "tdeck",
@@ -199,11 +199,11 @@ const PLATFORMS = [
     name: "T-Deck",
     chip: "ESP32-S3 · SX1262",
     gps: false,
-    heroLabel: "T-Deck",
+    heroLabel: "02 / Handheld analyzer",
     caption: `running ${FIRMWARE.version}`,
-    heading: "T-Deck firmware",
+    heading: "Lilyshark for T-Deck.",
     tagline:
-      "For the original LILYGO T-Deck with an SX1262 LoRa radio. Uses the same firmware image as the Plus; GPS requires an external receiver.",
+      "The same image on the original board. Every radio and capture tool works; only the GPS fix is absent.",
   },
   {
     id: "browser",
@@ -211,11 +211,11 @@ const PLATFORMS = [
     name: "Browser",
     chip: "ANALYZER · NO INSTALL",
     gps: false,
-    heroLabel: "Web analyzer",
-    caption: "USB / Web Serial",
-    heading: "Web analyzer",
+    heroLabel: "03 / Analyzer, no install",
+    caption: "web serial / bluetooth",
+    heading: "Lilyshark in the browser.",
     tagline:
-      "Connect a T-Deck running Lilyshark over USB to inspect live packets and spectrum data on a larger screen. You can also open saved captures or load sample traffic without a radio.",
+      "The same analyzer as a web page. Plug a flashed deck into a computer over USB, or pair one over Bluetooth — nothing to install, and it keeps working with no internet.",
   },
   {
     id: "source",
@@ -223,11 +223,11 @@ const PLATFORMS = [
     name: "From source",
     chip: "GPL-3.0 · PLATFORMIO",
     gps: false,
-    heroLabel: "Build from source",
+    heroLabel: "04 / Build it yourself",
     caption: "reproducible build",
-    heading: "Build from source",
+    heading: "Build it yourself.",
     tagline:
-      "The firmware is C++ with an LVGL interface, built using PlatformIO. Clone the repository to change the code, run the desktop simulator, or build a firmware image.",
+      "Clone the repository and build the same image this page serves. The release build is reproducible, so your checksum should match ours byte for byte.",
   },
 ] as const;
 
@@ -236,26 +236,26 @@ type PlatformKind = (typeof PLATFORMS)[number]["kind"];
 
 const CHECKLISTS: Record<PlatformKind, string[]> = {
   firmware: [
-    "LoRa packet capture and hex viewer",
-    "Spectrum waterfall and channel surveys",
-    "Node activity, RSSI and SNR history",
-    "microSD capture in .lscap and LoRaTap PCAP",
+    "Live LoRa traffic and packet inspection",
+    "Spectrum scan and band surveys",
+    "Node tracking and signal history",
+    "Capture to microSD, .lscap and PCAP",
   ],
   browser: [
-    "Live packets and spectrum data over USB",
-    "Decoded fields and hex dump",
-    "Node map and signal history",
-    "PCAP, CSV and JSON export",
-    "Sample captures for trying the tools",
-    "Available offline after the first load",
+    "Live traffic from a deck you have flashed",
+    "Packet inspector, raw bytes included",
+    "Nodes, map, spectrum and telemetry",
+    "USB on desktop Chrome or Edge",
+    "Bluetooth pairing where the browser allows it",
+    "No account, no cloud, works offline",
     "Open source, GPL-3.0",
   ],
   source: [
-    "Firmware source and build scripts",
-    "Factory image and SHA-256 checksums",
+    "The exact image this page flashes",
+    "Deterministic build, checksums to compare",
     "Pinned PlatformIO and toolchain",
     "A desktop simulator that runs the firmware",
-    "USB flashing script",
+    "One script to flash a connected deck",
     "Open source, GPL-3.0",
   ],
 };
@@ -267,48 +267,48 @@ const STEPS: Record<
   firmware: [
     {
       glyph: Glyph.download,
-      name: "Select your board",
+      name: "Pick a build",
       hint: "T-Deck or T-Deck Plus",
     },
     {
       glyph: Glyph.usb,
       name: "Connect USB",
-      hint: "use a cable that carries data",
+      hint: "data cable, device powered on",
     },
-    { glyph: Glyph.bolt, name: "Flash", hint: "select the USB port in the installer" },
+    { glyph: Glyph.bolt, name: "Flash", hint: "choose the port and install" },
   ],
   browser: [
     {
       glyph: Glyph.bolt,
       name: "Flash a deck",
-      hint: "install Lilyshark on your T-Deck",
+      hint: "any of the boards above",
     },
     {
       glyph: Glyph.usb,
-      name: "Connect the analyzer",
-      hint: "CONNECT → LILYSHARK T-DECK · USB",
+      name: "Open and connect",
+      hint: "CONNECT, then pick the link",
     },
     {
       glyph: Glyph.code,
-      name: "Inspect packets",
-      hint: "open a frame in TRAFFIC",
+      name: "Watch the mesh",
+      hint: "traffic, nodes, map, spectrum",
     },
   ],
   source: [
-    { glyph: Glyph.code, name: "Clone", hint: "get the source from GitHub" },
+    { glyph: Glyph.code, name: "Clone", hint: "GPL-3.0, no sign-up" },
     {
       glyph: Glyph.download,
       name: "Build",
-      hint: "run scripts/build_release.sh",
+      hint: "pinned toolchain, reproducible",
     },
-    { glyph: Glyph.usb, name: "Flash", hint: "run scripts/flash_tdeck.sh --auto" },
+    { glyph: Glyph.usb, name: "Flash", hint: "one script, one cable" },
   ],
 };
 
 const STEP_HEADING: Record<PlatformKind, string> = {
-  firmware: "Install over USB",
-  browser: "Connect a T-Deck",
-  source: "Build and flash",
+  firmware: "Three steps, one cable.",
+  browser: "Three steps, no install.",
+  source: "Three steps, from a clean clone.",
 };
 
 const CLONE_CMD =
@@ -348,21 +348,24 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
         <div className="lede">
           <div className="eyebrow">LILYSHARK / FIRMWARE INSTALLER</div>
           <h1>
-            Flash your <span>T-Deck.</span>
+            Small board.
+            <br />
+            <span>Big bite.</span>
           </h1>
           <p className="sub">
-            Install Lilyshark over USB from your browser, or download the
-            firmware and flash it yourself.
+            Turn your T-Deck into a handheld LoRa packet sniffer and RF
+            analyzer. Install Lilyshark straight from your browser.
           </p>
           <p className="release-note">
             <span className="status-dot" />
-            {FIRMWARE.version} <span className="release-divider">/</span> Developer alpha · GPL-3.0
+            {FIRMWARE.version} <span className="release-divider">/</span> Open
+            source. Made for the field.
           </p>
         </div>
 
         <div className="picker-heading">
           <span className="eyebrow">01 / Choose your platform</span>
-          <span className="picker-hint">T-Deck / T-Deck Plus</span>
+          <span className="picker-hint">Two boards. One firmware.</span>
         </div>
         <RadioGroup.Root
           className="devices"
@@ -403,7 +406,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
               </div>
             </div>
             <div className="hero-footnote">
-              <span>OPEN-SOURCE FIRMWARE</span>
+              <span>DESIGNED FOR THE FIELD</span>
               <span>LILYSHARK</span>
             </div>
           </div>
@@ -415,7 +418,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                 ? "Install the firmware"
                 : kind === "browser"
                   ? "Open the analyzer"
-                  : "Build from source"}
+                  : "Make it your own"}
             </div>
             <h2 id="product-heading">{selected.heading}</h2>
             <p className="tagline">{selected.tagline}</p>
@@ -450,7 +453,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                       </span>
                     </button>
                     <span slot="unsupported" className="unsupported">
-                      USB flashing requires Web Serial. Open this page in
+                      In-browser flashing needs Web Serial — open this page in
                       Chrome or Edge on a computer. The download links below
                       work anywhere.
                     </span>
@@ -487,8 +490,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                   <a href="#verify">Verify checksum</a>
                 </p>
                 <p className="ownership-note">
-                  Flashing replaces the firmware on your board. Back up any
-                  settings and files you want to keep.
+                  No account. No cloud. Yours to explore.
                 </p>
               </>
             ) : kind === "browser" ? (
@@ -499,7 +501,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                     <span className="cta-text">
                       Open the analyzer
                       <span className="cta-sub">
-                        USB live view · saved captures
+                        no install · works offline
                       </span>
                     </span>
                   </a>
@@ -513,9 +515,9 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                   </a>
                 </div>
                 <p className="meta">
-                  USB carries packet and spectrum data. Bluetooth supports
-                  mesh messaging in compatible browsers. To try a sample,
-                  open TRAFFIC and press SAMPLE.
+                  The analyzer links to a deck over USB with Web Serial, or over
+                  Bluetooth where the browser supports it. Nothing is uploaded:
+                  every capture stays in the tab until you export it.
                 </p>
               </>
             ) : (
@@ -542,7 +544,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                 <p className="meta">
                   Writes <b>dist/lilyshark-tdeck.factory.bin</b>, the
                   application image, the ELF and <b>dist/SHA256SUMS</b>. GitHub
-                  Actions on ubuntu-24.04 is the release environment;
+                  Actions on ubuntu-24.04 is the canonical release environment —
                   a build on another OS can embed different tool paths.
                 </p>
               </>
@@ -551,7 +553,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
         </div>
 
         <div className="card steps-card">
-          <div className="eyebrow">03 / Getting started</div>
+          <div className="eyebrow">03 / From cable to capture</div>
           <h3>{STEP_HEADING[kind]}</h3>
           <div className="steps">
             {STEPS[kind].map((s) => (
@@ -567,11 +569,11 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
         {kind === "firmware" ? (
           <div className="support-layout">
               <div className="card verify-card" id="verify">
-                <div className="eyebrow">SHA-256</div>
-                <h3>Verify the download</h3>
+                <div className="eyebrow">Trust, verified</div>
+                <h3>Check your image.</h3>
                 <p className="card-sub">
-                  Run this command on the downloaded factory image and
-                  compare the result with the SHA-256 below.
+                  Downloaded the binary? Check it against the SHA-256 below.
+                  This is the exact factory image served by the installer.
                 </p>
                 <div className="firmware-facts">
                   <span>{FIRMWARE.bytes} bytes</span>
@@ -593,14 +595,14 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
               </div>
 
               <div className="help-panel">
-                <div className="eyebrow">Troubleshooting</div>
-                <h3>USB flashing help</h3>
+                <div className="eyebrow">A little help</div>
+                <h3>Before you unplug.</h3>
                 <details>
                   <summary>My board doesn't appear</summary>
                   <div>
                     <span>
-                      · Check that your USB cable carries data. A charge-only
-                      cable will power the board without exposing a serial port.
+                      · Swap the cable first — most "broken" flashes are
+                      charge-only cables.
                     </span>
                     <span>
                       · Force the bootloader: hold the trackball center down,
@@ -622,9 +624,10 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                   <summary>What gets installed</summary>
                   <div>
                     <span>
-                      The factory image includes the bootloader, partition
-                      table and Lilyshark application. It replaces the firmware
-                      currently on your T-Deck.
+                      The same factory image the repository builds: the complete
+                      Lilyshark firmware — live traffic, packet inspector,
+                      spectrum scan, node tracking, surveys, capture to microSD,
+                      and the Shelby off-grid pointer pipeline.
                     </span>
                     <span>
                       After flashing, open <a href={tabHref("TRAFFIC")} onClick={(event) => openPage(event, "TRAFFIC")}>the analyzer</a>, press
@@ -644,7 +647,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                   </div>
                 </details>
                 <a className="help-link" href={`${REPO}/issues`}>
-                  Report an issue on GitHub
+                  Still stuck? Open an issue
                 </a>
               </div>
             </div>
