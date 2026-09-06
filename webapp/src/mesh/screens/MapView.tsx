@@ -1,3 +1,4 @@
+import { mapPinMarkup } from "../../components/UiIcon";
 import L from "leaflet";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import "leaflet/dist/leaflet.css";
@@ -144,7 +145,7 @@ interface Draft {
 	lon: number;
 	name: string;
 	desc: string;
-	icon: string; // a single emoji
+	icon: number; // preserved protocol value; the interface uses a vector pin
 	expireH: number; // hours · 0 = never expires
 }
 
@@ -224,7 +225,7 @@ export default function MapView({
 				lon: e.latlng.lng,
 				name: "",
 				desc: "",
-				icon: "📍",
+				icon: 0,
 				expireH: 0,
 			});
 		});
@@ -446,14 +447,14 @@ export default function MapView({
 			}
 		}
 
-		// Waypoints: emoji pin. Popup in the DOM (not HTML) so the edit/delete
+		// Waypoints use a vector pin; saved icon codes remain untouched.
+		// Popup controls use DOM handlers so edit/delete
 		// buttons can be attached directly.
 		for (const w of s.waypoints.values()) {
-			const emoji = w.icon ? String.fromCodePoint(w.icon) : "📍";
 			const box = document.createElement("div");
 			box.innerHTML =
 				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">WAYPOINT · ${fmtHemisphere(w.lat, w.lon)}</div>` +
-				`<div style="font-weight:700;margin:4px 0;">${emoji} ${w.name || t("(unnamed)")}</div>` +
+				`<div style="font-weight:700;margin:4px 0;">${w.name || t("(unnamed)")}</div>` +
 				(w.description
 					? `<div style="margin-bottom:4px;">${w.description}</div>`
 					: "") +
@@ -475,7 +476,7 @@ export default function MapView({
 					lon: w.lon,
 					name: w.name,
 					desc: w.description,
-					icon: emoji,
+					icon: w.icon,
 					expireH: 0,
 				});
 			};
@@ -491,7 +492,7 @@ export default function MapView({
 			L.marker([w.lat, w.lon], {
 				icon: L.divIcon({
 					className: "",
-					html: `<div style="font-size:22px;line-height:22px;text-shadow:0 0 4px #000;">${emoji}</div>`,
+					html: `<div style="line-height:26px;color:var(--fg);">${mapPinMarkup}</div>`,
 					iconSize: [22, 22],
 					iconAnchor: [11, 22],
 				}),
@@ -772,7 +773,7 @@ export default function MapView({
 							{(
 								[
 									["all", t("ALL")],
-									["fav", t("★ FAV")],
+									["fav", t("FAVORITES")],
 									["active", t("ACTIVE 1H")],
 								] as const
 							).map(([key, label]) => (
@@ -1074,16 +1075,7 @@ export default function MapView({
 									onChange={(e) => setDraft({ ...draft, desc: e.target.value })}
 								/>
 								<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-									<input
-										style={{ width: 50, textAlign: "center" }}
-										value={draft.icon}
-										onChange={(e) =>
-											setDraft({
-												...draft,
-												icon: [...e.target.value].pop() ?? "",
-											})
-										}
-									/>
+
 									<input
 										type="number"
 										min={0}
@@ -1106,14 +1098,14 @@ export default function MapView({
 													lon: draft.lon,
 													name: draft.name,
 													description: draft.desc,
-													icon: draft.icon.codePointAt(0) ?? 0,
+												icon: draft.icon,
 													expire: draft.expireH
 														? Math.floor(Date.now() / 1000) +
 															draft.expireH * 3600
 														: 0,
 													lockedTo: 0,
 												});
-												setWpMsg(t("WAYPOINT SENT ✓"));
+												setWpMsg(t("WAYPOINT SENT"));
 												setDraft(undefined);
 											} catch (e) {
 												setWpMsg(`ERROR: ${e}`);

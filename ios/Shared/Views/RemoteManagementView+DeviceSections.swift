@@ -48,7 +48,7 @@ struct RemoteSecuritySection: View {
                         Text("Set")
                             .foregroundStyle(MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
                 .listRowBackground(MeshTheme.surface)
             }
@@ -76,7 +76,7 @@ struct RemoteSecuritySection: View {
                     Text("Set")
                         .foregroundStyle(MeshTheme.accent)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
             }
             .listRowBackground(MeshTheme.surface)
 
@@ -119,7 +119,7 @@ struct RemoteGPSSection: View {
                         (gpsSyncFeedback ? Label("Clock Synced", systemImage: "checkmark.circle.fill") : Label("Sync Time", systemImage: "clock.arrow.2.circlepath"))
                             .foregroundStyle(gpsSyncFeedback ? .green : MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
 
                     Spacer()
 
@@ -134,7 +134,7 @@ struct RemoteGPSSection: View {
                         (gpsLocFeedback ? Label("Location Set", systemImage: "checkmark.circle.fill") : Label("Set from Hardware GPS", systemImage: "antenna.radiowaves.left.and.right"))
                             .foregroundStyle(gpsLocFeedback ? .green : MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
                 .listRowBackground(MeshTheme.surface)
 
@@ -226,7 +226,7 @@ struct RemoteClockRow: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
 
             HStack(spacing: 6) {
                 if isClockStale {
@@ -254,7 +254,7 @@ struct RemoteClockRow: View {
                     }
                     .foregroundStyle(MeshTheme.accent)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
             }
         }
         .listRowBackground(MeshTheme.surface)

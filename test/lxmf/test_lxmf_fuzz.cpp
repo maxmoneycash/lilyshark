@@ -24,13 +24,13 @@ std::vector<std::uint8_t> goodMessage()
     for (int i = 0; i < 16; ++i) frame.push_back(static_cast<std::uint8_t>(0x10 + i));
     for (int i = 0; i < 16; ++i) frame.push_back(static_cast<std::uint8_t>(0x20 + i));
     for (int i = 0; i < 64; ++i) frame.push_back(static_cast<std::uint8_t>((i * 3) & 0xff));
-    // msgpack: fixarray(4), float64, bin8 "HELLO", bin8 "T", fixmap(1) 1 -> 7
+    // msgpack: fixarray(4), float64, title "T", content "HELLO", fixmap(1) 1 -> 7
     frame.push_back(0x94);
     frame.push_back(0xcb);
     for (int i = 0; i < 8; ++i) frame.push_back(0x40);
+    frame.push_back(0xc4); frame.push_back(0x01); frame.push_back('T');
     frame.push_back(0xc4); frame.push_back(0x05);
     for (char c : {'H', 'E', 'L', 'L', 'O'}) frame.push_back(static_cast<std::uint8_t>(c));
-    frame.push_back(0xc4); frame.push_back(0x01); frame.push_back('T');
     frame.push_back(0x81); frame.push_back(0x01); frame.push_back(0x07);
     return frame;
 }

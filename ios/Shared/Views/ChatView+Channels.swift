@@ -20,6 +20,11 @@ import AppKit
 // MARK: - Channel Chat View
 
 struct ChannelChatView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var followsLatest = true
+    @State private var hasPositionedInitially = false
+    @State private var isVisible = false
+    @Environment(NavigationStore.self) private var navigationStore
     let channelIndex: UInt8
     let channelName: String
     @Environment(ContactStore.self) private var contactStore
@@ -61,8 +66,10 @@ struct ChannelChatView: View {
                     Text(channelName)
                         .font(.headline)
                         .foregroundStyle(MeshTheme.textPrimary)
+                        .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
+                .accessibilityLabel("Channel details for \(channelName)")
             }
             #endif
             ToolbarItem(placement: .automatic) {
@@ -72,7 +79,9 @@ struct ChannelChatView: View {
                     } label: {
                         Image(systemName: "location.fill")
                             .foregroundStyle(MeshTheme.accent)
+                            .touchable()
                     }
+                    .accessibilityLabel("Send location to channel")
                     Button {
                         // Cycle notification mode: all → mentions → muted → all
                         let next: String
@@ -88,21 +97,31 @@ struct ChannelChatView: View {
                     } label: {
                         Image(systemName: notifyMode == "muted" ? "bell.slash" : notifyMode == "mentions" ? "at" : "bell.fill")
                             .foregroundStyle(MeshTheme.accent)
+                            .touchable()
                     }
+                    .accessibilityLabel("Channel notifications")
+                    .accessibilityValue(notifyMode == "muted" ? "Muted" : notifyMode == "mentions" ? "Mentions only" : "All messages")
+                    .accessibilityHint("Changes the notification setting for this channel")
                 }
             }
         }
         #endif
         .onAppear {
+            isVisible = true
+            navigationStore.visibleConversationKey = channelKey
             notifyMode = channelStore.channelNotifyMode(for: channelName).rawValue
             if messageText.isEmpty {
                 messageText = messageStoreManager.loadDraft(for: channelKey)
             }
             DispatchQueue.main.async {
-                messageStoreManager.markAsRead(contactKey: channelKey)
+                markAsReadIfVisible()
             }
         }
         .onDisappear {
+            isVisible = false
+            if navigationStore.visibleConversationKey == channelKey {
+                navigationStore.visibleConversationKey = nil
+            }
             messageStoreManager.saveDraft(messageText, for: channelKey)
         }
         .onReceive(NotificationCenter.default.publisher(for: .insertMention)) { notification in
@@ -117,23 +136,23 @@ struct ChannelChatView: View {
         }
     }
 
+    private func markAsReadIfVisible() {
+        guard isVisible, navigationStore.isMessagesSectionVisible,
+              navigationStore.visibleConversationKey == channelKey else { return }
+        #if os(macOS)
+        guard NSApplication.shared.isUserViewing else { return }
+        #else
+        guard scenePhase == .active else { return }
+        #endif
+        messageStoreManager.markAsRead(contactKey: channelKey)
+    }
+
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 if messages.isEmpty {
-                    VStack(spacing: 12) {
-                        Spacer(minLength: 60)
-                        Image(systemName: "number.square")
-                            .font(.largeTitle)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        Text("No messages yet")
-                            .font(.subheadline)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        Text("Messages sent to this channel will appear here.")
-                            .font(.caption)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ContentUnavailableView("Channel messages", systemImage: "number.square",
+                                           description: Text("Messages this deck reports for the channel will appear here."))
                 }
                 LazyVStack(spacing: 4) {
                     ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
@@ -145,17 +164,43 @@ struct ChannelChatView: View {
                         }
                         ChannelMessageBubble(message: message)
                             .id(message.id)
+                            .transition(.opacity)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .meshAnimation(Design.Motion.quick, value: messages.last?.id)
             }
+            .chatScrollTracking(followsLatest: $followsLatest)
             #if !os(watchOS)
             .scrollDismissesKeyboard(.interactively)
             #endif
-            .onChange(of: messages.count) {
-                if let last = messages.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
+            .safeAreaInset(edge: .bottom) {
+                if !followsLatest && !messages.isEmpty {
+                    Button {
+                        followsLatest = true
+                        if let last = messages.last {
+                            withMeshAnimation(reduceMotion: reduceMotion) {
+                                proxy.scrollTo(last.id, anchor: .bottom)
+                            }
+                        }
+                    } label: {
+                        Label("Latest messages", systemImage: "arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal)
+                            .touchable()
+                    }
+                    .buttonStyle(.meshSecondary)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.bottom, 8)
+                    .transition(.opacity)
+                }
+            }
+            .onChange(of: messages.last?.id) {
+                guard isVisible && navigationStore.isMessagesSectionVisible else { return }
+                if let last = messages.last, followsLatest || last.isOutgoing {
+                    followsLatest = true
+                    withMeshAnimation(Design.Motion.quick, reduceMotion: reduceMotion) {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }
                 }
@@ -165,33 +210,37 @@ struct ChannelChatView: View {
                 #else
                 guard scenePhase == .active else { return }
                 #endif
-                withAnimation { unreadDividerIndex = nil }
+                withMeshAnimation(reduceMotion: reduceMotion) { unreadDividerIndex = nil }
                 DispatchQueue.main.async {
-                    messageStoreManager.markAsRead(contactKey: channelKey)
+                    markAsReadIfVisible()
                 }
             }
             #if os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification).merge(with: NotificationCenter.default.publisher(for: NSWindow.didDeminiaturizeNotification))) { _ in
-                withAnimation { unreadDividerIndex = nil }
+                guard isVisible && navigationStore.isMessagesSectionVisible else { return }
+                withMeshAnimation(reduceMotion: reduceMotion) { unreadDividerIndex = nil }
                 DispatchQueue.main.async {
-                    messageStoreManager.markAsRead(contactKey: channelKey)
+                    markAsReadIfVisible()
                 }
             }
             #else
             .onChange(of: scenePhase) { _, newPhase in
-                if newPhase == .active {
-                    withAnimation { unreadDividerIndex = nil }
+                if newPhase == .active && isVisible && navigationStore.isMessagesSectionVisible {
+                    withMeshAnimation(reduceMotion: reduceMotion) { unreadDividerIndex = nil }
                     DispatchQueue.main.async {
-                        messageStoreManager.markAsRead(contactKey: channelKey)
+                        markAsReadIfVisible()
                     }
                 }
             }
             #endif
             .onAppear {
+                guard !hasPositionedInitially else { return }
+                hasPositionedInitially = true
                 unreadDividerIndex = messageStoreManager.firstUnreadIndex(in: messages, for: channelKey)
                 // Delay scroll to let LazyVStack lay out content
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     if let idx = unreadDividerIndex, idx < messages.count {
+                        followsLatest = idx >= messages.count - 1
                         proxy.scrollTo(messages[idx].id, anchor: .center)
                     } else if let last = messages.last {
                         proxy.scrollTo(last.id, anchor: .bottom)
@@ -200,7 +249,7 @@ struct ChannelChatView: View {
                 // Clear the divider after user has had time to see it
                 if unreadDividerIndex != nil {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        withAnimation { unreadDividerIndex = nil }
+                        withMeshAnimation(reduceMotion: reduceMotion) { unreadDividerIndex = nil }
                     }
                 }
             }
@@ -235,7 +284,7 @@ struct ChannelChatView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                             Divider()
                         }
                     }
@@ -271,6 +320,8 @@ struct ChannelChatView: View {
                                     : MeshTheme.accent
                             )
                     }
+                    .buttonStyle(.meshPlain)
+                    .accessibilityLabel("Send to \(channelName)")
                     .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(.horizontal, 12)
@@ -325,7 +376,7 @@ struct ChannelChatView: View {
             return
         }
         let (fLat, fLon) = PommeCoreViewModel.fudgeLocation(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
-        let text = "\u{1F4CD} \(formatCoordinate(fLat)), \(formatCoordinate(fLon))"
+        let text = "Location: \(formatCoordinate(fLat)), \(formatCoordinate(fLon))"
         messageStoreManager.sendChannelMessage(text, channelIndex: channelIndex)
         messageStoreManager.playHapticFeedback()
         DebugLogger.shared.log("LOCATION: sent to channel \(channelIndex)", level: .tx)
@@ -336,6 +387,12 @@ struct ChannelChatView: View {
 
 /// Chat view for room servers — requires login, shows room messages, has gear icon for management.
 struct RoomChatView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var followsLatest = true
+    @State private var hasPositionedInitially = false
+    @State private var isVisible = false
+    @Environment(NavigationStore.self) private var navigationStore
     let contact: Contact
     @Environment(ContactStore.self) private var contactStore
     @Environment(RemoteSessionManager.self) private var remoteSessionManager
@@ -390,7 +447,7 @@ struct RoomChatView: View {
                 // Status bar — session persists until firmware timeout or reboot
                 HStack(spacing: 6) {
                     Image(systemName: "circle.fill")
-                        .font(.system(size: 6))
+                        .font(.caption2)
                         .foregroundStyle(statusBarColor)
                     Text(loginStatusText)
                         .font(.caption)
@@ -459,8 +516,29 @@ struct RoomChatView: View {
         }
         #endif
         .onAppear {
-            messageStoreManager.markAsRead(contact)
+            isVisible = true
+            navigationStore.visibleConversationKey = contact.publicKeyPrefix
+            DispatchQueue.main.async {
+                markAsReadIfVisible()
+            }
         }
+        .onDisappear {
+            isVisible = false
+            if navigationStore.visibleConversationKey == contact.publicKeyPrefix {
+                navigationStore.visibleConversationKey = nil
+            }
+        }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification).merge(with: NotificationCenter.default.publisher(for: NSWindow.didDeminiaturizeNotification))) { _ in
+            DispatchQueue.main.async { markAsReadIfVisible() }
+        }
+        #else
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                DispatchQueue.main.async { markAsReadIfVisible() }
+            }
+        }
+        #endif
         // No onDisappear logout — firmware handles session timeout.
         // Clearing local state causes mismatch with firmware and unresponsiveness.
         // Dismiss management sheet if logged out while it's open
@@ -481,27 +559,66 @@ struct RoomChatView: View {
                         }
                         RoomMessageBubble(message: message)
                             .id(message.id)
+                            .transition(.opacity)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .meshAnimation(Design.Motion.quick, value: messages.last?.id)
             }
+            .chatScrollTracking(followsLatest: $followsLatest)
             #if !os(watchOS)
             .scrollDismissesKeyboard(.interactively)
             #endif
-            .onChange(of: messages.count) {
-                if let last = messages.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
+            .safeAreaInset(edge: .bottom) {
+                if !followsLatest && !messages.isEmpty {
+                    Button {
+                        followsLatest = true
+                        if let last = messages.last {
+                            withMeshAnimation(reduceMotion: reduceMotion) {
+                                proxy.scrollTo(last.id, anchor: .bottom)
+                            }
+                        }
+                    } label: {
+                        Label("Latest messages", systemImage: "arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal)
+                            .touchable()
+                    }
+                    .buttonStyle(.meshSecondary)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.bottom, 8)
+                    .transition(.opacity)
+                }
+            }
+            .onChange(of: messages.last?.id) {
+                guard isVisible && navigationStore.isMessagesSectionVisible else { return }
+                if let last = messages.last, followsLatest || last.isOutgoing {
+                    followsLatest = true
+                    withMeshAnimation(Design.Motion.quick, reduceMotion: reduceMotion) {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }
                 }
             }
             .onAppear {
+                guard !hasPositionedInitially else { return }
+                hasPositionedInitially = true
                 if let last = messages.last {
                     proxy.scrollTo(last.id, anchor: .bottom)
                 }
             }
         }
+    }
+
+    private func markAsReadIfVisible() {
+        guard isVisible, navigationStore.isMessagesSectionVisible,
+              navigationStore.visibleConversationKey == contact.publicKeyPrefix else { return }
+        #if os(macOS)
+        guard NSApplication.shared.isUserViewing else { return }
+        #else
+        guard scenePhase == .active else { return }
+        #endif
+        messageStoreManager.markAsRead(contactKey: contact.publicKeyPrefix)
     }
 
     private var roomMessageInput: some View {
@@ -531,6 +648,8 @@ struct RoomChatView: View {
                                 : MeshTheme.accent
                         )
                 }
+                .buttonStyle(.meshPlain)
+                .accessibilityLabel("Send message to room")
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding(.horizontal, 12)
@@ -685,7 +804,7 @@ struct RoomChatView: View {
                         Label("Forget Saved Password", systemImage: "trash")
                             .font(.caption)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
             }
 
@@ -695,7 +814,7 @@ struct RoomChatView: View {
                     .font(.subheadline)
                     .foregroundStyle(MeshTheme.accent)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             #endif
 
             Spacer()
@@ -828,7 +947,7 @@ struct RoomMessageBubble: View {
                                 .font(.caption2)
                                 .foregroundStyle(MeshTheme.textSecondary)
                             if hops == 0 || hops == 0xFF {
-                                Text("direct")
+                                Text(hops == 0xFF ? "Hops not reported" : "Direct")
                                     .font(.caption2)
                                     .foregroundStyle(MeshTheme.textSecondary)
                             } else {
@@ -863,8 +982,9 @@ struct RoomMessageBubble: View {
                         .padding(.vertical, 4)
                         .background(MeshTheme.surfaceLight)
                         .clipShape(Capsule())
+                        .touchable()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
             }
             .contentShape(Rectangle())
@@ -1010,7 +1130,7 @@ struct RepeaterLoginView: View {
                             Label("Forget Saved Password", systemImage: "trash")
                                 .font(.caption)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                     }
                 }
 

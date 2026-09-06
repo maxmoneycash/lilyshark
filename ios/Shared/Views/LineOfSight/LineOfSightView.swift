@@ -149,7 +149,7 @@ struct LineOfSightView: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut, value: showCopiedFeedback)
+            .meshAnimation(Design.Motion.quick, value: showCopiedFeedback)
         }
         #if os(macOS) || targetEnvironment(macCatalyst)
         .frame(minWidth: 500, minHeight: 600)

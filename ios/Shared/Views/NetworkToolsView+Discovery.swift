@@ -40,9 +40,9 @@ struct DiscoverView: View {
                                 .controlSize(.small)
                         }
                     }
-                    .contentShape(Rectangle())
+                    .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
 
                 if remoteSessionManager.isDiscovering || isTimedDiscovery {
@@ -64,14 +64,14 @@ struct DiscoverView: View {
                                     .monospacedDigit()
                             }
                         }
-                        .contentShape(Rectangle())
+                        .touchable()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .listRowBackground(MeshTheme.surface)
                 }
 
                 if remoteSessionManager.isDiscovering {
-                    ActivityOverlay(message: "Scanning for nearby nodes...", timeout: 30)
+                    ActivityOverlay(message: "Waiting for discovery replies from the radio…", timeout: 30)
                         .listRowBackground(MeshTheme.surface)
                 }
 
@@ -121,9 +121,9 @@ struct DiscoverView: View {
                                 .monospacedDigit()
                         }
                     }
-                    .contentShape(Rectangle())
+                    .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             } header: {
                 Text("Timed Discovery")
@@ -135,21 +135,11 @@ struct DiscoverView: View {
 
             if remoteSessionManager.discoveredNodes.isEmpty {
                 Section {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 8) {
-                            Image(systemName: "sensor.tag.radiowaves.forward")
-                                .font(.system(size: 36))
-                                .foregroundStyle(MeshTheme.textSecondary)
-                            Text("No nodes discovered")
-                                .font(.subheadline)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                            Text("Tap Start Discover to scan the mesh")
-                                .font(.caption)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                        }
-                        Spacer()
-                    }
+                    ContentUnavailableView(
+                        "No discovery replies yet",
+                        systemImage: "sensor.tag.radiowaves.forward",
+                        description: Text("Start discovery to request replies from nearby nodes. An empty list does not mean the radio band is quiet.")
+                    )
                     .listRowBackground(MeshTheme.surface)
                 }
             } else {
@@ -184,12 +174,18 @@ struct DiscoverView: View {
                     Text(typeName(for: node.type))
                         .font(.caption2)
                         .foregroundStyle(MeshTheme.textSecondary)
-                    if node.pathLen == 0 {
-                        Text("direct")
-                            .font(.caption2)
-                            .foregroundStyle(MeshTheme.connected)
+                    if let pathLen = node.pathLen {
+                        if pathLen == 0 {
+                            Text("direct")
+                                .font(.caption2)
+                                .foregroundStyle(MeshTheme.connected)
+                        } else {
+                            Text("^[\(pathLen) hop](inflect: true)")
+                                .font(.caption2)
+                                .foregroundStyle(MeshTheme.textSecondary)
+                        }
                     } else {
-                        Text("^[\(node.pathLen) hop](inflect: true)")
+                        Text("Path not reported")
                             .font(.caption2)
                             .foregroundStyle(MeshTheme.textSecondary)
                     }
@@ -197,14 +193,21 @@ struct DiscoverView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text("SNR \(node.snr)")
-                    .font(.caption2)
-                    .foregroundStyle(snrColor(node.snr))
-                Text("RSSI \(node.rssi)")
+                if let snr = node.snr {
+                    Text("SNR \(snr)")
+                        .font(.caption2)
+                        .foregroundStyle(snrColor(snr))
+                } else {
+                    Text("SNR not reported")
+                        .font(.caption2)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                }
+                Text(node.rssi.map { "RSSI \($0) dBm" } ?? "RSSI not reported")
                     .font(.caption2)
                     .foregroundStyle(MeshTheme.textSecondary)
             }
         }
+        .accessibilityElement(children: .combine)
         .listRowBackground(MeshTheme.surface)
     }
 
@@ -385,7 +388,7 @@ struct StatusInfoView: View {
 
     private var batteryString: String {
         let mv = Int(status.batteryMV)
-        if mv == 0 { return "\u{2014}" }
+        if mv == 0 { return "Not reported" }
         return String(format: "%.2fV", Double(mv) / 1000.0)
     }
 
@@ -434,8 +437,11 @@ struct TelemetryView: View {
             }
 
             if readings.isEmpty {
-                Text("No telemetry data")
-                    .foregroundStyle(MeshTheme.textSecondary)
+                ContentUnavailableView(
+                    "Telemetry not reported",
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    description: Text("This response contained no sensor readings. Available readings depend on the node's sensors and sharing settings.")
+                )
             } else {
                 VStack(spacing: 8) {
                     ForEach(readings) { reading in

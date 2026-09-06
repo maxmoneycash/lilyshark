@@ -283,7 +283,7 @@ export default function Mesh() {
 								className="warn"
 								style={{ fontSize: 10, letterSpacing: 2, marginBottom: 4 }}
 							>
-								{t("★ SILENT FAVORITES")}
+								{t("SILENT FAVORITES")}
 							</div>
 							<div style={{ maxHeight: 92, overflowY: "auto" }}>
 								{sum.silent.map((n) => (
@@ -308,14 +308,14 @@ export default function Mesh() {
 					<span style={{ display: "flex", gap: 10, alignItems: "center" }}>
 						<button
 							className={view === "graph" ? "tab active" : "tab"}
-							style={{ fontSize: 10 }}
+
 							onClick={() => setView("graph")}
 						>
 							{t("GRAPH")}
 						</button>
 						<button
 							className={view === "activity" ? "tab active" : "tab"}
-							style={{ fontSize: 10 }}
+
 							onClick={() => setView("activity")}
 						>
 							{t("ACTIVITY")}
@@ -330,14 +330,14 @@ export default function Mesh() {
 								<button
 									key={h}
 									className={actHours === h ? "tab active" : "tab"}
-									style={{ fontSize: 10 }}
+
 									onClick={() => setActHours(h)}
 								>
 									{h === 168 ? t("7 D") : `${h} H`}
 								</button>
 							))}
 						<button
-							style={{ fontSize: 10, padding: "0 6px" }}
+
 							title={t("Reload neighbors and traceroutes from the database")}
 							onClick={() => setReload((v) => v + 1)}
 						>
@@ -511,9 +511,9 @@ export default function Mesh() {
 									<span>{short(sel)}</span>
 									<button
 										onClick={() => setSel(undefined)}
-										style={{ width: 22, height: 22, padding: 0, fontSize: 12 }}
+
 									>
-										✕
+										CLOSE
 									</button>
 								</div>
 								<div style={{ padding: "10px 12px" }}>

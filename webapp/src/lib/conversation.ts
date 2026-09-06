@@ -286,7 +286,7 @@ export function conversationLabel(address: FrameAddressing): string | null {
 	if (src !== null && dst !== null)
 		return dst === MESHTASTIC_BROADCAST_HEX || src === dst
 			? `${addressLabel(src)} → ${addressLabel(dst)}`
-			: `${addressLabel(src)} ↔ ${addressLabel(dst)}`;
+    : `${addressLabel(src)} / ${addressLabel(dst)}`;
 	if (dst !== null) return `→ ${addressLabel(dst)}`;
 	if (src !== null) return `${addressLabel(src)} →`;
 	return null;

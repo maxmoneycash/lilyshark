@@ -10,20 +10,22 @@
 
 import Foundation
 
-/// A node discovered via the discover feature (PUSH_CODE_CONTROL_DATA).
+/// A node discovered via control data or a contact advertisement.
 public struct DiscoveredNode: Identifiable, Sendable {
     public var id: Data { publicKey }
 
     public let publicKey: Data
     public let name: String
     public let type: ContactType
-    public let snr: Int8
-    public let rssi: Int8
-    public let pathLen: UInt8
+    /// Signal measurements are absent for contact advertisements; zero is a reading.
+    public let snr: Int8?
+    public let rssi: Int8?
+    /// The reported incoming path, independent of a contact's outgoing route.
+    public let pathLen: UInt8?
     public let latitude: Double
     public let longitude: Double
 
-    public init(publicKey: Data, name: String, type: ContactType, snr: Int8, rssi: Int8, pathLen: UInt8, latitude: Double = 0, longitude: Double = 0) {
+    public init(publicKey: Data, name: String, type: ContactType, snr: Int8?, rssi: Int8?, pathLen: UInt8?, latitude: Double = 0, longitude: Double = 0) {
         self.publicKey = publicKey
         self.name = name
         self.type = type
@@ -32,6 +34,13 @@ public struct DiscoveredNode: Identifiable, Sendable {
         self.pathLen = pathLen
         self.latitude = latitude
         self.longitude = longitude
+    }
+
+    /// A contact advert contains neither receive signal measurements nor an incoming path.
+    public init(advert contact: Contact) {
+        self.init(publicKey: contact.publicKeyPrefix, name: contact.name, type: contact.type,
+                  snr: nil, rssi: nil, pathLen: nil,
+                  latitude: contact.latitude, longitude: contact.longitude)
     }
 }
 

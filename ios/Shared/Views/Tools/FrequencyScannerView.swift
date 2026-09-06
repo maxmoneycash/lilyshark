@@ -24,6 +24,11 @@ struct FrequencyScannerView: View {
     @State private var isScanning = false
     @State private var presetToApply: ScanResult?
 
+    private var canScan: Bool {
+        connectionManager.connectionState == .ready && !connectionManager.isMeshtasticLinkActive
+            && deviceConfig.loadedSections.contains("selfInfo") && !deviceConfig.publicKeyHex.isEmpty
+    }
+
     private var sortedResults: [ScanResult] {
         results.sorted {
             if $0.status == .detected && $1.status != .detected { return true }
@@ -44,9 +49,13 @@ struct FrequencyScannerView: View {
 
             Section {
                 if results.isEmpty && !isScanning {
-                    Text("Tap Scan to check which frequencies have mesh activity nearby.")
-                        .font(.subheadline)
-                        .foregroundStyle(MeshTheme.textSecondary)
+                    ContentUnavailableView(
+                        "No scan observations",
+                        systemImage: "antenna.radiowaves.left.and.right",
+                        description: Text(canScan
+                            ? "Scan requests each preset and watches for contact updates. Radio tuning is not confirmed, so results cannot prove a frequency is active or quiet."
+                            : "Connect a MeshCore radio and wait for its current radio settings before scanning.")
+                    )
                         .listRowBackground(MeshTheme.surface)
                 } else {
                     ForEach(sortedResults) { result in
@@ -56,7 +65,7 @@ struct FrequencyScannerView: View {
             } header: {
                 Text("Scan Results")
             } footer: {
-                Text("Scanning temporarily changes your radio settings. Incoming messages may be missed during the scan (\(results.count * 5)s total).")
+                Text("Scanning requests temporary radio changes and may interrupt messages. Each preset is observed for 5 seconds. Counts are contact updates, not packet counts; tuning and restoration are not confirmed by this view.")
             }
         }
         .formStyle(.grouped)
@@ -71,7 +80,7 @@ struct FrequencyScannerView: View {
                     Button("Cancel", role: .cancel) { cancelScan() }
                 } else {
                     Button("Scan") { startScan() }
-                        .disabled(connectionManager.connectionState != .ready)
+                        .disabled(!canScan)
                 }
             }
         }
@@ -101,7 +110,10 @@ struct FrequencyScannerView: View {
         let bwStr = result.preset.bandwidth >= 1
             ? "\(Int(result.preset.bandwidth))kHz"
             : "\(result.preset.bandwidth)kHz"
-        return HStack(spacing: 12) {
+        return Button {
+            presetToApply = result
+        } label: {
+          HStack(spacing: 12) {
             statusIcon(result.status)
             VStack(alignment: .leading, spacing: 2) {
                 Text(result.preset.name)
@@ -110,20 +122,34 @@ struct FrequencyScannerView: View {
                 Text("\(freq) · SF\(result.preset.spreadingFactor) · \(bwStr)")
                     .font(.caption)
                     .foregroundStyle(MeshTheme.textSecondary)
+                if result.status == .clear {
+                    Text("No contact updates observed")
+                        .font(.caption)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                } else if result.status == .interrupted {
+                    Text("Observation interrupted")
+                        .font(.caption)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                } else if result.status == .pending {
+                    Text("Not scanned")
+                        .font(.caption)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                }
             }
             Spacer()
             if result.packetsReceived > 0 {
-                Text("\(result.packetsReceived) pkt")
+                Text("\(result.packetsReceived) updates")
                     .font(.caption2)
                     .foregroundStyle(.green)
             }
+          }
+          .touchable()
         }
-        .contentShape(Rectangle())
+        .buttonStyle(.meshPlain)
+        .disabled(result.status != .detected || isScanning || !canScan)
         .listRowBackground(result.status == .detected ? MeshTheme.accent.opacity(0.1) : MeshTheme.surface)
-        .onTapGesture {
-            guard result.status == .detected, !isScanning else { return }
-            presetToApply = result
-        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(result.status == .clear ? "No contact updates observed; radio tuning unconfirmed" : "Radio tuning unconfirmed")
     }
 
     @ViewBuilder
@@ -145,12 +171,18 @@ struct FrequencyScannerView: View {
             Image(systemName: "xmark")
                 .foregroundStyle(MeshTheme.textSecondary)
                 .frame(width: 24)
+        case .interrupted:
+            Image(systemName: "pause.circle")
+                .foregroundStyle(MeshTheme.textSecondary)
+                .frame(width: 24)
         }
     }
 
     // MARK: - Scan Logic
 
     private func startScan() {
+        guard canScan, !isScanning else { return }
+        let originalRadioKey = deviceConfig.publicKeyHex
         let origFreq = deviceConfig.radioFrequency
         let origBW = deviceConfig.radioBandwidth
         let origSF = deviceConfig.radioSpreadingFactor
@@ -164,7 +196,7 @@ struct FrequencyScannerView: View {
 
         scanTask = Task {
             for i in presets.indices {
-                guard !Task.isCancelled else { break }
+                guard !Task.isCancelled, canScan, deviceConfig.publicKeyHex == originalRadioKey else { break }
 
                 let preset = presets[i]
                 results[i].status = .scanning
@@ -178,49 +210,52 @@ struct FrequencyScannerView: View {
                 )
 
                 // Snapshot contact state before dwell
-                let snapStart = Date()
                 let snapAdverts = Dictionary(uniqueKeysWithValues:
                     contactStore.contacts.map { ($0.publicKeyPrefix, $0.lastAdvert) }
                 )
-                let snapCount = contactStore.contacts.count
 
                 try? await Task.sleep(for: .seconds(5))
 
-                guard !Task.isCancelled else { break }
+                guard !Task.isCancelled, canScan, deviceConfig.publicKeyHex == originalRadioKey else { break }
 
-                // Count new or recently-updated contacts as packets
-                let newCount = contactStore.contacts.count - snapCount
-                let updatedCount = contactStore.contacts.filter { c in
-                    let prev = snapAdverts[c.publicKeyPrefix] ?? 0
-                    return TimeInterval(c.lastAdvert) > snapStart.timeIntervalSince1970 && prev != c.lastAdvert
+                // A new contact is one update, even if its advert also changed.
+                // Contact updates are not a packet counter or proof of tuning.
+                let updates = contactStore.contacts.filter { c in
+                    snapAdverts[c.publicKeyPrefix] != c.lastAdvert
                 }.count
-                let packets = max(0, newCount) + updatedCount
 
-                results[i].packetsReceived = packets
-                results[i].status = packets > 0 ? .detected : .clear
+                results[i].packetsReceived = updates
+                results[i].status = updates > 0 ? .detected : .clear
                 progress = Double(i + 1) / Double(presets.count)
             }
 
             // Restore original config
-            connectionManager.setRadioParams(
-                frequency: origFreq,
-                bandwidth: origBW,
-                spreadingFactor: origSF,
-                codingRate: origCR,
-                repeatMode: origRepeat
-            )
+            if canScan, deviceConfig.publicKeyHex == originalRadioKey {
+                connectionManager.setRadioParams(
+                    frequency: origFreq,
+                    bandwidth: origBW,
+                    spreadingFactor: origSF,
+                    codingRate: origCR,
+                    repeatMode: origRepeat
+                )
+            }
+            for index in results.indices where results[index].status == .scanning {
+                results[index].status = .interrupted
+            }
             isScanning = false
+            scanTask = nil
         }
     }
 
     private func cancelScan() {
         guard isScanning else { return }
         scanTask?.cancel()
-        scanTask = nil
-        isScanning = false
+        // Keep Scan disabled until the task has requested restoration. Otherwise
+        // a new scan can race the previous scan's cleanup.
     }
 
     private func applyPreset(_ preset: RadioPreset) {
+        guard canScan, !isScanning else { return }
         connectionManager.setRadioParams(
             frequency: UInt32(preset.frequencyKHz),
             bandwidth: UInt32(preset.bandwidth * 1000),
@@ -240,5 +275,5 @@ private struct ScanResult: Identifiable {
     var packetsReceived: Int
 }
 
-private enum ScanStatus { case pending, scanning, detected, clear }
+private enum ScanStatus { case pending, scanning, detected, clear, interrupted }
 #endif

@@ -6,6 +6,20 @@
 #include <cstring>
 
 namespace lilyshark {
+
+std::uint32_t apiTextRoutingError(bool sent, bool have_channel, bool simulate_mode,
+                                  bool radio_initialized, std::size_t text_length,
+                                  bool compatible_profile) noexcept
+{
+    if (sent) return 0U;                  // NONE
+    if (!have_channel) return 6U;         // NO_CHANNEL
+    if (simulate_mode) return 33U;        // NOT_AUTHORIZED
+    if (!radio_initialized) return 4U;    // NO_INTERFACE
+    if (text_length > 200U) return 7U;    // TOO_LARGE
+    if (!compatible_profile) return 32U;  // BAD_REQUEST, no transmission attempted
+    return 5U;                           // MAX_RETRANSMIT
+}
+
 namespace {
 
 // Wire types, protobuf encoding spec.

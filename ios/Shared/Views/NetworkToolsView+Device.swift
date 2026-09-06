@@ -47,8 +47,8 @@ struct DeviceInfoPopover: View {
                 }
                 // A deck answers no CMD_GET_STATS, so its uptime arrives only
                 // on Meshtastic telemetry.
-                if config.displayUptimeSeconds > 0 {
-                    infoRow("Uptime", value: formatUptime(config.displayUptimeSeconds))
+                if config.availableUptimeSeconds != nil {
+                    infoRow("Uptime", value: formatUptime(config.availableUptimeSeconds))
                 }
                 if config.statsLastRSSI != 0 {
                     infoRow("Last RSSI", value: "\(config.statsLastRSSI) dBm")
@@ -294,9 +294,11 @@ struct ManualPathEditor: View {
     private var repeaterSelectionSection: some View {
         Section("Select Repeaters") {
             if repeaters.isEmpty {
-                Text("No repeaters discovered")
-                    .font(.caption)
-                    .foregroundStyle(MeshTheme.textSecondary)
+                ContentUnavailableView(
+                    "No saved repeaters",
+                    systemImage: "antenna.radiowaves.left.and.right",
+                    description: Text("Repeaters appear here when their contact records are received. You can also enter a known path manually.")
+                )
             }
             ForEach(repeaters) { repeater in
                 let isSelected = selectedRepeaters.contains(where: { $0.publicKey == repeater.publicKey })
@@ -308,7 +310,7 @@ struct ManualPathEditor: View {
                             .foregroundStyle(MeshTheme.textPrimary)
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
             }
         }
     }

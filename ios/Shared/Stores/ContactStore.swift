@@ -29,6 +29,39 @@ final class ContactStore {
     var contactGroups: [ContactGroup] = []
     var mutedContacts: Set<String> = []
 
+    /// The most recently received Meshtastic report. Signal, hops and its
+    /// timestamp belong to one report so a new timestamp cannot refresh an
+    /// older signal reading. Missing fields remain missing.
+    struct NodeObservation: Equatable {
+        enum Source: String { case deckRecord, packet }
+        let source: Source
+        let snr: Float?
+        let rssi: Int32?
+        let hops: UInt32?
+        let lastHeard: UInt32?
+        let viaMQTT: Bool?
+    }
+
+    struct NodePosition: Equatable {
+        let latitude: Double
+        let longitude: Double
+        var viaMQTT: Bool? = nil
+    }
+
+    var nodeObservations: [Data: NodeObservation] = [:]
+    var nodePositions: [Data: NodePosition] = [:]
+
+    @discardableResult
+    func recordNodeObservation(_ observation: NodeObservation, for key: Data) -> Bool {
+        if let previous = nodeObservations[key],
+           let previousTime = previous.lastHeard, let incomingTime = observation.lastHeard,
+           incomingTime < previousTime { return false }
+        if observation.source == .deckRecord, observation.lastHeard == nil,
+           nodeObservations[key]?.source == .packet { return false }
+        nodeObservations[key] = observation
+        return true
+    }
+
     // MARK: - Position History
 
     struct PositionPoint: Codable {
@@ -113,6 +146,11 @@ final class ContactStore {
     // MARK: - Init
 
     init() {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // The native UI fixture starts with fresh, in-memory contacts. Never
+        // import a person's cloud preferences or saved position history.
+        return
+        #endif
         // Don't load nicknames/notes at init — radio pubkey isn't known yet.
         // They are loaded in handleSelfInfo when the radio connects.
         loadContactGroupsFromiCloud()
@@ -213,6 +251,9 @@ final class ContactStore {
     /// Update a contact's lastAdvert to now. Call this on any activity that proves
     /// the contact is alive: message received, ACK, login success, CLI response.
     func touchContact(publicKeyPrefix: Data) {
+        // A Meshtastic packet may be replayed or relayed from a cache. Its
+        // reception time comes from the wire, not the phone's current clock.
+        guard nodeObservations[publicKeyPrefix] == nil else { return }
         guard let idx = contacts.firstIndex(where: { $0.publicKeyPrefix == publicKeyPrefix }) else { return }
         let now = Date().epochUInt32
         guard contacts[idx].lastAdvert < now else { return } // already current
@@ -610,6 +651,8 @@ final class ContactStore {
     // MARK: - Contact Management
 
     func removeContact(_ contact: Contact) {
+        nodeObservations.removeValue(forKey: contact.publicKeyPrefix)
+        nodePositions.removeValue(forKey: contact.publicKeyPrefix)
         let frame = MeshCoreProtocol.buildRemoveContact(publicKey: contact.publicKey)
         sendCommand?(frame, "REMOVE_CONTACT")
         contacts.removeAll { $0.publicKeyPrefix == contact.publicKeyPrefix }
@@ -774,7 +817,7 @@ final class ContactStore {
         )
     }
 
-    func handleAdvert(_ contact: Contact) {
+    func handleAdvert(_ contact: Contact, isLiveAdvert: Bool = true) {
         let now = Date().epochUInt32
         if let idx = contacts.firstIndex(where: { $0.publicKeyPrefix == contact.publicKeyPrefix }) {
             if contact.name.isEmpty && contact.type == .unknown {
@@ -784,13 +827,13 @@ final class ContactStore {
                 DebugLogger.shared.log("ADVERT: timestamp updated for \(contacts[idx].name)", level: .rx)
             } else {
                 // Full contact advert — replace with new data
-                let c = contactWithTimestamp(contact)
+                let c = isLiveAdvert ? contactWithTimestamp(contact) : contact
                 contacts[idx] = c
                 DebugLogger.shared.log("ADVERT: updated \(c.name) lastAdvert=\(c.lastAdvert)", level: .rx)
             }
         } else if !contact.name.isEmpty {
             // Only add new contacts if we have real data (not pubkey-only)
-            let c = contactWithTimestamp(contact)
+            let c = isLiveAdvert ? contactWithTimestamp(contact) : contact
             contacts.append(c)
             DebugLogger.shared.log("ADVERT: new contact \(c.name) lastAdvert=\(c.lastAdvert)", level: .rx)
         } else {
@@ -812,6 +855,8 @@ final class ContactStore {
 
     func handleContactDeleted(publicKey: Data) {
         let keyPrefix = publicKey.prefix(6)
+        nodeObservations.removeValue(forKey: keyPrefix)
+        nodePositions.removeValue(forKey: keyPrefix)
         let name = contacts.first(where: { $0.publicKeyPrefix == keyPrefix })?.name ?? "Unknown"
         Self.logger.info("Contact deleted by device: \(name)")
         contacts.removeAll { $0.publicKeyPrefix == keyPrefix }
@@ -905,6 +950,8 @@ final class ContactStore {
         incomingContacts = []
         pendingNewContacts = []
         contacts = []
+        nodeObservations = [:]
+        nodePositions = [:]
         nicknames = [:]
         contactNotes = [:]
     }

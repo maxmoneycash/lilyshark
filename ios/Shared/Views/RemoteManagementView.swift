@@ -326,7 +326,7 @@ struct RemoteManagementView: View {
                 #if os(macOS) || targetEnvironment(macCatalyst)
                 .buttonStyle(.borderless)
                 #else
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 #endif
                 if let info {
                     InfoButton(text: info)
@@ -395,7 +395,7 @@ struct LoginSection: View {
         Section {
             HStack {
                 Image(systemName: "circle.fill")
-                    .font(.system(size: 8))
+                    .font(.caption2)
                     .foregroundStyle(statusColor)
                     .shadow(color: statusColor.opacity(0.5), radius: 3)
                 Text("Login Status")
@@ -473,7 +473,7 @@ struct LoginSection: View {
                         }
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .listRowBackground(MeshTheme.surface)
                 }
 
@@ -550,7 +550,7 @@ private extension RemoteManagementView {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(MeshTheme.accent)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                         Button {
                             isEditingName = false
                             editedName = ""
@@ -558,7 +558,7 @@ private extension RemoteManagementView {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(MeshTheme.textSecondary)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                     } else {
                         let currentName = getValue("name").isEmpty || getValue("name") == "\u{2014}" ? contact.name : getValue("name")
                         Text(currentName)

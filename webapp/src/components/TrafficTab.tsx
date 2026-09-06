@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   findShelbyPointer,
@@ -67,6 +67,8 @@ import { CaptureSlotBar, type SlotTab } from './CaptureSlotBar';
 import { IoGraphPanel } from './IoGraphPanel';
 import { TrafficFrameTable } from './TrafficFrameTable';
 import { crcClass, fmtFreq } from './trafficFormat';
+import { dissectRNode } from '../lib/dissect/rnode';
+import { reportedLabel, telemetrySignal } from '../mesh/deviceTelemetry';
 
 
 /**
@@ -598,6 +600,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const t0 = frames.length ? frames[0].timestampUs : 0n;
   const f = frames[selected];
   const ptr = f ? pointers[selected] : null;
+  const lxmf = useMemo(() => {
+    if (!f || protoOfProfile(f.profileId) !== 'rnode') return null;
+    return dissectRNode(f.bytes, { truncated: f.truncated }).root.children
+      .find((part) => part.label === 'LXMF message') ?? null;
+  }, [f]);
 
   // ── display filter ────────────────────────────────────────────────────
   // Every frame's addressing and Reticulum destination hash are read once
@@ -743,12 +750,12 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             title="Compare this capture against another open one — what only one of the two heard"
             onClick={() => setDiffOpen((v) => !v)}
           >
-            ⇄ DIFF
+            DIFF
           </button>
           {/* Record what the linked radio hears, then open it right here. */}
           {session.recording ? (
             <button className="primary" onClick={onStopCapture} title="Stop and open the capture">
-              ■ STOP · {session.frames.length}f · {recSeconds}s
+              STOP · {session.frames.length}f · {recSeconds}s
             </button>
           ) : (
             <button
@@ -765,12 +772,12 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                   : 'Connect a Lilyshark device to capture'
               }
             >
-              ● CAPTURE
+              CAPTURE
             </button>
           )}
           {!session.recording && session.frames.length > 0 && (
             <button onClick={onDownloadCapture} title="Save the .lscap file">
-              ⭳ {(captureByteLength(session) / 1024).toFixed(1)} kB
+              DOWNLOAD {(captureByteLength(session) / 1024).toFixed(1)} kB
             </button>
           )}
           <button
@@ -784,7 +791,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             onClick={() => setLive((v) => !v)}
           >
             {/* Glyphs the bundled mono actually has. The pause glyph rendered as tofu. */}
-            {!demoActive ? 'SIM DISABLED' : simulatedLive ? '● SIM LIVE' : '▶ SIM LIVE'}
+            {!demoActive ? 'SIM DISABLED' : simulatedLive ? 'PAUSE SIM' : 'START SIM'}
           </button>
           <input
             ref={fileRef}
@@ -914,7 +921,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             )}
             {link.status === 'linked' && (
               <span className="v ok">
-                Lilyshark {link.firmware} over USB{' '}
+                Lilyshark {link.firmware}{link.node !== undefined ? ` · !${link.node.toString(16).padStart(8, '0')}` : ''} over USB{' '}
                 {link.telemetry?.sim ? <span className="sim-badge">SIMULATE MODE · SYNTHETIC</span> : null}{' '}
                 <button onClick={() => void disconnectDeviceLink()}>UNLINK</button>
               </span>
@@ -923,9 +930,10 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               <>
                 <span className="k">DEVICE</span>
                 <span className="v">
-                  {link.telemetry.bat} · {link.telemetry.gps} · {link.telemetry.profile} · frame
-                  #{link.telemetry.frames} · RSSI {(link.telemetry.rssiX10 / 10).toFixed(1)} dBm ·
-                  SNR {(link.telemetry.snrX10 / 10).toFixed(1)} dB
+                  {reportedLabel(link.telemetry.bat)} · {reportedLabel(link.telemetry.gps)} · {reportedLabel(link.telemetry.profile)} · capture sequence{' '}
+                  {link.telemetry.frames ?? 'not reported'} · latest frame RSSI{' '}
+                  {telemetrySignal(link.telemetry, 'rssi') !== undefined ? `${telemetrySignal(link.telemetry, 'rssi')!.toFixed(1)} dBm` : 'not reported'} · SNR{' '}
+                  {telemetrySignal(link.telemetry, 'snr') !== undefined ? `${telemetrySignal(link.telemetry, 'snr')!.toFixed(1)} dB` : 'not reported'}
                 </span>
               </>
             )}
@@ -985,8 +993,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                       </span>
                     </>,
                   ],
-                  ['BEST SNR', <>{stats.bestSnrDb?.toFixed(1) ?? '—'} dB</>],
-                  ['MEDIAN RSSI', <>{stats.medianRssiDbm?.toFixed(1) ?? '—'} dBm</>],
+                  ['BEST SNR', <>{stats.bestSnrDb === null ? 'Not reported' : `${stats.bestSnrDb.toFixed(1)} dB`}</>],
+                  ['MEDIAN RSSI', <>{stats.medianRssiDbm === null ? 'Not reported' : `${stats.medianRssiDbm.toFixed(1)} dBm`}</>],
                   ['AIRTIME', <>{stats.airtimeMs.toFixed(0)} ms</>],
                   [
                     'SHELBY PTRS',
@@ -1096,7 +1104,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 Nothing was heard in {brushLabel(brush)}. That silence is the
                 reading — {filtered.length} frame(s) match the filter outside this
                 range.{' '}
-                <button onClick={() => setBrush(null)}>⟲ WHOLE CAPTURE</button>
+                <button onClick={() => setBrush(null)}>WHOLE CAPTURE</button>
               </div>
             )}
 
@@ -1129,7 +1137,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 title={`Filter the capture to everything these endpoints exchanged: ${followExpression}`}
                 onClick={() => setFilterText(followExpression)}
               >
-                ⇄ FOLLOW
+                FOLLOW
               </button>
             )}
           </div>
@@ -1168,7 +1176,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               </span>
               <span className="k">SF / CR</span>
               <span className="v">
-                SF{f.spreadingFactor} · 4/{f.codingRateDenominator}
+                {hasField(f, RF_FIELD.spreadingFactor) ? `SF${f.spreadingFactor}` : 'SF not reported'} ·{' '}
+                {hasField(f, RF_FIELD.codingRate) ? `4/${f.codingRateDenominator}` : 'CR not reported'}
               </span>
               <span className="k">RSSI</span>
               <span className="v">
@@ -1189,6 +1198,21 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 {f.synthetic ? 'SYNTHETIC · NOT OTA' : 'UNMARKED'}
               </span>
             </div>
+
+            {lxmf && (
+              <section aria-label="LXMF message">
+                <div className="panel-title">LXMF MESSAGE</div>
+                <div className="panel-foot warn">Cleartext message · signature not verified</div>
+                <dl className="kv" style={{ margin: 0 }}>
+                  {lxmf.children.map((part) => (
+                    <Fragment key={part.label}>
+                      <dt className="k">{part.label.toUpperCase()}</dt>
+                      <dd className="v" style={{ margin: 0, overflowWrap: 'anywhere' }}>{part.value}</dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              </section>
+            )}
 
             {ptr && (
               <>
@@ -1227,7 +1251,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                   {trace.map((t) => (
                     <div className={`trace-step ${t.state}`} key={t.label}>
                       <span className="trace-glyph">
-                        {t.state === 'ok' ? '✓' : t.state === 'err' ? '✕' : '▸'}
+                        {t.state === 'ok' ? 'OK' : t.state === 'err' ? 'ERROR' : 'RUN'}
                       </span>
                       <span className="trace-label">{t.label}</span>
                       <span className="trace-detail">{t.detail}</span>

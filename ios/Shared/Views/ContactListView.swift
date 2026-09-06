@@ -138,19 +138,6 @@ struct ContactListView: View {
                 localSelection = newValue
             }
         }
-        #if !os(watchOS)
-        .onChange(of: navigationStore.sidebarSelection) { _, selection in
-            // Mark contact as read when selected — deferred past view update
-            if case .contact(let key) = selection,
-               let contact = contactStore.contacts.first(where: { $0.publicKeyPrefix == key }) {
-                DispatchQueue.main.async {
-                    Task { @MainActor in
-                        messageStoreManager.markAsRead(contact)
-                    }
-                }
-            }
-        }
-        #endif
         #if os(watchOS)
         .toolbar {
             ToolbarItem(placement: .automatic) {
@@ -210,12 +197,12 @@ struct ContactListView: View {
                         Label("Discover Nodes", systemImage: "binoculars.fill")
                     }
                     Button {
-                        navigateToMap = true
+                        navigationStore.section = .map
                     } label: {
                         Label("Mesh Map", systemImage: "map.fill")
                     }
                     Button {
-                        navigateToTools = true
+                        navigationStore.section = .radio
                     } label: {
                         Label("Tools", systemImage: "wrench.and.screwdriver")
                     }
@@ -419,32 +406,12 @@ struct ContactListView: View {
     // MARK: - Settings Navigation
 
     #if !os(watchOS)
-    /// Opens Settings in the most platform-appropriate way:
-    /// macOS/iPad (any size or orientation): selects Settings in the NavigationSplitView detail column.
-    /// iPhone (compact): opens Settings as a sheet.
-    ///
-    /// Note: iPad mini landscape reports .compact horizontalSizeClass but is still a split-view
-    /// layout. We detect iPad via UIDevice idiom to avoid opening a sheet on any iPad.
+    /// Settings is a parallel section on iOS and a sidebar destination on Mac.
     func openSettings() {
         #if os(macOS) || targetEnvironment(macCatalyst)
         navigationStore.sidebarSelection = .settings
         #elseif os(iOS)
-        // All iPad models should use sidebar, regardless of size class.
-        // iPad mini reports .pad idiom, but horizontalSizeClass can be .compact
-        // in portrait. Use idiom-based detection instead of size class.
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-
-        if isPad {
-            // All iPads (including iPad mini) use sidebar
-            navigationStore.sidebarSelection = .settings
-        } else {
-            // iPhone: use sheet in portrait/compact, sidebar in landscape/regular
-            if horizontalSizeClass == .regular {
-                navigationStore.sidebarSelection = .settings
-            } else {
-                showSettings?.wrappedValue = true
-            }
-        }
+        navigationStore.section = .settings
         #endif
     }
     #endif
@@ -561,7 +528,7 @@ private extension ContactListView {
                         }
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .listRowBackground(MeshTheme.surface)
                 } header: {
                     Text("USB Device")
@@ -640,8 +607,6 @@ struct GroupEditSheet: View {
     @State private var name = ""
     @State private var emoji = ""
 
-    private let emojiOptions = ["📡", "🏠", "🏔️", "🌲", "🏙️", "⛺", "🚗", "🛠️", "🔒", "⭐", "🔥", "💬", "📍", "🌊", "🎯"]
-
     var body: some View {
         NavigationStack {
             Form {
@@ -653,29 +618,24 @@ struct GroupEditSheet: View {
                 }
 
                 Section {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 12) {
-                        ForEach(emojiOptions, id: \.self) { option in
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 12)], spacing: 12) {
+                        ForEach(GroupIcon.allCases) { option in
                             Button {
-                                emoji = emoji == option ? "" : option
+                                emoji = emoji == option.rawValue ? "" : option.rawValue
                             } label: {
-                                Text(option)
+                                Image(systemName: option.symbolName)
                                     .font(.title2)
-                                    .frame(width: 36, height: 36)
-                                    .background(emoji == option ? MeshTheme.accent.opacity(0.3) : Color.clear)
+                                    .touchable()
+                                    .background(emoji == option.rawValue ? MeshTheme.accent.opacity(0.3) : Color.clear)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
+                            .accessibilityLabel(option.label)
+                            .accessibilityAddTraits(emoji == option.rawValue ? .isSelected : [])
                         }
                     }
                     .listRowBackground(MeshTheme.surface)
 
-                    HStack {
-                        Text("Custom:")
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        TextField("Emoji", text: $emoji)
-                            .frame(width: 50)
-                    }
-                    .listRowBackground(MeshTheme.surface)
                 } header: {
                     Text("Icon")
                 }
@@ -683,7 +643,7 @@ struct GroupEditSheet: View {
                 if !emoji.isEmpty {
                     Section {
                         HStack {
-                            Text("\(emoji) \(name.isEmpty ? "Group Name" : name)")
+                            Label(name.isEmpty ? "Group Name" : name, systemImage: GroupIcon.symbolName(for: emoji))
                                 .foregroundStyle(MeshTheme.textPrimary)
                         }
                         .listRowBackground(MeshTheme.surface)

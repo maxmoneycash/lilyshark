@@ -104,7 +104,7 @@ struct ChannelManagementView: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .disabled(channelName.trimmingCharacters(in: .whitespaces).isEmpty)
                 .listRowBackground(MeshTheme.surface)
             } footer: {
@@ -135,7 +135,7 @@ struct ChannelManagementView: View {
                                 Image(systemName: "qrcode")
                                     .foregroundStyle(MeshTheme.accent)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                             #endif
                             Button {
                                 removeChannel(channel)
@@ -143,7 +143,7 @@ struct ChannelManagementView: View {
                                 Image(systemName: "trash")
                                     .foregroundStyle(MeshTheme.disconnected)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                         }
                         .listRowBackground(MeshTheme.surface)
                         .contextMenu {

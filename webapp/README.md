@@ -88,6 +88,35 @@ npm run dev        # tsx watch; DATA_DIR and LOG_LEVEL env vars supported
 
 Format and lint with Biome (`npm run fmt`, `npm run lint`).
 
+## USB telemetry and message evidence
+
+The `LSK ID` node field supplies the linked deck's identity. Older firmware
+that omits it stays unidentified; the web app does not assign a substitute
+node number. A successful USB transmission or TX echo means **sent, delivery
+unconfirmed**. It does not establish that a recipient received the message.
+
+In `LSK T`, `frames` is the newest capture sequence and includes transmissions.
+`rx` is the radio's receive counter. The separate `drop_crc`, `drop_bad` and
+`drop_nosrc` counters explain frames the analyzer cannot attribute to nodes.
+Their lifetimes can differ from `rx`, so the UI does not subtract them to
+invent an attributed total. Missing counters remain unknown; explicit zeros
+are retained. The unattributed total is shown only when all three counters
+are present.
+
+`latest_pf` carries the newest frame's RF presence mask, and `latest_dir`
+uses 0 for unknown, 1 for receive and 2 for transmit. RSSI and SNR are shown
+only for a received frame with that measurement's presence bit. For older
+firmware, a recent `LSK F` with exactly the same sequence can supply this
+metadata. A receive count alone cannot certify a signal measurement.
+`BAT --` means the battery reading is unavailable, even when the firmware
+also sends its numeric zero defaults.
+
+Traffic decodes cleartext opportunistic LXMF messages only within eligible
+Reticulum data packets. Reference-generated fixtures in `../test/lxmf/`
+pin the timestamp/title/content/fields order, optional stamp, and both
+stored and opportunistic framing. Signature and stamp presence does not
+claim cryptographic verification.
+
 ## Deploy
 
 **Pushing to `main` deploys lilyshark.com. Nothing else does.**
@@ -121,4 +150,3 @@ proxy target in `api/[...path].ts` points at it.
 - The Shelby off-grid pointer (`../docs/shelby-pointer-format.md`) is
   decoded inline when a capture's frames carry one — press **Sample** on the
   TRAFFIC screen and select frame 9.
-

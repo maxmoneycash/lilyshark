@@ -457,13 +457,13 @@ async function syncMessages(): Promise<void> {
 
 const pendingAcks = new Map<number, { msgId: number; ts: number; timer: number }>();
 
-function setMsgState(id: number, ts: number, state: Message["state"]): void {
+function setMsgState(id: number, ts: number, state: Message["state"], failureReason?: string): void {
   mutate((s) => {
     s.messages = s.messages.map((m) =>
-      m.id === id && m.ts === ts ? { ...m, state } : m,
+      m.id === id && m.ts === ts ? { ...m, state, failureReason } : m,
     );
   });
-  updateMessageState(id, state).catch(dbFail(t("message state")));
+  updateMessageState(id, state, failureReason).catch(dbFail(t("message state")));
 }
 
 function onSendConfirmed(p: { ackCode: number; roundTrip: number }): void {
@@ -1306,7 +1306,7 @@ async function transmit(msg: Message): Promise<void> {
       const wait = Math.max(ACK_TIMEOUT_MIN_MS, (sent.estTimeout || 0) * 1.5);
       const timer = setTimeout(() => {
         if (pendingAcks.delete(sent.expectedAckCrc)) {
-          setMsgState(msg.id, msg.ts, "failed");
+          setMsgState(msg.id, msg.ts, "failed", "No acknowledgment from the recipient. Delivery is unconfirmed.");
           addLog("No ACK from !{0}: message failed", dest.toString(16));
         }
       }, wait) as unknown as number;
@@ -1327,24 +1327,33 @@ async function transmit(msg: Message): Promise<void> {
 
 // Retries a failed message reusing the same entry (id/ts untouched).
 export async function retryMessage(msg: Message): Promise<void> {
-  if (meshtasticBleActive()) {
-    setMsgState(msg.id, msg.ts, "queued");
-    try {
-      await meshtasticBleRetry(msg);
-    } catch (e) {
-      setMsgState(msg.id, msg.ts, "failed");
-      throw e;
-    }
-    return;
-  }
-  if (!device) throw new Error(t("Not connected"));
   setMsgState(msg.id, msg.ts, "queued");
   try {
-    await transmit(msg);
+    if (meshtasticBleActive()) {
+      await meshtasticBleRetry(msg);
+    } else if (!device && getDeviceLinkState().status === "linked") {
+      await transmitDeviceMessage(msg);
+    } else {
+      await transmit(msg);
+    }
   } catch (e) {
-    setMsgState(msg.id, msg.ts, "failed");
+    setMsgState(msg.id, msg.ts, "failed", e instanceof Error ? e.message : String(e));
     throw e;
   }
+}
+
+async function transmitDeviceMessage(msg: Message): Promise<void> {
+  mutate((s) => {
+    s.messages = s.messages.map((m) => m.id === msg.id && m.ts === msg.ts ? { ...m, awaitingEcho: true } : m);
+  });
+  const isDm = msg.convo.startsWith("dm:");
+  const destination = Number(msg.convo.slice(3));
+  await sendDeviceLine(
+    isDm
+      ? `LSK TX meshtastic dm ${(destination >>> 0).toString(16).padStart(8, "0")} ${msg.text}`
+      : `LSK TX meshtastic text ${msg.text}`,
+  );
+  setMsgState(msg.id, msg.ts, "sent");
 }
 
 export async function sendText(
@@ -1370,7 +1379,7 @@ export async function sendText(
     const msg: Message = {
       id: nextMsgId(),
       convo,
-      from: getSnapshot().myNodeNum ?? 0x4c534b01,
+      from: getSnapshot().myNodeNum ?? 0,
       to: destination,
       channel: 0,
       text,
@@ -1383,14 +1392,9 @@ export async function sendText(
       s.messages = [...s.messages, msg];
     });
     try {
-      await sendDeviceLine(
-        isDm
-          ? `LSK TX meshtastic dm ${(destination >>> 0).toString(16).padStart(8, "0")} ${text}`
-          : `LSK TX meshtastic text ${text}`,
-      );
-      setMsgState(msg.id, msg.ts, "sent");
+      await transmitDeviceMessage(msg);
     } catch (e) {
-      setMsgState(msg.id, msg.ts, "failed");
+      setMsgState(msg.id, msg.ts, "failed", e instanceof Error ? e.message : String(e));
       throw e;
     }
     return;
@@ -1421,7 +1425,7 @@ export async function sendText(
   try {
     await transmit(msg);
   } catch (e) {
-    setMsgState(msg.id, msg.ts, "failed");
+    setMsgState(msg.id, msg.ts, "failed", e instanceof Error ? e.message : String(e));
     throw e;
   }
 }

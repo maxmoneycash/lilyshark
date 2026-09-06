@@ -18,6 +18,7 @@
  * IFAC masks the header and payload — only the marker bit is interpreted.
  */
 
+import { lxmfSubtree, readLxmfMessage, type LxmfMessage } from "./lxmf";
 import type {
 	DecodeState,
 	Dissection,
@@ -280,6 +281,7 @@ export interface ReticulumFields {
 	encrypted: boolean;
 	/** Semantic announce tier (UI-013); null unless provably an announce. */
 	announce: ReticulumAnnounceFields | null;
+	lxmf: LxmfMessage | null;
 }
 
 export interface ReticulumDissection extends Dissection {
@@ -357,6 +359,7 @@ export function dissectRNode(
 		payloadLength: n - RNODE_SHIM_LENGTH,
 		encrypted: false,
 		announce: null,
+		lxmf: null,
 	};
 
 	root.children.push(
@@ -612,6 +615,17 @@ export function dissectRNode(
 			transportOffset,
 			destinationOffset,
 		});
+		state = "payload-decoded";
+	} else if (
+		!opts.truncated && packetType === RETICULUM_PACKET_TYPE.data &&
+		destinationType === RETICULUM_DESTINATION_TYPE.plain && context === 0 &&
+		(fields.lxmf = readLxmfMessage(bytes.subarray(physicalHeaderLength), "opportunistic"))
+	) {
+		root.children.push(node(
+			"LXMF message", physicalHeaderLength, fields.payloadLength,
+			"Read from cleartext · signature not verified",
+			lxmfSubtree(fields.lxmf, physicalHeaderLength),
+		));
 		state = "payload-decoded";
 	} else {
 		// The generic clear-payload node, with the firmware reader's refusal

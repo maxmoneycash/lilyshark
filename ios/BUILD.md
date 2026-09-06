@@ -96,10 +96,10 @@ Verified working beyond the iOS simulator app:
 xcodebuild -project ios/PommeCore.xcodeproj -scheme PommeCore-macOS \
   -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
 
-# MeshCoreKit unit tests -- 32 tests, 0 failures
+# MeshCoreKit unit tests
 cd ios/Packages/MeshCoreKit && swift test
 
-# MeshtasticKit unit tests -- 21 tests, 0 failures
+# MeshtasticKit unit tests
 cd ios/Packages/MeshtasticKit && swift test
 ```
 
@@ -108,6 +108,58 @@ pins an iOS Simulator destination. Use the `xcodebuild` line above.
 
 The two watch targets are the exception. They have never compiled here, and the section below
 explains exactly why and what a human would have to do about it.
+
+## Large text layout checks
+
+To build a separate Debug app with SwiftUI's `accessibility3` text size:
+
+```bash
+xcodebuild -project ios/PommeCore.xcodeproj -scheme PommeCore \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath ios/DerivedDataLargeType -configuration Debug \
+  CODE_SIGNING_ALLOWED=NO \
+  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LILYSHARK_UI_LARGE_TYPE' build
+```
+
+This overrides the app's SwiftUI environment without changing simulator settings.
+It helps check wrapping and scrolling; VoiceOver and system text-size changes
+still need their own interaction checks. The override requires both compile
+conditions and is absent from ordinary Debug and Release builds. Reinstall the
+ordinary app from `ios/DerivedData` after testing.
+
+Unsigned builds also disable CloudKit container creation through the generated
+`LilysharkCodeSigningAllowed` Info.plist value. This lets simulator and macOS
+builds run without signing entitlements. Signed builds retain the existing
+iCloud configuration.
+
+## Chat interaction fixture
+
+The Debug-only fixture opens the production Messages navigation with two
+simulated contacts and numbered conversation histories. Receive A/B controls
+inject messages through `MessageStoreManager`; Reset discards the session.
+
+```bash
+xcodebuild -project ios/PommeCore.xcodeproj -scheme PommeCore \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath ios/DerivedDataChatFixture -configuration Debug \
+  CODE_SIGNING_ALLOWED=NO \
+  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LILYSHARK_UI_CHAT_FIXTURE' build
+```
+
+Install `ios/DerivedDataChatFixture/Build/Products/Debug-iphonesimulator/PommeCore.app`
+on a test simulator. This uses the ordinary app's bundle identifier, so reinstall
+the ordinary app from `ios/DerivedData` afterward. The fixture skips the
+production coordinator and transport startup. Contacts, messages, drafts, and
+read timestamps stay in memory; it does not load saved messages or write cloud
+data or notifications. Ordinary Debug and Release builds exclude the fixture.
+
+Check automatic scrolling when receiving at the bottom, preserved reading
+position when receiving while scrolled upward, the Latest messages action,
+separate drafts after switching A/B, and unread counts for the other conversation.
+The banner also checks that a pending MeshCore retry sends once normally and
+does not send after disconnect, message deletion, or a different radio's activation.
+These checks cover native UI and store behavior; they do not verify a real radio
+connection, cloud draft persistence, or over-the-air delivery.
 
 ## The watch target cannot be built from this checkout
 
@@ -246,10 +298,9 @@ with `error: unable to load standard library for target 'arm64-apple-watchos11.0
 `warning: using sysroot for 'MacOSX' but targeting 'Watch'`, which looks like a toolchain fault
 and is not one.
 
-Clean up after yourself, or check `git status` before committing: `Packages/MeshtasticKit`
-ignores its own `.build/`, but **`Packages/MeshCoreKit` does not**, so the second command above
-leaves an untracked `Packages/MeshCoreKit/.build/` that a `git add -A` would happily commit.
-`ios/.gitignore` says `build/`, which does not match `.build/`.
+The root `.gitignore` excludes `ios/Packages/*/.build/`. Generated Swift package
+build files were removed from version control in `23d98cb`; local package builds
+remain available and no longer enter commits.
 
 Summary of the watch state, so nobody re-derives it:
 
@@ -265,32 +316,18 @@ Summary of the watch state, so nobody re-derives it:
 
 ## Continuous integration
 
-`.github/workflows/build.yml` has an `ios` job that runs `./scripts/build_ios.sh` and
-`swift test` for MeshtasticKit on a `macos-15` runner.
+`.github/workflows/build.yml` runs the `ios` job on `macos-26`. It records the
+runner toolchain, checks the SDK against the actual project targets, builds the
+ordinary simulator app and chat fixture, and runs both protocol packages' tests.
+The fixture step verifies compilation; native interaction checks are separate.
+The ordinary app and package steps passed in [GitHub run 34030841162](https://github.com/maxmoneycash/lilyshark/actions/runs/34030841162).
 
-It is scoped that narrowly on purpose. GitHub bills GitHub-hosted macOS minutes at **10x** the
-Linux rate, so on a private repository this one job drains the included allowance ten times
-faster than the four `ubuntu-24.04` jobs beside it. On a public repository it is free. The job
-does not build the macOS target and does not attempt the watch targets, which cannot be built
-anywhere for the reasons above.
+The macOS app is built by `./scripts/test_all.sh --host-only` when run on a Mac.
+CI's Linux firmware job cannot build it. Neither job builds the watch targets,
+which require the missing private package described above.
 
-Nothing in the release path depends on it: `publish-alpha` still gates on the firmware jobs
-only. A broken app build cannot block a firmware release, and a green firmware release does not
-imply the app compiles.
-
-Two honest caveats:
-
-- **The job has never run.** It is validated only statically — `actionlint` 1.7.7 reports no
-  findings, and the YAML parses with the expected job and step structure — but GitHub Actions
-  cannot be exercised locally. Treat its first run on a real push as the actual test.
-- **The runner's toolchain is not the one this file was verified on.** Everything here was
-  verified on Xcode 26.6 with the iOS 26.5 runtime; the `macos-15` image ships a different
-  Xcode. The project needs Xcode 16 or newer to open at all (`objectVersion = 77`, and it uses
-  `fileSystemSynchronizedGroups`), and both packages declare `swift-tools-version: 6.0` with
-  iOS 18 / macOS 15 / watchOS 11 floors, so `macos-15` should satisfy the floors — but "should"
-  is the correct word until it runs. The job's first step prints `sw_vers`, `xcodebuild
-  -version`, and `xcrun simctl list runtimes` so that a CI-only failure can be diagnosed
-  against the toolchain that actually produced it.
+`publish-alpha` depends on the firmware and artifact checks. A green firmware
+release does not imply the app compiles; inspect the separate `ios` job.
 
 ## Building from a clean clone
 
@@ -309,7 +346,9 @@ clone, `MeshtasticKit` ran 21 tests and `MeshCoreKit` 32 tests, both with 0 fail
 resulting `PommeCore.app` is a real bundle (`Assets.car`, localized `.lproj` directories, audio
 resources), not an empty directory. No network access and no Apple account were needed.
 
-Those two commands, in that order, are exactly what the CI job runs.
+These clean-clone results are historical checkpoints. The current CI checks are
+listed above, and current package counts are recorded in
+`docs/verification/continuation-2026-09-06.md`.
 
 ## Signing: what needs a human
 

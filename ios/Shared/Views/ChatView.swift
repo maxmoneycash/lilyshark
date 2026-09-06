@@ -10,6 +10,9 @@
 
 import SwiftUI
 import MeshCoreKit
+#if canImport(MeshtasticKit)
+import MeshtasticKit
+#endif
 #if !os(watchOS)
 import CoreLocation
 #endif
@@ -22,6 +25,11 @@ extension Notification.Name {
 }
 
 struct ChatView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var followsLatest = true
+    @State private var hasPositionedInitially = false
+    @State private var isVisible = false
+    @Environment(NavigationStore.self) private var navigationStore
     let contact: Contact
     @Environment(ContactStore.self) private var contactStore
     @Environment(MessageStoreManager.self) private var messageStoreManager
@@ -62,9 +70,9 @@ struct ChatView: View {
     private var lastSeenText: String? {
         _ = refreshTick // depend on timer for periodic refresh
         let c = liveContact
-        var latest = TimeInterval(c.lastAdvert)
-        if let activityDate = messageStoreManager.latestActivityDate(for: contact.publicKeyPrefix) {
-            latest = max(latest, activityDate.timeIntervalSince1970)
+        var latest = TimeInterval(contactStore.nodeObservations[c.publicKeyPrefix]?.lastHeard ?? c.lastAdvert)
+        if !isMeshtasticContact, let received = messages.last(where: { !$0.isOutgoing }) {
+            latest = max(latest, received.timestamp.timeIntervalSince1970)
         }
         guard latest > 1_000_000_000 else { return nil }
         let date = Date(timeIntervalSince1970: latest)
@@ -75,16 +83,25 @@ struct ChatView: View {
     }
 
     private var toolbarName: (text: String, font: Font) {
-        let fullName = contactStore.displayName(for: contact)
-        if fullName.count <= 14 { return (fullName, .headline) }
-        if fullName.count <= 18 { return (fullName, .subheadline) }
-        let firstName = fullName.components(separatedBy: " ").first ?? fullName
-        if firstName.count <= 14 { return (firstName, .subheadline) }
-        return (firstName, .caption)
+        (contactStore.displayName(for: liveContact), .headline)
+    }
+
+    private var isMeshtasticContact: Bool {
+        #if canImport(MeshtasticKit)
+        MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) != nil
+        #else
+        false
+        #endif
     }
 
     private var routeLabel: String {
         let c = liveContact
+        if isMeshtasticContact {
+            let observation = contactStore.nodeObservations[c.publicKeyPrefix]
+            if observation?.viaMQTT == true { return "Via MQTT" }
+            guard let hops = observation?.hops else { return "Hops not reported" }
+            return hops == 0 ? "Direct report" : "\(hops) hops reported"
+        }
         if c.outPathLen == 0 { return "Direct" }
         if c.outPathLen < 0 { return c.outPath.isEmpty ? "Auto" : "Flood" }
         // Lower 6 bits = hop count (upper 2 bits = hash_mode)
@@ -94,6 +111,7 @@ struct ChatView: View {
 
     private var routeColor: Color {
         let c = liveContact
+        if isMeshtasticContact { return MeshTheme.textSecondary }
         if c.outPathLen == 0 { return MeshTheme.connected }
         if c.outPathLen < 0 { return c.outPath.isEmpty ? MeshTheme.textSecondary : .orange }
         return MeshTheme.accent
@@ -116,8 +134,10 @@ struct ChatView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(MeshTheme.textSecondary)
+                        .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
+                .accessibilityLabel("Clear message search")
             }
         }
         .padding(8)
@@ -130,7 +150,7 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             if isSearching {
-                searchBar
+                searchBar.transition(.opacity)
             }
             messageList
             Divider()
@@ -175,8 +195,10 @@ struct ChatView: View {
                             ? Label("Edit Nickname", systemImage: "pencil")
                             : Label("Set Nickname", systemImage: "pencil")
                     }
-                    Button { showPathEditor = true } label: {
-                        Label("Edit Path", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    if !isMeshtasticContact {
+                        Button { showPathEditor = true } label: {
+                            Label("Edit Path", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                        }
                     }
                     Button { showContactDetail = true } label: {
                         Label("Contact Details", systemImage: "info.circle")
@@ -191,48 +213,50 @@ struct ChatView: View {
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: 12) {
                     #if os(macOS)
-                    Button {
-                        showPathEditor = true
-                    } label: {
-                        Text(routeLabel)
-                            .font(.caption2)
-                            .foregroundStyle(MeshTheme.accent)
+                    if !isMeshtasticContact {
+                        Button {
+                            showPathEditor = true
+                        } label: {
+                            Text(routeLabel)
+                                .font(.caption2)
+                                .foregroundStyle(MeshTheme.accent)
+                                .touchable()
+                        }
+                        .buttonStyle(.meshPlain)
                     }
-                    .buttonStyle(.plain)
                     #endif
                     Button {
-                        withAnimation { isSearching.toggle() }
+                        withMeshAnimation(reduceMotion: reduceMotion) { isSearching.toggle() }
                         if !isSearching { searchText = "" }
                     } label: {
                         Image(systemName: isSearching ? "magnifyingglass.circle.fill" : "magnifyingglass")
                             .foregroundStyle(MeshTheme.accent)
+                            .touchable()
                     }
                     .accessibilityLabel(isSearching ? Text("Close search") : Text("Search messages"))
-                    #if !os(watchOS)
-                    #if os(macOS)
-                    Button {
-                        exportChatHistory()
+                    Menu {
+                        Button { showContactDetail = true } label: {
+                            Label("Contact Details", systemImage: "info.circle")
+                        }
+                        #if !os(watchOS)
+                        Button { sendLocationAsDM() } label: {
+                            Label("Send Location", systemImage: "location.fill")
+                        }
+                        #if os(macOS)
+                        Button { exportChatHistory() } label: {
+                            Label("Export Chat", systemImage: "square.and.arrow.up")
+                        }
+                        #endif
+                        #endif
+                        Button { showNotes = true } label: {
+                            Label("Notes", systemImage: "note.text")
+                        }
                     } label: {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: "ellipsis.circle")
                             .foregroundStyle(MeshTheme.accent)
+                            .touchable()
                     }
-                    .accessibilityLabel("Export chat")
-                    #endif
-                    Button {
-                        sendLocationAsDM()
-                    } label: {
-                        Image(systemName: "location.fill")
-                            .foregroundStyle(MeshTheme.accent)
-                    }
-                    .accessibilityLabel("Send location")
-                    #endif
-                    Button {
-                        showNotes = true
-                    } label: {
-                        Image(systemName: contactStore.hasNote(for: contact) ? "note.text" : "note.text.badge.plus")
-                            .foregroundStyle(MeshTheme.accent)
-                    }
-                    .accessibilityLabel("Notes")
+                    .accessibilityLabel("Conversation actions")
                 }
             }
         }
@@ -280,7 +304,7 @@ struct ChatView: View {
                         copyToClipboard(url.path)
                         showExportSheet = false
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.meshPrimary)
                     Button("Done") { showExportSheet = false }
                 }
                 .padding(32)
@@ -313,36 +337,43 @@ struct ChatView: View {
         }
         #endif
         .onAppear {
+            isVisible = true
+            navigationStore.visibleConversationKey = contact.publicKeyPrefix
             if messageText.isEmpty {
                 messageText = messageStoreManager.loadDraft(for: contact.publicKeyPrefix)
             }
             DispatchQueue.main.async {
-                messageStoreManager.markAsRead(contact)
+                markAsReadIfVisible()
             }
         }
         .onDisappear {
+            isVisible = false
+            if navigationStore.visibleConversationKey == contact.publicKeyPrefix {
+                navigationStore.visibleConversationKey = nil
+            }
             messageStoreManager.saveDraft(messageText, for: contact.publicKeyPrefix)
         }
     }
 
+    private func markAsReadIfVisible() {
+        guard isVisible, navigationStore.isMessagesSectionVisible,
+              navigationStore.visibleConversationKey == contact.publicKeyPrefix else { return }
+        #if os(macOS)
+        guard NSApplication.shared.isUserViewing else { return }
+        #else
+        guard scenePhase == .active else { return }
+        #endif
+        messageStoreManager.markAsRead(contactKey: contact.publicKeyPrefix)
+    }
 
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                if messages.isEmpty {
-                    VStack(spacing: 12) {
-                        Spacer(minLength: 60)
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .font(.largeTitle)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        Text("No messages yet")
-                            .font(.subheadline)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        Text("Send a message to start the conversation.")
-                            .font(.caption)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if !searchText.isEmpty && displayedMessages.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                } else if messages.isEmpty {
+                    ContentUnavailableView("Start a conversation", systemImage: "bubble.left.and.bubble.right",
+                                           description: Text("Messages you send and receive with this contact will appear here."))
                 }
                 LazyVStack(spacing: 4) {
                     if !searchText.isEmpty {
@@ -370,17 +401,43 @@ struct ChatView: View {
                             }
                         )
                             .id(message.id)
+                            .transition(.opacity)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .meshAnimation(Design.Motion.quick, value: messages.last?.id)
             }
+            .chatScrollTracking(followsLatest: $followsLatest)
             #if !os(watchOS)
             .scrollDismissesKeyboard(.interactively)
             #endif
-            .onChange(of: messages.count) {
-                if let last = messages.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
+            .safeAreaInset(edge: .bottom) {
+                if !followsLatest && !messages.isEmpty && searchText.isEmpty {
+                    Button {
+                        followsLatest = true
+                        if let last = messages.last {
+                            withMeshAnimation(reduceMotion: reduceMotion) {
+                                proxy.scrollTo(last.id, anchor: .bottom)
+                            }
+                        }
+                    } label: {
+                        Label("Latest messages", systemImage: "arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal)
+                            .touchable()
+                    }
+                    .buttonStyle(.meshSecondary)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.bottom, 8)
+                    .transition(.opacity)
+                }
+            }
+            .onChange(of: messages.last?.id) {
+                guard isVisible && navigationStore.isMessagesSectionVisible else { return }
+                if let last = messages.last, searchText.isEmpty && (followsLatest || last.isOutgoing) {
+                    followsLatest = true
+                    withMeshAnimation(Design.Motion.quick, reduceMotion: reduceMotion) {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }
                 }
@@ -390,33 +447,37 @@ struct ChatView: View {
                 #else
                 guard scenePhase == .active else { return }
                 #endif
-                withAnimation { unreadDividerIndex = nil }
+                withMeshAnimation(reduceMotion: reduceMotion) { unreadDividerIndex = nil }
                 DispatchQueue.main.async {
-                    messageStoreManager.markAsRead(contactKey: contact.publicKeyPrefix)
+                    markAsReadIfVisible()
                 }
             }
             #if os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification).merge(with: NotificationCenter.default.publisher(for: NSWindow.didDeminiaturizeNotification))) { _ in
-                withAnimation { unreadDividerIndex = nil }
+                guard isVisible && navigationStore.isMessagesSectionVisible else { return }
+                withMeshAnimation(reduceMotion: reduceMotion) { unreadDividerIndex = nil }
                 DispatchQueue.main.async {
-                    messageStoreManager.markAsRead(contactKey: contact.publicKeyPrefix)
+                    markAsReadIfVisible()
                 }
             }
             #else
             .onChange(of: scenePhase) { _, newPhase in
-                if newPhase == .active {
-                    withAnimation { unreadDividerIndex = nil }
+                if newPhase == .active && isVisible && navigationStore.isMessagesSectionVisible {
+                    withMeshAnimation(reduceMotion: reduceMotion) { unreadDividerIndex = nil }
                     DispatchQueue.main.async {
-                        messageStoreManager.markAsRead(contactKey: contact.publicKeyPrefix)
+                        markAsReadIfVisible()
                     }
                 }
             }
             #endif
             .onAppear {
+                guard !hasPositionedInitially else { return }
+                hasPositionedInitially = true
                 unreadDividerIndex = messageStoreManager.firstUnreadIndex(in: messages, for: contact.publicKeyPrefix)
                 // Delay scroll to let LazyVStack lay out content
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     if let idx = unreadDividerIndex, idx < messages.count {
+                        followsLatest = idx >= messages.count - 1
                         proxy.scrollTo(messages[idx].id, anchor: .center)
                     } else if let last = messages.last {
                         proxy.scrollTo(last.id, anchor: .bottom)
@@ -425,7 +486,7 @@ struct ChatView: View {
                 // Clear the divider after user has had time to see it
                 if unreadDividerIndex != nil {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        withAnimation { unreadDividerIndex = nil }
+                        withMeshAnimation(reduceMotion: reduceMotion) { unreadDividerIndex = nil }
                     }
                 }
             }
@@ -454,7 +515,7 @@ struct ChatView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(MeshTheme.textSecondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -476,7 +537,7 @@ struct ChatView: View {
                     // Up to five lines before it scrolls. A long message
                     // typed into a one-line field is written blind.
                     .lineLimit(1...5)
-                    .font(.system(size: Design.Text.message))
+                    .font(Design.Text.message)
                     .padding(.horizontal, Design.Space.regular)
                     .padding(.vertical, Design.Space.snug)
                     .background(MeshTheme.surfaceLight)
@@ -493,7 +554,7 @@ struct ChatView: View {
 
                 Button(action: send) {
                     Image(systemName: "arrow.up")
-                        .font(.system(size: Design.Text.controlGlyph, weight: .semibold))
+                        .font(Design.Text.controlGlyph)
                         .foregroundStyle(canSend ? Color.white : MeshTheme.textSecondary)
                         .frame(width: Design.sendButton, height: Design.sendButton)
                         .background(
@@ -507,7 +568,7 @@ struct ChatView: View {
                 .buttonStyle(.pressable)
                 .meshAnimation(Design.Motion.quick, value: canSend)
                 .disabled(!canSend)
-                .accessibilityLabel("Send")
+                .accessibilityLabel("Send message")
             }
             .padding(.horizontal, Design.Space.snug)
 
@@ -582,7 +643,7 @@ struct ChatView: View {
         let lat = location.coordinate.latitude
         let lon = location.coordinate.longitude
         let (fLat, fLon) = PommeCoreViewModel.fudgeLocation(lat: lat, lon: lon)
-        let text = "\u{1F4CD} \(formatCoordinate(fLat)), \(formatCoordinate(fLon))"
+        let text = "Location: \(formatCoordinate(fLat)), \(formatCoordinate(fLon))"
         messageStoreManager.sendTextMessage(text, to: contact)
         messageStoreManager.playHapticFeedback()
         DebugLogger.shared.log("LOCATION: sent to \(contact.name)", level: .tx)

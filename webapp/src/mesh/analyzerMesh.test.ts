@@ -2,25 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  ANALYZER_SELF_NUM,
   applyAnalyzerLink,
   applyAnalyzerTelemetry,
   applyAnalyzerUnlink,
   applyHeardFrame,
 } from "./analyzerMesh.ts";
+import { parseLskLine } from "../lib/deviceLink";
+import { RF_FIELD } from "../lib/lscap";
 import { clearDemo, seedDemo } from "./demo.ts";
 import { getSnapshot } from "./store.ts";
+const DECK_A = 0x96f61b44;
 
 test("linking the T-Deck drops the demo mesh and pins ME", () => {
   seedDemo();
   assert.ok(getSnapshot().nodes.size > 8);
-  applyAnalyzerLink();
+  applyAnalyzerLink(DECK_A);
   const s = getSnapshot();
-  assert.equal(s.myNodeNum, ANALYZER_SELF_NUM);
-  assert.ok(s.nodes.get(ANALYZER_SELF_NUM));
-  assert.equal(s.nodes.get(ANALYZER_SELF_NUM)?.shortName, "ME");
+  assert.equal(s.myNodeNum, DECK_A);
+  assert.ok(s.nodes.get(DECK_A));
+  assert.equal(s.nodes.has(0x4c534b01), false);
   assert.ok(
-    [...s.nodes.values()].every((n) => n.num === ANALYZER_SELF_NUM || n.num < 0xd0000000),
+    [...s.nodes.values()].every((n) => n.num === DECK_A || n.num < 0xd0000000),
     "demo nodes must leave when the T-Deck links",
   );
   applyAnalyzerUnlink();
@@ -28,6 +30,7 @@ test("linking the T-Deck drops the demo mesh and pins ME", () => {
 });
 
 test("telemetry with a fix puts the T-Deck on the map", () => {
+  applyAnalyzerLink(DECK_A);
   applyAnalyzerTelemetry({
     bat: "BAT 64%",
     gps: "GPS FIX 8",
@@ -40,11 +43,111 @@ test("telemetry with a fix puts the T-Deck on the map", () => {
     lon: -122.143,
     atMs: 1_700_000_100_000,
   });
-  const me = getSnapshot().nodes.get(ANALYZER_SELF_NUM);
+  const me = getSnapshot().nodes.get(DECK_A);
   assert.ok(me);
   assert.equal(me.lat, 37.4419);
   assert.equal(me.lon, -122.143);
   assert.equal(me.batteryLevel, 64);
+  assert.equal(me.rssi, undefined, "a last-packet reading does not measure this deck");
+  assert.equal(me.snr, undefined);
+  applyAnalyzerUnlink();
+});
+
+test("an explicitly unavailable battery clears old readings while a partial sample preserves them", () => {
+  applyAnalyzerLink(DECK_A);
+  const send = (fields: Record<string, unknown>) => {
+    const parsed = parseLskLine(`LSK T ${JSON.stringify(fields)}`);
+    assert.ok(parsed?.kind === "T");
+    applyAnalyzerTelemetry(parsed.telemetry);
+    return getSnapshot().nodes.get(DECK_A)!;
+  };
+  send({ bat: "BAT 64%", pct: 64, mv: 3980 });
+  const partial = send({ rx: 3 });
+  assert.equal(partial.batteryLevel, 64);
+  assert.equal(partial.voltage, 3.98);
+  const unavailable = send({ bat: "BAT --", pct: 0, mv: 0 });
+  assert.equal(unavailable.batteryLevel, undefined);
+  assert.equal(unavailable.voltage, undefined);
+  const restored = send({ bat: "BAT 0%", pct: 0, mv: 3000 });
+  assert.equal(restored.batteryLevel, 0, "a real zero reading remains present");
+  assert.equal(restored.voltage, 3);
+  applyAnalyzerUnlink();
+});
+
+test("unknown identity stays absent and two decks never share a made-up ID", () => {
+  applyAnalyzerUnlink();
+  clearNodes();
+  applyAnalyzerLink();
+  assert.equal(getSnapshot().myNodeNum, undefined);
+  assert.equal(getSnapshot().nodes.size, 0);
+  applyAnalyzerLink(DECK_A);
+  assert.equal(getSnapshot().myNodeNum, DECK_A);
+  applyAnalyzerLink(0xcda172e0);
+  assert.equal(getSnapshot().myNodeNum, 0xcda172e0);
+  assert.equal(getSnapshot().nodes.has(DECK_A), false);
+  applyAnalyzerUnlink();
+  assert.equal(getSnapshot().myNodeNum, undefined);
+});
+
+function rawFrame(over: Record<string, unknown>) {
+  const parsed = parseLskLine(`LSK F ${JSON.stringify({
+    src: DECK_A, dst: 0xffffffff, proto: "meshtastic", kind: "TEXT", port: 1,
+    seq: 1, hex: "00", dir: 1, pf: RF_FIELD.rssi | RF_FIELD.snr,
+    rssi_x10: -910, snr_x10: 50, sim: false, ...over,
+  })}`);
+  assert.ok(parsed?.kind === "F");
+  return parsed.frame;
+}
+
+test("transmitted frames are outgoing, have no measured signal, and never claim delivery", () => {
+  clearNodes();
+  applyAnalyzerLink(DECK_A);
+  applyHeardFrame(rawFrame({ dir: 2, pf: 0, rssi_x10: 0, snr_x10: 0, text: "hello", dst: 0x1234 }));
+  const message = getSnapshot().messages[0];
+  assert.equal(message.mine, true);
+  assert.equal(message.convo, "dm:4660");
+  assert.equal(message.state, "sent");
+  assert.equal(message.rssi, undefined);
+  assert.equal(message.snr, undefined);
+  assert.equal(getSnapshot().nodes.get(DECK_A)?.rssi, undefined);
+  applyAnalyzerUnlink();
+});
+
+test("a missing RF field stays absent while a reported zero is preserved", () => {
+  clearNodes();
+  applyHeardFrame(rawFrame({ src: 0x1234, pf: 0, rssi_x10: 0, snr_x10: 0 }));
+  assert.equal(getSnapshot().nodes.get(0x1234)?.rssi, undefined);
+  applyHeardFrame(rawFrame({ src: 0x5678, rssi_x10: 0, snr_x10: 0 }));
+  assert.equal(getSnapshot().nodes.get(0x5678)?.rssi, 0);
+  assert.equal(getSnapshot().nodes.get(0x5678)?.snr, 0);
+  applyAnalyzerUnlink();
+});
+
+test("unnamed frames preserve an advertised name", () => {
+  clearNodes();
+  applyHeardFrame(rawFrame({ src: 0x1234, name: "Creek relay", short: "CRK" }));
+  applyHeardFrame(rawFrame({ src: 0x1234, text: "hello" }));
+  assert.equal(getSnapshot().nodes.get(0x1234)?.longName, "Creek relay");
+  assert.equal(getSnapshot().nodes.get(0x1234)?.shortName, "CRK");
+  applyAnalyzerUnlink();
+});
+
+test("one USB send consumes one echo without swallowing repeated hardware messages", () => {
+  clearNodes();
+  applyAnalyzerLink(DECK_A);
+  const now = Date.now();
+  mutate((s) => { s.messages = [{
+    id: 123, from: DECK_A, to: 0xffffffff, channel: 0, convo: "ch:0",
+    text: "repeatable", ts: now, mine: true, state: "queued", awaitingEcho: true,
+  }]; });
+  const echo = rawFrame({ dir: 2, pf: 0, text: "repeatable" });
+  echo.atMs = now + 1;
+  applyHeardFrame(echo);
+  assert.equal(getSnapshot().messages.length, 1);
+  assert.equal(getSnapshot().messages[0].awaitingEcho, false);
+  assert.equal(getSnapshot().messages[0].state, "queued", "the console result still owns transmit status");
+  applyHeardFrame({ ...echo, atMs: now + 2 });
+  assert.equal(getSnapshot().messages.length, 2, "a later hardware send is a separate message");
   applyAnalyzerUnlink();
 });
 

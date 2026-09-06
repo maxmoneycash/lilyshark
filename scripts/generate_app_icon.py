@@ -21,7 +21,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import subprocess
 import sys
 from pathlib import Path
@@ -108,6 +107,15 @@ def icon_filename(size: int) -> str:
     return "AppIcon.png" if size == 1024 else f"AppIcon-{size}.png"
 
 
+def same_pixels(committed: bytes, rendered: bytes) -> bool:
+    """PNG compression and metadata may change while the artwork stays identical."""
+    from io import BytesIO
+    from PIL import Image
+
+    with Image.open(BytesIO(committed)) as first, Image.open(BytesIO(rendered)) as second:
+        return first.size == second.size and first.convert("RGBA").tobytes() == second.convert("RGBA").tobytes()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -128,9 +136,7 @@ def main() -> int:
             if args.check:
                 if not target.exists():
                     mismatched.append(f"{target} is missing")
-                elif hashlib.sha256(target.read_bytes()).digest() != hashlib.sha256(
-                    data
-                ).digest():
+                elif not same_pixels(target.read_bytes(), data):
                     mismatched.append(f"{target} differs from the wordmark")
             else:
                 target.write_bytes(data)

@@ -13,6 +13,13 @@ import MeshCoreKit
 
 struct LoSResultsView: View {
     let result: LoSResult
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var resultColumns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), alignment: .leading)]
+            : [GridItem(.adaptive(minimum: 180), alignment: .leading)]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -32,10 +39,7 @@ struct LoSResultsView: View {
             }
 
             // Stats grid — show relay worst-case when relays are active
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 10) {
+            LazyVGrid(columns: resultColumns, alignment: .leading, spacing: Design.Space.regular) {
                 statCard("Distance", value: GeoMath.formatDistance(result.profile.totalDistance), icon: "ruler")
                 statCard("Frequency", value: String(format: "%.3f MHz", result.frequencyMHz), icon: "antenna.radiowaves.left.and.right")
 
@@ -59,9 +63,8 @@ struct LoSResultsView: View {
             }
 
             // Endpoint elevations
-            HStack(spacing: 16) {
+            LazyVGrid(columns: resultColumns, alignment: .leading, spacing: Design.Space.regular) {
                 elevationLabel("Point A", elevation: result.profile.pointA.groundElevation, antenna: result.profile.pointA.antennaHeight)
-                Spacer()
                 elevationLabel("Point B", elevation: result.profile.pointB.groundElevation, antenna: result.profile.pointB.antennaHeight)
             }
 
@@ -72,7 +75,7 @@ struct LoSResultsView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(MeshTheme.accent)
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                LazyVGrid(columns: resultColumns, alignment: .leading, spacing: Design.Space.regular) {
                     ForEach(Array(zip(segmentLabels, result.relaySegments)), id: \.0) { label, seg in
                         segmentSummary(label, result: seg)
                     }

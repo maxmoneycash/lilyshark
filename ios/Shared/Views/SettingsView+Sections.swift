@@ -199,10 +199,10 @@ struct DeviceInfoSection: View {
             Label("Name", systemImage: "textformat")
                 .foregroundStyle(MeshTheme.accent)
             Spacer()
-            Text(config.deviceName.isEmpty ? (connectedDeviceName ?? "\u{2014}") : config.deviceName)
+            Text(config.deviceName.isEmpty ? (connectedDeviceName ?? String(localized: "Not reported")) : config.deviceName)
                 .foregroundStyle(MeshTheme.textSecondary)
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     private var wizardRow: some View {
@@ -217,7 +217,7 @@ struct DeviceInfoSection: View {
                 .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     private var radioRow: some View {
@@ -237,7 +237,7 @@ struct DeviceInfoSection: View {
                     .foregroundStyle(presetName != nil ? .green : .orange)
             }
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     private var tuningRow: some View {
@@ -245,11 +245,11 @@ struct DeviceInfoSection: View {
             Label("Tuning", systemImage: "tuningfork")
                 .foregroundStyle(MeshTheme.accent)
             Spacer()
-            Text("RX \(String(format: "%.1f", config.rxDelaySeconds))s \u{2022} Air \(String(format: "%.1f", config.airtimeMultiplier))x")
+            Text(config.loadedSections.contains("tuning") ? "RX \(String(format: "%.1f", config.rxDelaySeconds))s \u{2022} Air \(String(format: "%.1f", config.airtimeMultiplier))x" : "Not reported")
                 .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     private var floodScopeRow: some View {
@@ -257,10 +257,10 @@ struct DeviceInfoSection: View {
             Label("Flood Scope", systemImage: "globe.americas")
                 .foregroundStyle(MeshTheme.accent)
             Spacer()
-            Text(config.defaultFloodScope.isEmpty ? "Not set" : config.defaultFloodScope)
+            Text(!config.loadedSections.contains("floodScope") ? "Not reported" : (config.defaultFloodScope.isEmpty ? "Not set" : config.defaultFloodScope))
                 .foregroundStyle(config.defaultFloodScope.isEmpty ? MeshTheme.textSecondary : MeshTheme.textPrimary)
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     @AppStorage("autoUpdateLocation") private var autoUpdateLocation = false
@@ -297,7 +297,7 @@ struct DeviceInfoSection: View {
                     .foregroundStyle(config.latitude == 0 && config.longitude == 0 ? .orange : .green)
             }
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     private var batteryChemistry: BatteryChemistry {
@@ -358,7 +358,7 @@ struct DeviceInfoSection: View {
                 healthAgeCaption
             }
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     /// Time since the radio booted. Meshtastic telemetry carries it; MeshCore
@@ -370,12 +370,12 @@ struct DeviceInfoSection: View {
                 .foregroundStyle(MeshTheme.accent)
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(formatUptime(config.displayUptimeSeconds))
+                Text(formatUptime(config.availableUptimeSeconds))
                     .foregroundStyle(MeshTheme.textSecondary)
                 healthAgeCaption
             }
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     private var firmwareRow: some View {
@@ -384,7 +384,7 @@ struct DeviceInfoSection: View {
                 .foregroundStyle(MeshTheme.accent)
             Spacer()
             HStack(spacing: 6) {
-                Text(config.semanticVersion.isEmpty ? "v\(config.firmwareVersion)" : config.semanticVersion)
+                Text(config.semanticVersion.isEmpty ? (config.firmwareVersion.isEmpty ? "Not reported" : "v\(config.firmwareVersion)") : config.semanticVersion)
                     .foregroundStyle(MeshTheme.textSecondary)
                 if !firmwareChecker.isUpdateAvailable && firmwareChecker.latestVersion != nil {
                     Image(systemName: "checkmark.circle.fill")
@@ -393,7 +393,7 @@ struct DeviceInfoSection: View {
                 }
             }
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     // MARK: - Body
@@ -415,47 +415,47 @@ struct DeviceInfoSection: View {
         Section {
             #if os(macOS) || targetEnvironment(macCatalyst)
             Button { openInspector(.name) } label: { nameRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             Button { showSetupWizard = true } label: { wizardRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             if config.radioFrequency > 0 {
                 Button { openInspector(.radio) } label: { radioRow }
-                    .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                    .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
                 Button { openInspector(.tuning) } label: { tuningRow }
-                    .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                    .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             }
             Button { openInspector(.floodScope) } label: { floodScopeRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             Button { openInspector(.gps) } label: { gpsRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             Button { openInspector(.battery) } label: { batteryRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             uptimeRow
                 .listRowBackground(MeshTheme.surface)
             Button { openInspector(.firmware) } label: { firmwareRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             firmwareUpdateRow
             verifyConfigRow
             verifyConfigResult
             Button { openInspector(.profileTransfer) } label: { profileTransferRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             Button { openInspector(.radioProfiles) } label: { radioProfilesRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             Button { openInspector(.radioStats) } label: { radioStatsRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             #else
             iOSDeviceRows
             firmwareUpdateRow
             verifyConfigRow
             verifyConfigResult
-            profileTransferRow
-                .onTapGesture { activeSheet = .profileTransfer }
+            Button { activeSheet = .profileTransfer } label: { profileTransferRow.touchable() }
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
-            radioProfilesRow
-                .onTapGesture { activeSheet = .radioProfiles }
+            Button { activeSheet = .radioProfiles } label: { radioProfilesRow.touchable() }
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
-            radioStatsRow
-                .onTapGesture { activeSheet = .radioStats }
+            Button { activeSheet = .radioStats } label: { radioStatsRow.touchable() }
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             #endif
         } header: {
@@ -487,9 +487,9 @@ struct DeviceInfoSection: View {
                             .font(.caption)
                             .foregroundStyle(MeshTheme.textSecondary)
                     }
-                    .contentShape(Rectangle())
+                    .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             } else if firmwareChecker.isChecking {
                 HStack(spacing: 8) {
@@ -518,9 +518,9 @@ struct DeviceInfoSection: View {
                         #endif
                 }
             }
-            .contentShape(Rectangle())
+            .touchable()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.meshPlain)
         .disabled(connectionManager.connectionState != .ready || connectionManager.isVerifyingConfig)
         .listRowBackground(MeshTheme.surface)
     }
@@ -550,25 +550,25 @@ struct DeviceInfoSection: View {
     private var iOSDeviceRows: some View {
         Group {
             Button { activeSheet = .name } label: { nameRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             Button { showSetupWizard = true } label: { wizardRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             if config.radioFrequency > 0 {
                 Button { activeSheet = .radio } label: { radioRow }
-                    .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                    .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
                 Button { activeSheet = .tuning } label: { tuningRow }
-                    .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                    .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             }
             Button { activeSheet = .floodScope } label: { floodScopeRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             Button { activeSheet = .gps } label: { gpsRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             Button { activeSheet = .battery } label: { batteryRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
             uptimeRow
                 .listRowBackground(MeshTheme.surface)
             Button { activeSheet = .firmware } label: { firmwareRow }
-                .buttonStyle(.plain).listRowBackground(MeshTheme.surface)
+                .buttonStyle(.meshPlain).listRowBackground(MeshTheme.surface)
         }
         // Sheet now lives in SettingsView (above this view) to survive structural changes here.
     }
@@ -596,7 +596,7 @@ struct DeviceInfoSection: View {
                 .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     @Environment(RadioProfileStore.self) private var radioProfileStore
@@ -616,7 +616,7 @@ struct DeviceInfoSection: View {
                 .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 
     private var radioStatsRow: some View {
@@ -633,7 +633,7 @@ struct DeviceInfoSection: View {
                 .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
         }
-        .contentShape(Rectangle())
+        .touchable()
     }
 }
 
@@ -658,7 +658,7 @@ extension SettingsView {
     }
 
     var statsBatteryDisplay: String {
-        guard config.statsBatteryMV != 0 else { return "\u{2014}" }
+        guard config.statsBatteryMV > 0 else { return String(localized: "Not reported") }
         let mv = Int(config.statsBatteryMV)
         if let cal = deviceConfig.batteryCalibration {
             let correctedMV = Int(Double(mv) * cal.correctionFactor)
@@ -689,9 +689,11 @@ extension SettingsView {
                 Image(systemName: "doc.on.doc")
                     .font(.caption)
                     .foregroundStyle(MeshTheme.accent)
+                    .touchable()
             }
-            .buttonStyle(.plain)
-            .contentShape(Rectangle())
+            .buttonStyle(.meshPlain)
+            .accessibilityLabel("Copy public key")
+            .disabled(config.publicKeyHex.isEmpty)
         }
         .listRowBackground(MeshTheme.surface)
     }
@@ -754,9 +756,9 @@ extension SettingsView {
                             .foregroundStyle(MeshTheme.accent)
                         Spacer()
                     }
-                    .contentShape(Rectangle())
+                    .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             }
         }
@@ -771,7 +773,7 @@ extension SettingsView {
         Section {
             HStack {
                 Image(systemName: "circle.fill")
-                    .font(.system(size: 8))
+                    .font(.caption2)
                     .foregroundStyle(statusColor)
                     .shadow(color: statusColor.opacity(0.5), radius: 3)
                 Text("Status")
@@ -801,9 +803,9 @@ extension SettingsView {
                         Text("Disconnect")
                         Spacer()
                     }
-                    .contentShape(Rectangle())
+                    .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             }
         } header: {

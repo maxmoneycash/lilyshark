@@ -295,21 +295,27 @@ bool msgpackSkipValue(MsgpackCursor &cursor) noexcept
 }
 
 bool readLxmfMessage(const std::uint8_t *bytes, std::size_t length,
-                     LxmfMessage &out) noexcept
+                     LxmfMessage &out, LxmfFraming framing) noexcept
 {
-    if (bytes == nullptr || length <= kLxmfHeaderLength) return false;
+    const std::size_t header_length = framing == LxmfFraming::AtRest
+                                          ? kLxmfHeaderLength
+                                          : kLxmfOpportunisticHeaderLength;
+    if (bytes == nullptr || length <= header_length) return false;
 
     LxmfMessage message{};
-    std::memcpy(message.destination_hash, bytes, kLxmfHashLength);
-    std::memcpy(message.source_hash, bytes + kLxmfHashLength, kLxmfHashLength);
+    if (framing == LxmfFraming::AtRest) {
+        message.has_destination_hash = true;
+        std::memcpy(message.destination_hash, bytes, kLxmfHashLength);
+        std::memcpy(message.source_hash, bytes + kLxmfHashLength, kLxmfHashLength);
+    } else {
+        std::memcpy(message.source_hash, bytes, kLxmfHashLength);
+    }
 
-    MsgpackCursor cursor{bytes + kLxmfHeaderLength, length - kLxmfHeaderLength, 0};
+    MsgpackCursor cursor{bytes + header_length, length - header_length, 0};
     std::uint32_t elements = 0;
     if (!msgpackReadArrayHeader(cursor, elements)) return false;
-    // The specification fixes four elements: timestamp, content, title,
-    // fields. A shorter array is not an LXMF payload, and a longer one is a
-    // format this build does not know how to read.
-    if (elements != 4U) return false;
+    // LXMessage.pack() appends a fifth element when the message has a stamp.
+    if (elements != 4U && elements != 5U) return false;
 
     double timestamp = 0.0;
     if (msgpackReadNumber(cursor, timestamp)) {
@@ -323,9 +329,9 @@ bool readLxmfMessage(const std::uint8_t *bytes, std::size_t length,
     std::uint32_t size = 0;
     if (msgpackReadBytes(cursor, data, size)) {
         if (size > 0U) {
-            copyPrintable(message.content, sizeof(message.content), data, size,
-                          message.content_length, message.content_truncated);
-            message.has_content = true;
+            copyPrintable(message.title, sizeof(message.title), data, size,
+                          message.title_length, message.title_truncated);
+            message.has_title = true;
         }
     } else if (!msgpackReadNil(cursor)) {
         return false;
@@ -333,9 +339,9 @@ bool readLxmfMessage(const std::uint8_t *bytes, std::size_t length,
 
     if (msgpackReadBytes(cursor, data, size)) {
         if (size > 0U) {
-            copyPrintable(message.title, sizeof(message.title), data, size,
-                          message.title_length, message.title_truncated);
-            message.has_title = true;
+            copyPrintable(message.content, sizeof(message.content), data, size,
+                          message.content_length, message.content_truncated);
+            message.has_content = true;
         }
     } else if (!msgpackReadNil(cursor)) {
         return false;
@@ -356,6 +362,15 @@ bool readLxmfMessage(const std::uint8_t *bytes, std::size_t length,
     } else if (!msgpackReadNil(cursor)) {
         return false;
     }
+
+    if (elements == 5U) {
+        if (msgpackReadBytes(cursor, data, size)) {
+            message.has_stamp = size > 0U;
+        } else if (!msgpackReadNil(cursor)) {
+            return false;
+        }
+    }
+    if (cursor.offset != cursor.length) return false;
 
     message.readable = true;
     out = message;

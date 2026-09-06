@@ -20,7 +20,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <string>
+#include <system_error>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
@@ -67,8 +69,9 @@ std::string makeScratchDirectory()
 void removeTree(const std::string &path)
 {
     // Only ever called on directories this test made.
-    const std::string command = "rm -rf '" + path + "'";
-    (void)std::system(command.c_str());
+    std::error_code error;
+    std::filesystem::remove_all(path, error);
+    assert(!error);
 }
 
 RawFrame makeFrame(std::uint16_t seed)

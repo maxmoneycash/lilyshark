@@ -306,8 +306,8 @@
   justify-content: center;
   gap: 10px;
   width: 100%;
-  min-height: 48px;
-  padding: 11px 12px;
+  min-height: 44px;
+  padding: 8px 12px;
   border: 1px solid var(--fg);
   font: inherit;
   font-size: 12px;
@@ -343,7 +343,7 @@
   background: transparent;
   border-color: var(--border);
   color: var(--fg);
-  font-size: 10px;
+  font-size: 12px;
 }
 .meshterm .flash-page .unsupported,
 .meshterm .flash-page .not-allowed {
@@ -794,4 +794,8 @@
   font-size: 9px;
   text-align: center;
   color: var(--fg-dim);
+}
+
+.meshterm .flash-page :is(p, .hint, .tagline) {
+  text-wrap: pretty;
 }

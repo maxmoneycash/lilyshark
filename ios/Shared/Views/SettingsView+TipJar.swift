@@ -30,15 +30,6 @@ class TipJarManager: ObservableObject {
 
     var purchaseSuccess: Bool { purchasedProductID != nil }
 
-    var thankYouEmoji: String {
-        guard let id = purchasedProductID else { return "" }
-        if id.hasSuffix(".decent") { return "\u{1F44B}" }
-        if id.hasSuffix(".nice") { return "\u{1F60A}" }
-        if id.hasSuffix(".great") { return "\u{1F389}" }
-        if id.hasSuffix(".help") { return "\u{1F49A}" }
-        return "\u{2764}\u{FE0F}"
-    }
-
     var thankYouTitle: String {
         guard let id = purchasedProductID else { return "Thank You!" }
         if id.hasSuffix(".decent") { return "Thanks!" }
@@ -56,21 +47,6 @@ class TipJarManager: ObservableObject {
         if id.hasSuffix(".help") { return "You're helping build the future of off-grid communication. Check the Supporters Wall!" }
         return "Your support means a lot."
     }
-
-    struct PlaceholderTip: Identifiable {
-        let id: String
-        let emoji: String
-        let name: String
-        let description: String
-        let price: String
-    }
-
-    static let placeholders: [PlaceholderTip] = [
-        PlaceholderTip(id: "decent", emoji: "\u{1F44B}", name: "Decent Try!", description: "Thanks for giving Lilyshark a shot", price: "$0.99"),
-        PlaceholderTip(id: "nice", emoji: "\u{1F44D}", name: "Nice App!", description: "You're enjoying the mesh life", price: "$2.99"),
-        PlaceholderTip(id: "great", emoji: "\u{1F389}", name: "Great Job!", description: "Lilyshark has become your go-to client", price: "$4.99"),
-        PlaceholderTip(id: "help", emoji: "\u{1F49A}", name: "I Want to Help!", description: "You believe in off-grid communication", price: "$9.99"),
-    ]
 
     nonisolated static let productIDs = [
         "com.lilyshark.app.tip.decent",
@@ -173,6 +149,7 @@ class TipJarManager: ObservableObject {
 class SupportersManager: ObservableObject {
     @Published var supporters: [Supporter] = []
     @Published var isLoading = false
+    @Published var loadError: String?
 
     struct Supporter: Identifiable {
         let id: String
@@ -180,12 +157,17 @@ class SupportersManager: ObservableObject {
         let date: Date
     }
 
-    private let container = CKContainer(identifier: "iCloud.com.lilyshark.app")
+    private lazy var container = CloudKitAccess.makeContainer()
 
     @MainActor
     func fetchSupporters() async {
+        guard let container else {
+            loadError = "Cloud features are unavailable in this build."
+            return
+        }
+        loadError = nil
         isLoading = true
-        objectWillChange.send()
+        defer { isLoading = false }
         DebugLogger.shared.log("SUPPORTERS: fetching from CloudKit public DB...", level: .info)
 
         let db = container.publicCloudDatabase
@@ -210,14 +192,14 @@ class SupportersManager: ObservableObject {
             .sorted { $0.date > $1.date }
             DebugLogger.shared.log("SUPPORTERS: updating UI with \(fetched.count) supporters", level: .info)
             self.supporters = fetched
-            self.isLoading = false
         } catch {
             DebugLogger.shared.log("SUPPORTERS: fetch error — \(error)", level: .error)
-            self.isLoading = false
+            loadError = error.localizedDescription
         }
     }
 
     func addSupporter(name: String) async -> Bool {
+        guard let container else { return false }
         DebugLogger.shared.log("SUPPORTERS: saving name '\(name)' to CloudKit...", level: .info)
 
         // Check account status first
@@ -289,9 +271,9 @@ extension SettingsView {
                         .foregroundStyle(msgCount > 20_000 ? .red : msgCount > 5_000 ? .orange : .green)
                     #endif
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             .confirmationDialog("Manage Storage", isPresented: $showPurgeOptions) {
                 Button("Clear All Messages", role: .destructive) {
@@ -332,9 +314,9 @@ extension SettingsView {
                             .foregroundStyle(MeshTheme.connected)
                     }
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             // Sheet is intentionally NOT attached here — see settingsForm for the macOS/Catalyst
             // .sheet(isPresented: $showTipJarSheet) anchor. Attaching .sheet to a List row
@@ -355,9 +337,9 @@ extension SettingsView {
                             .foregroundStyle(MeshTheme.connected)
                     }
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             #endif
 
@@ -372,12 +354,12 @@ extension SettingsView {
                         .font(.caption)
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
         } header: {
-            sectionInfoHeader("Support the App", info: "Lilyshark is free with all features. Tips help fund development. \u{1F49A} tippers join the Supporters Wall!")
+            sectionInfoHeader("Support the App", info: "Lilyshark is free with all features. Tips help fund development. The I Want to Help tip includes an optional place on the Supporters Wall.")
         }
     }
 
@@ -388,6 +370,7 @@ extension SettingsView {
 struct TipJarView: View {
     @ObservedObject var manager: TipJarManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showSupportersSheet = false
 
     var body: some View {
@@ -395,7 +378,7 @@ struct TipJarView: View {
         ScrollView {
             VStack(spacing: 16) {
                 Image(systemName: "heart.fill")
-                    .font(.system(size: 48))
+                    .font(.largeTitle)
                     .foregroundStyle(MeshTheme.accent)
                     .padding(.top, 20)
 
@@ -426,7 +409,7 @@ struct TipJarView: View {
                         Button("Try Again") {
                             manager.loadProductsIfNeeded()
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.meshSecondary)
                     }
                     .padding()
                 } else {
@@ -437,8 +420,10 @@ struct TipJarView: View {
 
                 if manager.purchaseSuccess {
                     VStack(spacing: 12) {
-                        Text(manager.thankYouEmoji)
-                            .font(.system(size: 48))
+                        Image(systemName: "heart.fill")
+                            .font(.largeTitle)
+                            .foregroundStyle(MeshTheme.accent)
+                            .accessibilityHidden(true)
                         Text(manager.thankYouTitle)
                             .font(.title2.bold())
                             .foregroundStyle(MeshTheme.textPrimary)
@@ -475,9 +460,9 @@ struct TipJarView: View {
                     .background(MeshTheme.surfaceLight)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
 
-                Text("\u{1F49A} I Want to Help! tippers can add their name to the Supporters Wall.")
+                Text("The I Want to Help tip includes an optional place on the Supporters Wall.")
                     .font(.caption)
                     .foregroundStyle(MeshTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -486,7 +471,7 @@ struct TipJarView: View {
             .padding()
             .onChange(of: manager.purchasedProductID) { _, newValue in
                 if newValue != nil {
-                    withAnimation {
+                    withMeshAnimation(reduceMotion: reduceMotion) {
                         proxy.scrollTo("thankYou", anchor: .bottom)
                     }
                 }
@@ -551,12 +536,11 @@ struct TipButton: View {
     let product: Product
     @ObservedObject var manager: TipJarManager
 
-    private var emoji: String {
-        if product.id.hasSuffix(".decent") { return "\u{1F44B}" }
-        if product.id.hasSuffix(".nice") { return "\u{1F44D}" }
-        if product.id.hasSuffix(".great") { return "\u{1F389}" }
-        if product.id.hasSuffix(".help") { return "\u{1F49A}" }
-        return "\u{2764}\u{FE0F}"
+    private var symbolName: String {
+        if product.id.hasSuffix(".decent") { return "hand.wave" }
+        if product.id.hasSuffix(".nice") { return "hand.thumbsup" }
+        if product.id.hasSuffix(".great") { return "star" }
+        return "heart"
     }
 
     var body: some View {
@@ -567,15 +551,19 @@ struct TipButton: View {
             }
         } label: {
             HStack {
-                Text(emoji)
+                Image(systemName: symbolName)
                     .font(.title2)
+                    .foregroundStyle(MeshTheme.accent)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(product.displayName)
                         .font(.headline)
                         .foregroundStyle(MeshTheme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(product.description)
                         .font(.caption)
                         .foregroundStyle(MeshTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 if manager.purchasingProductID == product.id {
@@ -584,18 +572,13 @@ struct TipButton: View {
                 } else {
                     Text(product.displayPrice)
                         .font(.headline)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(MeshTheme.interactiveGreen)
-                        .foregroundStyle(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(MeshTheme.textPrimary)
+                        .fixedSize()
                 }
             }
-            .padding()
-            .background(MeshTheme.surfaceLight)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.meshSecondary)
         .disabled(manager.purchasingProductID != nil)
     }
 }
@@ -614,15 +597,27 @@ struct SupportersView: View {
                         .padding(.top, 40)
                     Text("Loading supporters...")
                         .foregroundStyle(MeshTheme.textSecondary)
+                } else if let loadError = manager.loadError, manager.supporters.isEmpty {
+                    ContentUnavailableView {
+                        Label("Supporters unavailable", systemImage: "icloud.slash")
+                    } description: {
+                        Text(loadError)
+                    } actions: {
+                        if CloudKitAccess.isEnabledForBuild {
+                            Button("Try Again") {
+                                Task { await manager.fetchSupporters() }
+                            }
+                        }
+                    }
                 } else if manager.supporters.isEmpty {
                     Image(systemName: "heart.circle")
-                        .font(.system(size: 48))
+                        .font(.largeTitle)
                         .foregroundStyle(MeshTheme.textSecondary)
                         .padding(.top, 20)
                     Text("No supporters yet")
                         .font(.headline)
                         .foregroundStyle(MeshTheme.textPrimary)
-                    Text("Be the first! Leave a \u{1F49A} I Want to Help! tip to join the wall.")
+                    Text("The I Want to Help tip lets you add your name here.")
                         .font(.subheadline)
                         .foregroundStyle(MeshTheme.textSecondary)
                         .multilineTextAlignment(.center)
@@ -687,4 +682,3 @@ struct SupportersView: View {
         }
     }
 }
-

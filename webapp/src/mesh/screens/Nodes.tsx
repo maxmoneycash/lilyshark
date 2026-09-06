@@ -22,7 +22,7 @@ import {
 	toggleIgnored,
 } from "../radio";
 import { getDeviceLinkState, useDeviceLink } from "../../lib/deviceLink";
-import { ANALYZER_SELF_NUM } from "../analyzerMesh";
+import { isAnalyzerSelf } from "../analyzerMesh";
 import {
 	ContactType,
 	getSnapshot,
@@ -33,7 +33,7 @@ import {
 import { isDemo } from "../demo";
 import { ThisDeviceRow } from "../ThisDevice";
 
-// Click to copy the underlying text; a ✓ flashes for ~1 s. The visible label
+// Click to copy the underlying text; confirmation appears briefly. The visible label
 // and the copied value can differ (coords show 4 decimals, copy full precision).
 function Copy({ text, children }: { text: string; children: React.ReactNode }) {
 	const [done, setDone] = useState(false);
@@ -57,7 +57,7 @@ function Copy({ text, children }: { text: string; children: React.ReactNode }) {
 			}}
 		>
 			{children}
-			{done && <span className="dim"> ✓</span>}
+			{done && <span className="dim"> Copied</span>}
 		</span>
 	);
 }
@@ -303,14 +303,14 @@ function Detail(props: {
 	const onResetPath = () => {
 		setAdminMsg("");
 		resetPath(n.num)
-			.then(() => setAdminMsg(t("Path reset ✓")))
+			.then(() => setAdminMsg(t("Path reset")))
 			.catch((e: unknown) => setAdminMsg(`ERROR: ${e}`));
 	};
 
 	const onShare = () => {
 		setAdminMsg("");
 		shareContact(n.num)
-			.then(() => setAdminMsg(t("Contact shared with the mesh ✓")))
+			.then(() => setAdminMsg(t("Contact shared with the mesh")))
 			.catch((e: unknown) => setAdminMsg(`ERROR: ${e}`));
 	};
 
@@ -420,7 +420,7 @@ function Detail(props: {
 					],
 				] as [string, React.ReactNode][])
 			: []),
-		[t("DM ENCRYPTION"), n.publicKey ? "PKI 🔒" : t("channel PSK only")],
+		[t("DM ENCRYPTION"), n.publicKey ? "PKI" : t("channel PSK only")],
 		[
 			t("POSITION"),
 			n.lat !== undefined && n.lon !== undefined ? (
@@ -447,15 +447,9 @@ function Detail(props: {
 				</span>
 				<button
 					onClick={props.onClose}
-					style={{
-						width: 22,
-						height: 22,
-						padding: 0,
-						fontSize: 12,
-						lineHeight: 1,
-					}}
+
 				>
-					✕
+					CLOSE
 				</button>
 			</div>
 			<div
@@ -531,10 +525,10 @@ function Detail(props: {
 					{history.length > 0 && (
 						<>
 							<button
-								style={{ fontSize: 10, padding: "2px 6px", marginTop: 8 }}
+								style={{ marginTop: 8 }}
 								onClick={() => setShowHistory((v) => !v)}
 							>
-								{showHistory ? "▼" : "▶"} {t("HISTORY")} ({history.length})
+								{showHistory ? "HIDE" : "SHOW"} {t("HISTORY")} ({history.length})
 							</button>
 							{showHistory && (
 								<div
@@ -582,7 +576,7 @@ function Detail(props: {
 					)}
 					{posState === "ok" && (
 						<span style={{ fontSize: 11 }}>
-							{t("RECEIVED ✓ · see TELEMETRY tab")}
+							{t("RECEIVED · see TELEMETRY tab")}
 						</span>
 					)}
 					{posState === "timeout" && (
@@ -617,11 +611,12 @@ function Detail(props: {
 						padding: "8px 12px",
 						borderTop: "1px solid var(--border)",
 						display: "flex",
+						flexWrap: "wrap",
 						gap: 8,
 					}}
 				>
 					<button
-						style={{ flex: 1, padding: "6px 0" }}
+						style={{ flex: 1 }}
 						className={n.fav ? "primary" : ""}
 						title={
 							n.fav
@@ -630,10 +625,10 @@ function Detail(props: {
 						}
 						onClick={() => toggleFav(n.num)}
 					>
-						{n.fav ? "★ FAV" : "☆ FAV"}
+						{n.fav ? "FAVORITED" : "FAVORITE"}
 					</button>
 					<button
-						style={{ flex: 1, padding: "6px 0" }}
+						style={{ flex: 1 }}
 						title={
 							n.ignored
 								? t("Stop ignoring")
@@ -641,11 +636,11 @@ function Detail(props: {
 						}
 						onClick={() => toggleIgnored(n.num)}
 					>
-						{n.ignored ? t("🚫 IGNORED") : t("IGNORE")}
+						{n.ignored ? t("IGNORED") : t("IGNORE")}
 					</button>
 					<button
 						className="danger"
-						style={{ flex: 1, padding: "6px 0" }}
+						style={{ flex: 1 }}
 						title={t("Delete from the radio and the local DB")}
 						onClick={() => {
 							if (confirmDel) {
@@ -677,7 +672,7 @@ function Detail(props: {
 				>
 					<div style={{ display: "flex", gap: 8 }}>
 						<button
-							style={{ flex: 1, padding: "6px 0" }}
+							style={{ flex: 1 }}
 							title={t("Forget the stored path: the next exchange re-learns it",
 							)}
 							onClick={onResetPath}
@@ -685,7 +680,7 @@ function Detail(props: {
 							{t("RESET PATH")}
 						</button>
 						<button
-							style={{ flex: 1, padding: "6px 0" }}
+							style={{ flex: 1 }}
 							title={t("Broadcast this contact's card to the mesh")}
 							onClick={onShare}
 						>
@@ -708,18 +703,19 @@ function Detail(props: {
 						padding: 12,
 						borderTop: "1px solid var(--border)",
 						display: "flex",
+						flexWrap: "wrap",
 						gap: 8,
 					}}
 				>
 					<button
 						className="primary"
-						style={{ flex: 1, padding: "8px 0" }}
+						style={{ flex: 1 }}
 						onClick={() => props.onOpenDm(n.num)}
 					>
 						[ DM ]
 					</button>
 					<button
-						style={{ flex: 1, padding: "8px 0", minWidth: 0 }}
+						style={{ flex: 1, minWidth: 0 }}
 						title={t("Traceroute: trace the hop route to the node")}
 						disabled={tracing}
 						onClick={onTrace}
@@ -727,7 +723,7 @@ function Detail(props: {
 						[ TRACE ]
 					</button>
 					<button
-						style={{ flex: 1, padding: "8px 0", minWidth: 0 }}
+						style={{ flex: 1, minWidth: 0 }}
 						title={t("Request sensor telemetry from the node")}
 						disabled={posState === "waiting"}
 						onClick={onAskTelem}
@@ -775,7 +771,7 @@ export default function Nodes({
 	const [filter, setFilter] = useState("");
 	const me = s.myNodeNum !== undefined ? s.nodes.get(s.myNodeNum) : undefined;
 	const q = filter.trim().toLowerCase().replace(/^!/, "");
-	const all = [...s.nodes.values()].filter((n) => n.num !== ANALYZER_SELF_NUM);
+	const all = [...s.nodes.values()].filter((n) => !isAnalyzerSelf(n.num));
 	const matching = q
 		? all.filter(
 				(n) =>
@@ -861,13 +857,13 @@ export default function Nodes({
 												: undefined
 										}
 									>
-										{n.fav && <span className="warn">★ </span>}!
+										{n.fav && <span className="warn">FAV </span>}!
 										{n.num.toString(16)} · {n.longName}
 										{n.num === s.myNodeNum &&
 											(isDemo() ? " (DEMO)" : ` (${t("ME")})`)}
-										{n.type === ContactType.Repeater && " ⇄"}
-										{n.publicKey && " 🔒"}
-										{n.ignored && " 🚫"}
+										{n.type === ContactType.Repeater && " REPEATER"}
+										{n.publicKey && " · PKI"}
+										{n.ignored && " · IGNORED"}
 									</td>
 									<td style={{ fontWeight: 700 }}>{n.shortName}</td>
 									<td className={n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}>

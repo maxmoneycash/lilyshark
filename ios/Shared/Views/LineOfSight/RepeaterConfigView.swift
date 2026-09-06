@@ -76,8 +76,10 @@ private struct RelayCardView: View {
                     } label: {
                         Image(systemName: "minus.circle.fill")
                             .foregroundStyle(.red.opacity(0.8))
+                            .touchable()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
+                    .accessibilityLabel("Remove \(title)")
                 }
 
                 Picker("Source", selection: sourceBinding) {
@@ -97,9 +99,11 @@ private struct RelayCardView: View {
                     }
                 } else if relay.source == .contact {
                     if contactsWithLocation.isEmpty {
-                        Text("No contacts with GPS coordinates available")
-                            .font(.caption)
-                            .foregroundStyle(MeshTheme.textSecondary)
+                        ContentUnavailableView(
+                            "Contact positions not reported",
+                            systemImage: "mappin.slash",
+                            description: Text("Choose a position along the path or enter coordinates for this relay.")
+                        )
                     } else {
                         Picker("Contact", selection: contactBinding) {
                             Text("Select...").tag(Contact?.none)
@@ -178,10 +182,17 @@ private struct RelayCardView: View {
 
     private func parseRelayCoordinates() {
         guard store.relays.indices.contains(index) else { return }
-        guard !coordLatText.isEmpty, !coordLonText.isEmpty else { return }
+        guard !coordLatText.isEmpty, !coordLonText.isEmpty else {
+            store.relays[index].coordinates = nil
+            store.clearCache()
+            return
+        }
         guard let lat = Double(coordLatText), let lon = Double(coordLonText),
               lat >= -90, lat <= 90, lon >= -180, lon <= 180 else {
-            if store.relays[index].coordinates != nil { store.relays[index].coordinates = nil }
+            if store.relays[index].coordinates != nil {
+                store.relays[index].coordinates = nil
+                store.clearCache()
+            }
             return
         }
         let newCoord = CLLocationCoordinate2D(latitude: lat, longitude: lon)

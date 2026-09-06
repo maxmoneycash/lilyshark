@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 
 #include "lilyshark/core/lora_airtime.h"
 #include "lilyshark/core/builtin_profiles.h"
@@ -182,6 +183,30 @@ void testRefusesImpossibleInputs()
                 loraTimeOnAirUs(4, 250000, 5, 16, false, true, 30), 0U);
     expectEqual("spreading factor above SX1262 range yields no airtime",
                 loraTimeOnAirUs(13, 250000, 5, 16, false, true, 30), 0U);
+    expectEqual("coding rate below 4/5 yields no airtime",
+                loraTimeOnAirUs(9, 250000, 4, 16, false, true, 30), 0U);
+    expectEqual("coding rate above 4/8 yields no airtime",
+                loraTimeOnAirUs(9, 250000, 9, 16, false, true, 30), 0U);
+    expectEqual("payload beyond the radio's 255-byte limit yields no airtime",
+                loraTimeOnAirUs(9, 250000, 5, 16, false, true, 256), 0U);
+    expectEqual("oversized payload cannot wrap into a plausible airtime",
+                loraTimeOnAirUs(9, 250000, 5, 16, false, true,
+                                std::numeric_limits<std::size_t>::max()), 0U);
+}
+
+void testLongPreambleDoesNotWrap()
+{
+    // SF12/125 kHz: a symbol lasts 32768 us. The 13-byte payload takes
+    // 8 + ceil(100/40)*5 = 23 symbols, plus the preamble and 4.25 symbols.
+    // The result fits uint32_t even when its quarter-symbol product does not.
+    expectEqual("32768-symbol preamble airtime (us)",
+                loraTimeOnAirUs(12, 125000, 5, 32768, false, true, 13), 1074634752U);
+    expectEqual("maximum preamble airtime (us)",
+                loraTimeOnAirUs(12, 125000, 5, 65535, false, true, 13), 2148343808U);
+    // At half the bandwidth the same frame takes 4296687616 us, beyond the
+    // field's range. Report it as unavailable instead of wrapping or clamping.
+    expectEqual("unrepresentable airtime is unavailable",
+                loraTimeOnAirUs(12, 62500, 5, 65535, false, true, 13), 0U);
 }
 
 /// Build the two beacons the deck emits on a Meshtastic profile, byte for byte
@@ -341,6 +366,7 @@ int main()
     testCanonicalVector();
     testLowDataRateThreshold();
     testRefusesImpossibleInputs();
+    testLongPreambleDoesNotWrap();
     testMeshtasticBeaconAirtime();
     testOldConstantsWereOverBudget();
     testMeshCoreAdvertAirtime();

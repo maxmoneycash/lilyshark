@@ -74,7 +74,7 @@ function Section(props: {
 										),
 									),
 								]);
-								setMsg(t("Saved ✓"));
+								setMsg(t("Saved"));
 								setCls("");
 							} catch (e) {
 								setMsg(`ERROR: ${e instanceof Error ? e.message : e}`);
@@ -238,7 +238,7 @@ export default function Config() {
 	const onBackup = async () => {
 		try {
 			await saveText(`lilyshark-backup-${stamp()}.json`, exportConfigJson());
-			setBkMsg(t("Backup downloaded ✓"));
+			setBkMsg(t("Backup downloaded"));
 			setBkCls("");
 		} catch (e) {
 			setBkMsg(`ERROR: ${e}`);
@@ -250,7 +250,7 @@ export default function Config() {
 		setBkMsg("");
 		try {
 			const n = await importConfigJson(await file.text());
-			setBkMsg(t("{0} settings applied ✓ (the node may reboot)", n));
+			setBkMsg(t("{0} settings applied (the node may reboot)", n));
 			setBkCls("");
 		} catch (e) {
 			setBkMsg(`ERROR: ${e}`);
@@ -263,7 +263,7 @@ export default function Config() {
 		try {
 			const b64 = await exportPrivateKeyB64();
 			await saveText(`meshcore-privatekey-${stamp()}.txt`, b64);
-			setBkMsg(t("Private key downloaded ✓"));
+			setBkMsg(t("Private key downloaded"));
 			setBkCls("");
 		} catch (e) {
 			setBkMsg(`ERROR: ${e}`);
@@ -278,7 +278,7 @@ export default function Config() {
 			const name = (chNames[index] ?? cur?.name ?? "").trim();
 			const secret = pskFromB64(chPsks[index] ?? pskToB64(cur?.secret));
 			await setChannelCfg(index, name, secret);
-			setChMsg(t("Channel {0} saved ✓", index));
+			setChMsg(t("Channel {0} saved", index));
 			setChCls("");
 		} catch (e) {
 			setChMsg(`ERROR: ${e instanceof Error ? e.message : e}`);
@@ -353,7 +353,7 @@ export default function Config() {
 				await setChannelCfg(c.index, c.name, pskFromB64(c.secret));
 				n++;
 			}
-			setImportMsg(t("{0} channels imported ✓", n));
+			setImportMsg(t("{0} channels imported", n));
 			setImportCls("");
 			setChJson("");
 		} catch (e) {
@@ -533,7 +533,7 @@ export default function Config() {
 							</div>
 						</div>
 						<p className="dim" style={{ padding: "0 14px 12px", fontSize: 11 }}>
-							{t("Only warns about nodes marked ★ in NODES, and at most once every 6 h per node and reason.",
+							{t("Only warns about favorite nodes, at most once every 6 h per node and reason.",
 							)}
 						</p>
 					</Section>
@@ -656,7 +656,7 @@ export default function Config() {
 										}
 										try {
 											await setFixedPosition(lat, lon);
-											setPosMsg(t("Fixed position sent ✓"));
+											setPosMsg(t("Fixed position sent"));
 											setPosCls("");
 										} catch (e) {
 											setPosMsg(`ERROR: ${e}`);
@@ -671,7 +671,7 @@ export default function Config() {
 										setPosMsg("");
 										try {
 											await clearFixedPosition();
-											setPosMsg(t("Fixed position cleared ✓"));
+											setPosMsg(t("Fixed position cleared"));
 											setPosCls("");
 										} catch (e) {
 											setPosMsg(`ERROR: ${e}`);
@@ -846,7 +846,7 @@ export default function Config() {
 										setAdvMsg("");
 										sendAdvert(true)
 											.then(() => {
-												setAdvMsg(t("Advert sent ✓"));
+												setAdvMsg(t("Advert sent"));
 												setAdvCls("");
 											})
 											.catch((e) => {
@@ -862,7 +862,7 @@ export default function Config() {
 										setAdvMsg("");
 										sendAdvert(false)
 											.then(() => {
-												setAdvMsg(t("Advert sent ✓"));
+												setAdvMsg(t("Advert sent"));
 												setAdvCls("");
 											})
 											.catch((e) => {

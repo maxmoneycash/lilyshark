@@ -13,6 +13,8 @@ Design.* and for the two accessibility rules the app must not break:
   - motion that ignores Reduce Motion. Someone who asked the system for
     stillness asked us too, and `.animation(...)` applied directly skips
     the check that `.meshAnimation` performs.
+  - a hardcoded font size that ignores the reader's preferred text size.
+    Design.Text.* holds semantic styles that scale with Dynamic Type.
   - a tap target below 44pt. Apple's minimum, and the reason it matters HERE
     is a cold hand outdoors, not a review guideline.
 
@@ -45,6 +47,7 @@ EXEMPT_FILES = {
 RAW_FONT = re.compile(r"\.font\(\s*\.system\(\s*size:\s*(\d+)")
 # `.animation(` that is not the system-honouring `.meshAnimation(`.
 RAW_ANIMATION = re.compile(r"(?<!mesh)\.animation\(")
+RAW_WITH_ANIMATION = re.compile(r"\bwithAnimation\s*(?:\(|\{)")
 # A frame small enough to be a tap target problem, when it is on a Button.
 SMALL_FRAME = re.compile(r"\.frame\(\s*(?:width:\s*(\d+)|height:\s*(\d+))")
 
@@ -76,18 +79,26 @@ def scan() -> list[str]:
 
             if RAW_FONT.search(line) and not allowed_reason:
                 findings.append(
-                    f"{rel}:{number}: raw font size — use Design.Text.*\n"
+                    f"{rel}:{number}: hardcoded font size bypasses Dynamic Type — "
+                    f"use a semantic style from Design.Text.*\n"
                     f"    {stripped[:100]}"
                 )
 
             if RAW_ANIMATION.search(line):
-                # withAnimation inside a gesture handler is a different thing
-                # and is checked by eye, not here.
-                if "withAnimation" not in line:
+                # TimelineView's animation schedule is not a View animation.
+                # This backdrop explicitly pauses its schedule for Reduce Motion.
+                paused_timeline = "TimelineView(.animation(" in line and "paused: reduceMotion" in line
+                if not paused_timeline:
                     findings.append(
                         f"{rel}:{number}: .animation() bypasses Reduce Motion — "
                         f"use .meshAnimation(_:value:)\n    {stripped[:100]}"
                     )
+
+            if RAW_WITH_ANIMATION.search(line):
+                findings.append(
+                    f"{rel}:{number}: withAnimation bypasses Reduce Motion — "
+                    f"use withMeshAnimation(reduceMotion:)\n    {stripped[:100]}"
+                )
 
             match = SMALL_FRAME.search(line)
             if match:
@@ -95,8 +106,12 @@ def scan() -> list[str]:
                 # Only a problem where it is plausibly a control. A 20pt icon
                 # inside a 44pt touchable is correct and common.
                 if value < 44 and "touchable" not in line:
-                    context = "\n".join(lines[max(0, number - 4) : number + 2])
-                    if "Button" in context and "touchable" not in context:
+                    context = "\n".join(lines[max(0, number - 4) : number + 4])
+                    # A hidden alert presenter carries no action or hit target.
+                    if value == 0 and "Color.clear" in context:
+                        continue
+                    before = "\n".join(lines[max(0, number - 4):number])
+                    if re.search(r"\bButton\s*(?:\(|\{)", before) and "touchable" not in context:
                         findings.append(
                             f"{rel}:{number}: {value}pt frame on a control — "
                             f"below the 44pt minimum; add .touchable()\n    {stripped[:100]}"

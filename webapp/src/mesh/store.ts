@@ -71,6 +71,8 @@ export interface Message {
   // queued: waiting locally · sent: the radio accepted the packet ·
   // delivered: ACK received from the contact · failed: error/timeout
   state: "queued" | "sent" | "delivered" | "failed";
+  failureReason?: string; // reported refusal or link error; absent when unknown
+  awaitingEcho?: boolean; // USB send awaiting its matching transmitted frame
   hops?: number; // hops traveled to reach us; undefined = unknown/direct
   replyId?: number; // kept for UI compatibility; MeshCore has no reply id
   snr?: number; // rx SNR of the last hop to us (dB); undefined = unknown

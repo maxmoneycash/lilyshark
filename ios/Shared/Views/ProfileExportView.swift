@@ -69,7 +69,7 @@ struct ProfileExportView: View {
                         }
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             } else {
                 LabelValueRow(label: "Export Config", value: "Connect to radio first")
@@ -106,7 +106,7 @@ struct ProfileExportView: View {
                 Label("Choose .meshprofile File", systemImage: "square.and.arrow.down")
                     .foregroundStyle(MeshTheme.accent)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
 
             if let err = importError {
@@ -160,7 +160,7 @@ struct ProfileExportView: View {
                     if isApplying { ProgressView().tint(MeshTheme.accent) }
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .disabled(isApplying)
             .listRowBackground(MeshTheme.surface)
         }

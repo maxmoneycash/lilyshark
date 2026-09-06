@@ -319,6 +319,12 @@
 }
 .meshterm button {
 	cursor: pointer;
+	min-height: 36px;
+	min-width: 36px;
+	padding: 8px 12px;
+	font-size: 12px;
+	line-height: 1.25;
+	font-weight: 500;
 	letter-spacing: 1px;
 	/* A control never wraps — a two-line button reads as a box, not a key. */
 	white-space: nowrap;
@@ -385,7 +391,21 @@
 
 .meshterm button.primary {
 	border-color: var(--fg);
+	background: var(--fg);
+	color: var(--bg);
 	font-weight: 700;
+}
+.meshterm button.primary:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--fg) 86%, var(--bg));
+	color: var(--bg);
+}
+.meshterm button:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: 3px;
+}
+.meshterm button > svg {
+	vertical-align: middle;
+	flex-shrink: 0;
 }
 .meshterm button.danger {
 	border-color: var(--err);
@@ -480,11 +500,11 @@
 
 /* Toolbar controls share one footprint: one height whatever the label, and
    the buttons hold their size while the text input is the part that gives
-   way. (On phones the 40px touch-target min-height below still wins.) */
+   way. Phone controls use a 44px minimum below. */
 .meshterm .panel-title button,
 .meshterm .panel-title select,
 .meshterm .panel-title input {
-	height: 28px;
+	min-height: 36px;
 	padding-top: 0;
 	padding-bottom: 0;
 }
@@ -568,6 +588,32 @@
 	padding: 6px 12px;
 	cursor: pointer;
 }
+.meshterm button.convo-item {
+	width: 100%;
+	min-height: 44px;
+	border: 0;
+	text-align: left;
+	white-space: normal;
+}
+.meshterm .chat-latest {
+	min-height: 44px;
+	margin: 4px 14px;
+}
+.meshterm .chat-tools {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	max-width: 100%;
+}
+@media (max-width: 860px) {
+	.meshterm .chat-tools {
+		width: 100%;
+	}
+	.meshterm .panel-title .chat-tools input {
+		flex: 1 0 100%;
+	}
+}
 .meshterm .convo-item:hover,
 .meshterm .convo-item.active {
 	background: var(--fg);
@@ -617,6 +663,16 @@
 }
 .meshterm .quote-btn:hover {
 	opacity: 1;
+}
+.meshterm .quote-btn:focus-visible {
+	opacity: 1;
+}
+@media (hover: none) {
+	.meshterm .quote-btn {
+		opacity: 1;
+		min-width: 44px;
+		min-height: 44px;
+	}
 }
 
 /* clickable sender name in a message */
@@ -1386,7 +1442,7 @@ body {
 
 	/* Label columns sized in px force sideways scroll; size to content. */
 	.meshterm .kv {
-		grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+		grid-template-columns: minmax(0, 9ch) minmax(0, 1fr);
 		gap: 9px 14px;
 		padding: 12px;
 		font-size: 13px;
@@ -1423,7 +1479,10 @@ body {
 
 	/* Touch targets, not mouse targets. */
 	.meshterm :where(button, .tb-btn, select, input) {
-		min-height: 40px;
+		min-height: 44px;
+	}
+	.meshterm button {
+		min-width: 44px;
 	}
 	.meshterm .chat-input input {
 		min-height: 44px;
@@ -1994,16 +2053,15 @@ body:has(.meshterm .app.menu-open) {
 	align-items: center;
 	margin-top: 26px;
 }
-.meshterm .intro-cta button {
-	min-height: 46px;
-	padding: 0 22px;
-	letter-spacing: 1.5px;
+.meshterm .intro-cta button:not(.tab) {
+	min-height: 36px;
+	padding: 8px 12px;
 }
 /* Two actions carry the ending — open the analyzer, or flash a radio. The
    paper is a third destination, not a third decision, so it reads as a link:
    three equally weighted buttons made the choice look harder than it is, and
    on a phone the row wrapped its last two past the bottom of the stage. */
-.meshterm .intro-cta .cta-link {
+.meshterm .intro-cta button.cta-link {
 	min-height: 0;
 	padding: 0 2px;
 	background: none;
@@ -2048,20 +2106,32 @@ body:has(.meshterm .app.menu-open) {
 	gap: 10px;
 }
 .meshterm .intro-rail button {
-	width: 10px;
-	min-height: 10px;
-	height: 10px;
+	width: 36px;
+	min-height: 36px;
+	height: 36px;
 	padding: 0;
-	border: 1px solid var(--fg);
+	border: 0;
 	background: transparent;
+	box-shadow: none;
+	display: grid;
+	place-items: center;
+}
+.meshterm .intro-rail button::after {
+	content: "";
+	width: 8px;
+	height: 8px;
+	border: 1px solid var(--fg);
 	border-radius: 50%;
 }
-.meshterm .intro-rail button.on {
+.meshterm .intro-rail button.on::after {
 	background: var(--fg);
 }
 .meshterm .intro-rail button:focus-visible {
 	outline: 2px solid var(--ink, var(--fg));
 	outline-offset: 4px;
+}
+.meshterm .intro-pager {
+	display: none;
 }
 
 @media (max-width: 860px) {
@@ -2213,13 +2283,13 @@ body:has(.meshterm .app.menu-open) {
 		margin-top: 6px;
 		gap: 6px;
 	}
-	.meshterm .intro-cta button {
+	.meshterm .intro-cta button:not(.tab) {
 		min-height: 38px;
 		padding: 0 12px;
 		font-size: 11px;
 		letter-spacing: 1px;
 	}
-	.meshterm .intro-cta .cta-link {
+	.meshterm .intro-cta button.cta-link {
 		min-height: 0;
 		padding: 0;
 	}
@@ -2251,13 +2321,13 @@ body:has(.meshterm .app.menu-open) {
 		margin-top: 6px;
 		gap: 5px;
 	}
-	.meshterm .intro-cta button {
+	.meshterm .intro-cta button:not(.tab) {
 		min-height: 36px;
 		padding: 0 9px;
 		font-size: 10px;
 		letter-spacing: 0.3px;
 	}
-	.meshterm .intro-cta .cta-link {
+	.meshterm .intro-cta button.cta-link {
 		min-height: 0;
 		padding: 0;
 	}
@@ -2305,7 +2375,7 @@ body:has(.meshterm .app.menu-open) {
 }
 .meshterm .trace-step {
 	display: grid;
-	grid-template-columns: 2ch 11ch minmax(0, 1fr);
+	grid-template-columns: 5ch 11ch minmax(0, 1fr);
 	gap: 8px;
 	align-items: baseline;
 }
@@ -2794,6 +2864,150 @@ body:has(.meshterm .app.menu-open) {
 		margin-top: 6px;
 	}
 }
+.meshterm .device-counters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 20px;
+	padding: 10px 12px;
+	border-top: 1px solid var(--border);
+}
+
+.meshterm .device-counters span {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.meshterm p {
+	text-wrap: pretty;
+}
+
+
+@media (max-width: 560px) {
+	.meshterm .kv {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 4px;
+	}
+	.meshterm .kv .v {
+		margin-bottom: 10px;
+	}
+	.meshterm .kv .k {
+		font-size: 11px;
+	}
+	.meshterm .this-device .device-readout {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.meshterm .this-device .stat-tile {
+		min-width: 0;
+	}
+	.meshterm .device-note {
+		font-size: 12px;
+		line-height: 1.5;
+	}
+	.meshterm .heard-line {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 3px;
+	}
+}
+
+/* The mobile pager sits beside the handset, leaving the text and CTA bands
+   unchanged. Its empty middle passes pointer gestures through to the model. */
+@media (max-width: 860px) {
+	.meshterm .intro-rail,
+	.meshterm .intro-hint {
+		display: none;
+	}
+	.meshterm .intro-pager {
+		position: absolute;
+		top: 25%;
+		left: 18px;
+		right: 18px;
+		transform: translateY(-50%);
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		grid-template-rows: auto auto;
+		gap: 4px 0;
+		align-items: center;
+		pointer-events: none;
+	}
+	.meshterm .intro-pager button {
+		grid-row: 1;
+		padding: 0 8px;
+		font-size: 10px;
+		letter-spacing: 0.4px;
+		pointer-events: auto;
+	}
+	.meshterm .intro-pager button:first-child {
+		grid-column: 1;
+	}
+	.meshterm .intro-pager button:last-child {
+		grid-column: 3;
+	}
+	.meshterm .intro-pager span {
+		grid-column: 3;
+		grid-row: 2;
+		justify-self: center;
+		font-size: 10px;
+		color: var(--fg-dim);
+	}
+	.meshterm .sheet-actions button {
+		min-height: 44px;
+		padding: 8px 12px;
+		font-size: 12px;
+	}
+}
+@media (max-width: 860px) and (max-height: 620px) {
+	.meshterm .intro-pager {
+		top: 19%;
+	}
+}
+@media (min-width: 600px) and (max-width: 860px) and (min-height: 320px) and (max-height: 480px) {
+	.meshterm .intro-pager {
+		top: 12px;
+		left: calc(66.667% + 6px);
+		transform: none;
+	}
+}
+
+.meshterm .telemetry-plot {
+	width: 100%;
+	height: clamp(248px, 48dvh, 480px);
+}
+.meshterm .telemetry-controls select {
+	max-width: 100%;
+}
+@media (max-width: 560px) {
+	.meshterm .telemetry-controls > select {
+		width: 100%;
+	}
+	.meshterm .telemetry-plot {
+		height: 300px;
+	}
+}
+
+.meshterm .uplot .u-legend {
+	min-width: 0;
+	font-size: 11px;
+}
+.meshterm .uplot .u-label {
+	white-space: normal;
+}
+@media (max-width: 860px) {
+	.meshterm button:not(.tab),
+	.meshterm .panel-title :is(button, input, select),
+	.meshterm .chat-input input {
+		min-height: 44px;
+	}
+}
+@media (max-width: 560px) {
+	.meshterm .trace-step {
+		grid-template-columns: 5ch minmax(0, 1fr);
+	}
+	.meshterm .trace-detail {
+		grid-column: 2;
+	}
+}
 
 /* Links share the same navigation controls on every page, including /flash/. */
 .meshterm header .logo { text-decoration: none; }
@@ -2815,4 +3029,12 @@ body:has(.meshterm .app.menu-open) {
   .meshterm header nav > a.tab { flex: 0 0 auto; font-size: 10px; letter-spacing: 0; height: 30px; padding: 0 4px; }
   .meshterm header > .primary { margin-left: auto; font-size: 10px; height: 30px; }
   .meshterm header > .conn-pill { display: none; }
+}
+
+@media (max-width: 860px) {
+	.meshterm .section-tabs a {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+	}
 }

@@ -14,6 +14,8 @@ import Charts
 
 struct NoiseFloorMonitorView: View {
     @Environment(RFMonitorStore.self) private var rfStore
+    @Environment(ConnectionManager.self) private var connectionManager
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedTab: RFTab = .chart
 
     enum RFTab: String, CaseIterable {
@@ -24,28 +26,20 @@ struct NoiseFloorMonitorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header + toggle + tab picker
-            HStack {
-                Image(systemName: "waveform.badge.magnifyingglass")
-                    .foregroundStyle(MeshTheme.accent)
-                Text("RF Monitor")
+            VStack(alignment: .leading, spacing: Design.Space.regular) {
+                Label("RF Monitor", systemImage: "waveform.badge.magnifyingglass")
                     .font(.headline)
-                    .foregroundStyle(MeshTheme.accent)
-                Spacer()
+                    .foregroundStyle(MeshTheme.textPrimary)
                 Button {
+                    guard rfStore.isMonitoring || canMonitor else { return }
                     rfStore.toggleMonitoring()
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: rfStore.isMonitoring ? "stop.circle.fill" : "play.circle.fill")
-                        (rfStore.isMonitoring ? Text("Stop") : Text("Start"))
-                            .font(.caption.weight(.medium))
-                    }
-                    .foregroundStyle(rfStore.isMonitoring ? .red : MeshTheme.accent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(rfStore.isMonitoring ? Color.red.opacity(0.1) : MeshTheme.surfaceLight)
-                    .clipShape(Capsule())
+                    Label(rfStore.isMonitoring ? "Stop Monitoring" : "Start Monitoring",
+                          systemImage: rfStore.isMonitoring ? "stop.circle" : "play.circle")
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshSecondary)
+                .disabled(!rfStore.isMonitoring && !canMonitor)
             }
 
             Picker("View", selection: $selectedTab) {
@@ -53,17 +47,27 @@ struct NoiseFloorMonitorView: View {
                     Text(tab.rawValue).tag(tab)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
 
             if selectedTab == .log {
                 PacketLogView(samples: rfStore.rfSamples)
+            } else if !canMonitor && rfStore.rfSamples.isEmpty {
+                ContentUnavailableView(
+                    "Radio reports unavailable",
+                    systemImage: "antenna.radiowaves.left.and.right.slash",
+                    description: Text("Connect a MeshCore radio to collect packet signal reports here.")
+                )
             } else if rfStore.isMonitoring && rfStore.rfSamples.isEmpty {
                 VStack(spacing: 8) {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("Listening for LoRa packets...")
+                    Text("Waiting for packet reports from the radio…")
                         .font(.caption)
                         .foregroundStyle(MeshTheme.textSecondary)
+                    Text("Only packets reported by the radio appear here. No reports does not mean there is no RF activity.")
+                        .font(.footnote)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -119,21 +123,29 @@ struct NoiseFloorMonitorView: View {
                 }
 
                 // Stats
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    statCard("Avg SNR", value: rfStore.averageSNR.map { String(format: "%.1f dB", $0) } ?? "--")
-                    statCard("Peak SNR", value: rfStore.peakSNR.map { String(format: "%.1f dB", $0) } ?? "--")
-                    statCard("Avg RSSI", value: rfStore.averageRSSI.map { String(format: "%.0f dBm", $0) } ?? "--")
+                LazyVGrid(columns: dynamicTypeSize.isAccessibilitySize
+                          ? [GridItem(.flexible())]
+                          : [GridItem(.adaptive(minimum: 180))], spacing: Design.Space.regular) {
+                    statCard("Avg SNR", value: rfStore.averageSNR.map { String(format: "%.1f dB", $0) } ?? "Not reported")
+                    statCard("Peak SNR", value: rfStore.peakSNR.map { String(format: "%.1f dB", $0) } ?? "Not reported")
+                    statCard("Avg RSSI", value: rfStore.averageRSSI.map { String(format: "%.0f dBm", $0) } ?? "Not reported")
                     statCard("Packets", value: "\(rfStore.rfSamples.count)")
                 }
             } else {
-                Text("Tap Start to begin capturing LoRa packet signal data.")
-                    .font(.caption)
-                    .foregroundStyle(MeshTheme.textSecondary)
+                ContentUnavailableView(
+                    "RF monitor is stopped",
+                    systemImage: "waveform.badge.magnifyingglass",
+                    description: Text("Start monitoring to collect signal readings from packet reports. This chart does not measure the noise between packets.")
+                )
             }
         }
         .padding()
         .background(MeshTheme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var canMonitor: Bool {
+        connectionManager.connectionState == .ready && !connectionManager.isMeshtasticLinkActive
     }
 
     private func statCard(_ label: LocalizedStringKey, value: String) -> some View {
@@ -159,50 +171,30 @@ struct PacketLogView: View {
 
     var body: some View {
         if samples.isEmpty {
-            VStack(spacing: 8) {
-                Text("No packets logged yet.")
-                    .font(.caption)
-                    .foregroundStyle(MeshTheme.textSecondary)
-                Text("Start monitoring to capture packets.")
-                    .font(.caption2)
-                    .foregroundStyle(MeshTheme.textSecondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
+            ContentUnavailableView(
+                "No saved packet reports",
+                systemImage: "list.bullet.rectangle",
+                description: Text("Keep monitoring with a compatible radio connected. Reports appear when the radio forwards received packets to the app.")
+            )
         } else {
-            VStack(spacing: 0) {
-                HStack {
-                    Text("Time").frame(width: 70, alignment: .leading)
-                    Text("SNR").frame(width: 60, alignment: .trailing)
-                    Text("RSSI").frame(width: 60, alignment: .trailing)
-                }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(MeshTheme.textSecondary)
-                .padding(.horizontal, 4)
-                .padding(.bottom, 4)
-
                 ScrollView {
-                    LazyVStack(spacing: 2) {
+                    LazyVStack(spacing: Design.Space.regular) {
                         ForEach(samples.reversed()) { sample in
-                            HStack {
+                            VStack(alignment: .leading, spacing: Design.Space.tight) {
                                 Text(Self.timeFormatter.string(from: sample.timestamp))
-                                    .frame(width: 70, alignment: .leading)
+                                    .font(.subheadline.monospacedDigit())
                                     .foregroundStyle(MeshTheme.textSecondary)
-                                Text(String(format: "%.1f dB", sample.snr))
-                                    .frame(width: 60, alignment: .trailing)
-                                    .foregroundStyle(sample.snr > 0 ? MeshTheme.connected : sample.snr > -10 ? .orange : MeshTheme.disconnected)
-                                Text("\(sample.rssi) dBm")
-                                    .frame(width: 60, alignment: .trailing)
-                                    .foregroundStyle(sample.rssi > -100 ? MeshTheme.connected : sample.rssi > -120 ? .orange : MeshTheme.disconnected)
+                                MeshValueRow(label: "SNR", value: String(format: "%.1f dB", sample.snr),
+                                             valueColor: sample.snr > 0 ? MeshTheme.connected : sample.snr > -10 ? .orange : MeshTheme.disconnected)
+                                MeshValueRow(label: "RSSI", value: "\(sample.rssi) dBm",
+                                             valueColor: sample.rssi > -100 ? MeshTheme.connected : sample.rssi > -120 ? .orange : MeshTheme.disconnected)
                             }
-                            .font(.caption.monospacedDigit())
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
+                            .padding(Design.Space.regular)
+                            .background(MeshTheme.surfaceLight, in: RoundedRectangle(cornerRadius: Design.Radius.card))
                         }
                     }
                 }
                 .frame(maxHeight: 300)
-            }
         }
     }
 }

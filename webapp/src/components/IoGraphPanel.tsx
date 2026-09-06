@@ -331,7 +331,7 @@ export function IoGraphPanel({
           title="Drop the time range and show the whole capture again"
           onClick={() => onBrush(null)}
         >
-          ⟲ WHOLE CAPTURE
+          WHOLE CAPTURE
         </button>
       </div>
 
@@ -380,7 +380,7 @@ export function IoGraphPanel({
             {brushed ? (
               <span className="ok">
                 BRUSHED {brushLabel(brush)} · {shownFrames} OF {filteredFrames} FILTERED
-                FRAME(S) IN RANGE — click a bar, drag across bars, or press ⟲ WHOLE
+                FRAME(S) IN RANGE — click a bar, drag across bars, or press WHOLE
                 CAPTURE
               </span>
             ) : (

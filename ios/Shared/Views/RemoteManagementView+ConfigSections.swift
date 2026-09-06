@@ -269,7 +269,7 @@ struct RemoteRoutingSection: View {
                         }
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .disabled(regionPutName.trimmingCharacters(in: .whitespaces).isEmpty)
                     .listRowBackground(MeshTheme.surface)
 
@@ -300,7 +300,7 @@ struct RemoteRoutingSection: View {
                         }
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .disabled(regionRemoveName.trimmingCharacters(in: .whitespaces).isEmpty)
                     .listRowBackground(MeshTheme.surface)
 
@@ -388,7 +388,7 @@ struct RemoteAdvertSection: View {
                     (mapPickFeedback ? Label("Location Set!", systemImage: "checkmark.circle.fill") : Label("Pick on Map", systemImage: "map"))
                         .foregroundStyle(mapPickFeedback ? .green : MeshTheme.accent)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             }
 
@@ -448,7 +448,7 @@ struct RemoteAdvertSection: View {
                         (showAdvertSent ? Label("Sent!", systemImage: "dot.radiowaves.left.and.right") : Label("Advertise", systemImage: "dot.radiowaves.left.and.right"))
                             .foregroundStyle(showAdvertSent ? .green : MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .contentShape(Rectangle())
                 }
             }

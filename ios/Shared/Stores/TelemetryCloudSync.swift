@@ -18,8 +18,8 @@ import MeshCoreKit
 @MainActor
 final class TelemetryCloudSync {
 
-    private let container = CKContainer(identifier: "iCloud.com.lilyshark.app")
-    private var database: CKDatabase { container.privateCloudDatabase }
+    private lazy var container = CloudKitAccess.makeContainer()
+    private var database: CKDatabase? { container?.privateCloudDatabase }
     private let defaults = UserDefaults.standard
 
     private static let recordType = "TelemetryBatch"
@@ -39,7 +39,7 @@ final class TelemetryCloudSync {
 
     func markDirty(contactKey: Data) {
         guard let prefix = radioPrefix, !prefix.isEmpty else { return }
-        guard iCloudSyncEnabled else { return }
+        guard iCloudSyncEnabled, CloudKitAccess.isEnabledForBuild else { return }
         let dateStr = Self.dayString(from: Date())
         let batchKey = "\(prefix).\(contactKey.hexCompact).\(dateStr)"
         dirtyBatches.insert(batchKey)
@@ -50,6 +50,7 @@ final class TelemetryCloudSync {
     func uploadIfNeeded(telemetryHistory: [Data: [TelemetrySnapshot]]) {
         guard iCloudSyncEnabled, !dirtyBatches.isEmpty, !isUploading else { return }
         guard let prefix = radioPrefix, !prefix.isEmpty else { return }
+        guard let database else { return }
 
         let batches = dirtyBatches
         dirtyBatches.removeAll()
@@ -57,11 +58,11 @@ final class TelemetryCloudSync {
 
         Task { @MainActor in
             defer { self.isUploading = false }
-            await self.performUpload(batches: batches, telemetryHistory: telemetryHistory, radioPrefix: prefix)
+            await self.performUpload(batches: batches, telemetryHistory: telemetryHistory, radioPrefix: prefix, database: database)
         }
     }
 
-    private func performUpload(batches: Set<String>, telemetryHistory: [Data: [TelemetrySnapshot]], radioPrefix: String) async {
+    private func performUpload(batches: Set<String>, telemetryHistory: [Data: [TelemetrySnapshot]], radioPrefix: String, database: CKDatabase) async {
         // Pre-compute day strings and filter snapshots on MainActor, then JSON-encode on background thread.
         let cutoff = Date().addingTimeInterval(-7 * 86400)
         let recordTypeName = Self.recordType
@@ -104,7 +105,7 @@ final class TelemetryCloudSync {
                 DebugLogger.shared.log("TELEMETRY CLOUD: uploaded \(saves.count) batch records", level: .info)
             } catch let error as CKError where error.code == .serverRecordChanged {
                 // Conflict — fetch server version, merge, retry
-                await handleConflicts(records: chunk)
+                await handleConflicts(records: chunk, database: database)
             } catch {
                 DebugLogger.shared.log("TELEMETRY CLOUD: upload error — \(error.localizedDescription)", level: .warning)
                 // Re-mark as dirty for next attempt
@@ -115,7 +116,7 @@ final class TelemetryCloudSync {
         }
     }
 
-    private func handleConflicts(records: [CKRecord]) async {
+    private func handleConflicts(records: [CKRecord], database: CKDatabase) async {
         for record in records {
             do {
                 let serverRecord = try await database.record(for: record.recordID)
@@ -143,13 +144,14 @@ final class TelemetryCloudSync {
     func fetchFromCloud() {
         guard iCloudSyncEnabled else { return }
         guard let prefix = radioPrefix, !prefix.isEmpty else { return }
+        guard let database else { return }
 
         Task { @MainActor in
-            await self.performFetch(radioPrefix: prefix)
+            await self.performFetch(radioPrefix: prefix, database: database)
         }
     }
 
-    private func performFetch(radioPrefix: String) async {
+    private func performFetch(radioPrefix: String, database: CKDatabase) async {
         let cutoff = Date().addingTimeInterval(-7 * 86400)
         let predicate = NSPredicate(format: "radioPrefix == %@ AND date > %@", radioPrefix, cutoff as NSDate)
         let query = CKQuery(recordType: Self.recordType, predicate: predicate)
@@ -185,7 +187,7 @@ final class TelemetryCloudSync {
     // MARK: - Migration (existing local data → CloudKit)
 
     func migrateIfNeeded(telemetryHistory: [Data: [TelemetrySnapshot]]) {
-        guard iCloudSyncEnabled else { return }
+        guard iCloudSyncEnabled, CloudKitAccess.isEnabledForBuild else { return }
         guard !defaults.bool(forKey: "telemetryCloudMigrated") else { return }
         guard let prefix = radioPrefix, !prefix.isEmpty else { return }
         guard !telemetryHistory.isEmpty else {

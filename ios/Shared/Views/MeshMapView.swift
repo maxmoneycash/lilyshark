@@ -574,7 +574,7 @@ struct MeshMapView: View {
                                     .lineLimit(1)
                             }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                     }
                 }
 
@@ -594,13 +594,13 @@ struct MeshMapView: View {
                                         .background(Circle().fill(Color.teal))
                                         .shadow(radius: 2)
                                     Text(cluster.nodes[0].name)
-                                        .font(.system(size: 9))
+                                        .font(.caption2)
                                         .foregroundStyle(MeshTheme.textSecondary)
                                         .lineLimit(1)
                                         .frame(maxWidth: 80)
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                         } else {
                             // Cluster — show count bubble
                             Button {
@@ -617,11 +617,11 @@ struct MeshMapView: View {
                                         )
                                         .shadow(radius: 3)
                                     Text(clusterLabel(cluster.count))
-                                        .font(.system(size: clusterFontSize(cluster.count), weight: .bold))
+                                        .font(.caption.weight(.bold))
                                         .foregroundStyle(.white)
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                         }
                     }
                 }
@@ -761,14 +761,11 @@ struct MeshMapView: View {
                         .padding()
                 }
                 if mappableContacts.isEmpty && internetMapNodes.isEmpty && !isLoadingInternetNodes {
-                    VStack(spacing: 4) {
-                        Text("No contacts with location data")
-                            .font(.caption)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        Text("\(contactStore.contacts.count) contacts total, \(mappableContacts.count) with coordinates")
-                            .font(.caption2)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                    }
+                    ContentUnavailableView(
+                        "No shared positions to show",
+                        systemImage: "mappin.slash",
+                        description: Text("Contacts appear on the map when a usable position is shared. Nodes without a reported position remain in Messages.")
+                    )
                     .padding(8)
                     .background(.thinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -793,13 +790,14 @@ struct MeshMapView: View {
                         }
                     } label: {
                         Image(systemName: overlayButtonIcon)
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(mapOverlay == .none ? MeshTheme.textSecondary : MeshTheme.accent)
                             .frame(width: 32, height: 32)
                             .background(.thinMaterial)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .touchable()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .alert("Coverage Heat Map", isPresented: $showCoverageInfo) {
                         Button("Got It", role: .cancel) {}
                     } message: {
@@ -879,15 +877,6 @@ struct MeshMapView: View {
         case 10...99:  return 42
         case 100...999: return 50
         default:       return 56
-        }
-    }
-
-    private func clusterFontSize(_ count: Int) -> CGFloat {
-        switch count {
-        case 1...9:    return 13
-        case 10...99:  return 12
-        case 100...999: return 11
-        default:       return 10
         }
     }
 

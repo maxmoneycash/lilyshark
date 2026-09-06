@@ -65,7 +65,11 @@ public enum MeshtasticIdentity {
     /// as decibels × 4 in an `Int8`, and every screen that shows SNR divides by
     /// four. Converting here is what stops a deck's −8.5 dB being drawn as
     /// −2.1 dB.
-    public static func snrQuarterDecibels(from decibels: Float) -> Int8 {
-        Int8(clamping: Int((decibels * 4).rounded()))
+    /// Nonfinite values contain no reading. Clamp in Double before integer
+    /// conversion so even a finite Float near its limit cannot overflow.
+    public static func snrQuarterDecibels(from decibels: Float) -> Int8? {
+        guard decibels.isFinite else { return nil }
+        let scaled = (Double(decibels) * 4).rounded()
+        return Int8(max(Double(Int8.min), min(Double(Int8.max), scaled)))
     }
 }

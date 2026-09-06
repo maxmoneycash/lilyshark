@@ -54,42 +54,45 @@ extension ContactListView {
                     showScanner = true
                 }
             } label: {
-                HStack {
+                HStack(spacing: Design.Space.regular) {
                     Image(systemName: connectionSymbol)
-                        .font(.system(size: 10))
+                        .font(.body)
                         .foregroundStyle(connectionColor)
-                        .shadow(color: connectionColor.opacity(0.6), radius: 4)
                         .accessibilityHidden(true)
-                    Text(connectionLabel)
-                        .font(.subheadline)
-                        .foregroundStyle(connectionColor)
-                    Spacer()
-                    if let rawName = {
-                        if !deviceConfig.deviceName.isEmpty { return deviceConfig.deviceName }
-                        if let name = connectionManager.connectedDeviceName { return name }
-                        #if os(macOS) || targetEnvironment(macCatalyst)
-                        if let name = remoteSessionManager.usbDeviceContact?.name, isUSBCLIConnected { return "USB: \(name)" }
-                        #endif
-                        return nil as String?
-                    }() {
-                        let shortName = rawName
-                            .replacingOccurrences(of: "MeshCore-", with: "")
-                            .replacingOccurrences(of: "meshcore-", with: "")
-                        HStack(spacing: 4) {
-                            Text(shortName)
-                                .font(.caption)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                            deckBatteryPill
+                    VStack(alignment: .leading, spacing: Design.Space.tight) {
+                        Text(connectionLabel)
+                            .font(.body)
+                            .foregroundStyle(connectionColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let rawName = {
+                            if !deviceConfig.deviceName.isEmpty { return deviceConfig.deviceName }
+                            if let name = connectionManager.connectedDeviceName { return name }
+                            #if os(macOS) || targetEnvironment(macCatalyst)
+                            if let name = remoteSessionManager.usbDeviceContact?.name, isUSBCLIConnected { return "USB: \(name)" }
+                            #endif
+                            return nil as String?
+                        }() {
+                            let shortName = rawName
+                                .replacingOccurrences(of: "MeshCore-", with: "")
+                                .replacingOccurrences(of: "meshcore-", with: "")
+                            HStack(spacing: 4) {
+                                Text(shortName)
+                                    .font(.subheadline)
+                                    .foregroundStyle(MeshTheme.textSecondary)
+                                    .lineLimit(1)
+                                deckBatteryPill
+                            }
                         }
-                    } else {
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(MeshTheme.textSecondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .accessibilityHidden(true)
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             .contextMenu {
                 if connectionManager.connectionState == .ready || connectionManager.connectionState == .connected {
@@ -163,7 +166,7 @@ extension ContactListView {
                         .foregroundStyle(MeshTheme.accent)
                 }
                 .accessibilityLabel("Settings")
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
             }
             #endif
         }
@@ -184,7 +187,8 @@ extension ContactListView {
                     .foregroundStyle(MeshTheme.textPrimary)
                 channelMessagePreview
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             channelUnreadBadge
         }
         .contentShape(Rectangle())
@@ -327,6 +331,7 @@ extension ContactListView {
                 } label: {
                     Image(systemName: "plus")
                         .foregroundStyle(MeshTheme.accent)
+                        .touchable()
                 }
                 .accessibilityLabel("Add channel")
                 .menuIndicator(.hidden)
@@ -360,7 +365,8 @@ extension ContactListView {
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             let count = messageStoreManager.unreadCounts[Data([channel.index])] ?? 0
             if count > 0 {
                 Text("\(count)")
@@ -385,16 +391,26 @@ extension ContactListView {
     }
 
     var connectionSymbol: String {
-        connectionManager.connectionState == .disconnected ? "circle" : "circle.fill"
+        switch connectionManager.connectionState {
+        case .ready: "checkmark.circle.fill"
+        case .connected, .connecting: "arrow.triangle.2.circlepath"
+        case .scanning: "dot.radiowaves.left.and.right"
+        case .disconnected: "antenna.radiowaves.left.and.right.slash"
+        }
     }
 
     var connectionLabel: String {
         switch connectionManager.connectionState {
-        case .ready: String(localized: "Connected")
-        case .connected: String(localized: "Discovering services...")
-        case .connecting: String(localized: "Connecting...")
-        case .scanning: String(localized: "Scanning...")
-        case .disconnected: String(localized: "Disconnected")
+        case .ready:
+            if deviceConfig.isLoading || contactStore.isSyncingContacts {
+                String(localized: "Reading deck data")
+            } else {
+                String(localized: "Ready for messages")
+            }
+        case .connected: String(localized: "Reading deck services")
+        case .connecting: String(localized: "Connecting to deck")
+        case .scanning: String(localized: "Looking for decks")
+        case .disconnected: String(localized: "Connect a deck")
         }
     }
 }
