@@ -2025,7 +2025,7 @@ body:has(.meshterm .app.menu-open) {
 	grid-area: 1 / 1;
 	z-index: 2;
 	min-width: 0;
-	max-width: min(34rem, 38%);
+	max-width: min(32rem, 34%);
 	align-self: center;
 	justify-self: start;
 	padding-right: 12px;
