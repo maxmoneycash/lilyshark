@@ -97,6 +97,7 @@
 		8EF971496F064F1AD761B796 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21606E2B959E6496D3B0230D /* ContactListView.swift */; };
 		9144822AD9EB38340AF2317E /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFFE2BF3488F0C0647632CD /* ChatView.swift */; };
 		96059FF0363E830C376C23ED /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		D74B8A331B684581BE4D34CD /* ChatFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */; };
 		26AF0F49A5DB4256BE07C12D /* MeshValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */; };
 		CFA39D0BA5C242D0858D74AC /* InterfaceSymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */; };
 		3B6AAB23BFC54667824FAB5F /* CloudKitAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A27F5CC64D48B58A46DEE8 /* CloudKitAccess.swift */; };
@@ -108,6 +109,7 @@
 		A3B4C5D6E7F8A9B0C1D2E3F4 /* NavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */; };
 		A3C4EC30F51CEF0E73260DD5 /* RadioPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E616344CEDCD1ADC41548B7 /* RadioPreset.swift */; };
 		A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		2C2599DCC68F4E8FA32D509D /* ChatFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */; };
 		783CDF1A172745ADAE7545F8 /* MeshValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */; };
 		B8D3DA1A033A491882AC6121 /* InterfaceSymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */; };
 		EDC1F87CDECB4444934FFC0C /* CloudKitAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A27F5CC64D48B58A46DEE8 /* CloudKitAccess.swift */; };
@@ -153,6 +155,7 @@
 		F70142BB0E4E485FAA189AD7 /* alert.caf in Resources */ = {isa = PBXBuildFile; fileRef = 38CA824A6E6A4B7D9DD6A055 /* alert.caf */; };
 		F90000EB8EC8EB28EA724AC8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 43931BD12312D05F62A9E3B3 /* Assets.xcassets */; };
 		FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		61B06DCE452F4A6599FC1D47 /* ChatFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */; };
 		4BD73EF6CBC14A47AB9A3192 /* MeshValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */; };
 		9AA63F674DF346429C6975E6 /* InterfaceSymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */; };
 		F8BF7961367140E9BBA8CCC6 /* CloudKitAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A27F5CC64D48B58A46DEE8 /* CloudKitAccess.swift */; };
@@ -353,6 +356,7 @@
 		E09A1F63605E4CA4ACDE7634 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStore.swift; sourceTree = "<group>"; };
 		F6BA0593D517B1467DBC1C42 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/App/ChatFixtureHost.swift"; sourceTree = SOURCE_ROOT; };
 		B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MeshValueRow.swift"; sourceTree = SOURCE_ROOT; };
 		CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/App/InterfaceSymbols.swift"; sourceTree = SOURCE_ROOT; };
 		D5A27F5CC64D48B58A46DEE8 /* CloudKitAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/App/CloudKitAccess.swift"; sourceTree = SOURCE_ROOT; };
@@ -682,6 +686,7 @@
 			children = (
 				A259126AAB80661010C6A336 /* PommeCoreApp.swift */,
 				F6BA0593D517B1467DBC1C42 /* Theme.swift */,
+				30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */,
 				B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */,
 				CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */,
 				D5A27F5CC64D48B58A46DEE8 /* CloudKitAccess.swift */,
@@ -965,6 +970,7 @@
 			files = (
 				894905739E99B7E425A27485 /* PommeCoreApp.swift in Sources */,
 				A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */,
+				2C2599DCC68F4E8FA32D509D /* ChatFixtureHost.swift in Sources */,
 				783CDF1A172745ADAE7545F8 /* MeshValueRow.swift in Sources */,
 				B8D3DA1A033A491882AC6121 /* InterfaceSymbols.swift in Sources */,
 				EDC1F87CDECB4444934FFC0C /* CloudKitAccess.swift in Sources */,
@@ -1012,6 +1018,7 @@
 				SVT10000000100000000002 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000002 /* SettingsView+Editors.swift in Sources */,
 				96059FF0363E830C376C23ED /* Theme.swift in Sources */,
+				D74B8A331B684581BE4D34CD /* ChatFixtureHost.swift in Sources */,
 				26AF0F49A5DB4256BE07C12D /* MeshValueRow.swift in Sources */,
 				CFA39D0BA5C242D0858D74AC /* InterfaceSymbols.swift in Sources */,
 				3B6AAB23BFC54667824FAB5F /* CloudKitAccess.swift in Sources */,
@@ -1109,6 +1116,7 @@
 				SVT10000000100000000003 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000003 /* SettingsView+Editors.swift in Sources */,
 				FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */,
+				61B06DCE452F4A6599FC1D47 /* ChatFixtureHost.swift in Sources */,
 				4BD73EF6CBC14A47AB9A3192 /* MeshValueRow.swift in Sources */,
 				9AA63F674DF346429C6975E6 /* InterfaceSymbols.swift in Sources */,
 				F8BF7961367140E9BBA8CCC6 /* CloudKitAccess.swift in Sources */,

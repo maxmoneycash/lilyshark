@@ -22,6 +22,7 @@ import MeshCoreKit
 import PommeCoreWatchKit
 #endif
 
+#if !(DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS))
 @main
 struct PommeCoreApp: App {
     #if os(watchOS)
@@ -159,6 +160,7 @@ struct PommeCoreApp: App {
     }
     #endif
 }
+#endif
 
 #if os(iOS)
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -247,7 +249,11 @@ struct ContentView: View {
     @AppStorage("openSettingsAfterOnboarding") private var openSettingsAfterOnboarding = false
 
     var body: some View {
-        #if os(watchOS)
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Exercise the production Messages routes without startup services,
+        // auto-scan, external URL handlers, or the other app sections.
+        messagesNavigation
+        #elseif os(watchOS)
         NavigationStack {
             ContactListView(showScanner: $showScanner)
                 .sheet(isPresented: $showScanner) {

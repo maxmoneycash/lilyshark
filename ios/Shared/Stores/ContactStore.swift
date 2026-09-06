@@ -146,6 +146,11 @@ final class ContactStore {
     // MARK: - Init
 
     init() {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // The native UI fixture starts with fresh, in-memory contacts. Never
+        // import a person's cloud preferences or saved position history.
+        return
+        #endif
         // Don't load nicknames/notes at init — radio pubkey isn't known yet.
         // They are loaded in handleSelfInfo when the radio connects.
         loadContactGroupsFromiCloud()

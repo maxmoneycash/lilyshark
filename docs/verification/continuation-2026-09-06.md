@@ -41,6 +41,9 @@ Additional reliability fixes:
 - Nonfinite or negative voltage reports remain unavailable. Interrupted sends
   reopen as unconfirmed, with a retry warning; changing conversations resets
   draft and visibility state for the selected peer or channel.
+- Delayed MeshCore retries verify the active radio, protocol, message existence,
+  and sending state again before dispatch. Disconnecting, deleting the message,
+  or switching radios cannot dispatch the old retry through a new connection.
 - Firmware airtime arithmetic uses a wide intermediate for long preambles.
 - The native airtime calculator uses the coding-rate denominator correctly and
   matches firmware fixtures, including SF5/6. Its canonical 13-byte
@@ -114,6 +117,29 @@ the three registered widgets remain.
   cleanup in a host filesystem test; cleanup now uses the filesystem API and
   checks errors. The focused sanitizer test passes, including a scratch path
   containing an apostrophe.
+- [GitHub run 34030841162](https://github.com/maxmoneycash/lilyshark/actions/runs/34030841162)
+  passed the iOS, web, full firmware, reproducibility, and downloaded-artifact
+  checks at `97d5b43`. Simulator runtime gates now disable live map downloads
+  explicitly; a cold Linux runner cannot stall waiting for tile requests while
+  a warm local cache hides the delay. Existing timeouts and assertions remain.
+
+The later native chat fixture builds only with `DEBUG LILYSHARK_UI_CHAT_FIXTURE`.
+It uses the production Messages navigation and message store with in-memory
+history, drafts, and read timestamps. It bypasses transport startup, persisted
+messages, cloud sync, and notifications. The build command and manual checks are
+in `ios/BUILD.md`; CI compiles this separate entry point as well as the ordinary
+app. Fixture checks cannot establish real-radio or cloud-persistence behavior.
+
+Argent verified bottom-following arrivals, unchanged history-message coordinates
+when receiving while scrolled upward, the Latest messages action, separate A/B
+drafts across navigation, and unread counts for the inactive conversation. Two
+fixture defects were corrected: its retry recorder checked too early during
+startup, and Reset replaced the environment before the old chat saved its draft.
+The corrected fixture passes all four manual retry/cancellation scenarios and
+clears an open conversation's draft on Reset. Automatic path-reset retries now
+use the same guarded dispatcher; their ACK-timeout trigger has not been exercised
+with a physical radio. Local screenshots and accessibility evidence are in
+`/tmp/lilyshark-ios-chat-fixture-qa/README.md`.
 
 ## Integration with current main
 

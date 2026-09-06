@@ -35,7 +35,11 @@ struct USBTerminalLine: Identifiable {
 
 /// Whether iCloud sync is enabled (stored locally per device, defaults to true).
 var iCloudSyncEnabled: Bool {
+    #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+    return false
+    #else
     UserDefaults.standard.object(forKey: "iCloudSyncEnabled") == nil ? true : UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+    #endif
 }
 
 // RadioConfigVerification, RegionCheck, RadioRegion moved to ConnectionManager

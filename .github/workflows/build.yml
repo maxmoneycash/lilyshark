@@ -91,6 +91,15 @@ jobs:
       - name: Build the iOS simulator app
         run: ./scripts/build_ios.sh
 
+      - name: Compile the isolated chat interaction fixture
+        run: |
+          xcodebuild -project ios/PommeCore.xcodeproj -scheme PommeCore \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/DerivedDataChatFixture -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LILYSHARK_UI_CHAT_FIXTURE' \
+            build > ios/chat-fixture-build.log 2>&1
+
       - name: Test MeshtasticKit
         working-directory: ios/Packages/MeshtasticKit
         run: swift test
@@ -106,7 +115,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ios-build-log-${{ github.sha }}
-          path: ios/DerivedData/build_ios.log
+          path: |
+            ios/DerivedData/build_ios.log
+            ios/chat-fixture-build.log
           if-no-files-found: ignore
           retention-days: 14
 
