@@ -92,8 +92,13 @@ export function mountTDeck(
     lastTime = now;
     if (moving && !pointer) {
       time += dt;
-      yaw += (.11 + velocity) * dt;
-      velocity *= Math.exp(-5 * dt);
+      velocity *= Math.exp(-3.4 * dt);
+      yaw += velocity * dt;
+      // Keep the LCD toward the camera. A full spin parks the hero on the
+      // battery door. Drag can still turn it; idle eases back to a 3/4 front.
+      const facing = INITIAL_YAW + Math.sin(time * .55) * .4;
+      yaw += (facing - yaw) * (1 - Math.exp(-1.7 * dt));
+      pitch += (.06 - pitch) * (1 - Math.exp(-1.5 * dt));
     }
     rig.rotation.set(pitch + Math.sin(time * .7) * .045, yaw, -.055 + Math.sin(time * .55) * .035, 'YXZ');
     rig.position.set(Math.sin(time * .6) * .002, Math.sin(time * 1.1) * .004, 0);
@@ -110,12 +115,15 @@ export function mountTDeck(
     const height = Math.max(canvas.clientHeight, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, width < 600 ? 1.5 : 2));
     renderer.setSize(width, height, false);
-    // Frame the handset so the body fills the stage. The long whip can extend
-    // above the canvas, as a product photograph would crop an aerial.
-    const halfHeight = Math.max(height < 400 ? .072 : .090, .052 * height / width);
-    camera.position.y = height < 400 ? .008 : .018;
-    camera.left = -halfHeight * width / height;
-    camera.right = halfHeight * width / height;
+    // Frame the handset so the body fills the stage. On a wide canvas the
+    // portrait radio would sit in a sea of empty space, so the view pans
+    // toward the copy. The whip can still crop off the top.
+    const aspect = width / height;
+    const halfHeight = Math.max(height < 400 ? .062 : .074, .046 * height / width);
+    const pan = aspect > .9 ? halfHeight * (aspect - .72) * .62 : 0;
+    camera.position.y = height < 400 ? .004 : .01;
+    camera.left = -halfHeight * aspect + pan;
+    camera.right = halfHeight * aspect + pan;
     camera.top = halfHeight;
     camera.bottom = -halfHeight;
     camera.updateProjectionMatrix();

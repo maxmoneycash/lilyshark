@@ -2014,10 +2014,10 @@ body:has(.meshterm .app.menu-open) {
 	height: 100%;
 	max-height: calc(100% / var(--intro-n, 5));
 	display: grid;
-	grid-template-columns: minmax(16rem, 0.68fr) minmax(0, 1.32fr);
+	grid-template-columns: minmax(17rem, 0.78fr) minmax(0, 1.22fr);
 	align-items: stretch;
-	gap: clamp(12px, 2.4vw, 32px);
-	padding: 0 clamp(14px, 3vw, 40px) 0 clamp(18px, 4vw, 56px);
+	gap: 0;
+	padding: 0 clamp(10px, 2vw, 28px) 0 clamp(18px, 4vw, 56px);
 	overflow: hidden;
 }
 .meshterm .intro-copy {
