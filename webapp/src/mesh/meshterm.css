@@ -2927,3 +2927,33 @@ body:has(.meshterm .app.menu-open) {
 		grid-column: 2;
 	}
 }
+
+/* Links share the same navigation controls on every page, including /flash/. */
+.meshterm header .logo { text-decoration: none; }
+.meshterm header nav > a.tab { box-sizing: border-box; text-decoration: none; color: var(--fg); border: 1px solid var(--border); font-family: inherit; line-height: 1.45; justify-content: center; }
+.meshterm header nav > a.tab.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.meshterm header nav > a.tab:focus-visible, .meshterm header .logo:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+.meshterm .section-tabs { display: flex; flex: none; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.meshterm .section-tabs a { color: var(--fg); font-size: 11px; padding: 8px 12px; border: 1px solid var(--border); text-decoration: none; }
+.meshterm .section-tabs a[aria-current="page"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
+.meshterm .section-tabs a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .meshterm header nav > a.tab:hover, .meshterm .section-tabs a:hover { border-color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+}
+
+/* Keep the navigation legible on smaller laptops; controls get their own row. */
+@media (min-width: 861px) and (max-width: 1280px) {
+  .meshterm header { flex-wrap: wrap; gap: 8px; }
+  .meshterm header nav { order: 3; flex: 1 0 100%; justify-content: space-between; gap: 2px; }
+  .meshterm header nav > a.tab { flex: 0 0 auto; font-size: 10px; letter-spacing: 0; height: 30px; padding: 0 4px; }
+  .meshterm header > .primary { margin-left: auto; font-size: 10px; height: 30px; }
+  .meshterm header > .conn-pill { display: none; }
+}
+
+@media (max-width: 860px) {
+	.meshterm .section-tabs a {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+	}
+}

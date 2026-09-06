@@ -772,7 +772,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                   : 'Connect a Lilyshark device to capture'
               }
             >
-              ● CAPTURE
+              CAPTURE
             </button>
           )}
           {!session.recording && session.frames.length > 0 && (
@@ -1104,7 +1104,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 Nothing was heard in {brushLabel(brush)}. That silence is the
                 reading — {filtered.length} frame(s) match the filter outside this
                 range.{' '}
-                <button onClick={() => setBrush(null)}>⟲ WHOLE CAPTURE</button>
+                <button onClick={() => setBrush(null)}>WHOLE CAPTURE</button>
               </div>
             )}
 

@@ -1,0 +1,17 @@
+.tdeck-photo {
+  position: relative;
+  aspect-ratio: 517 / 1116;
+  width: 100%;
+}
+.tdeck-photo .tdeck-photo-body {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tdeck-photo .tdeck-photo-screen {
+  position: absolute;
+  display: block;
+  object-fit: fill;
+  border-radius: 2px;
+  background: #000;
+}

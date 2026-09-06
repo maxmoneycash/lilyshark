@@ -1,362 +1,306 @@
-/* Flash page — the browser flasher, built on the same design system as the
- * analyzer (src/mesh/meshterm.css): JetBrains Mono throughout, the fixed
- * Lilyshark paper-and-pink palette, and --fg-dim/--border/--glow mixed from --fg.
- * Written mobile-first: the base rules are the phone layout and the two
- * min-width blocks at the bottom widen it.
- *
- * Every asset on this page is ours — our copy, our line art, our SVG device
- * render, and screens rendered straight from our own simulator. */
-
-@font-face {
-  font-family: "JetBrains Mono";
-  src: url("/flash/JetBrainsMono-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: block;
-}
-@font-face {
-  font-family: "JetBrains Mono";
-  src: url("/flash/JetBrainsMono-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: block;
-}
-
-/* The flasher is pinned to the Lilyshark palette -- the light paper and deep
-   pink ink of mesh/theme.ts's `lilyshark` theme, which is the analyzer's
-   default. It deliberately does NOT follow the analyzer's theme picker: the
-   other six themes are phosphor-green, amber, cyan and violet terminals, and a
-   download page that changes colour with a setting made on another page reads
-   as a bug rather than a preference. Values are the same tokens meshterm.css
-   uses, so the two pages are the same design system, not a copy of it. */
-:root {
-  --fg: #c00068;
+.meshterm .flash-page {
+  --fg: #b80062;
   --bg: #f2e2ec;
   --panel: #fbf3f7;
-  /* 55% of the ink over paper lands near 2.5:1, so the dim and hairline mixes
-     are pulled back the way :root.light does in meshterm.css. */
-  --fg-dim: color-mix(in srgb, var(--fg) 88%, transparent);
-  --border: color-mix(in srgb, var(--fg) 42%, transparent);
-  --glow: color-mix(in srgb, var(--fg) 14%, transparent);
-  --warn: #9a6a00;
-  --err: #b3261e;
-  --ok: #2b7a3d;
-  /* Body copy is near-black on paper, not the brand pink: #ff4f9d only reaches
-     2.8:1 against a near-white page. --ink lives here and not on .flash-page
-     because body -- its parent -- reads it. */
-  --ink: #1a0f15;
-  --pad: 16px;
+  --ink: #291d26;
+  --fg-dim: #795268;
+  --border: #d8bdcc;
+  --ok: #317a4c;
+  --pad: 20px;
   color-scheme: light;
 }
-
-* {
+.meshterm .flash-page * {
   box-sizing: border-box;
   margin: 0;
 }
-
-body {
+.meshterm .flash-page {
   background: var(--bg);
   color: var(--ink);
-  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
-
-.flash-page a {
-  color: var(--fg);
+.meshterm .flash-page button,
+.meshterm .flash-page a,
+.meshterm .flash-page summary {
+  -webkit-tap-highlight-color: transparent;
 }
-
-.flash-page {
-  position: relative;
-  min-height: 100dvh;
+.meshterm .flash-page button {
+  font: inherit;
+}
+.meshterm .flash-page ::selection {
+  background: var(--fg);
+  color: var(--panel);
+}
+.meshterm .flash-page {
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
-
-/* The analyzer's CRT wash, at the strength it uses over paper: the 16% the
-   dark themes take would dirty the page. */
-.flash-page::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 50;
-  background:
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 3px),
-    radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.1) 100%);
+.meshterm .flash-page a {
+  color: var(--fg);
+  text-underline-offset: 4px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .flash-page * {
-    animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
-  }
+.meshterm .flash-page :is(a, button, summary):focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 4px;
 }
-
-/* ── status bars, top and bottom, like the analyzer chrome ── */
-.flash-page .statusbar {
+.meshterm .flash-page .page {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 38px max(var(--pad), env(safe-area-inset-right)) 56px
+    max(var(--pad), env(safe-area-inset-left));
+}
+.meshterm .flash-page .eyebrow {
+  color: var(--fg-dim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.meshterm .flash-page .lede h1 {
+  margin-top: 16px;
+  font-size: clamp(40px, 5.7vw, 72px);
+  line-height: 1.06;
+  letter-spacing: -0.065em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.meshterm .flash-page .lede h1 span {
+  color: var(--fg);
+}
+.meshterm .flash-page .sub {
+  max-width: 48ch;
+  margin-top: 20px;
+  color: var(--fg-dim);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.meshterm .flash-page .release-note {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+  font-size: 9px;
+  color: var(--fg-dim);
+}
+.meshterm .flash-page .status-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--ok);
+  border-radius: 50%;
+}
+.meshterm .flash-page .release-divider {
+  color: var(--border);
+  margin: 0 3px;
+}
+.meshterm .flash-page .picker-heading {
+  display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px calc(var(--pad) + env(safe-area-inset-right)) 7px
-    calc(var(--pad) + env(safe-area-inset-left));
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-dim);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  margin-top: 34px;
+  margin-bottom: 12px;
 }
-.flash-page .statusbar.bottom {
-  border-bottom: none;
-  border-top: 1px solid var(--border);
-  margin-top: auto;
-  padding-bottom: calc(7px + env(safe-area-inset-bottom));
-}
-.flash-page .statusbar .lit {
-  color: var(--fg);
-}
-.flash-page .statusbar a {
-  color: inherit;
-  text-decoration: none;
-}
-.flash-page .statusbar a:hover {
-  color: var(--fg);
-}
-.flash-page .statusbar .sb-right {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
-.flash-page .statusbar .hide-narrow {
+.meshterm .flash-page .picker-hint {
   display: none;
-}
-
-.flash-page .page {
-  width: 100%;
-  max-width: 1116px;
-  margin: 0 auto;
-  padding: 22px calc(var(--pad) + env(safe-area-inset-right)) 40px
-    calc(var(--pad) + env(safe-area-inset-left));
-}
-
-/* ── lede ── */
-.flash-page .lede h1 {
-  font-weight: 700;
-  font-size: 27px;
-  line-height: 1.14;
-  letter-spacing: -0.02em;
-  color: var(--fg);
-}
-.flash-page .lede .sub {
-  margin-top: 12px;
-  color: var(--ink);
-  font-size: 13px;
-  max-width: 62ch;
-}
-.flash-page .lede .code-note {
-  margin-top: 12px;
   color: var(--fg-dim);
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 10px;
 }
-.flash-page .code-note b {
-  color: var(--fg);
-  font-weight: 400;
-}
-
-/* ── platform picker ── */
-.flash-page .devices {
+.meshterm .flash-page .devices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  padding: 22px 0 4px;
 }
-.flash-page .device-card {
+.meshterm .flash-page .device-card {
   position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 3px;
-  min-height: 148px;
-  padding: 12px 12px 11px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 83px;
+  padding: 12px;
+  color: var(--fg-dim);
+  background: transparent;
   border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--ink);
-  font-family: inherit;
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 120ms linear,
-    background-color 120ms linear;
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
 }
-.flash-page .device-card:hover {
-  border-color: var(--fg);
-}
-.flash-page .device-card:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
-}
-.flash-page .device-card[data-state="checked"] {
+.meshterm .flash-page .device-card[data-state="checked"] {
+  background: var(--panel);
   border-color: var(--fg);
   box-shadow: inset 0 0 0 1px var(--fg);
-}
-/* The corner ticks are the analyzer's selected-row marker, not a rounded card. */
-.flash-page .device-card[data-state="checked"]::before,
-.flash-page .device-card[data-state="checked"]::after {
-  content: "";
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--fg);
-}
-.flash-page .device-card[data-state="checked"]::before {
-  top: -1px;
-  left: -1px;
-  border-right: none;
-  border-bottom: none;
-}
-.flash-page .device-card[data-state="checked"]::after {
-  bottom: -1px;
-  right: -1px;
-  border-left: none;
-  border-top: none;
-}
-.flash-page .device-card .art {
-  flex: 1;
-  width: 100%;
-  display: grid;
-  place-items: center;
-  color: var(--fg-dim);
-  transition: color 120ms linear;
-}
-.flash-page .device-card[data-state="checked"] .art,
-.flash-page .device-card:hover .art {
   color: var(--fg);
 }
-.flash-page .device-name {
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fg);
+.meshterm .flash-page .art {
+  display: none;
+  flex: none;
 }
-.flash-page .device-chip {
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--fg-dim);
-}
-
-/* ── hero ── */
-/* Fixed stage: the device render is much taller than the two window mocks, so
-   the panel is sized for the tallest and everything is centred in it. Without
-   this the page jumps by ~200px as you move between tiles. */
-.flash-page .hero {
-  position: relative;
-  margin-top: 12px;
-  padding: 26px 12px 14px;
-  min-height: 430px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border: 1px solid var(--border);
-  background:
-    radial-gradient(ellipse 70% 55% at 50% 40%, var(--glow), transparent 72%),
-    var(--panel);
-  overflow: hidden;
-}
-.flash-page .hero-label {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fg-dim);
-}
-.flash-page .device-mock {
+.meshterm .flash-page .art svg {
+  width: 52px;
+  height: 42px;
   display: block;
-  margin: 0 auto;
-  width: min(300px, 76%);
-  height: auto;
-  filter: drop-shadow(0 16px 34px rgba(0, 0, 0, 0.45));
 }
-/* The window mocks are line art on the page's own ground, not an object
-   sitting above it: no cast shadow, and they draw in the theme's ink-pink
-   rather than inheriting the body's near-black --ink. */
-.flash-page .window-mock {
+.meshterm .flash-page .device-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.meshterm .flash-page .device-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.meshterm .flash-page .device-card[data-state="checked"] .device-name {
+  color: var(--fg);
+}
+.meshterm .flash-page .device-chip {
+  font-size: 9px;
+  line-height: 1.6;
+}
+.meshterm .flash-page .selection-dot {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.meshterm .flash-page .device-card[data-state="checked"] .selection-dot {
+  background: var(--fg);
+}
+.meshterm .flash-page .install-layout {
+  display: grid;
+  gap: 28px;
+  margin-top: 16px;
+}
+.meshterm .flash-page .hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 378px;
+  padding: 40px 20px 50px;
+  border: 1px solid var(--border);
+  background-color: #e8d5e1;
+  background-image:
+    linear-gradient(rgba(184, 0, 98, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184, 0, 98, 0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.meshterm .flash-page .hero-label {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  color: var(--fg-dim);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.meshterm .flash-page .preview-content {
+  width: 100%;
+}
+.meshterm .flash-page .tdeck-photo {
+  display: block;
+  width: 210px;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  filter: drop-shadow(0 14px 12px #49313e38);
+}
+.meshterm .flash-page .window-mock {
+  display: block;
+  height: auto;
+  margin: 0 auto;
   width: 100%;
   color: var(--fg);
   filter: none;
 }
-.flash-page .deck-screen {
-  image-rendering: auto;
-}
-.flash-page .hero-caption {
-  display: flex;
-  justify-content: center;
-  margin-top: 12px;
-}
-.flash-page .hero-caption span {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.meshterm .flash-page .hero-caption {
+  margin-top: 16px;
+  text-align: center;
   color: var(--fg-dim);
-  border: 1px solid var(--border);
-  padding: 4px 12px;
-  background: var(--bg);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
-.flash-page .hero-caption b {
-  color: var(--fg);
-  font-weight: 700;
+.meshterm .flash-page .hero-caption b {
+  font-weight: 400;
 }
-
-/* ── product block ── */
-.flash-page .product {
-  margin-top: 30px;
-  max-width: 640px;
+.meshterm .flash-page .hero-footnote {
+  position: absolute;
+  bottom: 14px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--fg-dim);
+  font-size: 9px;
+  letter-spacing: 0.06em;
 }
-.flash-page .product h2 {
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: -0.01em;
-  color: var(--fg);
+.meshterm .flash-page .product {
+  min-width: 0;
+  align-self: center;
 }
-.flash-page .product .tagline {
-  color: var(--ink);
-  margin-top: 8px;
-  font-size: 13px;
+.meshterm .flash-page .product h2 {
+  margin-top: 10px;
+  font-size: clamp(23px, 2.5vw, 30px);
+  line-height: 1.25;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
 }
-.flash-page .checklist {
+.meshterm .flash-page .tagline {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--fg-dim);
+  line-height: 1.8;
+}
+.meshterm .flash-page .checklist {
   list-style: none;
   padding: 0;
-  margin-top: 18px;
+  margin-top: 20px;
   display: grid;
   gap: 7px;
 }
-.flash-page .checklist li {
+.meshterm .flash-page .checklist li {
   display: flex;
+  gap: 10px;
   align-items: baseline;
-  gap: 9px;
-  color: var(--ink);
-  font-size: 12.5px;
-}
-.flash-page .checklist .tick {
-  flex: none;
-  color: var(--fg);
   font-size: 11px;
 }
-
-/* ── calls to action ── */
-.flash-page .cta {
-  margin-top: 22px;
-  display: grid;
-  gap: 10px;
+.meshterm .flash-page .tick {
+  color: var(--fg);
+  flex: none;
 }
-.flash-page .flash-btn,
-.flash-page .outline-btn {
+.meshterm .flash-page .install-requirement {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg-dim);
+  font-size: 10px;
+  line-height: 1.7;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.meshterm .flash-page .install-requirement svg {
+  flex: none;
+}
+.meshterm .flash-page .cta {
+  margin-top: 16px;
+}
+.meshterm .flash-page esp-web-install-button {
+  display: block;
+}
+.meshterm .flash-page .flash-btn,
+.meshterm .flash-page .outline-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -365,306 +309,493 @@ body {
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid var(--fg);
-  font-family: inherit;
+  font: inherit;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color 110ms linear,
-    color 110ms linear;
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
 }
-.flash-page .flash-btn {
+.meshterm .flash-page .flash-btn {
   background: var(--fg);
-  color: var(--bg);
+  color: var(--panel);
+  min-height: 56px;
 }
-.flash-page .flash-btn:hover {
-  background: transparent;
-  color: var(--fg);
-}
-.flash-page .flash-btn:active {
-  transform: translateY(1px);
-}
-.flash-page .flash-btn .cta-text {
+.meshterm .flash-page .cta-text {
   display: grid;
   text-align: left;
-  line-height: 1.25;
 }
-.flash-page .flash-btn .cta-sub {
+.meshterm .flash-page .cta-sub {
   font-weight: 400;
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  opacity: 0.72;
+  font-size: 9px;
+  opacity: 0.85;
 }
-.flash-page .outline-btn {
-  background: transparent;
-  color: var(--fg);
-  border-color: var(--border);
-}
-.flash-page .outline-btn:hover {
-  border-color: var(--fg);
-}
-.flash-page .secondary {
+.meshterm .flash-page .secondary {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 10px;
-}
-.flash-page .cta-note,
-.flash-page .unsupported,
-.flash-page .not-allowed {
-  display: block;
-  color: var(--fg-dim);
-  font-size: 11px;
-  border: 1px dashed var(--border);
-  padding: 10px 12px;
-}
-.flash-page .meta {
-  margin-top: 16px;
-  color: var(--fg-dim);
-  font-size: 10.5px;
-  line-height: 1.7;
-  letter-spacing: 0.02em;
-}
-.flash-page .meta b {
-  color: var(--fg);
-  font-weight: 400;
-}
-.flash-page .meta .hash {
-  word-break: break-all;
-}
-
-/* ── panels ── */
-.flash-page .card {
-  margin-top: 26px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  padding: 18px 16px;
-}
-.flash-page .card .eyebrow {
-  color: var(--fg-dim);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-.flash-page .card h3 {
-  margin-top: 6px;
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--fg);
-}
-.flash-page .card .card-sub {
-  color: var(--ink);
-  font-size: 12.5px;
   margin-top: 8px;
-  max-width: 62ch;
 }
-.flash-page .card .card-sub .inline-code {
+.meshterm .flash-page .outline-btn {
+  background: transparent;
+  border-color: var(--border);
   color: var(--fg);
+  font-size: 12px;
 }
-.flash-page .steps {
-  display: grid;
-  gap: 12px;
+.meshterm .flash-page .unsupported,
+.meshterm .flash-page .not-allowed {
+  display: block;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 11px;
+}
+.meshterm .flash-page .meta {
   margin-top: 16px;
+  color: var(--fg-dim);
+  font-size: 9px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
 }
-.flash-page .step {
+.meshterm .flash-page .release-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 3px 12px;
+}
+.meshterm .flash-page .ownership-note {
+  margin-top: 15px;
+  color: var(--fg-dim);
+  font-size: 9px;
+}
+.meshterm .flash-page .card {
+  min-width: 0;
+}
+.meshterm .flash-page .steps-card {
+  margin-top: 40px;
+  padding: 28px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.meshterm .flash-page h3 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.4;
+  margin-top: 8px;
+}
+.meshterm .flash-page .steps {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 12px;
-  align-items: center;
+  gap: 24px;
+  margin-top: 26px;
 }
-.flash-page .step .glyph {
+.meshterm .flash-page .step {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  column-gap: 14px;
+}
+.meshterm .flash-page .glyph {
   grid-row: span 2;
+  color: var(--fg);
+  border: 1px solid var(--border);
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border);
-  color: var(--fg);
+  width: 36px;
+  height: 40px;
 }
-.flash-page .step .name {
-  color: var(--fg);
+.meshterm .flash-page .name {
   font-weight: 700;
   font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  align-self: end;
 }
-.flash-page .step .hint {
+.meshterm .flash-page .hint {
   color: var(--fg-dim);
+  font-size: 10px;
+  margin-top: 3px;
+}
+.meshterm .flash-page .support-layout {
+  display: grid;
+  gap: 32px;
+  margin-top: 32px;
+}
+.meshterm .flash-page .verify-card {
+  padding: 22px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  scroll-margin-top: 24px;
+}
+.meshterm .flash-page .card-sub {
+  margin-top: 12px;
   font-size: 11px;
-  align-self: start;
-}
-
-/* ── command rows ── */
-.flash-page .cmd-label {
-  margin-top: 14px;
   color: var(--fg-dim);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
+  line-height: 1.8;
 }
-.flash-page .cmd-row {
+.meshterm .flash-page .firmware-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 9px;
+  color: var(--fg-dim);
+  margin-top: 18px;
+}
+.meshterm .flash-page .checksum {
+  display: block;
+  margin-top: 6px;
+  font: inherit;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.meshterm .flash-page .cmd-label {
+  margin-top: 18px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim);
+}
+.meshterm .flash-page .cmd-row {
   display: flex;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 8px;
   align-items: stretch;
+  min-width: 0;
 }
-.flash-page .verify-cmd {
+.meshterm .flash-page .verify-cmd {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1.8;
+  padding: 12px;
   background: var(--bg);
-  color: var(--ink);
-  padding: 9px 10px;
-  font-size: 11px;
-  overflow-x: auto;
-  white-space: pre;
+  border: 1px solid var(--border);
 }
-.flash-page .copy-btn {
+.meshterm .flash-page .copy-btn {
   flex: none;
   width: 44px;
   min-height: 44px;
   border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--fg-dim);
-  font-family: inherit;
+  background: transparent;
+  color: var(--fg);
   cursor: pointer;
   transition:
-    color 110ms linear,
-    border-color 110ms linear;
+    background-color 150ms ease,
+    transform 150ms ease;
 }
-.flash-page .copy-btn:hover {
-  color: var(--fg);
-  border-color: var(--fg);
-}
-.flash-page .copy-btn.copied {
+.meshterm .flash-page .copy-btn.copied {
   color: var(--ok);
   border-color: var(--ok);
 }
-
-.flash-page :is(button, .flash-btn, .outline-btn):focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 3px;
+.meshterm .flash-page .copy-btn.error {
+  color: #a52f26;
 }
-
-.flash-page :is(p, .hint, .tagline) {
-  text-wrap: pretty;
-}
-
-.flash-page h1,
-.flash-page h2 {
-  text-wrap: balance;
-}
-.flash-page .verify-note {
-  margin-top: 12px;
+.meshterm .flash-page .verify-note {
+  margin-top: 14px;
   color: var(--fg-dim);
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.8;
 }
-
-/* ── disclosures ── */
-.flash-page details {
-  margin-top: 18px;
-  border: 1px solid var(--border);
-  color: var(--ink);
+.meshterm .flash-page .help-panel {
+  padding-top: 4px;
+  min-width: 0;
 }
-.flash-page summary {
+.meshterm .flash-page .help-panel h3 {
+  margin-bottom: 20px;
+}
+.meshterm .flash-page details {
+  border-bottom: 1px solid var(--border);
+}
+.meshterm .flash-page summary {
+  position: relative;
   cursor: pointer;
   list-style: none;
-  padding: 12px 14px;
-  color: var(--fg);
+  padding: 16px 28px 16px 0;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
-.flash-page summary::-webkit-details-marker {
+.meshterm .flash-page summary::-webkit-details-marker {
   display: none;
 }
-.flash-page summary::before {
-  content: "+ ";
+.meshterm .flash-page summary::after {
+  content: "+";
+  position: absolute;
+  right: 2px;
+  color: var(--fg);
+  font-size: 18px;
+  font-weight: 400;
+  top: 10px;
 }
-.flash-page details[open] summary::before {
-  content: "- ";
+.meshterm .flash-page details[open] summary::after {
+  content: "−";
 }
-.flash-page details > div {
-  padding: 0 14px 14px;
+.meshterm .flash-page details > div {
   display: grid;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--ink);
+  gap: 10px;
+  padding-bottom: 18px;
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--fg-dim);
 }
-/* ── tablet ── */
-@media (min-width: 620px) {
-  :root {
-    --pad: 24px;
+.meshterm .flash-page .help-link {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 8px 0;
+  font-size: 10px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .meshterm .flash-page .device-card:hover {
+    border-color: var(--fg);
+    background: var(--panel);
   }
-  .flash-page .statusbar .hide-narrow {
+  .meshterm .flash-page .flash-btn:hover {
+    background: #950050;
+    border-color: #950050;
+  }
+  .meshterm .flash-page .outline-btn:hover,
+  .meshterm .flash-page .copy-btn:hover {
+    background: var(--panel);
+    border-color: var(--fg);
+  }
+  .meshterm .flash-page summary:hover {
+    color: var(--fg);
+  }
+}
+.meshterm
+  .flash-page
+  :is(.device-card, .flash-btn, .outline-btn, .copy-btn):active {
+  transform: scale(0.98);
+}
+@media (min-width: 620px) {
+  .meshterm .flash-page {
+    --pad: 32px;
+  }
+  .meshterm .flash-page .lede {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    column-gap: 32px;
+  }
+  .meshterm .flash-page .lede .eyebrow {
+    grid-column: 1 / -1;
+  }
+  .meshterm .flash-page .lede h1 {
+    grid-row: 2 / 4;
+  }
+  .meshterm .flash-page .sub {
+    align-self: end;
+    font-size: 14px;
+  }
+  .meshterm .flash-page .release-note {
+    align-self: start;
+    margin-top: 14px;
+  }
+  .meshterm .flash-page .picker-hint {
     display: inline;
   }
-  .flash-page .lede h1 {
-    font-size: 38px;
-  }
-  .flash-page .devices {
+  .meshterm .flash-page .devices {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-    padding-top: 30px;
   }
-  .flash-page .device-card {
-    min-height: 172px;
+  .meshterm .flash-page .device-card {
+    min-height: 88px;
   }
-  .flash-page .hero {
-    padding: 28px 20px 18px;
+  .meshterm .flash-page .hero {
+    min-height: 420px;
   }
-  .flash-page .hero {
-    min-height: 542px;
+  .meshterm .flash-page .tdeck-photo {
+    width: 225px;
   }
-  .flash-page .device-mock {
-    width: min(340px, 58%);
+  .meshterm .flash-page .window-mock {
+    width: min(470px, 100%);
   }
-  .flash-page .window-mock {
-    width: min(600px, 88%);
+  .meshterm .flash-page .steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
   }
-  .flash-page .cta,
-  .flash-page .secondary {
-    grid-auto-flow: column;
-    justify-content: start;
+  .meshterm .flash-page .steps-card {
+    margin-top: 48px;
   }
-  .flash-page .flash-btn,
-  .flash-page .outline-btn {
-    width: auto;
-    min-width: 232px;
+}
+@media (min-width: 960px) {
+  .meshterm .flash-page .page {
+    padding-top: 44px;
   }
-  .flash-page .steps {
-    grid-template-columns: repeat(3, 1fr);
+  .meshterm .flash-page .lede {
+    grid-template-columns: 1.1fr 1fr;
+    column-gap: 64px;
   }
-  .flash-page .card {
-    padding: 24px 26px;
+  .meshterm .flash-page .lede h1 {
+    font-size: 62px;
+  }
+  .meshterm .flash-page .sub {
+    max-width: 45ch;
+    font-size: 14px;
+  }
+  .meshterm .flash-page .release-note {
+    font-size: 10px;
+  }
+  .meshterm .flash-page .picker-heading {
+    margin-top: 32px;
+  }
+  .meshterm .flash-page .art {
+    display: block;
+  }
+  .meshterm .flash-page .device-card {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+  .meshterm .flash-page .install-layout {
+    grid-template-columns: 1.1fr 1fr;
+    gap: 48px;
+    margin-top: 20px;
+  }
+  .meshterm .flash-page .hero {
+    min-height: 520px;
+  }
+  .meshterm .flash-page .tdeck-photo {
+    width: 214px;
+  }
+  .meshterm .flash-page .window-mock {
+    width: 100%;
+  }
+  .meshterm .flash-page .product {
+    padding: 12px 0;
+  }
+  .meshterm .flash-page .product h2 {
+    font-size: 28px;
+  }
+  .meshterm .flash-page .tagline {
+    font-size: 12px;
+  }
+  .meshterm .flash-page .hero-caption {
+    font-size: 9px;
+  }
+  .meshterm .flash-page .support-layout {
+    grid-template-columns: 1.1fr 1fr;
+    gap: 48px;
+  }
+  .meshterm .flash-page .verify-card {
+    padding: 28px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meshterm .flash-page *,
+  .meshterm .flash-page *::before,
+  .meshterm .flash-page *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .meshterm .flash-page .device-card[data-state="checked"] {
+    outline: 2px solid Highlight;
+  }
+  .meshterm .flash-page .selection-dot {
+    background: ButtonText;
   }
 }
 
-/* ── desktop ── */
-@media (min-width: 960px) {
-  .flash-page .page {
-    padding: 34px calc(var(--pad) + env(safe-area-inset-right)) 64px
-      calc(var(--pad) + env(safe-area-inset-left));
+/* The shared shell stays fixed while the installer scrolls beneath it. */
+.meshterm main.flash-page {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.meshterm main.flash-page > .page {
+  flex: none;
+  min-height: auto;
+}
+.meshterm .app.app-flash::after {
+  display: none;
+}
+.meshterm .flash-page .device-card {
+  white-space: normal;
+  letter-spacing: normal;
+}
+.meshterm .flash-page .art {
+  display: block;
+}
+.meshterm .flash-page .art .tdeck-photo {
+  width: 25px;
+  margin: 0;
+  filter: none;
+}
+.meshterm .flash-page .art .tdeck-photo img {
+  border-radius: 0;
+}
+.meshterm .flash-page .art svg {
+  width: 36px;
+}
+.meshterm .flash-page .hero {
+  background: radial-gradient(ellipse at 50% 60%, #ddc3d3, transparent 68%);
+  border: 0;
+  padding-top: 38px;
+  padding-bottom: 52px;
+}
+.meshterm .flash-page .hero > .preview-content > .tdeck-photo {
+  filter: drop-shadow(0 16px 20px #49313e30);
+}
+.meshterm .flash-page .flash-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.meshterm .flash-page .installer-error {
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+.meshterm .flash-page .installer-error button {
+  margin-top: 10px;
+}
+@media (max-width: 860px) {
+  .meshterm main.flash-page {
+    flex: 1 0 auto;
+    overflow: visible;
+    padding: 0;
   }
-  .flash-page .lede h1 {
-    font-size: 46px;
+  .meshterm main.flash-page > .page {
+    max-width: 1240px !important;
   }
-  .flash-page .lede .sub {
-    font-size: 14px;
+  .meshterm .flash-page .device-card {
+    padding: 12px 8px;
+    gap: 8px;
   }
-  .flash-page .product h2 {
-    font-size: 26px;
-  }
-  .flash-page .hero {
-    min-height: 600px;
-  }
-  .flash-page .device-mock {
-    width: min(370px, 40%);
-  }
-  .flash-page .window-mock {
-    width: min(740px, 72%);
-  }
+}
+
+.meshterm .flash-page .analyzer-preview {
+  width: 100%;
+  margin: 0;
+}
+.meshterm .flash-page .preview-titlebar {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  color: var(--fg-dim);
+  font-size: 9px;
+}
+.meshterm .flash-page .analyzer-preview-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}
+.meshterm .flash-page .analyzer-preview figcaption {
+  margin-top: 12px;
+  font-size: 9px;
+  text-align: center;
+  color: var(--fg-dim);
+}
+
+.meshterm .flash-page :is(p, .hint, .tagline) {
+  text-wrap: pretty;
 }
