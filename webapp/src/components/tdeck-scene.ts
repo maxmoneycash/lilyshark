@@ -116,11 +116,12 @@ export function mountTDeck(
     const height = Math.max(canvas.clientHeight, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, width < 600 ? 1.5 : 2));
     renderer.setSize(width, height, false);
-    // Fill the stage with the body. Sit the radio next to the copy; leftover
-    // space belongs on the far right, not between the headline and the handset.
+    // Fill the column with the body and pin it to the copy side. Extra
+    // canvas width stays on the right. The whip can crop off the top.
     const aspect = width / height;
     const halfHeight = Math.max(height < 400 ? .058 : .066, .04 * height / width);
-    const pan = aspect > 1 ? halfHeight * aspect * .22 : 0;
+    const bodyAspect = .58;
+    const pan = aspect > bodyAspect ? halfHeight * (aspect - bodyAspect) * .9 : 0;
     camera.position.y = height < 400 ? -.004 : -.006;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
