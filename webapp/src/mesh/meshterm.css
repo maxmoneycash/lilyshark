@@ -2014,7 +2014,7 @@ body:has(.meshterm .app.menu-open) {
 	height: 100%;
 	max-height: calc(100% / var(--intro-n, 5));
 	display: grid;
-	grid-template-columns: minmax(20rem, 28rem) minmax(0, 1fr);
+	grid-template-columns: minmax(22rem, 36rem) minmax(0, 1fr);
 	align-items: stretch;
 	gap: clamp(16px, 2vw, 28px);
 	padding: 0 clamp(18px, 4vw, 56px);
