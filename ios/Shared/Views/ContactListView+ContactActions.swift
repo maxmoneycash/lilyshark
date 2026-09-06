@@ -95,7 +95,7 @@ extension ContactListView {
                             contactStore.addContactToGroup(contact, group: group)
                         }
                     } label: {
-                        Label("\(group.emoji) \(group.name)", systemImage: isMember ? "checkmark.circle.fill" : "plus.circle")
+                        Label(group.name, systemImage: isMember ? "checkmark.circle.fill" : GroupIcon.symbolName(for: group.emoji))
                     }
                 }
                 if !contactStore.contactGroups.isEmpty { Divider() }
@@ -187,14 +187,16 @@ extension ContactListView {
                 contact: contact,
                 session: remoteSessionManager.remoteSession(for: contact)
             )
+            .id(contact.publicKeyPrefix)
         case .repeater:
             RepeaterLoginView(
                 contact: contact,
                 session: remoteSessionManager.remoteSession(for: contact)
             )
+            .id(contact.publicKeyPrefix)
         default:
             ChatView(contact: contact)
-                .onAppear { messageStoreManager.markAsRead(contact) }
+                .id(contact.publicKeyPrefix)
         }
     }
 
@@ -205,16 +207,19 @@ extension ContactListView {
         switch selection {
         case .publicChannel:
             ChannelChatView(channelIndex: 0, channelName: "Public Channel")
+                .id(0)
         case .channel(let index):
             if let channel = channelStore.channels.first(where: { $0.index == index }) {
                 ChannelChatView(channelIndex: channel.index, channelName: channel.name)
+                    .id(channel.index)
             } else {
                 ChannelChatView(channelIndex: index, channelName: "Channel \(index)")
+                    .id(index)
             }
         case .contact(let key):
             if let contact = contactStore.contacts.first(where: { $0.publicKeyPrefix == key }) {
                 contactDestination(contact)
-                } else {
+            } else {
                 Text("Contact not found")
             }
         case .settings:

@@ -142,6 +142,13 @@ final class MessageStoreManager {
     /// Activate message storage for a specific radio. Called after SELF_INFO provides the radio's public key.
     /// Migrates flat files if needed, loads persisted messages, and merges iCloud data.
     func activateForRadio(_ prefix: String) {
+        if radioPrefix12 == prefix {
+            // A settings refresh can report SELF_INFO during an active send.
+            // Keep its current row and pending timers instead of loading an
+            // older disk snapshot (which may not contain that message yet).
+            mergeMessagesForCurrentRadio()
+            return
+        }
         radioPrefix12 = prefix
         persistenceStore = MessageStore(radioPrefix: prefix)
         MessageStore.migrateToPerRadioStorage(radioPrefix: prefix)
@@ -232,9 +239,14 @@ final class MessageStoreManager {
 
     private func loadPersistedMessages() {
         messagesByContact = persistenceStore.loadAllMessages()
-        // Prune any contacts over the limit on load
-        for (key, msgs) in messagesByContact where msgs.count > self.maxMessagesPerContact {
-            messagesByContact[key] = Array(msgs.suffix(self.maxMessagesPerContact))
+        for (key, stored) in messagesByContact {
+            var messages = Array(stored.suffix(maxMessagesPerContact))
+            var changed = messages.count != stored.count
+            for index in messages.indices {
+                if messages[index].recoverInterruptedSend() { changed = true }
+            }
+            messagesByContact[key] = messages
+            if changed { persistMessages(for: key) }
         }
     }
 
@@ -469,13 +481,14 @@ final class MessageStoreManager {
         _ text: String,
         to destination: UInt32,
         channelIndex: UInt8?,
-        conversationKey: Data
+        conversationKey: Data,
+        retrying message: Message? = nil
     ) {
         // Zero is the id the firmware reads as "no id wanted", and it would
         // leave the message waiting on a result that is never sent.
         let packetID = UInt32.random(in: 1...UInt32.max)
 
-        let outgoing = Message(
+        var outgoing = message ?? Message(
             contactKeyHash: conversationKey,
             text: text,
             timestamp: Date(),
@@ -484,7 +497,14 @@ final class MessageStoreManager {
             expectedACK: packetID,
             channelIndex: channelIndex
         )
-        messagesByContact[conversationKey, default: []].append(outgoing)
+        outgoing.status = .sending
+        outgoing.expectedACK = packetID
+        outgoing.failureReason = nil
+        if let message, let index = messagesByContact[conversationKey]?.firstIndex(where: { $0.id == message.id }) {
+            messagesByContact[conversationKey]?[index] = outgoing
+        } else {
+            messagesByContact[conversationKey, default: []].append(outgoing)
+        }
         persistMessages(for: conversationKey)
 
         let payload = MeshtasticProto.encodeTextPacket(
@@ -498,18 +518,21 @@ final class MessageStoreManager {
         Self.logger.info("MT SEND: to=\(String(format: "%08x", destination)) id=\(packetID) [\(payload.count) bytes]")
         DebugLogger.shared.log("MT TX: to=\(String(format: "%08x", destination)) '\(text.prefix(40))'", level: .tx)
 
+        pendingMeshtasticPackets[packetID] = (conversationKey: conversationKey, messageID: outgoing.id)
         guard sendToRadio?(payload, label) == true else {
-            markMeshtasticMessage(outgoing.id, in: conversationKey, as: .failed)
+            pendingMeshtasticPackets.removeValue(forKey: packetID)
+            markMeshtasticMessage(outgoing.id, in: conversationKey, as: .failed,
+                                  reason: "The message could not reach the deck. Reconnect and retry.")
             return
         }
 
-        pendingMeshtasticPackets[packetID] = (conversationKey: conversationKey, messageID: outgoing.id)
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: Self.meshtasticRoutingTimeoutSeconds * 1_000_000_000)
             guard let self,
                   let pending = self.pendingMeshtasticPackets.removeValue(forKey: packetID) else { return }
             Self.logger.warning("MT SEND: no routing result for id \(packetID) — marking failed")
-            self.markMeshtasticMessage(pending.messageID, in: pending.conversationKey, as: .failed)
+            self.markMeshtasticMessage(pending.messageID, in: pending.conversationKey, as: .failed,
+                                       reason: "The deck did not confirm transmission. Retrying may send a duplicate.")
         }
     }
 
@@ -533,7 +556,7 @@ final class MessageStoreManager {
         case 8: return "no response"
         case 9: return "duty cycle limit reached — wait and retry"
         case 32: return "the deck rejected the request"
-        case 33: return "not allowed (the deck is in simulate mode)"
+        case 33: return "the request is not authorized"
         default: return "refused, routing error \(error)"
         }
     }
@@ -563,14 +586,16 @@ final class MessageStoreManager {
         markMeshtasticMessage(
             pending.messageID,
             in: pending.conversationKey,
-            as: error == 0 ? .sent : .failed
+            as: error == 0 ? .sent : .failed,
+            reason: error == 0 ? nil : Self.routingErrorText(error)
         )
     }
 
-    private func markMeshtasticMessage(_ id: UUID, in conversationKey: Data, as status: DeliveryStatus) {
+    private func markMeshtasticMessage(_ id: UUID, in conversationKey: Data, as status: DeliveryStatus, reason: String? = nil) {
         guard var messages = messagesByContact[conversationKey],
               let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index].status = status
+        messages[index].failureReason = reason
         messagesByContact[conversationKey] = messages
         persistMessages(for: conversationKey)
     }
@@ -924,9 +949,31 @@ final class MessageStoreManager {
     func retryMessage(_ message: Message) {
         guard message.isOutgoing, message.status == .failed else { return }
         let contactKey = message.contactKeyHash
+        guard messagesByContact[contactKey]?.first(where: { $0.id == message.id })?.status == .failed else { return }
+
+        #if canImport(MeshtasticKit)
+        if meshtasticNodeNum != 0 {
+            let destination: UInt32
+            if message.channelIndex != nil {
+                destination = MeshtasticProto.broadcast
+            } else if let contact = contactProvider?(contactKey),
+                      let node = MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) {
+                destination = node
+            } else {
+                markMeshtasticMessage(message.id, in: contactKey, as: .failed,
+                                      reason: "This contact has no Meshtastic node address.")
+                return
+            }
+            sendMeshtasticText(message.text, to: destination, channelIndex: message.channelIndex,
+                               conversationKey: contactKey, retrying: message)
+            return
+        }
+        #endif
 
         if var messages = messagesByContact[contactKey],
            let idx = messages.firstIndex(where: { $0.id == message.id }) {
+
+            messages[idx].failureReason = nil
 
             if message.channelIndex == nil {
                 if let contact = contactProvider?(contactKey) {
@@ -1014,7 +1061,11 @@ final class MessageStoreManager {
             var merged = localMessages
 
             for msg in cloudMessages where !localIDs.contains(msg.id) {
-                merged.append(msg)
+                // This ID has no local send attempt to resume. Preserve sent
+                // outcomes, but expose interrupted pending work for retry.
+                var imported = msg
+                imported.recoverInterruptedSend()
+                merged.append(imported)
                 mergedCount += 1
             }
 

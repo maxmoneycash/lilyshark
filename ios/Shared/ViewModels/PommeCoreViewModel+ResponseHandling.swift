@@ -165,10 +165,12 @@ extension PommeCoreViewModel {
             Self.logger.info("PARSED AutoAddConfig: bitmask=0x\(String(format: "%02x", bitmask)) maxHops=\(maxHops)")
             deviceConfig.autoAddBitmask = bitmask
             deviceConfig.autoAddMaxHops = maxHops
+            deviceConfig.loadedSections.insert("autoAdd")
 
         case .defaultFloodScope(let name):
             Self.logger.info("PARSED DefaultFloodScope: '\(name)'")
             deviceConfig.defaultFloodScope = name
+            deviceConfig.loadedSections.insert("floodScope")
 
         case .contactsStart(let count):
             contactStore.handleContactsStart(count: count)
@@ -432,7 +434,8 @@ extension PommeCoreViewModel {
         // Only suppress unread/notifications when the user is actively viewing the chat.
         // On macOS, scenePhase doesn't reliably detect background — use NSApplication.isActive.
         var userIsViewing = false
-        if case .contact(let key) = navigationStore.sidebarSelection, key == message.contactKeyHash {
+        if navigationStore.isMessagesSectionVisible,
+           navigationStore.visibleConversationKey == message.contactKeyHash {
             #if os(macOS)
             userIsViewing = NSApplication.shared.isUserViewing
             #else
@@ -462,29 +465,8 @@ extension PommeCoreViewModel {
     }
 
     func parseStats(subType: UInt8, payload: Data) {
-        var offset = 0
-        switch subType {
-        case 0:
-            deviceConfig.statsBatteryMV = Int16(bitPattern: readUInt16(payload, offset: &offset))
-            deviceConfig.statsUptime = readUInt32(payload, offset: &offset)
-            deviceConfig.statsErrorFlags = readUInt16(payload, offset: &offset)
-            deviceConfig.statsQueueLength = readUInt8(payload, offset: &offset)
-        case 1:
-            deviceConfig.statsNoiseFloor = Int16(bitPattern: readUInt16(payload, offset: &offset))
-            deviceConfig.statsLastRSSI = Int8(bitPattern: readUInt8(payload, offset: &offset))
-            deviceConfig.statsLastSNR = Int8(bitPattern: readUInt8(payload, offset: &offset))
-            deviceConfig.statsTXAirtime = readUInt32(payload, offset: &offset)
-            deviceConfig.statsRXAirtime = readUInt32(payload, offset: &offset)
-        case 2:
-            deviceConfig.statsPacketsReceived = readUInt32(payload, offset: &offset)
-            deviceConfig.statsPacketsSent = readUInt32(payload, offset: &offset)
-            deviceConfig.statsFloodCount = readUInt32(payload, offset: &offset)
-            deviceConfig.statsDirectCount = readUInt32(payload, offset: &offset)
-            deviceConfig.statsRecvFlood = readUInt32(payload, offset: &offset)
-            deviceConfig.statsRecvDirect = readUInt32(payload, offset: &offset)
-            if offset < payload.count { deviceConfig.statsReceiveErrors = readUInt32(payload, offset: &offset) }
-        default:
-            Self.logger.debug("Unknown stats subtype \(subType)")
+        if !deviceConfig.applyStats(subType: subType, payload: payload) {
+            Self.logger.debug("Ignored incomplete or unknown stats subtype \(subType)")
         }
     }
 
@@ -575,7 +557,8 @@ extension PommeCoreViewModel {
                 num: info.num,
                 name: info.displayName,
                 latitude: info.latitude,
-                longitude: info.longitude
+                longitude: info.longitude,
+                observation: .init(source: .deckRecord, snr: info.snr, rssi: nil, hops: info.hopsAway, lastHeard: info.lastHeard, viaMQTT: info.viaMQTT)
             )
             if info.num == messageStoreManager.meshtasticNodeNum {
                 // The deck lists itself first in the dump, and that entry is
@@ -590,7 +573,8 @@ extension PommeCoreViewModel {
                 num: position.from,
                 name: nil,
                 latitude: position.latitude,
-                longitude: position.longitude
+                longitude: position.longitude,
+                observation: .init(source: .packet, snr: position.rxSNR, rssi: position.rxRSSI, hops: position.hopsAway, lastHeard: position.rxTime, viaMQTT: position.viaMQTT)
             )
 
         case .deviceMetrics(let metrics):
@@ -718,13 +702,14 @@ extension PommeCoreViewModel {
         num: UInt32,
         name: String?,
         latitude: Double?,
-        longitude: Double?
+        longitude: Double?,
+        observation: ContactStore.NodeObservation
     ) -> Contact? {
         guard num != 0 else { return nil }
         let key = MeshtasticIdentity.syntheticKey(forNodeNum: num)
         let prefix = Data(key.prefix(MeshtasticIdentity.prefixLength))
         let existing = contactStore.contacts.first { $0.publicKeyPrefix == prefix }
-        let now = Date().epochUInt32
+        let acceptedObservation = contactStore.recordNodeObservation(observation, for: prefix)
 
         let contact = Contact(
             publicKey: key,
@@ -738,13 +723,15 @@ extension PommeCoreViewModel {
             // every screen reads as "no path known".
             outPathLen: -1,
             outPath: Data(),
-            lastAdvert: now,
-            latitude: latitude ?? existing?.latitude ?? 0,
-            longitude: longitude ?? existing?.longitude ?? 0,
-            lastmod: now
+            lastAdvert: max(observation.lastHeard ?? 0, existing?.lastAdvert ?? 0),
+            latitude: acceptedObservation ? (latitude ?? existing?.latitude ?? 0) : (existing?.latitude ?? 0),
+            longitude: acceptedObservation ? (longitude ?? existing?.longitude ?? 0) : (existing?.longitude ?? 0),
+            lastmod: existing?.lastmod ?? 0
         )
-        contactStore.handleAdvert(contact)
-        contactStore.recordPosition(for: contact)
+        contactStore.handleAdvert(contact, isLiveAdvert: false)
+        if acceptedObservation, let latitude, let longitude {
+            contactStore.nodePositions[prefix] = .init(latitude: latitude, longitude: longitude, viaMQTT: observation.viaMQTT)
+        }
         return contact
     }
 
@@ -752,7 +739,10 @@ extension PommeCoreViewModel {
         // A node can be heard talking before it has announced itself, so the
         // sender is upserted here too — otherwise the conversation would be
         // headed by a name nobody recognises.
-        let sender = upsertMeshtasticNode(num: text.from, name: nil, latitude: nil, longitude: nil)
+        let sender = upsertMeshtasticNode(
+            num: text.from, name: nil, latitude: nil, longitude: nil,
+            observation: .init(source: .packet, snr: text.rxSNR, rssi: text.rxRSSI, hops: text.hopsAway, lastHeard: text.rxTime, viaMQTT: text.viaMQTT)
+        )
         let senderPrefix = Data(
             MeshtasticIdentity.syntheticKey(forNodeNum: text.from)
                 .prefix(MeshtasticIdentity.prefixLength)
@@ -768,13 +758,12 @@ extension PommeCoreViewModel {
             senderKeyHash: senderPrefix,
             contactKeyHash: conversationKey,
             text: text.text,
-            timestamp: Date(),
+            timestamp: text.rxTime.map { Date(timeIntervalSince1970: TimeInterval($0)) } ?? Date(),
             isOutgoing: false,
             status: .sent,
-            snr: text.rxSNR.map { MeshtasticIdentity.snrQuarterDecibels(from: $0) },
-            // The deck relays no hop count, and a fabricated zero would tell the
-            // UI the sender is a direct neighbour.
-            hops: nil,
+            snr: text.rxSNR.flatMap { MeshtasticIdentity.snrQuarterDecibels(from: $0) },
+            // Only a complete, valid hop_start/hop_limit pair supplies this.
+            hops: text.hopsAway.flatMap { UInt8(exactly: $0) },
             channelIndex: isBroadcast ? channelIndex : nil,
             senderName: sender.map { contactStore.displayName(for: $0) }
         )

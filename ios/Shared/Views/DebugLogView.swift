@@ -12,6 +12,7 @@ import SwiftUI
 import MeshCoreKit
 
 struct DebugLogView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var logger = DebugLogger.shared
     @State private var filterLevel: DebugLogger.LogEntry.Level?
     @State private var searchText = ""
@@ -91,17 +92,13 @@ struct DebugLogView: View {
     private var logList: some View {
         Group {
             if filteredEntries.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "text.alignleft")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No log entries")
-                        .foregroundStyle(.secondary)
-                    Text("Protocol operations will appear here")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ContentUnavailableView(
+                    logger.entries.isEmpty ? "No saved log entries" : "No matching log entries",
+                    systemImage: "text.alignleft",
+                    description: Text(logger.entries.isEmpty
+                        ? "Connection and protocol events appear here as the app records them."
+                        : "Choose All to include events from other log levels.")
+                )
             } else {
                 ScrollViewReader { proxy in
                     List(filteredEntries) { entry in
@@ -111,7 +108,7 @@ struct DebugLogView: View {
                     .listStyle(.plain)
                     .onChange(of: logger.entries.count) {
                         if let last = filteredEntries.last {
-                            withAnimation {
+                            withMeshAnimation(reduceMotion: reduceMotion) {
                                 proxy.scrollTo(last.id, anchor: .bottom)
                             }
                         }
@@ -164,12 +161,12 @@ struct DebugLogView: View {
     private func copyAll() {
         let text = logger.exportText()
         copyToClipboard(text)
-        withAnimation {
+        withMeshAnimation(reduceMotion: reduceMotion) {
             showCopied = true
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            withAnimation {
+            withMeshAnimation(reduceMotion: reduceMotion) {
                 showCopied = false
             }
         }
@@ -203,6 +200,6 @@ private struct FilterChip: View {
                 .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                 .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.meshPlain)
     }
 }

@@ -56,13 +56,13 @@ struct MessageBubble: View {
             if let rtt = message.roundTripMs, rtt > 0 {
                 parts.append("Delivered, round trip \(String(format: "%.1f", Double(rtt) / 1000.0)) seconds")
             } else { parts.append("Delivered") }
-        case .failed: parts.append("Not delivered")
+        case .failed: parts.append(message.failureReason ?? "No delivery confirmation")
         }
-        if !message.reactions.isEmpty { parts.append("Reactions: \(message.reactions.joined(separator: ", "))") }
+        if !message.reactions.isEmpty { parts.append("Reactions: \(message.reactions.map { MessageReaction.label(for: $0) }.joined(separator: ", "))") }
         if message.isSigned { parts.append("Verified") }
         if !message.isOutgoing {
             if let hops = message.hops {
-                parts.append(hops == 0 || hops == 0xFF ? "Direct" : "\(hops) \(hops == 1 ? "hop" : "hops")")
+                parts.append(hops == 0xFF ? "Hop count not reported" : hops == 0 ? "Direct" : "\(hops) \(hops == 1 ? "hop" : "hops")")
             }
             if let snr = message.snr { parts.append(formatSNR(snr)) }
         }
@@ -124,7 +124,7 @@ struct MessageBubble: View {
                     // is the size of a caption. Sized from Design now, so a
                     // message read at arm's length outdoors does not need a
                     // second look.
-                    .font(.system(size: Design.Text.message))
+                    .font(Design.Text.message)
                     .padding(.horizontal, Design.Space.regular)
                     .padding(.vertical, Design.Space.snug)
                     .background(message.isOutgoing ? MeshTheme.outgoingBubble : MeshTheme.incomingBubble)
@@ -158,7 +158,7 @@ struct MessageBubble: View {
                                 .font(.caption2)
                                 .foregroundStyle(MeshTheme.textSecondary)
                             if hops == 0 || hops == 0xFF {
-                                Text("direct")
+                                Text(hops == 0 ? "direct" : "hops not reported")
                                     .font(.caption2)
                                     .foregroundStyle(MeshTheme.textSecondary)
                             } else {
@@ -182,8 +182,9 @@ struct MessageBubble: View {
                                 Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
                                     .font(.caption2)
                                     .foregroundStyle(MeshTheme.accent)
+                                    .touchable()
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                             .sheet(isPresented: $showPathSheet) {
                                 MessagePathSheet(message: message)
                             }
@@ -202,28 +203,10 @@ struct MessageBubble: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .accessibilityHidden(true)
+                .accessibilityElement(children: .contain)
 
-                if message.status == .failed {
-                    Button {
-                        messageStoreManager.retryMessage(message)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Tap to retry")
-                        }
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(MeshTheme.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(MeshTheme.surfaceLight)
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel("Message not delivered")
-                    .accessibilityHint("Tap to resend")
+                if message.isOutgoing && message.status == .failed {
+                    MessageSendFailure(message: message)
                 }
             }
             .contentShape(Rectangle())
@@ -235,8 +218,12 @@ struct MessageBubble: View {
                 }
                 // Quick reactions
                 Menu {
-                    ForEach(["👍", "❤️", "😂", "😮", "😢", "🙏"], id: \.self) { emoji in
-                        Button(emoji) { onReact?(message, emoji) }
+                    ForEach(MessageReaction.allCases) { reaction in
+                        Button {
+                            onReact?(message, reaction.rawValue)
+                        } label: {
+                            Label(reaction.label, systemImage: reaction.symbolName)
+                        }
                     }
                 } label: {
                     Label("React", systemImage: "face.smiling")
@@ -394,7 +381,7 @@ struct ChannelMessageBubble: View {
                     // is the size of a caption. Sized from Design now, so a
                     // message read at arm's length outdoors does not need a
                     // second look.
-                    .font(.system(size: Design.Text.message))
+                    .font(Design.Text.message)
                     .padding(.horizontal, Design.Space.regular)
                     .padding(.vertical, Design.Space.snug)
                     .background(message.isOutgoing ? MeshTheme.outgoingBubble : MeshTheme.incomingBubble)
@@ -417,6 +404,10 @@ struct ChannelMessageBubble: View {
 
                     if message.isOutgoing {
                         switch message.status {
+                        case .failed:
+                            Label("Unconfirmed", systemImage: "exclamationmark.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(MeshTheme.disconnected)
                         case .sending:
                             Image(systemName: "clock")
                                 .font(.caption2)
@@ -444,7 +435,7 @@ struct ChannelMessageBubble: View {
                                 .foregroundStyle(MeshTheme.textSecondary)
                                 .accessibilityHidden(true)
                             if hops == 0 || hops == 0xFF {
-                                Text("direct")
+                                Text(hops == 0 ? "direct" : "hops not reported")
                                     .font(.caption2)
                                     .foregroundStyle(MeshTheme.textSecondary)
                             } else {
@@ -475,8 +466,11 @@ struct ChannelMessageBubble: View {
                     }
                 }
                 .padding(.horizontal, 4)
+                if message.isOutgoing && message.status == .failed {
+                    MessageSendFailure(message: message)
+                }
             }
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .contain)
             .contentShape(Rectangle())
             .contextMenu {
                 Button {
@@ -487,14 +481,16 @@ struct ChannelMessageBubble: View {
                 if !message.isOutgoing, let sender = message.senderName, !sender.isEmpty {
                     // Channel reactions (MeshCore One format: emoji@[senderName]\nhash)
                     Menu {
-                        ForEach(["👍", "❤️", "😂", "😮", "😢", "🙏"], id: \.self) { emoji in
-                            Button(emoji) {
+                        ForEach(MessageReaction.allCases) { reaction in
+                            Button {
                                 let hash = messageStoreManager.reactionHash(for: message)
-                                let reactionText = "\(emoji)@[\(sender)]\n\(hash)"
+                                let reactionText = "\(reaction.rawValue)@[\(sender)]\n\(hash)"
                                 if let chIdx = message.channelIndex {
                                     messageStoreManager.sendChannelMessage(reactionText, channelIndex: chIdx)
                                 }
-                                messageStoreManager.addReactionLocal(emoji, to: message)
+                                messageStoreManager.addReactionLocal(reaction.rawValue, to: message)
+                            } label: {
+                                Label(reaction.label, systemImage: reaction.symbolName)
                             }
                         }
                     } label: {
@@ -524,7 +520,6 @@ struct ChannelMessageBubble: View {
 private struct ReactionBadge: View {
     let reactions: [String]
     @ScaledMetric private var circleSize: CGFloat = 34
-    @ScaledMetric private var fontSize: CGFloat = 19
 
     var body: some View {
         HStack(spacing: 4) {
@@ -533,14 +528,14 @@ private struct ReactionBadge: View {
                     Circle()
                         .fill(.regularMaterial)
                         .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
-                    Text(emoji)
-                        .font(.system(size: fontSize))
+                    Image(systemName: MessageReaction.symbolName(for: emoji))
+                        .font(.body)
                 }
                 .frame(width: circleSize, height: circleSize)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Reactions: \(reactions.joined(separator: ", "))")
+        .accessibilityLabel("Reactions: \(reactions.map { MessageReaction.label(for: $0) }.joined(separator: ", "))")
     }
 }
 
@@ -558,7 +553,8 @@ struct DateSeparator: View {
                 .padding(.horizontal, 8)
             VStack { Divider() }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func formattedDate(_ date: Date) -> String {
@@ -613,9 +609,9 @@ struct ShareSheetView: UIViewControllerRepresentable {
 
 /// Make meshcore:// URLs in text tappable as links.
 func linkifyMeshcoreURLs(_ text: String) -> Text {
-    // Check for location pin: "📍 lat, lon"
-    if text.contains("\u{1F4CD}"),
-       let regex = try? NSRegularExpression(pattern: "\u{1F4CD}\\s*(-?\\d+\\.\\d+),\\s*(-?\\d+\\.\\d+)"),
+    // Recognize the current location label and older messages without rewriting
+    // either message's content.
+    if let regex = try? NSRegularExpression(pattern: "(?:Location:|\u{1F4CD})\\s*(-?\\d+\\.\\d+),\\s*(-?\\d+\\.\\d+)"),
        let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
        let latRange = Range(match.range(at: 1), in: text),
        let lonRange = Range(match.range(at: 2), in: text),
@@ -623,8 +619,8 @@ func linkifyMeshcoreURLs(_ text: String) -> Text {
        let lon = Double(text[lonRange]),
        let mapsURL = URL(string: "https://maps.apple.com/?ll=\(lat),\(lon)&q=Shared%20Location") {
         var attr = AttributedString(text)
-        if let emojiRange = text.range(of: "\u{1F4CD}"),
-           let fullRange = attr.range(of: String(text[emojiRange.lowerBound...])) {
+        if let locationRange = Range(match.range, in: text),
+           let fullRange = attr.range(of: String(text[locationRange])) {
             attr[fullRange].link = mapsURL
             attr[fullRange].foregroundColor = .accentColor
         }
@@ -883,10 +879,9 @@ struct LinkPreviewCard: View {
 
 // MARK: - Message Path
 
-/// A received DM knows how many hops it traveled and the SNR of its last
-/// hop; the contact record knows the current out path (repeater hash bytes).
-/// Together they make the route tangible: the footer button opens this sheet
-/// with the hop chain and a map of every hop whose position is known.
+/// A received DM may report hop count and last-hop SNR, but it does not carry
+/// a verified repeater chain. The contact's current outgoing path is unrelated
+/// to the historical incoming route and must not be drawn as that route.
 struct MessagePathSheet: View {
     let message: Message
     @Environment(ContactStore.self) private var contactStore
@@ -897,9 +892,7 @@ struct MessagePathSheet: View {
         contactStore.contacts.first { $0.publicKeyPrefix == message.contactKeyHash }
     }
 
-    /// One entry per step of the route the message took: sender → hops → us.
-    /// The stored out path is our route *to* the contact, so incoming
-    /// traffic walks it in reverse.
+    /// Known endpoints only; intermediate repeaters are not identified.
     private struct PathStep: Identifiable {
         let id = UUID()
         let title: String
@@ -915,32 +908,14 @@ struct MessagePathSheet: View {
                 PathStep(
                     title: contactStore.displayName(for: contact),
                     subtitle: "Sender",
-                    coordinate: pathCoordinate(latitude: contact.latitude, longitude: contact.longitude),
+                    coordinate: contactStore.nodePositions[contact.publicKeyPrefix].map {
+                        CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                    } ?? pathCoordinate(latitude: contact.latitude, longitude: contact.longitude),
                     symbol: "person.wave.2.fill"
                 )
             )
-            let pathLen = max(0, Int(contact.outPathLen))
-            for hash in contact.outPath.prefix(pathLen).reversed() {
-                if let repeater = contactStore.contacts.first(where: { $0.publicKey.first == hash }) {
-                    result.append(
-                        PathStep(
-                            title: contactStore.displayName(for: repeater),
-                            subtitle: "Repeater \(String(format: "%02x", hash))",
-                            coordinate: pathCoordinate(latitude: repeater.latitude, longitude: repeater.longitude),
-                            symbol: "antenna.radiowaves.left.and.right"
-                        )
-                    )
-                } else {
-                    result.append(
-                        PathStep(
-                            title: "Repeater \(String(format: "%02x", hash))",
-                            subtitle: "Not in contacts",
-                            coordinate: nil,
-                            symbol: "antenna.radiowaves.left.and.right"
-                        )
-                    )
-                }
-            }
+        } else {
+            result.append(PathStep(title: "Sender", subtitle: "Contact record unavailable", coordinate: nil, symbol: "person.wave.2.fill"))
         }
         result.append(PathStep(title: "You", subtitle: nil, coordinate: nil, symbol: "iphone.gen3"))
         return result
@@ -969,7 +944,7 @@ struct MessagePathSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Route") {
+                Section {
                     ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
                         HStack(spacing: 12) {
                             Image(systemName: step.symbol)
@@ -991,17 +966,25 @@ struct MessagePathSheet: View {
                             }
                         }
                     }
+                } header: {
+                    Text("Known endpoints")
+                } footer: {
+                    Text("The received message does not identify its repeaters. A saved outgoing path cannot establish the route this message took.")
                 }
 
                 Section("Signal") {
-                    if let hops = message.hops {
+                    if let hops = message.hops, hops != 0xFF {
                         LabeledContent(
                             "Hops traveled",
-                            value: hops == 0 || hops == 0xFF ? "Direct" : "\(hops)"
+                            value: hops == 0 ? "Direct" : "\(hops)"
                         )
+                    } else {
+                        LabeledContent("Hops traveled", value: "Not reported")
                     }
                     if let snr = message.snr {
                         LabeledContent("Last hop SNR", value: formatSNR(snr))
+                    } else {
+                        LabeledContent("Last hop SNR", value: "Not reported")
                     }
                     LabeledContent("Received", value: message.timestamp.formatted(date: .abbreviated, time: .shortened))
                 }
@@ -1009,11 +992,6 @@ struct MessagePathSheet: View {
                 if let region {
                     Section("Known positions") {
                         Map(initialPosition: .region(region)) {
-                            let coords = mappedSteps.compactMap(\.coordinate)
-                            if coords.count >= 2 {
-                                MapPolyline(coordinates: coords)
-                                    .stroke(MeshTheme.accent.opacity(0.7), lineWidth: 2)
-                            }
                             ForEach(mappedSteps) { step in
                                 if let coordinate = step.coordinate {
                                     Marker(step.title, systemImage: step.symbol, coordinate: coordinate)
@@ -1022,17 +1000,17 @@ struct MessagePathSheet: View {
                         }
                         .frame(height: 260)
                         .listRowInsets(EdgeInsets())
-                        if mappedSteps.count < steps.count - 1 {
-                            Text("Hops without a shared position are not shown.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                        Text("The sender's latest shared position may differ from its position when this message was sent.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 } else {
                     Section {
-                        Text("No positions are known for this route yet.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        ContentUnavailableView(
+                            "Sender position not reported",
+                            systemImage: "mappin.slash",
+                            description: Text("A map appears when the sender shares a usable position.")
+                        )
                     }
                 }
             }
@@ -1051,7 +1029,7 @@ struct MessagePathSheet: View {
 }
 
 private func pathCoordinate(latitude: Double, longitude: Double) -> CLLocationCoordinate2D? {
-    guard abs(latitude) > 0.001 || abs(longitude) > 0.001 else { return nil }
+    guard latitude != 0 || longitude != 0 else { return nil }
     guard abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
     return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
 }
@@ -1091,7 +1069,7 @@ struct MessageMapCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .allowsHitTesting(false)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.meshPlain)
         .accessibilityLabel("Shared position \(coordinate.latitude), \(coordinate.longitude). Opens in Maps.")
     }
 }

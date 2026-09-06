@@ -15,6 +15,7 @@ import MeshCoreKit
 
 struct RadioCalculatorView: View {
     @Environment(DeviceConfig.self) private var deviceConfig
+    @Environment(ConnectionManager.self) private var connectionManager
     @State private var frequencyMHz: Double = 910.525
     @State private var txPowerDBm: Double = 22
     @State private var distanceKm: Double = 5.0
@@ -23,10 +24,16 @@ struct RadioCalculatorView: View {
     @State private var rxSensitivityDBm: Double = -130
     @State private var useDeviceConfig = true
 
+    private var hasRadioSettings: Bool {
+        connectionManager.connectionState == .ready && !connectionManager.isMeshtasticLinkActive
+            && deviceConfig.loadedSections.contains("selfInfo")
+    }
+
     var body: some View {
         Form {
             Section {
                 Toggle("Use Connected Radio Settings", isOn: $useDeviceConfig)
+                    .disabled(!hasRadioSettings)
                     .foregroundStyle(MeshTheme.accent)
                     .listRowBackground(MeshTheme.surface)
                     .onChange(of: useDeviceConfig) { _, use in
@@ -62,7 +69,7 @@ struct RadioCalculatorView: View {
             } header: {
                 Text("Results")
             } footer: {
-                Text("Free-space path loss assumes ideal conditions (no obstacles, reflections, or atmospheric absorption). Real-world loss is typically 10-30 dB higher.")
+                Text("Free-space path loss assumes an unobstructed path. Terrain, buildings, reflections, and atmospheric conditions can change the result.")
             }
 
             Section {
@@ -81,6 +88,9 @@ struct RadioCalculatorView: View {
         #endif
         .onAppear {
             if useDeviceConfig { loadFromDevice() }
+        }
+        .onChange(of: hasRadioSettings) { _, available in
+            if !available { useDeviceConfig = false }
         }
     }
 
@@ -133,39 +143,39 @@ struct RadioCalculatorView: View {
     // MARK: - Helpers
 
     private func loadFromDevice() {
+        guard hasRadioSettings else {
+            useDeviceConfig = false
+            return
+        }
         frequencyMHz = deviceConfig.frequencyMHz
         txPowerDBm = Double(deviceConfig.radioTXPower)
     }
 
     private func paramRow(_ label: LocalizedStringKey, value: Binding<Double>, unit: LocalizedStringKey, range: ClosedRange<Double>) -> some View {
-        HStack {
+        VStack(alignment: .leading, spacing: Design.Space.tight) {
             Text(label)
-                .foregroundStyle(MeshTheme.accent)
-            Spacer()
-            TextField(unit, value: value, format: .number)
-                .frame(width: 80)
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.primary)
-                #if !os(watchOS)
-                .textFieldStyle(.roundedBorder)
-                #endif
-            Text(unit)
-                .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
-                .frame(width: 35, alignment: .leading)
+            HStack(spacing: Design.Space.tight) {
+                TextField(label, value: Binding(
+                    get: { value.wrappedValue },
+                    set: { input in
+                        guard input.isFinite else { return }
+                        value.wrappedValue = min(range.upperBound, max(range.lowerBound, input))
+                    }
+                ), format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .monospacedDigit()
+                    .frame(minHeight: Design.minimumTouchTarget)
+                Text(unit)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                    .fixedSize()
+            }
         }
         .listRowBackground(MeshTheme.surface)
     }
 
     private func resultRow(_ label: LocalizedStringKey, value: String, color: Color = MeshTheme.textSecondary) -> some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(MeshTheme.accent)
-            Spacer()
-            Text(value)
-                .font(.body.monospaced())
-                .foregroundStyle(color)
-        }
+        MeshValueRow(label: label, value: value, valueColor: color)
         .listRowBackground(MeshTheme.surface)
     }
 }

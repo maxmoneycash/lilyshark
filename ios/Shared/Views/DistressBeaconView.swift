@@ -35,7 +35,7 @@ struct DistressBeaconView: View {
 
     private var messagePreview: String {
         let name = deviceConfig.deviceName.isEmpty ? "Unknown" : deviceConfig.deviceName
-        var text = "\u{1F198} DISTRESS from \(name)"
+        var text = "DISTRESS from \(name)"
         if !locationText.isEmpty { text += " at \(locationText)" }
         return text
     }
@@ -47,7 +47,7 @@ struct DistressBeaconView: View {
 
                 // Warning icon
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 64))
+                    .font(.largeTitle)
                     .foregroundStyle(.red)
 
                 Text("Emergency Beacon")
@@ -104,7 +104,7 @@ struct DistressBeaconView: View {
                         .background(.red)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .padding(.horizontal, 32)
                     .padding(.bottom, 40)
                 }

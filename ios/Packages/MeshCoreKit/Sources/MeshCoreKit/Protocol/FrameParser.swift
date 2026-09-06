@@ -341,6 +341,11 @@ public enum FrameParser {
     // MARK: - Self Info (code 5)
 
     private static func parseSelfInfo(_ data: Data) -> ParsedResponse {
+        // All fields through coding rate are fixed-width. A truncated response
+        // must not turn the read helpers' fallback zeros into reported tuning.
+        guard data.count >= 57 else {
+            return .unknown(type: MeshCoreResponseCode.selfInfo.rawValue, payload: data)
+        }
         var offset = 0
 
         let type = readUInt8(data, offset: &offset)

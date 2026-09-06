@@ -91,7 +91,7 @@ struct RadioSection: View {
                     Button("Show All") { regionFilter = nil }
                         .foregroundStyle(MeshTheme.accent)
                         .font(.subheadline)
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                 }
                 .listRowBackground(MeshTheme.surface)
             }
@@ -271,9 +271,9 @@ struct RadioSection: View {
                             .foregroundStyle(MeshTheme.accent)
                         Spacer()
                     }
-                    .contentShape(Rectangle())
+                    .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
         } header: {
             SectionInfoHeader(title: "Radio Configuration", info: "All radios on your mesh must use the same settings. SF (Spreading Factor): higher = longer range, slower. CR (Coding Rate): higher = more error correction. BW (Bandwidth): lower = longer range. Changes require reboot.")
@@ -371,11 +371,12 @@ struct RadioSection: View {
 
 extension SettingsView {
     var privacySection: some View {
-        PrivacySection()
+        PrivacySection(showRadioControls: supportsMeshCoreSettings)
     }
 }
 
 struct PrivacySection: View {
+    var showRadioControls = true
 
     @Environment(DeviceConfig.self) private var config
     @Environment(ConnectionManager.self) private var connectionManager
@@ -458,7 +459,9 @@ struct PrivacySection: View {
     }
 
     var body: some View {
+        Group {
         Section {
+            if showRadioControls && config.loadedSections.contains("selfInfo") {
             Toggle(isOn: manualAddBinding) {
                 HStack {
                     Image(systemName: "person.badge.plus")
@@ -471,24 +474,31 @@ struct PrivacySection: View {
             .tint(MeshTheme.accent)
             .listRowBackground(MeshTheme.surface)
 
-            if config.manualAddContacts == 0 {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 4) {
-                        Text("Auto-Add Contact Types")
-                            .font(.caption)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        InfoButton(text: "Chat = people, Repeaters extend range, Room Servers host group chats, Sensors report data.")
-                    }
-                    Toggle("Chat Users", isOn: autoAddBinding(bit: 0x01))
-                        .tint(MeshTheme.accent)
-                    Toggle("Repeaters", isOn: autoAddBinding(bit: 0x02))
-                        .tint(MeshTheme.accent)
-                    Toggle("Room Servers", isOn: autoAddBinding(bit: 0x04))
-                        .tint(MeshTheme.accent)
-                    Toggle("Sensors", isOn: autoAddBinding(bit: 0x08))
-                        .tint(MeshTheme.accent)
+            if config.manualAddContacts == 0 && config.loadedSections.contains("autoAdd") {
+                LabeledContent {
+                    InfoButton(text: "Chat users are people. Repeaters extend range, room servers host group chats, and sensors report data.")
+                } label: {
+                    Text("Auto-Add Contact Types")
+                        .font(.subheadline.weight(.semibold))
                 }
                 .listRowBackground(MeshTheme.surface)
+
+                // A separate List row gives each native switch its own height
+                // and lets labels wrap independently at larger text sizes.
+                Toggle("Chat Users", isOn: autoAddBinding(bit: 0x01))
+                    .tint(MeshTheme.accent)
+                    .listRowBackground(MeshTheme.surface)
+                Toggle("Repeaters", isOn: autoAddBinding(bit: 0x02))
+                    .tint(MeshTheme.accent)
+                    .listRowBackground(MeshTheme.surface)
+                Toggle("Room Servers", isOn: autoAddBinding(bit: 0x04))
+                    .tint(MeshTheme.accent)
+                    .listRowBackground(MeshTheme.surface)
+                Toggle("Sensors", isOn: autoAddBinding(bit: 0x08))
+                    .tint(MeshTheme.accent)
+                    .listRowBackground(MeshTheme.surface)
+            } else if config.manualAddContacts == 0 {
+                LabeledContent("Auto-Add Contact Types", value: "Not reported")
             }
 
             HStack {
@@ -548,6 +558,10 @@ struct PrivacySection: View {
             .listRowBackground(MeshTheme.surface)
             #endif
 
+            } else if showRadioControls {
+                LabeledContent("Radio privacy", value: "Not reported")
+            }
+
             Toggle(isOn: appLockBinding) {
                 Label("App Lock", systemImage: biometricIcon)
                     .foregroundStyle(MeshTheme.accent)
@@ -569,9 +583,9 @@ struct PrivacySection: View {
                             .foregroundStyle(MeshTheme.textSecondary)
                     }
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             #else
             NavigationLink {
@@ -592,9 +606,10 @@ struct PrivacySection: View {
             #endif
 
         } header: {
-            SectionInfoHeader(title: "Privacy & Security", info: "Controls what telemetry data is shared when requested. Per-Contact mode only shares with contacts that have telemetry permission set. App Lock requires Face ID, Touch ID, or your device passcode to open MeshCore.")
+            SectionInfoHeader(title: "Privacy & Security", info: "App Lock protects Lilyshark with device authentication. Blocked contacts are hidden and their messages are suppressed. A MeshCore radio also provides telemetry and location-sharing controls.")
         }
 
+        if showRadioControls && config.loadedSections.contains("selfInfo") {
         #if !os(watchOS)
         safeZonesRow
         #endif
@@ -669,7 +684,9 @@ struct PrivacySection: View {
 
         // BLE PIN — adaptive based on whether device has a screen
         Section {
-            if config.blePIN == 0 {
+            if !config.loadedSections.contains("deviceInfo") {
+                LabeledContent("BLE PIN", value: "Not reported")
+            } else if config.blePIN == 0 {
                 HStack {
                     Image(systemName: "lock.shield")
                         .foregroundStyle(MeshTheme.accent)
@@ -716,7 +733,7 @@ struct PrivacySection: View {
                         Label("Randomize", systemImage: "dice")
                             .foregroundStyle(MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
 
                     Spacer()
 
@@ -728,7 +745,7 @@ struct PrivacySection: View {
                         Text("Apply")
                             .foregroundStyle(MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .disabled(pinText.count > 6 || UInt32(pinText) == nil)
                 }
                 .listRowBackground(MeshTheme.surface)
@@ -736,10 +753,14 @@ struct PrivacySection: View {
         } header: {
             SectionInfoHeader(
                 title: "Bluetooth Security",
-                info: config.blePIN == 0
+                info: !config.loadedSections.contains("deviceInfo")
+                    ? "The radio has not reported its Bluetooth security settings yet."
+                    : config.blePIN == 0
                     ? "This device generates a random PIN each time it starts. Check the device screen for the current PIN when pairing."
                     : "Change the BLE PIN from the default (123456) for security. After changing, forget this device in Bluetooth settings and re-pair with the new PIN."
             )
+        }
+        }
         }
         .onAppear { pinText = String(config.blePIN) }
         .onChange(of: config.blePIN) { pinText = String(config.blePIN) }
@@ -822,9 +843,9 @@ struct PrivacySection: View {
                         .font(.caption)
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
         } header: {
             SectionInfoHeader(title: "Emergency Safety", info: "Safe zones send an automatic SOS beacon if you leave the defined area. Requires \u{201C}Always\u{201D} location permission.")
@@ -870,7 +891,7 @@ struct CustomVarsSection: View {
                         .font(.system(.body, design: .monospaced))
                 }
                 .listRowBackground(MeshTheme.surface)
-                .contentShape(Rectangle())
+                .touchable()
                 .contextMenu {
                     Button {
                         newName = pair.name
@@ -911,8 +932,8 @@ struct CustomVarsSection: View {
                     Image(systemName: "plus.circle.fill")
                         .foregroundStyle(MeshTheme.accent)
                 }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
+                .buttonStyle(.meshPlain)
+                .touchable()
             }
             .listRowBackground(MeshTheme.surface)
         } header: {
@@ -946,26 +967,35 @@ extension SettingsView {
     var statsSection: some View {
         Section {
             DisclosureGroup(isExpanded: $statsExpanded) {
-                // Core
-                infoRow(icon: "battery.75", label: "Battery (stats)", value: statsBatteryDisplay, valueColor: statsBatteryColor)
-                infoRow(icon: "clock.arrow.circlepath", label: "Uptime", value: formatUptime(config.displayUptimeSeconds))
-                infoRow(icon: "exclamationmark.triangle", label: "Error Flags", value: config.statsErrorFlags > 0 ? "0x\(String(format: "%04x", config.statsErrorFlags))" : "None", valueColor: config.statsErrorFlags > 0 ? .red : .green)
-                infoRow(icon: "tray", label: "Queue Length", value: "\(config.statsQueueLength)")
+                if config.hasCoreStats {
+                    infoRow(icon: "battery.75", label: "Battery (stats)", value: statsBatteryDisplay, valueColor: statsBatteryColor)
+                    infoRow(icon: "clock.arrow.circlepath", label: "Uptime", value: formatUptime(config.availableUptimeSeconds))
+                    infoRow(icon: "exclamationmark.triangle", label: "Error Flags", value: config.statsErrorFlags > 0 ? "0x\(String(format: "%04x", config.statsErrorFlags))" : "None", valueColor: config.statsErrorFlags > 0 ? .red : .green)
+                    infoRow(icon: "tray", label: "Queue Length", value: "\(config.statsQueueLength)")
+                } else {
+                    LabeledContent("Core statistics", value: "Not reported")
+                }
 
-                // Radio
-                infoRow(icon: "waveform.badge.minus", label: "Noise Floor", value: "\(config.statsNoiseFloor) dBm", valueColor: noiseFloorColor)
-                infoRow(icon: "cellularbars", label: "Last RSSI", value: "\(config.statsLastRSSI) dBm", valueColor: rssiColor)
-                infoRow(icon: "antenna.radiowaves.left.and.right", label: "Last SNR", value: formatSNR(config.statsLastSNR), valueColor: snrColor)
-                infoRow(icon: "arrow.up.circle", label: "TX Airtime", value: "\(config.statsTXAirtime) s")
-                infoRow(icon: "arrow.down.circle", label: "RX Airtime", value: "\(config.statsRXAirtime) s")
+                if config.hasRadioStats {
+                    infoRow(icon: "waveform.badge.minus", label: "Noise Floor", value: "\(config.statsNoiseFloor) dBm", valueColor: noiseFloorColor)
+                    infoRow(icon: "cellularbars", label: "Last RSSI", value: "\(config.statsLastRSSI) dBm", valueColor: rssiColor)
+                    infoRow(icon: "antenna.radiowaves.left.and.right", label: "Last SNR", value: formatSNR(config.statsLastSNR), valueColor: snrColor)
+                    infoRow(icon: "arrow.up.circle", label: "TX Airtime", value: "\(config.statsTXAirtime) s")
+                    infoRow(icon: "arrow.down.circle", label: "RX Airtime", value: "\(config.statsRXAirtime) s")
+                } else {
+                    LabeledContent("Radio statistics", value: "Not reported")
+                }
 
-                // Packets
-                infoRow(icon: "arrow.down.doc", label: "Packets RX", value: "\(config.statsPacketsReceived)")
-                infoRow(icon: "arrow.up.doc", label: "Packets TX", value: "\(config.statsPacketsSent)")
-                infoRow(icon: "arrow.triangle.branch", label: "Sent Flood", value: "\(config.statsFloodCount)")
-                infoRow(icon: "arrow.right", label: "Sent Direct", value: "\(config.statsDirectCount)")
-                infoRow(icon: "arrow.down.left", label: "Recv Flood", value: "\(config.statsRecvFlood)")
-                infoRow(icon: "arrow.down.right", label: "Recv Direct", value: "\(config.statsRecvDirect)")
+                if config.hasPacketStats {
+                    infoRow(icon: "arrow.down.doc", label: "Packets RX", value: "\(config.statsPacketsReceived)")
+                    infoRow(icon: "arrow.up.doc", label: "Packets TX", value: "\(config.statsPacketsSent)")
+                    infoRow(icon: "arrow.triangle.branch", label: "Sent Flood", value: "\(config.statsFloodCount)")
+                    infoRow(icon: "arrow.right", label: "Sent Direct", value: "\(config.statsDirectCount)")
+                    infoRow(icon: "arrow.down.left", label: "Recv Flood", value: "\(config.statsRecvFlood)")
+                    infoRow(icon: "arrow.down.right", label: "Recv Direct", value: "\(config.statsRecvDirect)")
+                } else {
+                    LabeledContent("Packet statistics", value: "Not reported")
+                }
 
                 Button {
                     connectionManager.requestStats(subType: 0)
@@ -980,9 +1010,9 @@ extension SettingsView {
                             .foregroundStyle(MeshTheme.accent)
                         Spacer()
                     }
-                    .contentShape(Rectangle())
+                    .touchable()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
             } label: {
                 Label("Statistics", systemImage: "chart.bar")
                     .foregroundStyle(MeshTheme.accent)
@@ -997,7 +1027,7 @@ extension SettingsView {
 
     /// Battery status: reuses existing battery percentage logic
     var statsBatteryColor: Color {
-        guard config.statsBatteryMV != 0 else { return MeshTheme.textSecondary }
+        guard config.statsBatteryMV > 0 else { return MeshTheme.textSecondary }
         let mv = Int(config.statsBatteryMV)
         let pct = batteryChemistry.profile.percentage(forMillivolts: mv)
         if pct > 50 { return .green }

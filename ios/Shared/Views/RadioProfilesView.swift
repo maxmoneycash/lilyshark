@@ -93,7 +93,7 @@ struct RadioProfilesView: View {
                         .foregroundStyle(profileStore.profiles.count >= 10
                                          ? MeshTheme.textSecondary : MeshTheme.accent)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .disabled(profileStore.profiles.count >= 10)
                 .listRowBackground(MeshTheme.surface)
             } else {

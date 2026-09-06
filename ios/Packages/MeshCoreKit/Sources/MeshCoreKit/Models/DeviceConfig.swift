@@ -135,6 +135,13 @@ public final class DeviceConfig {
 
     // MARK: - Statistics
 
+    /// A valid reply marks only its own group as reported. Zero can then be
+    /// displayed as a measurement without confusing it with initial state.
+    public private(set) var hasCoreStats = false
+    public private(set) var hasRadioStats = false
+    public private(set) var hasPacketStats = false
+    public private(set) var hasReceiveErrorStats = false
+
     // Core stats (sub_type 0)
     public var statsBatteryMV: Int16 = 0
     public var statsUptime: UInt32 = 0
@@ -179,10 +186,65 @@ public final class DeviceConfig {
     public var healthReportedAt: Date?
 
     /// Uptime to show: what the radio's telemetry said, else what MeshCore's
-    /// stats said. Zero when neither has spoken, which every caller renders
-    /// through `formatUptime` as an em dash.
+    /// stats said. Prefer `availableUptimeSeconds` for display so a reported
+    /// zero remains distinct from a radio that has not answered yet.
     public var displayUptimeSeconds: UInt32 {
         reportedUptimeSeconds ?? statsUptime
+    }
+
+    public var availableUptimeSeconds: UInt32? {
+        reportedUptimeSeconds ?? (hasCoreStats ? statsUptime : nil)
+    }
+
+    /// Apply a complete MeshCore stats payload. A truncated reply must neither
+    /// invent zero readings nor overwrite the last complete snapshot.
+    @discardableResult
+    public func applyStats(subType: UInt8, payload: Data) -> Bool {
+        let minimumLength: Int
+        switch subType {
+        case 0: minimumLength = 9
+        case 1: minimumLength = 12
+        case 2: minimumLength = 24
+        default: return false
+        }
+        guard payload.count >= minimumLength else { return false }
+        let bytes = Array(payload)
+        var offset = 0
+        func read(_ count: Int) -> UInt32 {
+            var value: UInt32 = 0
+            for shift in 0..<count {
+                value |= UInt32(bytes[offset + shift]) << (shift * 8)
+            }
+            offset += count
+            return value
+        }
+        switch subType {
+        case 0:
+            statsBatteryMV = Int16(bitPattern: UInt16(read(2)))
+            statsUptime = read(4)
+            statsErrorFlags = UInt16(read(2))
+            statsQueueLength = UInt8(read(1))
+            hasCoreStats = true
+        case 1:
+            statsNoiseFloor = Int16(bitPattern: UInt16(read(2)))
+            statsLastRSSI = Int8(bitPattern: UInt8(read(1)))
+            statsLastSNR = Int8(bitPattern: UInt8(read(1)))
+            statsTXAirtime = read(4)
+            statsRXAirtime = read(4)
+            hasRadioStats = true
+        case 2:
+            statsPacketsReceived = read(4)
+            statsPacketsSent = read(4)
+            statsFloodCount = read(4)
+            statsDirectCount = read(4)
+            statsRecvFlood = read(4)
+            statsRecvDirect = read(4)
+            hasReceiveErrorStats = bytes.count >= 28
+            statsReceiveErrors = hasReceiveErrorStats ? read(4) : 0
+            hasPacketStats = true
+        default: break
+        }
+        return true
     }
 
     // MARK: - Loading State
@@ -230,6 +292,10 @@ public final class DeviceConfig {
         deviceTimeEpoch = 0
         customVars = []
         statsBatteryMV = 0
+        hasCoreStats = false
+        hasRadioStats = false
+        hasPacketStats = false
+        hasReceiveErrorStats = false
         statsUptime = 0
         statsErrorFlags = 0
         statsQueueLength = 0

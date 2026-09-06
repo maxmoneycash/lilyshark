@@ -15,6 +15,16 @@ import MeshCoreKit
 
 struct SensitivityTableView: View {
     @Environment(DeviceConfig.self) private var deviceConfig
+    @Environment(ConnectionManager.self) private var connectionManager
+
+    private var hasRadioSettings: Bool {
+        connectionManager.connectionState == .ready && !connectionManager.isMeshtasticLinkActive
+            && deviceConfig.loadedSections.contains("selfInfo")
+    }
+
+    private var referenceFrequencyMHz: Double {
+        hasRadioSettings ? deviceConfig.frequencyMHz : 910.525
+    }
 
     @State private var selectedBandwidth: Double = 62.5
     private let bandwidthOptions: [Double] = [7.8, 15.6, 31.25, 62.5, 125, 250, 500]
@@ -35,54 +45,31 @@ struct SensitivityTableView: View {
             }
 
             Section {
-                // Header row
-                HStack(spacing: 0) {
-                    Text("SF")
-                        .frame(width: 36, alignment: .leading)
-                    Text("Sensitivity")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    Text("Bit Rate")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    Text("Range")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(MeshTheme.textSecondary)
-                .listRowBackground(MeshTheme.surface)
-
                 ForEach(5...12, id: \.self) { sf in
                     let entry = tableEntry(sf: sf, bwKHz: selectedBandwidth)
-                    let isCurrentSF = Int(deviceConfig.radioSpreadingFactor) == sf &&
+                    let isCurrentSF = hasRadioSettings && Int(deviceConfig.radioSpreadingFactor) == sf &&
                         abs(deviceConfig.bandwidthKHz - selectedBandwidth) < 0.5
-                    HStack(spacing: 0) {
-                        HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: Design.Space.tight) {
+                        HStack(spacing: Design.Space.tight) {
                             Text("SF\(sf)")
-                                .font(.body.weight(isCurrentSF ? .bold : .regular))
+                                .font(.headline)
                             if isCurrentSF {
-                                Image(systemName: "antenna.radiowaves.left.and.right")
-                                    .font(.caption2)
+                                Label("Current", systemImage: "antenna.radiowaves.left.and.right")
+                                    .font(.subheadline)
                                     .foregroundStyle(MeshTheme.accent)
                             }
                         }
-                        .frame(width: 56, alignment: .leading)
-
-                        Text(String(format: "%.0f dBm", entry.sensitivity))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-
-                        Text(formatBitRate(entry.bitRate))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-
-                        Text(formatRange(entry.theoreticalRangeKm))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+                        MeshValueRow(label: "Sensitivity", value: String(format: "%.0f dBm", entry.sensitivity))
+                        MeshValueRow(label: "Bit Rate", value: formatBitRate(entry.bitRate))
+                        MeshValueRow(label: "Theoretical Range", value: formatRange(entry.theoreticalRangeKm))
                     }
-                    .font(.body.monospaced())
-                    .foregroundStyle(isCurrentSF ? MeshTheme.accent : MeshTheme.textSecondary)
+                    .padding(.vertical, Design.Space.tight)
                     .listRowBackground(isCurrentSF ? MeshTheme.accent.opacity(0.1) : MeshTheme.surface)
                 }
             } header: {
                 Text("Performance by Spreading Factor")
             } footer: {
-                Text("Sensitivity assumes CR 4/5. Range is theoretical FSPL max with 22 dBm TX + 2 dBi antenna. Real-world range is typically 30-50\u{0025} of theoretical.")
+                Text("Calculated at \(String(format: "%.3f", referenceFrequencyMHz)) MHz with CR 4/5, 22 dBm TX power, and 2 dBi antenna gain. Range assumes free space.")
             }
 
             Section {
@@ -101,6 +88,7 @@ struct SensitivityTableView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .onAppear {
+            guard hasRadioSettings else { return }
             // Select the bandwidth matching the connected radio
             let deviceBW = deviceConfig.bandwidthKHz
             if bandwidthOptions.contains(where: { abs($0 - deviceBW) < 0.5 }) {
@@ -150,7 +138,7 @@ struct SensitivityTableView: View {
         let rxGain = 2.0
         let budget = txPower + txGain + rxGain - sensitivity
         // FSPL: d = 10^((budget - 32.44 - 20*log10(f_MHz)) / 20)
-        let freqMHz = deviceConfig.frequencyMHz > 0 ? deviceConfig.frequencyMHz : 910.525
+        let freqMHz = referenceFrequencyMHz
         let exponent = (budget - 32.44 - 20 * log10(freqMHz)) / 20
         let rangeKm = pow(10, exponent)
 

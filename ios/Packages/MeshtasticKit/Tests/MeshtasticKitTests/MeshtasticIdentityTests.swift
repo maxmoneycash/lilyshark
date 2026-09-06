@@ -61,6 +61,11 @@ final class MeshtasticIdentityTests: XCTestCase {
         // opposite sign, which would draw a dead link as an excellent one.
         XCTAssertEqual(MeshtasticIdentity.snrQuarterDecibels(from: 200), 127)
         XCTAssertEqual(MeshtasticIdentity.snrQuarterDecibels(from: -200), -128)
+        XCTAssertEqual(MeshtasticIdentity.snrQuarterDecibels(from: .greatestFiniteMagnitude), 127)
+        XCTAssertEqual(MeshtasticIdentity.snrQuarterDecibels(from: -.greatestFiniteMagnitude), -128)
+        XCTAssertNil(MeshtasticIdentity.snrQuarterDecibels(from: .nan))
+        XCTAssertNil(MeshtasticIdentity.snrQuarterDecibels(from: .infinity))
+        XCTAssertNil(MeshtasticIdentity.snrQuarterDecibels(from: -.infinity))
     }
 
     func testDefaultLabelMatchesTheIdStockFirmwarePrints() {

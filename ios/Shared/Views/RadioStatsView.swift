@@ -22,12 +22,13 @@ struct RadioStatsView: View {
                 statRow("Battery Voltage", value: batteryVoltage)
                 // Falls back to Meshtastic telemetry so this screen and the
                 // Settings rows never disagree about the same deck's uptime.
-                statRow("Uptime", value: formatUptime(deviceConfig.displayUptimeSeconds))
-                statRow("Queue Depth", value: "\(deviceConfig.statsQueueLength)")
+                statRow("Uptime", value: formatUptime(deviceConfig.availableUptimeSeconds))
+                statRow("Queue Depth", value: deviceConfig.hasCoreStats ? "\(deviceConfig.statsQueueLength)" : "Not reported")
                 errorFlagsRow
             } header: { Text("Core") }
 
             Section {
+                if deviceConfig.hasRadioStats {
                 statRow("Noise Floor", value: "\(deviceConfig.statsNoiseFloor) dBm",
                         color: noiseFloorColor)
                 statRow("Last RSSI", value: "\(deviceConfig.statsLastRSSI) dBm",
@@ -36,34 +37,31 @@ struct RadioStatsView: View {
                         color: snrColor)
                 statRow("TX Airtime", value: formatUptime(deviceConfig.statsTXAirtime))
                 statRow("RX Airtime", value: formatUptime(deviceConfig.statsRXAirtime))
+                } else {
+                    ContentUnavailableView("Radio statistics not reported", systemImage: "waveform",
+                                           description: Text("This deck has not supplied signal or airtime readings."))
+                }
             } header: { Text("Radio") }
 
             Section {
+                if deviceConfig.hasPacketStats {
                 statRow("Packets Received", value: "\(deviceConfig.statsPacketsReceived)")
                 statRow("Packets Sent", value: "\(deviceConfig.statsPacketsSent)")
-                HStack {
-                    Text("Flood Sent").foregroundStyle(MeshTheme.accent)
-                    Spacer()
-                    Text("\(deviceConfig.statsFloodCount)")
-                        .foregroundStyle(MeshTheme.textSecondary)
-                    Text("/ Direct \(deviceConfig.statsDirectCount)")
-                        .foregroundStyle(MeshTheme.textSecondary)
-                        .font(.caption)
-                }
-                HStack {
-                    Text("Flood Received").foregroundStyle(MeshTheme.accent)
-                    Spacer()
-                    Text("\(deviceConfig.statsRecvFlood)")
-                        .foregroundStyle(MeshTheme.textSecondary)
-                    Text("/ Direct \(deviceConfig.statsRecvDirect)")
-                        .foregroundStyle(MeshTheme.textSecondary)
-                        .font(.caption)
-                }
-                if deviceConfig.statsReceiveErrors > 0 {
+                statRow("Flood Sent", value: "\(deviceConfig.statsFloodCount)")
+                statRow("Direct Sent", value: "\(deviceConfig.statsDirectCount)")
+                statRow("Flood Received", value: "\(deviceConfig.statsRecvFlood)")
+                statRow("Direct Received", value: "\(deviceConfig.statsRecvDirect)")
+                if !deviceConfig.hasReceiveErrorStats {
+                    statRow("Receive Errors", value: "Not reported")
+                } else if deviceConfig.statsReceiveErrors > 0 {
                     statRow("Receive Errors", value: "\(deviceConfig.statsReceiveErrors)",
                             color: .red)
                 } else {
                     statRow("Receive Errors", value: "0", color: MeshTheme.connected)
+                }
+                } else {
+                    ContentUnavailableView("Packet counts not reported", systemImage: "tray",
+                                           description: Text("An empty report does not tell us whether the band is quiet."))
                 }
             } header: { Text("Packets") }
 
@@ -73,13 +71,14 @@ struct RadioStatsView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                         .foregroundStyle(MeshTheme.accent)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             }
             #endif
         }
         .meshTheme()
         .navigationTitle("Radio Stats")
+        .onAppear { requestStats() }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -98,6 +97,8 @@ struct RadioStatsView: View {
     // MARK: - Actions
 
     private func requestStats() {
+        guard connectionManager.connectionState == .ready,
+              !connectionManager.isMeshtasticLinkActive else { return }
         connectionManager.requestStats(subType: 0)
         connectionManager.requestStats(subType: 1)
         connectionManager.requestStats(subType: 2)
@@ -106,11 +107,7 @@ struct RadioStatsView: View {
     // MARK: - Row helpers
 
     private func statRow(_ label: LocalizedStringKey, value: String, color: Color = MeshTheme.textSecondary) -> some View {
-        HStack {
-            Text(label).foregroundStyle(MeshTheme.accent)
-            Spacer()
-            Text(value).foregroundStyle(color)
-        }
+        MeshValueRow(label: label, value: value, valueColor: color)
         .listRowBackground(MeshTheme.surface)
     }
 
@@ -118,7 +115,9 @@ struct RadioStatsView: View {
         HStack {
             Text("Error Flags").foregroundStyle(MeshTheme.accent)
             Spacer()
-            if deviceConfig.statsErrorFlags == 0 {
+            if !deviceConfig.hasCoreStats {
+                Text("Not reported").foregroundStyle(MeshTheme.textSecondary)
+            } else if deviceConfig.statsErrorFlags == 0 {
                 Text("None").foregroundStyle(MeshTheme.connected)
             } else {
                 Text(String(format: "0x%04X", deviceConfig.statsErrorFlags))
@@ -131,7 +130,7 @@ struct RadioStatsView: View {
     // MARK: - Computed values
 
     private var batteryVoltage: String {
-        guard deviceConfig.statsBatteryMV > 0 else { return "—" }
+        guard deviceConfig.hasCoreStats, deviceConfig.statsBatteryMV > 0 else { return "Not reported" }
         return String(format: "%.2f V", Double(deviceConfig.statsBatteryMV) / 1000.0)
     }
 

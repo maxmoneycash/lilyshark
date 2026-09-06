@@ -96,10 +96,10 @@ Verified working beyond the iOS simulator app:
 xcodebuild -project ios/PommeCore.xcodeproj -scheme PommeCore-macOS \
   -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
 
-# MeshCoreKit unit tests -- 32 tests, 0 failures
+# MeshCoreKit unit tests
 cd ios/Packages/MeshCoreKit && swift test
 
-# MeshtasticKit unit tests -- 21 tests, 0 failures
+# MeshtasticKit unit tests
 cd ios/Packages/MeshtasticKit && swift test
 ```
 
@@ -108,6 +108,29 @@ pins an iOS Simulator destination. Use the `xcodebuild` line above.
 
 The two watch targets are the exception. They have never compiled here, and the section below
 explains exactly why and what a human would have to do about it.
+
+## Large text layout checks
+
+To build a separate Debug app with SwiftUI's `accessibility3` text size:
+
+```bash
+xcodebuild -project ios/PommeCore.xcodeproj -scheme PommeCore \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath ios/DerivedDataLargeType -configuration Debug \
+  CODE_SIGNING_ALLOWED=NO \
+  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LILYSHARK_UI_LARGE_TYPE' build
+```
+
+This overrides the app's SwiftUI environment without changing simulator settings.
+It helps check wrapping and scrolling; VoiceOver and system text-size changes
+still need their own interaction checks. The override requires both compile
+conditions and is absent from ordinary Debug and Release builds. Reinstall the
+ordinary app from `ios/DerivedData` after testing.
+
+Unsigned builds also disable CloudKit container creation through the generated
+`LilysharkCodeSigningAllowed` Info.plist value. This lets simulator and macOS
+builds run without signing entitlements. Signed builds retain the existing
+iCloud configuration.
 
 ## The watch target cannot be built from this checkout
 

@@ -33,26 +33,36 @@ enum Design {
 
     // MARK: - Type
 
-    /// Type scale, in points.
+    /// The type scale.
     ///
-    /// Chat body is 17 rather than the inherited 15: a message read at arm's
-    /// length in daylight is the one piece of text in this app that must never
-    /// need a second look, and 15 is the size of a caption in Apple's own
-    /// scale. Everything else is sized in relation to it.
+    /// Semantic styles, NOT point sizes. A hardcoded `.system(size: 17)` opts
+    /// out of Dynamic Type and ignores the reader's preferred text size.
+    ///
+    /// This was originally written as fixed CGFloat sizes, and the irony is
+    /// worth recording: the reason for touching typography at all was that
+    /// chat messages were too small to read outdoors, and fixed sizes are
+    /// precisely what stops a reader fixing that for themselves.
+    ///
+    /// The relationships are Apple's, converged on across every device, so
+    /// the job here is to say which role each piece of text plays and let the
+    /// system size it.
     enum Text {
-        /// The message itself. The largest text that is not a heading.
-        static let message: CGFloat = 17
-        /// Names, list rows, anything the eye lands on while scanning.
-        static let row: CGFloat = 16
-        /// Timestamps, delivery state, RSSI — read deliberately, not scanned.
-        static let detail: CGFloat = 13
-        /// Section labels. Small, but never below 11, which is where the
-        /// system's own smallest label sits.
-        static let label: CGFloat = 12
-        /// A glyph inside a control -- the send arrow, a toolbar icon. Sized
-        /// to the control rather than to the text scale, because it is read
-        /// as a shape and not as a word.
-        static let controlGlyph: CGFloat = 19
+        /// The message itself. `.body` is the reading size the whole scale is
+        /// built around, and a message is the one thing in this app that is
+        /// read rather than scanned.
+        static let message: Font = .body
+        /// Names and list rows -- scanned, and slightly more prominent than
+        /// the body they sit above.
+        static let row: Font = .callout
+        /// Timestamps, delivery state, RSSI. Read deliberately when wanted
+        /// and ignored otherwise, but never below .footnote: anything
+        /// carrying meaning has to survive being read.
+        static let detail: Font = .footnote
+        /// Section labels.
+        static let label: Font = .caption
+        /// Control glyphs scale with the text they accompany. Control frames
+        /// provide a minimum touch area without fixing the symbol's size.
+        static let controlGlyph: Font = .headline.weight(.semibold)
     }
 
     // MARK: - Space
@@ -130,7 +140,54 @@ enum Design {
                 // the thumb is harder to read at the moment you are looking
                 // at it, which is exactly backwards.
                 .scaleEffect(configuration.isPressed && !reduceMotion ? scale : 1)
-                .animation(reduceMotion ? nil : Design.Motion.quick, value: configuration.isPressed)
+                .meshAnimation(Design.Motion.quick, value: configuration.isPressed)
+        }
+    }
+
+    /// Shared standalone actions use native button rendering, including focus,
+    /// disabled, pressed, and destructive states. Minimum size belongs to the
+    /// styled label so the entire visible control responds to a tap.
+    struct ActionButtonStyle: PrimitiveButtonStyle {
+        let prominent: Bool
+
+        @ViewBuilder
+        func makeBody(configuration: Configuration) -> some View {
+            if prominent {
+                action(configuration)
+                    .buttonStyle(.borderedProminent)
+            } else {
+                action(configuration)
+                    .buttonStyle(.bordered)
+            }
+        }
+
+        private func action(_ configuration: Configuration) -> some View {
+            Button(role: configuration.role, action: configuration.trigger) {
+                configuration.label
+                    .font(.body.weight(.semibold))
+                    .touchable()
+            }
+            .tint(configuration.role == .destructive ? .red : MeshTheme.accent)
+            .controlSize(.regular)
+        }
+    }
+
+    struct PlainControlStyle: ButtonStyle {
+        @Environment(\.isEnabled) private var isEnabled
+
+        @ViewBuilder
+        func makeBody(configuration: Configuration) -> some View {
+            if configuration.role == .destructive {
+                control(configuration).foregroundStyle(.red)
+            } else {
+                control(configuration)
+            }
+        }
+
+        private func control(_ configuration: Configuration) -> some View {
+            configuration.label
+                .touchable()
+                .opacity(isEnabled ? (configuration.isPressed ? 0.65 : 1) : 0.45)
         }
     }
 }
@@ -140,12 +197,22 @@ extension ButtonStyle where Self == Design.PressableStyle {
     static var pressable: Design.PressableStyle { Design.PressableStyle() }
 }
 
+extension PrimitiveButtonStyle where Self == Design.ActionButtonStyle {
+    static var meshPrimary: Design.ActionButtonStyle { .init(prominent: true) }
+    static var meshSecondary: Design.ActionButtonStyle { .init(prominent: false) }
+}
+
+extension ButtonStyle where Self == Design.PlainControlStyle {
+    static var meshPlain: Design.PlainControlStyle { .init() }
+}
+
 extension View {
-    /// Guarantee a control is at least as big as a fingertip.
-    ///
-    /// Applied to the tappable area, not the drawn shape: a 24pt icon can stay
-    /// 24pt and still be comfortable to hit, and growing the icon instead
-    /// would make the design coarse to fix an ergonomics problem.
+    /// Expand an interactive label to at least 44 points in each dimension.
+    /// Apply INSIDE a Button or NavigationLink label, after its visual styling:
+    /// `Button { send() } label: { Image(systemName: "arrow.up").touchable() }`.
+    /// Framing the Button itself or an ancestor only enlarges layout bounds;
+    /// it does not reliably enlarge the styled label's hit region. An ancestor
+    /// contentShape also cannot attach an action to empty space around a child.
     func touchable(_ size: CGFloat = Design.minimumTouchTarget) -> some View {
         frame(minWidth: size, minHeight: size)
             .contentShape(Rectangle())
@@ -157,6 +224,18 @@ extension View {
     func meshAnimation<V: Equatable>(_ animation: Animation, value: V) -> some View {
         modifier(MeshAnimationModifier(animation: animation, value: value))
     }
+}
+
+/// Animate an imperative state change using the view's Reduce Motion value.
+/// Use this for actions such as ScrollViewReader scrolling that cannot attach
+/// a value-driven `.meshAnimation` modifier to the changed state.
+@discardableResult
+func withMeshAnimation<Result>(
+    _ animation: Animation = Design.Motion.quick,
+    reduceMotion: Bool,
+    _ body: () throws -> Result
+) rethrows -> Result {
+    try withAnimation(reduceMotion ? nil : animation, body)
 }
 
 private struct MeshAnimationModifier<V: Equatable>: ViewModifier {

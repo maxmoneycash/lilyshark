@@ -85,7 +85,7 @@ struct SettingsView: View {
             Text("Thank you for your generous tip! Enter a display name to appear on the Supporters Wall, visible to all Lilyshark users.")
         }
         .onAppear {
-            if isConnected {
+            if supportsMeshCoreSettings {
                 connectionManager.refreshAllSettings()
             }
         }
@@ -93,6 +93,10 @@ struct SettingsView: View {
 
     var isConnected: Bool {
         connectionManager.connectionState == .ready || connectionManager.connectionState == .connected
+    }
+
+    var supportsMeshCoreSettings: Bool {
+        isConnected && !connectionManager.isMeshtasticLinkActive
     }
 
     // MARK: - Disconnected State
@@ -104,19 +108,11 @@ struct SettingsView: View {
             radioDataSection
 
             Section {
-                VStack(spacing: 16) {
-                    Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                        .font(.system(size: 48))
-                        .foregroundStyle(MeshTheme.textSecondary)
-                    Text("No Device Connected")
-                        .font(.headline)
-                    Text("Connect to a MeshCore radio to view and change device settings.")
-                        .font(.subheadline)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                        .multilineTextAlignment(.center)
+                ContentUnavailableView {
+                    Label("Connect a Radio", systemImage: "antenna.radiowaves.left.and.right.slash")
+                } description: {
+                    Text("Your app preferences are available here. Connect a MeshCore radio to view and change its device settings.")
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
             }
 
             tipJarSection
@@ -147,7 +143,18 @@ struct SettingsView: View {
             // 2. Connection
             connectionSection
 
-            // 4. Device Info (BLE/WiFi/USB Binary only — USB CLI uses RemoteManagementView)
+            if connectionManager.isMeshtasticLinkActive {
+                deckInfoSection
+            } else if !deviceConfig.loadedSections.contains("selfInfo") {
+                Section("Radio Details") {
+                    ContentUnavailableView {
+                        Label("Radio Details Not Reported", systemImage: "radio")
+                    } description: {
+                        Text("Waiting for the connected radio to report its configuration. Refresh settings if the report does not arrive.")
+                    }
+                }
+            } else {
+            // Device Info (USB CLI uses RemoteManagementView).
             #if os(macOS) || targetEnvironment(macCatalyst)
             if isConnected && !connectionManager.isUSBCLIMode {
                 deviceInfoSection
@@ -157,6 +164,7 @@ struct SettingsView: View {
                 deviceInfoSection
             }
             #endif
+            }
 
             // 5. Notifications
             notificationsSection
@@ -166,7 +174,9 @@ struct SettingsView: View {
             watchCompanionSection
             #endif
 
-            messageSettingsSection
+            if supportsMeshCoreSettings {
+                messageSettingsSection
+            }
 
             meshResponderSection
 
@@ -184,7 +194,7 @@ struct SettingsView: View {
 
             // 9. Advanced
             Section {
-                if isConnected {
+                if supportsMeshCoreSettings {
                     if !deviceConfig.customVars.isEmpty {
                         customVarsSection
                     }
@@ -196,7 +206,7 @@ struct SettingsView: View {
             }
 
             // 10. Danger Zone
-            if isConnected {
+            if supportsMeshCoreSettings {
                 dangerZoneSection
             }
         }
@@ -331,17 +341,41 @@ struct SettingsView: View {
         // iOS: add a settings-specific refresh button.
         #if !os(macOS) && !targetEnvironment(macCatalyst)
         .toolbar {
+            if supportsMeshCoreSettings {
             ToolbarItem(placement: .automatic) {
                 Button {
                     connectionManager.refreshAllSettings()
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .foregroundStyle(MeshTheme.accent)
+                        .touchable()
                 }
+                .accessibilityLabel("Refresh all settings")
                 .help("Refresh all settings")
+            }
             }
         }
         #endif
+    }
+
+    private var deckInfoSection: some View {
+        let battery = batteryRowContent(deviceConfig.batteryReading(chemistry: batteryChemistry), voltage: deviceConfig.batteryVoltage)
+        return Section {
+            LabeledContent("Name", value: deviceConfig.deviceName.isEmpty ? (connectionManager.connectedDeviceName ?? "Not reported") : deviceConfig.deviceName)
+            LabeledContent("Firmware", value: deviceConfig.semanticVersion.isEmpty ? "Not reported" : deviceConfig.semanticVersion)
+            LabeledContent("Battery") {
+                Label(battery.text, systemImage: battery.icon)
+                    .foregroundStyle(battery.color)
+            }
+            LabeledContent("Uptime", value: formatUptime(deviceConfig.availableUptimeSeconds))
+            if let reportedAt = deviceConfig.healthReportedAt {
+                LabeledContent("Health report", value: reportedAt.formatted(date: .abbreviated, time: .shortened))
+            }
+        } header: {
+            Text("Connected Deck")
+        } footer: {
+            Text("The deck shares its identity and health through Meshtastic. Radio configuration, firmware updates, and remote management here require a MeshCore radio.")
+        }
     }
 }
 
@@ -501,7 +535,7 @@ struct RadioDataSection: View {
                 NavigationStack {
                     VStack(spacing: 16) {
                         Image(systemName: "arrow.right.arrow.left")
-                            .font(.system(size: 48))
+                            .font(.largeTitle)
                             .foregroundStyle(MeshTheme.accent)
                         Text("Migrate Messages")
                             .font(.headline)
@@ -516,7 +550,7 @@ struct RadioDataSection: View {
                             }
                             showMigrateSheet = false
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.meshPrimary)
                         .tint(MeshTheme.interactiveGreen)
                     }
                     .padding()
@@ -606,7 +640,7 @@ private extension SettingsView {
                     Text(theme.displayName).tag(theme.rawValue)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
 
             Toggle(isOn: AppStorage(wrappedValue: false, "channelsFirst").projectedValue) {
                 Label("Channels First", systemImage: "arrow.up.arrow.down")
@@ -619,4 +653,3 @@ private extension SettingsView {
         }
     }
 }
-

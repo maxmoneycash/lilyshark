@@ -15,6 +15,7 @@ import MeshCoreKit
 // MARK: - USB Terminal View (CLI Mode)
 
 struct USBTerminalView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(RemoteSessionManager.self) private var remoteSessionManager
     @Environment(ConnectionManager.self) private var connectionManager
     @State private var commandText = ""
@@ -38,7 +39,7 @@ struct USBTerminalView: View {
                 }
                 .onChange(of: remoteSessionManager.usbCLIOutput.count) {
                     if let last = remoteSessionManager.usbCLIOutput.last {
-                        withAnimation(.easeOut(duration: 0.2)) {
+                        withMeshAnimation(reduceMotion: reduceMotion) {
                             proxy.scrollTo(last.id, anchor: .bottom)
                         }
                     }
@@ -67,7 +68,8 @@ struct USBTerminalView: View {
                         .font(.title2)
                         .foregroundStyle(MeshTheme.accent)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
+                .accessibilityLabel("Send command")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)

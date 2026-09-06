@@ -190,7 +190,7 @@ struct FirmwareUpdateView: View {
             .background(MeshTheme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.meshPlain)
     }
 
     // MARK: - Downloading
@@ -249,7 +249,7 @@ struct FirmwareUpdateView: View {
                                 Label("Send start ota Command", systemImage: "terminal")
                                     .foregroundStyle(MeshTheme.accent)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                         } else if let session = remoteSessionManager.activeAdminSession {
                             remoteAdminOTAContent(session: session)
                         } else {
@@ -304,7 +304,7 @@ struct FirmwareUpdateView: View {
                     .background(MeshTheme.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -371,7 +371,7 @@ struct FirmwareUpdateView: View {
     private func doneView(asset: OTAAsset) -> some View {
         VStack(spacing: 24) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
+                .font(.largeTitle)
                 .foregroundStyle(.green)
 
             VStack(spacing: 8) {
@@ -405,7 +405,7 @@ struct FirmwareUpdateView: View {
                     .background(MeshTheme.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -415,7 +415,7 @@ struct FirmwareUpdateView: View {
     private func failedView(message: String, canRetry: Bool) -> some View {
         VStack(spacing: 24) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 52))
+                .font(.largeTitle)
                 .foregroundStyle(.orange)
 
             VStack(spacing: 8) {
@@ -443,14 +443,14 @@ struct FirmwareUpdateView: View {
                         .background(MeshTheme.accent)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
             }
 
             Button { dismiss() } label: {
                 Text("Close")
                     .foregroundStyle(MeshTheme.textSecondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -476,7 +476,7 @@ struct FirmwareUpdateView: View {
                                 Label("Save \(asset.name)", systemImage: "square.and.arrow.up")
                                     .foregroundStyle(MeshTheme.accent)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                         }
                     }
                 }
@@ -501,7 +501,7 @@ struct FirmwareUpdateView: View {
                                 Label("Get nRF Device Firmware Update", systemImage: "arrow.up.right.square")
                                     .foregroundStyle(MeshTheme.accent)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.meshPlain)
                         }
                     }
                 }
@@ -511,7 +511,7 @@ struct FirmwareUpdateView: View {
                 Text("Done")
                     .foregroundStyle(MeshTheme.textSecondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -537,7 +537,7 @@ struct FirmwareUpdateView: View {
                 Label("Send start ota Command", systemImage: "terminal")
                     .foregroundStyle(MeshTheme.accent)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
         }
     }
 
@@ -564,7 +564,7 @@ struct FirmwareUpdateView: View {
     private func stepHeader(icon: String, title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 44))
+                .font(.largeTitle)
                 .foregroundStyle(MeshTheme.accent)
             VStack(spacing: 4) {
                 Text(title)
