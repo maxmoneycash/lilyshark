@@ -33,73 +33,67 @@ interface Section {
   body: string;
 }
 
-/**
- * The argument, in twelve beats. Every number here is from the whitepaper the
- * PAPER tab ships — measured or sourced there, not invented for a landing
- * page. The screens are the firmware's own render-test output: all 42 of the
- * simulator's pixel-locked frames, distributed across the beats they belong
- * to. Each screen has a native scroll stop within the original track length.
- */
+/** Each section describes the firmware screens shown beside it. */
 const SECTIONS: Section[] = [
   {
     screens: INTRO_SCREEN_GROUPS[0],
-    head: 'Turn a $60 handheld into a LoRa packet sniffer.',
-    body: 'Lilyshark is C++ firmware that turns the LILYGO T-Deck Plus — a $60 handheld with a LoRa radio, QWERTY keyboard and GPS — into a packet sniffer and RF analyzer for off-grid mesh networks.',
+    head: 'A LoRa packet sniffer for your T-Deck.',
+    body: 'Lilyshark turns the LILYGO T-Deck and T-Deck Plus into a handheld tool for inspecting mesh radio traffic. Open a packet to read its headers and raw bytes, then save a capture for Wireshark. The firmware is open source.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[1],
-    head: 'Mesh networks already carry hundreds of thousands of users.',
-    body: 'Meshtastic passed 40,000 GitHub stars and an 80,000-member subreddit, with 100+ supported boards, sub-$50 entry devices, and active meshes in most major US cities. When India ordered a mesh app off GitHub during the Delhi protests, it was carrying 430,000 daily users — and stayed up.',
+    head: "See who's on the channel.",
+    body: 'Watch LoRa frames arrive in the traffic feed. Check which protocols are active and open a node to see when it was last heard. Source IDs and routing details appear when the received packet exposes them.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[2],
-    head: 'LoRa carries kilometers per hop, not meters.',
-    body: "Bluetooth mesh dies at 30–300 m — it works at a protest because a protest is a crowd. LoRa carries 2–15 km per hop, across a city, a county, a disaster zone; MeshCore's source routing now spans 64 hops with deterministic delivery receipts.",
+    head: 'Check reception as you move.',
+    body: 'Run a survey to record received packets and signal measurements. Compare RSSI and SNR between locations, or open the map to see positions reported by nearby nodes. The T-Deck Plus has GPS for your own position.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[3],
-    head: 'Flooded meshes deliver less as they grow. We measured it.',
-    body: 'A LongFast channel moves about 987 bit/s and flood routing repeats everything: we measured 7.36 transmissions per delivered message, reach collapsing from 68.6% to 25.8% as the mesh grows, saturation near 6,721 nodes. Growth is exactly what breaks it.',
+    head: "Find out what's using the airtime.",
+    body: 'Put packet rate, signal levels and CRC failures on the same timeline. Filter the traffic view by protocol or decode state to inspect a burst of activity. The capture keeps the frames you filtered out.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[4],
-    head: 'The firmware measures everything the radio hears.',
-    body: 'So we built the instrument: a live spectrum waterfall with noise floor and channel occupancy, node rosters with SNR, RSSI and hop-count history, survey mode for coverage runs, and every frame kept with its radio physics.',
+    head: 'Scan the band.',
+    body: 'Use the SX1262 to look for activity around your channel. The spectrum waterfall shows how signal levels change over time. Packet reception pauses during a sweep and resumes when it finishes.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[5],
-    head: 'Every anomaly becomes a logged event.',
-    body: 'CRC failures, profile changes, storage faults, capture starts and stops — the firmware keeps a running event log with one-line causes, and each entry opens into its own detail screen. When something went wrong in the field, you can read back exactly when and why.',
+    head: 'Check the log when something breaks.',
+    body: 'The event log records radio changes, capture activity and hardware faults. Open an entry for the details when a capture stops or the microSD card fails to write.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[6],
-    head: 'Three mesh protocols, one capture engine.',
-    body: 'Meshtastic, MeshCore and Reticulum share one capture engine. Each decoder claims only what it can prove from the frame: packet fields, RF measurements and decode state are separate tabs on the same packet, so interpretation never overwrites measurement.',
+    head: 'Inspect mesh packet headers.',
+    body: "Lilyshark has decoders for Meshtastic, MeshCore and Reticulum/RNode framing. Packet details keep decoded fields beside the radio measurements. Anything the decoder can't read stays available as raw bytes.",
   },
   {
     screens: INTRO_SCREEN_GROUPS[7],
-    head: 'Down to the last byte.',
-    body: 'What a decoder cannot prove stays as raw hex with frequency, bandwidth, SF, CR, CRC state and airtime. Captures write to microSD as .lscap and export as LoRaTap PCAP — desktop Wireshark opens them.',
+    head: 'Open the hex dump.',
+    body: 'Page through the captured bytes alongside frequency, spreading factor, coding rate and CRC state. Save .lscap and LoRaTap PCAP files to microSD for inspection on a computer. Wireshark can open the PCAP files.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[8],
-    head: 'A guided first run, not a config file.',
-    body: 'The device explains its tools, checks what hardware it is running on, and walks a first-time user through network and radio-profile selection before the Home screen ever appears. No companion app, no serial console, no YAML.',
+    head: 'Set the radio for your mesh.',
+    body: "Choose the network and radio profile during first boot. Match the frequency, bandwidth and spreading factor to the traffic you want to receive. A radio listening with the wrong settings won't see those packets.",
   },
   {
     screens: INTRO_SCREEN_GROUPS[9],
-    head: 'It teaches its own controls.',
-    body: 'The trackball, keyboard and shortcuts are taught on the device, the hardware check reports radio, storage, GPS and battery, and Help stays one keypress away. A field tool has to work where the manual is whatever the screen says.',
+    head: 'Use the keyboard and trackball.',
+    body: 'Move between tools and open packets on the T-Deck itself. Setup shows the controls, and the device status screen reports the radio, storage, GPS and battery state. Keyboard shortcuts are listed in Help.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[10],
-    head: 'Every control lives on the device.',
-    body: 'Radio profiles, display and input, capture and storage, setup reset — all of it adjustable from the T-Deck itself. Change a spreading factor at the trailhead without opening a laptop.',
+    head: 'Change settings on the device.',
+    body: 'Switch radio profiles or adjust individual LoRa parameters from Settings. Capture controls show whether the card is writing and where the files are going. Display brightness and input settings live here too.',
   },
   {
     screens: INTRO_SCREEN_GROUPS[11],
-    head: 'Captures are stored on Shelby; the mesh carries an 82-byte pointer.',
-    body: "Captures are evidence, so they live in Shelby's content-addressed storage on Aptos. A radio has no uplink — it broadcasts an 82-byte pointer instead, and any connected node resolves the bytes. Radio-frequency capture meets verifiable storage for the first time.",
+    head: 'Share a capture over a slow link.',
+    body: 'Upload a capture to Shelby from the web analyzer, then share an 82-byte reference over LoRa. A recipient with internet access can use it to fetch the file. Local captures stay on your microSD card until you choose to share them.',
   },
 ];
 
