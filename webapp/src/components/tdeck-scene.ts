@@ -116,12 +116,11 @@ export function mountTDeck(
     const height = Math.max(canvas.clientHeight, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, width < 600 ? 1.5 : 2));
     renderer.setSize(width, height, false);
-    // Frame the handset so the body fills the stage. On a wide canvas the
-    // portrait radio would sit in a sea of empty space, so the view pans
-    // toward the copy. The whip can still crop off the top.
+    // Fill the stage with the body. On a wide canvas sit the radio on the
+    // right so the copy keeps the left. The whip can still crop off the top.
     const aspect = width / height;
-    const halfHeight = Math.max(height < 400 ? .062 : .074, .046 * height / width);
-    const pan = aspect > .9 ? halfHeight * (aspect - .72) * .62 : 0;
+    const halfHeight = Math.max(height < 400 ? .058 : .066, .04 * height / width);
+    const pan = aspect > 1 ? -halfHeight * Math.min((aspect - .58) * .8, .48) : 0;
     camera.position.y = height < 400 ? .004 : .01;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
