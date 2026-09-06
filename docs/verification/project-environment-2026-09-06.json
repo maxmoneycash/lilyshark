@@ -1,0 +1,104 @@
+{
+  "project_type": "monorepo",
+  "project_type_details": "Native SwiftUI iOS/macOS app, React 18 + Vite webapp, PlatformIO C++ ESP32 T-Deck firmware and host simulator",
+  "is_react_native": false,
+  "is_ios": true,
+  "is_android": false,
+  "is_expo": false,
+  "is_web": true,
+  "is_flutter": false,
+  "is_native_ios": true,
+  "is_native_android": false,
+  "startup_commands": [
+    {
+      "command": "pnpm --dir webapp dev",
+      "context": "React/Vite webapp"
+    }
+  ],
+  "build_commands": [
+    {
+      "command": "./scripts/build_ios.sh",
+      "platform": "ios",
+      "context": "PommeCore.xcodeproj; scheme PommeCore; ios/DerivedData; unsigned simulator"
+    },
+    {
+      "command": "xcodebuild -project ios/PommeCore.xcodeproj -scheme PommeCore-macOS -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build",
+      "platform": "macos",
+      "context": "Also invoked by ./scripts/test_all.sh --host-only"
+    },
+    {
+      "command": "pnpm --dir webapp build",
+      "platform": "web",
+      "context": "Vite"
+    },
+    {
+      "command": "pio run -e t-deck",
+      "platform": "firmware",
+      "context": "PlatformIO espressif32 6.13.0 Arduino"
+    },
+    {
+      "command": "pio run -e simulator",
+      "platform": "host",
+      "context": "PlatformIO native 1.2.1"
+    }
+  ],
+  "argent_workflow": {
+    "start_dev_server": null,
+    "build_ios": "./scripts/build_ios.sh",
+    "build_android": null,
+    "notes": "Native app, no Metro. Root coordinates simulator use. Installed environment-inspector guidance found in ~/.claude/agents. Root located Argent skills at /Users/maxmohammadi/.nvm/versions/node/v22.22.1/lib/node_modules/@swmansion/argent/skills."
+  },
+  "ios_has_podfile": false,
+  "android_has_gradle": false,
+  "configs": {
+    "metro": null,
+    "babel": null,
+    "app": null,
+    "tsconfig": "webapp/tsconfig.json",
+    "pubspec": null,
+    "xcode": "ios/PommeCore.xcodeproj",
+    "gradle": null
+  },
+  "metro_port": null,
+  "env_resolution": {
+    "env_files": [],
+    "strategy": null,
+    "notes": "No root .env files from snapshot"
+  },
+  "key_packages": {
+    "react": "^18.3.1",
+    "vite": "^6.0.1",
+    "typescript": "^5.6.3",
+    "@liamcottle/meshcore.js": "^1.14.0",
+    "MeshCoreKit": "local Swift package",
+    "MeshtasticKit": "local Swift package"
+  },
+  "package_json": {
+    "name": "lilyshark-webapp",
+    "version": "0.0.3",
+    "scripts_summary": "dev/build/preview/test/lint/fmt and Shelby upload/image/migrate"
+  },
+  "bundler": "vite",
+  "terminal_tools": {
+    "package_manager": "pnpm 10.19.0",
+    "pod_available": false,
+    "expo_cli": null,
+    "eas_cli": "20.2.0"
+  },
+  "cloud_build": {
+    "eas": false,
+    "eas_profiles": null,
+    "ci": ".github/workflows/build.yml"
+  },
+  "quality_control": {
+    "host_tests": "./scripts/test_all.sh --host-only (ASan/UBSan + macOS build + static checks)",
+    "ios_build": "./scripts/build_ios.sh",
+    "source_registration": "python3 scripts/add_ios_source.py --check",
+    "design": "python3 scripts/check_ios_design.py --list",
+    "web_tests": "pnpm --dir webapp test"
+  },
+  "additional_notes": "Watch targets require private PommeCoreWatchKit and cannot build from checkout. scripts/build_ios.sh internally uses xcrun simctl list runtimes as a read-only prerequisite check; no device commands executed by this agent.",
+  "needs_user_input": false,
+  "missing_information": [],
+  "inspected_at": "2026-09-06"
+}

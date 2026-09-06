@@ -33,6 +33,14 @@
 - **Python tests use `unittest` discovery.** Add a `test/<name>/test_*.py`
   directory and one `discover` line in `scripts/test_all.sh`, next to the
   existing suites.
+- **Keep app controls consistent.** Native actions use the shared mesh button
+  styles; web actions use the shared button classes. Check 44-point native and
+  44-pixel mobile web targets, narrow layouts, and larger text. Labels and
+  readings should stack before they squeeze into narrow columns.
+- **Use symbols for interface icons.** Authored web and iOS copy contains no
+  emoji decorations. Use SF Symbols or SVG icons, preserving user message text
+  and legacy payload compatibility. Missing readings say what is unknown;
+  never substitute a plausible zero or position.
 
 ## Everyday commands
 
