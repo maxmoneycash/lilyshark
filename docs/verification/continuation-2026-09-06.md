@@ -72,6 +72,8 @@ disabled styling, with 44-pixel mobile controls. Onboarding is four scrollable
 pages with a persistent action bar. Parameter and measurement rows stack when
 needed, and the sensitivity table uses full-width readings. Web onboarding,
 chat, telemetry, and flasher layouts were checked at 320 and 390 pixels.
+Two unused Xcode widget templates containing sample emoji content were removed;
+the three registered widgets remain.
 
 ## Verification
 
@@ -107,6 +109,11 @@ chat, telemetry, and flasher layouts were checked at 320 and 390 pixels.
   pixels to those two lines. Only that reference was refreshed. All 43 render
   checks pass. The full gate passes simulator scenarios, motion and README
   animation checks, the T-Deck build, and factory image validation.
+- Two forced-clean firmware release builds are byte-identical at the same
+  `SOURCE_DATE_EPOCH`. GitHub's Linux compiler also exposed unchecked shell
+  cleanup in a host filesystem test; cleanup now uses the filesystem API and
+  checks errors. The focused sanitizer test passes, including a scratch path
+  containing an apostrophe.
 
 ## Integration with current main
 
@@ -117,7 +124,9 @@ passes 552 tests, TypeScript, production build, and Arc checks at 320/390 pixels
 
 Calculator inputs preserve partial typing and show range guidance only when
 invalid. Results stay hidden until inputs are valid. Both native targets compile
-after that final correction; typing itself has not been exercised on-device.
+after that final correction. Simulator entry checks confirm that `4` can become
+`433` and `-` can become `-120`, while an invalid sensitivity hides numerical
+results and shows range guidance.
 
 ## Saved worktree inventory
 
