@@ -1,30 +1,18 @@
 #pragma once
 
-// Reading an LXMF message carried inside a Reticulum packet.
+// Read clear or already-decrypted LXMF messages. This parser checks structure;
+// callers must inspect the Reticulum envelope before passing captured bytes.
 //
-// Reticulum moves packets; LXMF is the message format almost everything on a
-// Reticulum network actually speaks, and it is an open, documented structure.
-// Without it an analyzer can say "a 214-byte data packet took three hops to
-// destination 0x1a2b3c4d" and nothing whatsoever about what was carried --
-// which is the difference between a link tester and a protocol analyzer.
-//
-// Nothing here attacks a cipher. A message to a SINGLE destination is
-// encrypted end to end and stays that way; this parses the messages that were
-// never encrypted in the first place -- PLAIN destinations, and the outer
-// structure of anything else -- and gives up the moment the bytes stop
-// parsing. That an unencrypted destination type carries readable text is a
-// property of the protocol worth showing plainly, not a protection worth
-// defeating.
-//
-// Wire format (LXMF specification):
+// Stored LXMF framing:
 //
 //     16 bytes   destination hash
 //     16 bytes   source hash
 //     64 bytes   Ed25519 signature
-//     remainder  msgpack array [timestamp, content, title, fields]
+//     remainder  msgpack array [timestamp, title, content, fields, optional stamp]
 //
-// Note the payload order: content comes *before* title. Getting that backwards
-// produces a decoder that confidently mislabels every message it reads.
+// Opportunistic delivery strips the destination hash; it is carried by the
+// Reticulum header instead. Callers select that 80-byte framing explicitly.
+// Packing order and framing: https://github.com/markqvist/LXMF/blob/master/LXMF/LXMessage.py
 
 #include <cstddef>
 #include <cstdint>
@@ -36,6 +24,10 @@ inline constexpr std::size_t kLxmfSignatureLength = 64;
 /// Destination + source + signature, before any msgpack payload.
 inline constexpr std::size_t kLxmfHeaderLength =
     (kLxmfHashLength * 2U) + kLxmfSignatureLength;
+inline constexpr std::size_t kLxmfOpportunisticHeaderLength =
+    kLxmfHashLength + kLxmfSignatureLength;
+
+enum class LxmfFraming : std::uint8_t { AtRest, Opportunistic };
 
 /// How much of a message body this build will keep. A LXMF message can be far
 /// larger than a 320x240 panel can show, and an analyzer running on 8 MB of
@@ -48,6 +40,8 @@ struct LxmfMessage {
     /// every element this build reads out of it.
     bool readable = false;
 
+    // Opportunistic framing has no destination hash in this buffer.
+    bool has_destination_hash = false;
     std::uint8_t destination_hash[kLxmfHashLength]{};
     std::uint8_t source_hash[kLxmfHashLength]{};
 
@@ -74,15 +68,17 @@ struct LxmfMessage {
     /// message carried structured extras -- telemetry, an image, a ticket.
     std::uint16_t field_count = 0;
     bool has_fields = false;
+    // Presence only. This reader does not verify stamp work or signatures.
+    bool has_stamp = false;
 };
 
 /// Try to read `length` bytes as an LXMF message.
 ///
 /// Returns false and leaves `out` untouched whenever the bytes do not parse.
-/// Encrypted payloads are noise to this function, and noise must never be
-/// presented as a message.
+/// Callers must restrict input to clear or already-decrypted payloads. Parsing
+/// validates structure only and cannot prove sender identity or encryption state.
 bool readLxmfMessage(const std::uint8_t *bytes, std::size_t length,
-                     LxmfMessage &out) noexcept;
+                     LxmfMessage &out, LxmfFraming framing = LxmfFraming::AtRest) noexcept;
 
 // The msgpack subset LXMF needs, exposed so it can be tested directly rather
 // than only through a whole message.

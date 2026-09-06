@@ -359,6 +359,9 @@ void TDeckRadioService::consumeInterrupt() noexcept
         frame.rf.center_frequency_hz = profile_.center_frequency_hz;
         frame.rf.bandwidth_hz = profile_.bandwidth_hz;
         frame.rf.airtime_us = receivedLoRaAirtimeUs(profile_, rx_metadata, packet_length);
+        if (frame.rf.airtime_us == 0U) {
+            frame.rf.present_fields &= ~static_cast<std::uint32_t>(RfFieldAirtime);
+        }
         frame.rf.rssi_dbm_x10 = static_cast<std::int16_t>(radio_.getRSSI() * 10.0F);
         frame.rf.snr_db_x10 = static_cast<std::int16_t>(radio_.getSNR() * 10.0F);
         frame.rf.frequency_error_hz = static_cast<std::int32_t>(radio_.getFrequencyError());

@@ -583,6 +583,20 @@ void testEncodeRefusesTinyBuffers()
     assert(encodeApiTextPacket(1, 2, 3, "hello", 0, 0, out, sizeof(out)) == 0);
 }
 
+void testRoutingErrorDistinguishesProfileRefusalFromRadioFailure()
+{
+    // A compatible profile permits transmission; an incompatible profile never
+    // tried, so it cannot truthfully report exhausted retransmissions.
+    assert(apiTextRoutingError(true, true, false, true, 12U, true) == 0U);
+    assert(apiTextRoutingError(false, true, false, true, 12U, true) == 5U);
+    assert(apiTextRoutingError(false, true, false, true, 12U, false) == 32U);
+    // Existing refusal precedence remains intact when several checks fail.
+    assert(apiTextRoutingError(false, false, true, false, 201U, false) == 6U);
+    assert(apiTextRoutingError(false, true, true, false, 201U, false) == 33U);
+    assert(apiTextRoutingError(false, true, false, false, 201U, false) == 4U);
+    assert(apiTextRoutingError(false, true, false, true, 201U, false) == 7U);
+}
+
 } // namespace
 
 int main()
@@ -611,6 +625,7 @@ int main()
     testRoutingAckNamesThePhonesPacket();
     testPhonePacketIdSurvivesTheParse();
     testEncodeRefusesTinyBuffers();
+    testRoutingErrorDistinguishesProfileRefusalFromRadioFailure();
     std::printf("meshtastic_api: all assertions passed\n");
     return 0;
 }

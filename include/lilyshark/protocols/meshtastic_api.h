@@ -20,6 +20,12 @@
 
 namespace lilyshark {
 
+/// Classify a phone text send using Meshtastic Routing.Error values. Report a
+/// preflight refusal before the retry-exhausted fallback for a failed radio send.
+std::uint32_t apiTextRoutingError(bool sent, bool have_channel, bool simulate_mode,
+                                  bool radio_initialized, std::size_t text_length,
+                                  bool compatible_profile) noexcept;
+
 /// One row of the node list handed to the phone. `label` is whatever the
 /// deck knows the node as -- a claimed short name or the hex fallback.
 /// Meshtastic's own limit on a channel name.

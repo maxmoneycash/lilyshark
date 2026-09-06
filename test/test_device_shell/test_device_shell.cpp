@@ -7,6 +7,7 @@
 
 #include "device_shell_fake.h"
 #include "lilyshark/core/app_settings.h"
+#include "lilyshark/core/builtin_profiles.h"
 #include "lilyshark/core/channel_keys.h"
 #include "lilyshark/core/profile_settings.h"
 #include "lilyshark/crypto/aes128.h"
@@ -15,6 +16,7 @@
 #include "lilyshark/device/tdeck_display_init.h"
 #include "lilyshark/tdeck.h"
 #include "theme.h"
+#include "../lxmf/fixtures.h"
 
 #include <array>
 #include <cstddef>
@@ -1203,9 +1205,9 @@ bool recoverableFailureScenario()
     if(!require(state().serial_log.find("Spectrum unavailable: PSRAM allocation failed") !=
                     std::string::npos,
                 "missing PSRAM was not reported")) return false;
-    if(!require(state().serial_log.find("Lilyshark SD capture: unavailable (no card)") !=
+    if(!require(state().serial_log.find("Lilyshark SD capture: unavailable (no card answered the slot)") !=
                     std::string::npos &&
-                    state().serial_log.find("Lilyshark native capture: unavailable") !=
+                    state().serial_log.find("Lilyshark native capture: unavailable (no card answered the slot)") !=
                         std::string::npos,
                 "missing SD was not reported for both capture formats")) return false;
     if(!require(state().files.empty(), "capture files were opened without an SD card")) return false;
@@ -1923,7 +1925,7 @@ bool capturePreferenceSaveFailureScenario()
     state().fail_file_flush = true;
     device_shell_fake::advance_ms(5100U);
     loop();
-    if(!require(hasLabel(lv_screen_active(), "I/O ERROR") &&
+    if(!require(hasLabel(lv_screen_active(), "WRITE REFUSED") &&
                     hasLabel(lv_screen_active(), "RETRY NEEDED") &&
                     !retry_pcap->is_open && !retry_native->is_open,
                 "runtime SD flush failure was not shown as a recoverable storage fault")) {
@@ -2063,6 +2065,149 @@ bool corruptSettingsScenario()
     return true;
 }
 
+bool lxmfReceiveScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+    if(!require(seedCompletedAppSettings(), "LXMF app settings could not be encoded")) return false;
+    const auto *profile = lilyshark::findBuiltinProfile(5);
+    state().saved_profile.resize(lilyshark::kSavedProfileV2Size);
+    if(!require(profile != nullptr &&
+                    lilyshark::encodeSavedProfileV2(*profile, state().saved_profile.data(),
+                                                     state().saved_profile.size()),
+                "RNode test profile could not be encoded")) return false;
+    setup();
+
+    auto receive = [](const std::vector<std::uint8_t> &frame) {
+        auto &radio = radiolib_fake::state();
+        radio.packet = frame;
+        radio.packet_length = frame.size();
+        radio.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+        radio.triggerDio1();
+        device_shell_fake::advance_ms(250);
+        loop();
+        sendKeyboard('E');
+    };
+
+    // These carry parseable LXMF bytes under envelopes that do not permit
+    // interpreting them as clear messages: encrypted, announce, IFAC, split,
+    // and a resource context.
+    for(unsigned envelope = 0; envelope < 5U; ++envelope) {
+        std::vector<std::uint8_t> frame(std::begin(kLxmfRNodeReference),
+                                        std::end(kLxmfRNodeReference));
+        if(envelope == 0U) frame[1] = 0x00; // DATA / SINGLE
+        if(envelope == 1U) frame[1] = 0x09; // ANNOUNCE / PLAIN
+        if(envelope == 2U) frame[1] = 0x88; // IFAC
+        if(envelope == 3U) frame[0] |= 0x01; // split RNode frame
+        if(envelope == 4U) frame[19] = 0x01; // RESOURCE context
+        receive(frame);
+        if(!require(hasLabel(lv_screen_active(), "NO MESSAGES HEARD YET"),
+                    "a protected or non-message Reticulum frame became LXMF text")) return false;
+    }
+
+    receive(std::vector<std::uint8_t>(std::begin(kLxmfRNodeStamped), std::end(kLxmfRNodeStamped)));
+    if(!require(hasLabel(lv_screen_active(), "Heard on 913.125 MHz") &&
+                    !hasLabel(lv_screen_active(), "NO MESSAGES HEARD YET"),
+                "reference LXMF body did not reach Messages through the radio callback")) return false;
+
+    char sender[64]{};
+    std::snprintf(sender, sizeof(sender), "0S  RNS %02x%02x%02x%02x...  LXMF",
+                  kLxmfStamped[16], kLxmfStamped[17], kLxmfStamped[18], kLxmfStamped[19]);
+    if(!require(hasLabel(lv_screen_active(), sender),
+                "LXMF source hash was replaced by a Meshtastic node number")) return false;
+    return true;
+}
+
+std::string nextAnalyzerTelemetry()
+{
+    state().serial_log.clear();
+    device_shell_fake::advance_ms(2000);
+    loop();
+    const auto start = state().serial_log.rfind("LSK T ");
+    if(start == std::string::npos) return {};
+    return state().serial_log.substr(start, state().serial_log.find('\n', start) - start);
+}
+
+bool telemetryUnsigned(const std::string &line, const char *field, unsigned long &value)
+{
+    const std::string key = std::string("\"") + field + "\":";
+    const auto start = line.find(key);
+    return start != std::string::npos &&
+           std::sscanf(line.c_str() + start + key.size(), "%lu", &value) == 1;
+}
+
+bool analyzerTelemetryReceiveProvenanceScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+    if(!require(seedCompletedAppSettings(), "telemetry settings could not be encoded")) return false;
+    // RNode does not emit Meshtastic beacons, so the first report has no frame.
+    const auto *profile = lilyshark::findBuiltinProfile(5);
+    state().saved_profile.resize(lilyshark::kSavedProfileV2Size);
+    if(!require(profile != nullptr &&
+                    lilyshark::encodeSavedProfileV2(*profile, state().saved_profile.data(),
+                                                   state().saved_profile.size()),
+                "telemetry RNode profile could not be encoded")) return false;
+    setup();
+    Serial.pushInput("LSK HELLO");
+    loop();
+    auto line = nextAnalyzerTelemetry();
+    unsigned long fields = 0;
+    unsigned long direction = 0;
+    if(!require(radiolib_fake::state().transmitted.empty() &&
+                    line.find("\"frames\":0,") != std::string::npos &&
+                    telemetryUnsigned(line, "latest_pf", fields) && fields == 0 &&
+                    telemetryUnsigned(line, "latest_dir", direction) && direction == 0,
+                "empty telemetry invented frame measurement provenance")) return false;
+
+    auto &radio = radiolib_fake::state();
+    radio.packet.assign(std::begin(kLxmfRNodeReference), std::end(kLxmfRNodeReference));
+    radio.packet_length = radio.packet.size();
+    radio.rssi_dbm = 0.0F;
+    radio.snr_db = 0.0F;
+    radio.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+    radio.triggerDio1();
+    device_shell_fake::advance_ms(250);
+    loop();
+    line = nextAnalyzerTelemetry();
+    const auto signal_fields = lilyshark::RfFieldRssi | lilyshark::RfFieldSnr;
+    if(!require(telemetryUnsigned(line, "latest_pf", fields) &&
+                    (fields & signal_fields) == signal_fields &&
+                    telemetryUnsigned(line, "latest_dir", direction) && direction == 1 &&
+                    line.find("\"rssi_x10\":0,\"snr_x10\":0,") != std::string::npos,
+                "received zero signal measurements lost their presence or direction")) return false;
+
+    // A bridge carries bytes but no signal measurements from this radio.
+    Serial.pushInput("LSK INJ 01020304");
+    loop();
+    line = nextAnalyzerTelemetry();
+    return require(telemetryUnsigned(line, "latest_pf", fields) &&
+                       (fields & signal_fields) == 0 &&
+                       telemetryUnsigned(line, "latest_dir", direction) && direction == 1,
+                   "bridged telemetry claimed receive signal measurements");
+}
+
+bool analyzerTelemetryTransmitProvenanceScenario()
+{
+    device_shell_fake::reset();
+    Wire.reset();
+    radiolib_fake::state().reset();
+    if(!require(seedCompletedAppSettings(), "transmit telemetry settings could not be encoded")) return false;
+    setup();
+    Serial.pushInput("LSK HELLO");
+    loop();
+    const auto line = nextAnalyzerTelemetry();
+    unsigned long fields = 0;
+    unsigned long direction = 0;
+    return require(!radiolib_fake::state().transmitted.empty() &&
+                       telemetryUnsigned(line, "latest_pf", fields) &&
+                       (fields & (lilyshark::RfFieldRssi | lilyshark::RfFieldSnr)) == 0 &&
+                       telemetryUnsigned(line, "latest_dir", direction) && direction == 2,
+                   "transmitted frame telemetry looked like a receive signal reading");
+}
+
 using Scenario = bool (*)();
 
 int runIsolated(Scenario scenario)
@@ -2145,6 +2290,10 @@ bool chatDraftIsBoundToItsThreadScenario()
 
 void testDeviceShellEntryPath()
 {
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(analyzerTelemetryReceiveProvenanceScenario),
+                                  "analyzer receive telemetry provenance scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(analyzerTelemetryTransmitProvenanceScenario),
+                                  "analyzer transmit telemetry provenance scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(chatDraftIsBoundToItsThreadScenario),
                                   "chat draft binding scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(healthyScenario),
@@ -2173,6 +2322,8 @@ void testDeviceShellEntryPath()
                                   "spectrum-sweep-readout device-shell scenario failed");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(corruptSettingsScenario),
                                   "corrupt-settings device-shell scenario failed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, runIsolated(lxmfReceiveScenario),
+                                  "LXMF receive device-shell scenario failed");
 }
 
 } // namespace

@@ -9,15 +9,17 @@ namespace lilyshark {
 ///
 /// This is the SX1268 datasheet v1.1 section 6.1.4 formula, transcribed from
 /// RadioLib's `SX126x::calculateTimeOnAir` including its integer rounding. The
-/// transcription is deliberate and must stay exact: received frames used to
+/// rounding is deliberate: received frames used to
 /// get their airtime from RadioLib and transmitted frames got none at all, so
 /// the moment this deck started counting its own transmissions there were two
 /// possible rulers for one number on one screen. A utilization percentage that
 /// mixes two rulers is worse than no percentage, so there is now one ruler,
 /// and it lives here where a host test can check it without a radio attached.
 ///
-/// Returns 0 when an input makes the formula meaningless (no bandwidth, no
-/// coding rate, spreading factor outside the SX1262's range). Callers must
+/// Uses a wider intermediate product so long preambles cannot wrap.
+/// Returns 0 for invalid inputs (no bandwidth, coding rate outside 4/5..4/8,
+/// spreading factor outside SF5..SF12, payload over 255 bytes) or a duration
+/// beyond the uint32_t field's range. Callers must
 /// treat 0 as "not computed" and leave `RfFieldAirtime` clear rather than
 /// recording a zero: absent is not zero, and an airtime of zero on a frame
 /// that plainly occupied the channel is a number an operator would act on.
