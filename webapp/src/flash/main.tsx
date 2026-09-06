@@ -1,18 +1,13 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { applyTheme } from '../mesh/theme'
-import { FlashPage } from './FlashPage'
-import './flash.css'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { FlashPage } from "./FlashPage";
+import "./flash.css";
 
-// Same theme the analyzer is running: applyTheme() reads localStorage and
-// writes --fg/--bg/--panel onto <html>, so a deck flashed from a phone in the
-// amber theme sees an amber flasher. "themechange" fires when another tab
-// switches it.
-applyTheme()
-window.addEventListener('themechange', applyTheme)
+const root = document.getElementById("root");
+if (!root) throw new Error("Flash page root element is missing");
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <FlashPage />
   </React.StrictMode>,
-)
+);

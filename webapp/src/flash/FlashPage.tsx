@@ -1,6 +1,5 @@
 import * as RadioGroup from "@radix-ui/react-radio-group";
-import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Browser flasher for the T-Deck family, plus the two other ways to run
@@ -87,23 +86,35 @@ const Glyph = {
 };
 
 function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
+  const resetTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(resetTimer.current), []);
+  const label =
+    status === "copied"
+      ? "Copied"
+      : status === "error"
+        ? "Select and copy the command"
+        : "Copy command";
   return (
     <button
       type="button"
-      className={`copy-btn ${copied ? "copied" : ""}`}
-      title={copied ? "Copied" : "Copy"}
+      className={`copy-btn ${status}`}
+      title={label}
+      aria-label={label}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1600);
+          setStatus("copied");
+          clearTimeout(resetTimer.current);
+          resetTimer.current = setTimeout(() => setStatus("idle"), 2000);
         } catch {
-          /* clipboard unavailable — the command text stays selectable */
+          setStatus("error");
         }
       }}
     >
-      {copied ? "✓" : Glyph.copy}
+      <span aria-live="polite">
+        {status === "copied" ? "✓" : status === "error" ? "!" : Glyph.copy}
+      </span>
     </button>
   );
 }
@@ -181,7 +192,14 @@ function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
             stroke="rgba(255,255,255,0.07)"
             strokeWidth="0.8"
           />
-          <rect x="3" y="1.5" width="15.4" height="1.4" rx="0.7" fill="rgba(255,255,255,0.09)" />
+          <rect
+            x="3"
+            y="1.5"
+            width="15.4"
+            height="1.4"
+            rx="0.7"
+            fill="rgba(255,255,255,0.09)"
+          />
         </g>
       </defs>
 
@@ -198,7 +216,14 @@ function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
       />
 
       {/* Body */}
-      <rect x="10" y="11" width="300" height="440" rx="30" fill="url(#deck-body)" />
+      <rect
+        x="10"
+        y="11"
+        width="300"
+        height="440"
+        rx="30"
+        fill="url(#deck-body)"
+      />
       <rect
         x="10"
         y="11"
@@ -221,7 +246,16 @@ function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
       />
 
       {/* Screen: bloom on the bezel, then glass, then our firmware frame. */}
-      <rect x="52" y="46" width="216" height="162" rx="10" fill="#ff4f9d" opacity="0.2" filter="url(#deck-bloom)" />
+      <rect
+        x="52"
+        y="46"
+        width="216"
+        height="162"
+        rx="10"
+        fill="#ff4f9d"
+        opacity="0.2"
+        filter="url(#deck-bloom)"
+      />
       <rect x="44" y="38" width="232" height="178" rx="9" fill="#08070a" />
       <rect x="59" y="49" width="202" height="152" rx="2" fill="#000" />
       <image
@@ -234,8 +268,18 @@ function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
         className="deck-screen"
       />
       <g clipPath="url(#deck-glass-clip)">
-        <polygon points="44,38 166,38 84,216 44,216" fill="url(#deck-glass)" opacity="0.42" />
-        <rect x="44" y="38" width="232" height="1.3" fill="rgba(255,255,255,0.16)" />
+        <polygon
+          points="44,38 166,38 84,216 44,216"
+          fill="url(#deck-glass)"
+          opacity="0.42"
+        />
+        <rect
+          x="44"
+          y="38"
+          width="232"
+          height="1.3"
+          fill="rgba(255,255,255,0.16)"
+        />
       </g>
       <rect
         x="44"
@@ -249,19 +293,53 @@ function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
       />
 
       {/* Trackball */}
-      <circle cx="160" cy="256" r="16.5" fill="#1a171b" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+      <circle
+        cx="160"
+        cy="256"
+        r="16.5"
+        fill="#1a171b"
+        stroke="rgba(255,255,255,0.08)"
+        strokeWidth="1"
+      />
       <circle cx="160" cy="256" r="10.5" fill="url(#deck-ball)" />
       <circle cx="156.4" cy="252.4" r="2.7" fill="rgba(255,255,255,0.18)" />
 
       {/* Keyboard: four rows of caps, each row sitting behind a fret bar. */}
       {rowY.map((y) => (
-        <rect key={`fret-${y}`} x="36" y={y - 6} width="248" height="3" rx="1.5" fill="url(#deck-fret)" />
+        <rect
+          key={`fret-${y}`}
+          x="36"
+          y={y - 6}
+          width="248"
+          height="3"
+          rx="1.5"
+          fill="url(#deck-fret)"
+        />
       ))}
-      {rowY.slice(0, 3).map((y) =>
-        COLS.map((col) => <use key={`key-${y}-${col}`} href="#deck-cap" x={keyX(col)} y={y} />),
+      {rowY.slice(0, 3).map((y, row) =>
+        COLS.map((col) => (
+          <g key={`key-${y}-${col}`}>
+            <use href="#deck-cap" x={keyX(col)} y={y} />
+            <text
+              x={keyX(col) + 10.7}
+              y={y + 15}
+              textAnchor="middle"
+              fill="#c9bdc9"
+              fontSize="9"
+              fontFamily="monospace"
+            >
+              {["QWERTYUIOP", "ASDFGHJKL↵", "⇧ZXCVBNM⌫⇧"][row][col]}
+            </text>
+          </g>
+        )),
       )}
       {[0, 1, 2, 7, 8, 9].map((col) => (
-        <use key={`key-space-row-${col}`} href="#deck-cap" x={keyX(col)} y={rowY[3]} />
+        <use
+          key={`key-space-row-${col}`}
+          href="#deck-cap"
+          x={keyX(col)}
+          y={rowY[3]}
+        />
       ))}
       <rect
         x={keyX(3)}
@@ -513,13 +591,10 @@ type PlatformKind = (typeof PLATFORMS)[number]["kind"];
 
 const CHECKLISTS: Record<PlatformKind, string[]> = {
   firmware: [
-    "Live LoRa traffic feed",
-    "Packet inspector, raw bytes included",
+    "Live LoRa traffic and packet inspection",
     "Spectrum scan and band surveys",
-    "Node tracking with signal history",
-    "Capture to microSD — .lscap and PCAP",
-    "No account, no cloud, works offline",
-    "Open source, GPL-3.0",
+    "Node tracking and signal history",
+    "Capture to microSD, .lscap and PCAP",
   ],
   browser: [
     "Live traffic from a deck you have flashed",
@@ -540,20 +615,47 @@ const CHECKLISTS: Record<PlatformKind, string[]> = {
   ],
 };
 
-const STEPS: Record<PlatformKind, { glyph: JSX.Element; name: string; hint: string }[]> = {
+const STEPS: Record<
+  PlatformKind,
+  { glyph: JSX.Element; name: string; hint: string }[]
+> = {
   firmware: [
-    { glyph: Glyph.download, name: "Pick a build", hint: "the image below is the current alpha" },
-    { glyph: Glyph.usb, name: "Connect USB", hint: "data cable, device powered on" },
-    { glyph: Glyph.bolt, name: "Flash", hint: "one click, about a minute" },
+    {
+      glyph: Glyph.download,
+      name: "Pick a build",
+      hint: "T-Deck or T-Deck Plus",
+    },
+    {
+      glyph: Glyph.usb,
+      name: "Connect USB",
+      hint: "data cable, device powered on",
+    },
+    { glyph: Glyph.bolt, name: "Flash", hint: "choose the port and install" },
   ],
   browser: [
-    { glyph: Glyph.bolt, name: "Flash a deck", hint: "any of the boards above" },
-    { glyph: Glyph.usb, name: "Open and connect", hint: "CONNECT, then pick the link" },
-    { glyph: Glyph.code, name: "Watch the mesh", hint: "traffic, nodes, map, spectrum" },
+    {
+      glyph: Glyph.bolt,
+      name: "Flash a deck",
+      hint: "any of the boards above",
+    },
+    {
+      glyph: Glyph.usb,
+      name: "Open and connect",
+      hint: "CONNECT, then pick the link",
+    },
+    {
+      glyph: Glyph.code,
+      name: "Watch the mesh",
+      hint: "traffic, nodes, map, spectrum",
+    },
   ],
   source: [
     { glyph: Glyph.code, name: "Clone", hint: "GPL-3.0, no sign-up" },
-    { glyph: Glyph.download, name: "Build", hint: "pinned toolchain, reproducible" },
+    {
+      glyph: Glyph.download,
+      name: "Build",
+      hint: "pinned toolchain, reproducible",
+    },
     { glyph: Glyph.usb, name: "Flash", hint: "one script, one cable" },
   ],
 };
@@ -564,7 +666,8 @@ const STEP_HEADING: Record<PlatformKind, string> = {
   source: "Three steps, from a clean clone.",
 };
 
-const CLONE_CMD = "git clone https://github.com/maxmoneycash/lilyshark && cd lilyshark";
+const CLONE_CMD =
+  "git clone https://github.com/maxmoneycash/lilyshark && cd lilyshark";
 const BUILD_CMD = "./scripts/build_release.sh";
 const REPO = "https://github.com/maxmoneycash/lilyshark";
 
@@ -574,7 +677,13 @@ export function FlashPage() {
   const kind = selected.kind;
 
   const art = (id: PlatformId, gps: boolean) =>
-    id === "browser" ? <BrowserIcon /> : id === "source" ? <SourceIcon /> : <DeckIcon gps={gps} />;
+    id === "browser" ? (
+      <BrowserIcon />
+    ) : id === "source" ? (
+      <SourceIcon />
+    ) : (
+      <DeckIcon gps={gps} />
+    );
 
   return (
     <main className="flash-page">
@@ -593,18 +702,27 @@ export function FlashPage() {
 
       <div className="page">
         <div className="lede">
-          <h1>Flash your board.</h1>
+          <div className="eyebrow">LILYSHARK / FIRMWARE INSTALLER</div>
+          <h1>
+            Small board.
+            <br />
+            <span>Big bite.</span>
+          </h1>
           <p className="sub">
-            Lilyshark turns a LILYGO T-Deck into a handheld LoRa packet sniffer
-            and RF analyzer. Pick a board, plug it in, click once — no
-            toolchain, nothing to compile.
+            Turn your T-Deck into a handheld LoRa packet sniffer and RF
+            analyzer. Install Lilyshark straight from your browser.
           </p>
-          <p className="code-note">
-            In-browser flashing needs <b>Chrome</b> or <b>Edge</b> on a
-            computer. The direct download works in any browser.
+          <p className="release-note">
+            <span className="status-dot" />
+            {FIRMWARE.version} <span className="release-divider">/</span> Open
+            source. Made for the field.
           </p>
         </div>
 
+        <div className="picker-heading">
+          <span className="eyebrow">01 / Choose your platform</span>
+          <span className="picker-hint">Two boards. One firmware.</span>
+        </div>
         <RadioGroup.Root
           className="devices"
           value={platform}
@@ -615,25 +733,26 @@ export function FlashPage() {
           {PLATFORMS.map((p) => (
             <RadioGroup.Item key={p.id} value={p.id} className="device-card">
               <span className="art">{art(p.id, p.gps)}</span>
-              <span className="device-name">{p.name}</span>
-              <span className="device-chip">{p.chip}</span>
+              <span className="device-copy">
+                <span className="device-name">{p.name}</span>
+                <span className="device-chip">{p.chip}</span>
+              </span>
+              <span className="selection-dot" aria-hidden="true" />
             </RadioGroup.Item>
           ))}
         </RadioGroup.Root>
 
-        <div className="hero">
-          <span className="hero-label">{selected.heroLabel}</span>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={selected.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-            >
+        <div className="install-layout">
+          <div className="hero">
+            <span className="hero-label">{selected.heroLabel}</span>
+            <div className="preview-content" key={selected.id}>
               {kind === "firmware" ? (
                 <DeviceMock
-                  screen={selected.gps ? "/flash/deck-screen-plus.png" : "/flash/deck-screen-base.png"}
+                  screen={
+                    selected.gps
+                      ? "/flash/deck-screen-plus.png"
+                      : "/flash/deck-screen-base.png"
+                  }
                   alt={`A T-Deck running Lilyshark — ${selected.name}`}
                 />
               ) : kind === "browser" ? (
@@ -646,120 +765,150 @@ export function FlashPage() {
                   <b>{selected.name}</b> · {selected.caption}
                 </span>
               </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
+            </div>
+            <div className="hero-footnote">
+              <span>DESIGNED FOR THE FIELD</span>
+              <span>↗ LILYSHARK</span>
+            </div>
+          </div>
 
-        <div className="product">
-          <h2>{selected.heading}</h2>
-          <p className="tagline">{selected.tagline}</p>
+          <section className="product" aria-labelledby="product-heading">
+            <div className="eyebrow">
+              02 /{" "}
+              {kind === "firmware"
+                ? "Install the firmware"
+                : kind === "browser"
+                  ? "Open the analyzer"
+                  : "Make it your own"}
+            </div>
+            <h2 id="product-heading">{selected.heading}</h2>
+            <p className="tagline">{selected.tagline}</p>
 
-          <ul className="checklist">
-            {CHECKLISTS[kind].map((item) => (
-              <li key={item}>
-                <span className="tick">✓</span>
-                {item}
-              </li>
-            ))}
-          </ul>
+            <ul className="checklist">
+              {CHECKLISTS[kind].map((item) => (
+                <li key={item}>
+                  <span className="tick">✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
 
-          {kind === "firmware" ? (
-            <>
-              <div className="cta">
-                <esp-web-install-button manifest={FIRMWARE.manifest}>
-                  <button slot="activate" className="flash-btn" type="button">
+            {kind === "firmware" ? (
+              <>
+                <div className="install-requirement">
+                  {Glyph.usb}
+                  <span>
+                    Connect your board with a USB data cable.
+                    <br />
+                    Open this page in Chrome or Edge on a computer.
+                  </span>
+                </div>
+                <div className="cta">
+                  <esp-web-install-button manifest={FIRMWARE.manifest}>
+                    <button slot="activate" className="flash-btn" type="button">
+                      {Glyph.bolt}
+                      <span className="cta-text">
+                        Install Lilyshark
+                        <span className="cta-sub">
+                          Choose USB port to begin
+                        </span>
+                      </span>
+                    </button>
+                    <span slot="unsupported" className="unsupported">
+                      In-browser flashing needs Web Serial — open this page in
+                      Chrome or Edge on a computer. The download links below
+                      work anywhere.
+                    </span>
+                    <span slot="not-allowed" className="not-allowed">
+                      Serial access is blocked here; check the browser's site
+                      permissions.
+                    </span>
+                  </esp-web-install-button>
+                </div>
+
+                <div className="secondary">
+                  <a
+                    className="outline-btn"
+                    href={`/flash/${FIRMWARE.file}`}
+                    download
+                  >
+                    {Glyph.download} Download .bin
+                  </a>
+                  <a className="outline-btn" href={REPO}>
+                    {Glyph.code} Source
+                  </a>
+                </div>
+
+                <p className="meta release-meta">
+                  <span>{FIRMWARE.version}</span>
+                  <span>977 KiB · Factory image</span>
+                  <a href="#verify">Verify checksum ↗</a>
+                </p>
+                <p className="ownership-note">
+                  No account. No cloud. Yours to explore.
+                </p>
+              </>
+            ) : kind === "browser" ? (
+              <>
+                <div className="cta">
+                  <a className="flash-btn" href="/">
                     {Glyph.bolt}
                     <span className="cta-text">
-                      Flash in browser
-                      <span className="cta-sub">Web Serial · Chrome / Edge</span>
+                      Open the analyzer
+                      <span className="cta-sub">
+                        no install · works offline
+                      </span>
                     </span>
-                  </button>
-                  <span slot="unsupported" className="unsupported">
-                    In-browser flashing needs Web Serial — open this page in
-                    Chrome or Edge on a computer. The download links below work
-                    anywhere.
-                  </span>
-                  <span slot="not-allowed" className="not-allowed">
-                    Serial access is blocked here; check the browser's site
-                    permissions.
-                  </span>
-                </esp-web-install-button>
-              </div>
-
-              <div className="secondary">
-                <a className="outline-btn" href={`/flash/${FIRMWARE.file}`}>
-                  {Glyph.download} Download .bin
-                </a>
-                <a className="outline-btn" href={REPO}>
-                  {Glyph.code} Source
-                </a>
-              </div>
-
-              <p className="meta">
-                {selected.name} · {FIRMWARE.version} · image <b>{FIRMWARE.file}</b> ·{" "}
-                {FIRMWARE.bytes} bytes · written at {FIRMWARE.offset}
-                <br />
-                sha256 <b className="hash">{FIRMWARE.sha256}</b>
-              </p>
-            </>
-          ) : kind === "browser" ? (
-            <>
-              <div className="cta">
-                <a className="flash-btn" href="/">
-                  {Glyph.bolt}
-                  <span className="cta-text">
-                    Open the analyzer
-                    <span className="cta-sub">no install · works offline</span>
-                  </span>
-                </a>
-              </div>
-              <div className="secondary">
-                <a className="outline-btn" href="/docs">
-                  {Glyph.code} Read the docs
-                </a>
-                <a className="outline-btn" href="/demo">
-                  {Glyph.download} Try the demo
-                </a>
-              </div>
-              <p className="meta">
-                The analyzer links to a deck over USB with Web Serial, or over
-                Bluetooth where the browser supports it. Nothing is uploaded:
-                every capture stays in the tab until you export it.
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="cta">
-                <a className="flash-btn" href={REPO}>
-                  {Glyph.code}
-                  <span className="cta-text">
-                    View the source
-                    <span className="cta-sub">GPL-3.0 · github</span>
-                  </span>
-                </a>
-              </div>
-              <div className="cmd-label">CLONE</div>
-              <div className="cmd-row">
-                <code className="verify-cmd">{CLONE_CMD}</code>
-                <CopyButton text={CLONE_CMD} />
-              </div>
-              <div className="cmd-label">BUILD THE RELEASE ARTIFACTS</div>
-              <div className="cmd-row">
-                <code className="verify-cmd">{BUILD_CMD}</code>
-                <CopyButton text={BUILD_CMD} />
-              </div>
-              <p className="meta">
-                Writes <b>dist/lilyshark-tdeck.factory.bin</b>, the application
-                image, the ELF and <b>dist/SHA256SUMS</b>. GitHub Actions on
-                ubuntu-24.04 is the canonical release environment — a build on
-                another OS can embed different tool paths.
-              </p>
-            </>
-          )}
+                  </a>
+                </div>
+                <div className="secondary">
+                  <a className="outline-btn" href="/docs">
+                    {Glyph.code} Read the docs
+                  </a>
+                  <a className="outline-btn" href="/demo">
+                    {Glyph.download} Try the demo
+                  </a>
+                </div>
+                <p className="meta">
+                  The analyzer links to a deck over USB with Web Serial, or over
+                  Bluetooth where the browser supports it. Nothing is uploaded:
+                  every capture stays in the tab until you export it.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="cta">
+                  <a className="flash-btn" href={REPO}>
+                    {Glyph.code}
+                    <span className="cta-text">
+                      View the source
+                      <span className="cta-sub">GPL-3.0 · github</span>
+                    </span>
+                  </a>
+                </div>
+                <div className="cmd-label">CLONE</div>
+                <div className="cmd-row">
+                  <code className="verify-cmd">{CLONE_CMD}</code>
+                  <CopyButton text={CLONE_CMD} />
+                </div>
+                <div className="cmd-label">BUILD THE RELEASE ARTIFACTS</div>
+                <div className="cmd-row">
+                  <code className="verify-cmd">{BUILD_CMD}</code>
+                  <CopyButton text={BUILD_CMD} />
+                </div>
+                <p className="meta">
+                  Writes <b>dist/lilyshark-tdeck.factory.bin</b>, the
+                  application image, the ELF and <b>dist/SHA256SUMS</b>. GitHub
+                  Actions on ubuntu-24.04 is the canonical release environment —
+                  a build on another OS can embed different tool paths.
+                </p>
+              </>
+            )}
+          </section>
         </div>
 
-        <div className="card">
-          <div className="eyebrow">How it goes</div>
+        <div className="card steps-card">
+          <div className="eyebrow">03 / From cable to capture</div>
           <h3>{STEP_HEADING[kind]}</h3>
           <div className="steps">
             {STEPS[kind].map((s) => (
@@ -773,75 +922,90 @@ export function FlashPage() {
         </div>
 
         {kind === "firmware" ? (
-          <>
-            <div className="card">
-              <div className="eyebrow">Verify</div>
-              <h3>Check your image.</h3>
-              <p className="card-sub">
-                The checksum in the install panel is computed from the exact
-                file this page flashes. To confirm a copy you downloaded
-                separately — or to audit what was flashed — run:
-              </p>
-              <div className="cmd-label">DOWNLOADED IMAGE</div>
-              <div className="cmd-row">
-                <code className="verify-cmd">shasum -a 256 {FIRMWARE.file}</code>
-                <CopyButton text={`shasum -a 256 ${FIRMWARE.file}`} />
+          <div className="support-layout">
+              <div className="card verify-card" id="verify">
+                <div className="eyebrow">Trust, verified</div>
+                <h3>Check your image.</h3>
+                <p className="card-sub">
+                  Downloaded the binary? Check it against the SHA-256 below.
+                  This is the exact factory image served by the installer.
+                </p>
+                <div className="firmware-facts">
+                  <span>{FIRMWARE.bytes} bytes</span>
+                  <span>Flash offset {FIRMWARE.offset}</span>
+                </div>
+                <code className="checksum">{FIRMWARE.sha256}</code>
+                <div className="cmd-label">CHECK YOUR DOWNLOAD</div>
+                <div className="cmd-row">
+                  <code className="verify-cmd">
+                    shasum -a 256 {FIRMWARE.file}
+                  </code>
+                  <CopyButton text={`shasum -a 256 ${FIRMWARE.file}`} />
+                </div>
+                <p className="verify-note">
+                  The output should match the hash above. You can also follow
+                  the <a href={REPO}>reproducible-build instructions</a> and
+                  compare hashes.
+                </p>
               </div>
-              <div className="cmd-label">AGAINST THE PUBLISHED SUMS</div>
-              <div className="cmd-row">
-                <code className="verify-cmd">
-                  curl -sL {REPO}/raw/main/dist/SHA256SUMS
-                </code>
-                <CopyButton text={`curl -sL ${REPO}/raw/main/dist/SHA256SUMS`} />
+
+              <div className="help-panel">
+                <div className="eyebrow">A little help</div>
+                <h3>Before you unplug.</h3>
+                <details>
+                  <summary>My board doesn't appear</summary>
+                  <div>
+                    <span>
+                      · Swap the cable first — most "broken" flashes are
+                      charge-only cables.
+                    </span>
+                    <span>
+                      · Force the bootloader: hold the trackball center down,
+                      press the reset button, release both, then click install
+                      again.
+                    </span>
+                    <span>
+                      · Close other tabs or serial monitors using the port; only
+                      one program can hold it.
+                    </span>
+                    <span>
+                      · If installation is interrupted, reconnect the board in
+                      bootloader mode and try flashing again.
+                    </span>
+                  </div>
+                </details>
+
+                <details>
+                  <summary>What gets installed</summary>
+                  <div>
+                    <span>
+                      The same factory image the repository builds: the complete
+                      Lilyshark firmware — live traffic, packet inspector,
+                      spectrum scan, node tracking, surveys, capture to microSD,
+                      and the Shelby off-grid pointer pipeline.
+                    </span>
+                    <span>
+                      After flashing, open <a href="/">the analyzer</a>, press
+                      CONNECT → LILYSHARK T-DECK · USB, and the device links to
+                      this site over the same cable.
+                    </span>
+                  </div>
+                </details>
+                <details>
+                  <summary>Can I install from my phone?</summary>
+                  <div>
+                    <p>
+                      Use Chrome or Edge on a computer to flash over USB. You
+                      can download the firmware on any device and transfer it to
+                      your computer.
+                    </p>
+                  </div>
+                </details>
+                <a className="help-link" href={`${REPO}/issues`}>
+                  Still stuck? Open an issue ↗
+                </a>
               </div>
-              <p className="verify-note">
-                The output must match the sha256 above. Prefer proof over
-                trust? Build the image yourself with the{" "}
-                <a href={REPO}>reproducible-build instructions</a> and compare
-                hashes.
-              </p>
             </div>
-
-            <details>
-              <summary>If the device never appears</summary>
-              <div>
-                <span>
-                  · Swap the cable first — most "broken" flashes are
-                  charge-only cables.
-                </span>
-                <span>
-                  · Force the bootloader: hold the trackball center down, press
-                  the reset button, release both, then click install again.
-                </span>
-                <span>
-                  · Close other tabs or serial monitors using the port; only
-                  one program can hold it.
-                </span>
-                <span>
-                  · The image is unbrickable to experiment with: it writes the
-                  full flash from byte zero, so a failed attempt is cured by
-                  flashing again.
-                </span>
-              </div>
-            </details>
-
-            <details>
-              <summary>What gets installed</summary>
-              <div>
-                <span>
-                  The same factory image the repository builds: the complete
-                  Lilyshark firmware — live traffic, packet inspector, spectrum
-                  scan, node tracking, surveys, capture to microSD, and the
-                  Shelby off-grid pointer pipeline.
-                </span>
-                <span>
-                  After flashing, open <a href="/">the analyzer</a>, press
-                  CONNECT → LILYSHARK T-DECK · USB, and the device links to
-                  this site over the same cable.
-                </span>
-              </div>
-            </details>
-          </>
         ) : null}
       </div>
 
