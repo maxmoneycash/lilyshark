@@ -78,7 +78,7 @@ chat, telemetry, and flasher layouts were checked at 320 and 390 pixels.
 - Baseline: GitHub web and iOS jobs passed; firmware CI stopped at the icon
   check because Pillow was absent. Local icon checks also rejected losslessly
   optimized PNGs even though all pixels matched.
-- Web checkpoint: 548 tests, TypeScript, and production build pass. Arc verified
+- Web checkpoint: 552 tests, TypeScript, and production build pass. Arc verified
   USB failure and retry with a mock serial port, reading-position preservation,
   mobile layout, reference LXMF content, and unknown versus real-zero telemetry.
   Explicit-unavailable battery reports clear older readings; omitted reports
@@ -96,12 +96,28 @@ chat, telemetry, and flasher layouts were checked at 320 and 390 pixels.
   the simulator settings were restored. The separate `accessibility3` Debug
   build checks larger text without changing the system slider; see
   `ios/BUILD.md` for the command.
+- Refreshed large-text checks cover the Contacts header and action row,
+  full-width channel and Radio tool text, the Appearance menu, and both scanner
+  states. The ordinary app was restored and launched successfully. Only the
+  session's iPhone simulator services were stopped. Screenshots and detailed
+  limitations are saved locally in `/tmp/lilyshark-ios-qa-final/README.md`.
 - The full gate exposed an existing stale STORAGE render reference. The old
   image showed fabricated capture filenames; current code already said
   `SIMULATED - NO FILE ON THIS BUILD`. Pixel comparison confined all 903 changed
   pixels to those two lines. Only that reference was refreshed. All 43 render
   checks pass. The full gate passes simulator scenarios, motion and README
   animation checks, the T-Deck build, and factory image validation.
+
+## Integration with current main
+
+Main advanced to `a4bb505` during the continuation. Merge `f0a4725` preserves
+its focused flasher layout, real T-Deck photography, shared navigation, history,
+and installer recovery while retaining the fixes above. The merged web app
+passes 552 tests, TypeScript, production build, and Arc checks at 320/390 pixels.
+
+Calculator inputs preserve partial typing and show range guidance only when
+invalid. Results stay hidden until inputs are valid. Both native targets compile
+after that final correction; typing itself has not been exercised on-device.
 
 ## Saved worktree inventory
 

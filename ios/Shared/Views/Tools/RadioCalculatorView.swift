@@ -24,6 +24,12 @@ struct RadioCalculatorView: View {
     @State private var rxSensitivityDBm: Double = -130
     @State private var useDeviceConfig = true
 
+    private let frequencyRange = 400.0...928.0
+    private let powerRange = -9.0...30.0
+    private let distanceRange = 0.1...200.0
+    private let gainRange = 0.0...20.0
+    private let sensitivityRange = -150.0...(-80.0)
+
     private var hasRadioSettings: Bool {
         connectionManager.connectionState == .ready && !connectionManager.isMeshtasticLinkActive
             && deviceConfig.loadedSections.contains("selfInfo")
@@ -40,16 +46,17 @@ struct RadioCalculatorView: View {
                         if use { loadFromDevice() }
                     }
 
-                paramRow("Frequency", value: $frequencyMHz, unit: "MHz", range: 400...928)
-                paramRow("TX Power", value: $txPowerDBm, unit: "dBm", range: -9...30)
-                paramRow("Distance", value: $distanceKm, unit: "km", range: 0.1...200)
-                paramRow("TX Antenna Gain", value: $txAntennaGainDBi, unit: "dBi", range: 0...20)
-                paramRow("RX Antenna Gain", value: $rxAntennaGainDBi, unit: "dBi", range: 0...20)
-                paramRow("RX Sensitivity", value: $rxSensitivityDBm, unit: "dBm", range: -150...(-80))
+                paramRow("Frequency", value: $frequencyMHz, unit: "MHz", range: frequencyRange)
+                paramRow("TX Power", value: $txPowerDBm, unit: "dBm", range: powerRange)
+                paramRow("Distance", value: $distanceKm, unit: "km", range: distanceRange)
+                paramRow("TX Antenna Gain", value: $txAntennaGainDBi, unit: "dBi", range: gainRange)
+                paramRow("RX Antenna Gain", value: $rxAntennaGainDBi, unit: "dBi", range: gainRange)
+                paramRow("RX Sensitivity", value: $rxSensitivityDBm, unit: "dBm", range: sensitivityRange)
             } header: {
                 Text("Parameters")
             }
 
+            if inputsAreValid {
             Section {
                 resultRow("Wavelength", value: String(format: "%.3f m", wavelength))
                 resultRow("Free-Space Path Loss", value: String(format: "%.1f dB", fspl))
@@ -79,6 +86,12 @@ struct RadioCalculatorView: View {
             } footer: {
                 Text("Theoretical maximum based on TX power, antenna gains, and RX sensitivity. Actual range depends on terrain, obstructions, and interference.")
             }
+            } else {
+                Section("Results") {
+                    ContentUnavailableView("Check the parameters", systemImage: "slider.horizontal.3",
+                                           description: Text("Enter values within the ranges shown above to calculate the link budget."))
+                }
+            }
         }
         .formStyle(.grouped)
         .meshTheme()
@@ -95,6 +108,16 @@ struct RadioCalculatorView: View {
     }
 
     // MARK: - Calculations
+
+    private var inputsAreValid: Bool {
+        [frequencyMHz, txPowerDBm, distanceKm, txAntennaGainDBi, rxAntennaGainDBi, rxSensitivityDBm].allSatisfy(\.isFinite)
+            && frequencyRange.contains(frequencyMHz)
+            && powerRange.contains(txPowerDBm)
+            && distanceRange.contains(distanceKm)
+            && gainRange.contains(txAntennaGainDBi)
+            && gainRange.contains(rxAntennaGainDBi)
+            && sensitivityRange.contains(rxSensitivityDBm)
+    }
 
     private var wavelength: Double {
         guard frequencyMHz > 0 else { return 0 }
@@ -156,19 +179,19 @@ struct RadioCalculatorView: View {
             Text(label)
                 .foregroundStyle(MeshTheme.textSecondary)
             HStack(spacing: Design.Space.tight) {
-                TextField(label, value: Binding(
-                    get: { value.wrappedValue },
-                    set: { input in
-                        guard input.isFinite else { return }
-                        value.wrappedValue = min(range.upperBound, max(range.lowerBound, input))
-                    }
-                ), format: .number)
+                TextField(label, value: value, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .monospacedDigit()
                     .frame(minHeight: Design.minimumTouchTarget)
                 Text(unit)
                     .foregroundStyle(MeshTheme.textSecondary)
                     .fixedSize()
+            }
+            if !value.wrappedValue.isFinite || !range.contains(value.wrappedValue) {
+                Text("Enter a value from \(range.lowerBound.formatted()) to \(range.upperBound.formatted()).")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .listRowBackground(MeshTheme.surface)

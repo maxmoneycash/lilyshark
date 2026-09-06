@@ -33,6 +33,8 @@ struct LoRaAirtimeView: View {
     }
 
     private let sfRange = 5...12
+    private let payloadRange = 1...255
+    private let preambleRange = 6...65535
     private let bandwidthOptions: [Double] = [7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125, 250, 500]
 
     var body: some View {
@@ -73,8 +75,8 @@ struct LoRaAirtimeView: View {
                 .tint(.primary)
                 .listRowBackground(MeshTheme.surface)
 
-                paramRow("Payload Size", value: $payloadBytes, unit: "bytes", range: 1...255)
-                paramRow("Preamble", value: $preambleSymbols, unit: "symbols", range: 6...65535)
+                paramRow("Payload Size", value: $payloadBytes, unit: "bytes", range: payloadRange)
+                paramRow("Preamble", value: $preambleSymbols, unit: "symbols", range: preambleRange)
 
                 Toggle("Explicit Header", isOn: $explicitHeader)
                     .foregroundStyle(MeshTheme.accent)
@@ -136,7 +138,8 @@ struct LoRaAirtimeView: View {
 
     // MARK: - LoRa Airtime Math
     private var estimate: LoRaAirtimeEstimate? {
-        LoRaAirtimeEstimate(
+        guard payloadRange.contains(payloadBytes), preambleRange.contains(preambleSymbols) else { return nil }
+        return LoRaAirtimeEstimate(
             spreadingFactor: spreadingFactor, bandwidthKHz: bandwidthKHz,
             codingRateDenominator: codingRate, payloadBytes: payloadBytes,
             preambleSymbols: preambleSymbols, explicitHeader: explicitHeader,
@@ -180,16 +183,19 @@ struct LoRaAirtimeView: View {
             Text(label)
                 .foregroundStyle(MeshTheme.textSecondary)
             HStack(spacing: Design.Space.tight) {
-                TextField(label, value: Binding(
-                    get: { value.wrappedValue },
-                    set: { value.wrappedValue = min(range.upperBound, max(range.lowerBound, $0)) }
-                ), format: .number)
+                TextField(label, value: value, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .monospacedDigit()
                     .frame(minHeight: Design.minimumTouchTarget)
                 Text(unit)
                     .foregroundStyle(MeshTheme.textSecondary)
                     .fixedSize()
+            }
+            if !range.contains(value.wrappedValue) {
+                Text("Enter a value from \(range.lowerBound.formatted()) to \(range.upperBound.formatted()).")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .listRowBackground(MeshTheme.surface)
