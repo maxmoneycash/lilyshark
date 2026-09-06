@@ -1927,17 +1927,24 @@ body:has(.meshterm .app.menu-open) {
 
 /* ── Intro ────────────────────────────────────────────────────────────────
    The scroll stage: a tall track drives progress; a sticky viewport inside it
-   holds the copy, the device, and the section rail. The device photo is the
-   fixed object; scrolling swaps what its display shows. */
+   holds the copy, the interactive device, and the section rail. Scrolling
+   changes the display; the model animates independently. */
 .meshterm .intro-scroll {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
+	overflow-x: hidden;
 	-webkit-overflow-scrolling: touch;
-	scrollbar-width: none;
+	touch-action: pan-y;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border) transparent;
 }
 .meshterm .intro-scroll::-webkit-scrollbar {
-	display: none;
+	width: 6px;
+}
+.meshterm .intro-scroll::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border-radius: 3px;
 }
 .meshterm .intro-track {
 	position: relative;
@@ -2025,28 +2032,11 @@ body:has(.meshterm .app.menu-open) {
 .meshterm .intro-device {
 	position: relative;
 	justify-self: center;
+	min-width: 0;
+	min-height: 0;
+	width: 100%;
 	height: min(78vh, 640px);
-	aspect-ratio: 517 / 1116;
-}
-.meshterm .intro-device-img {
-	width: 100%;
-	height: 100%;
-	display: block;
-	filter: drop-shadow(0 18px 40px rgba(64, 0, 34, 0.28));
-}
-.meshterm .intro-screen {
-	position: absolute;
-	overflow: hidden;
-	border-radius: 2px;
-	background: #000;
-}
-.meshterm .intro-screen img {
-	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
-	object-fit: fill;
-	display: block;
+	max-height: 100%;
 }
 .meshterm .intro-rail {
 	position: absolute;
@@ -2069,6 +2059,10 @@ body:has(.meshterm .app.menu-open) {
 .meshterm .intro-rail button.on {
 	background: var(--fg);
 }
+.meshterm .intro-rail button:focus-visible {
+	outline: 2px solid var(--ink, var(--fg));
+	outline-offset: 4px;
+}
 
 @media (max-width: 860px) {
 	/* Copy above, device below, both inside one still viewport. */
@@ -2086,10 +2080,9 @@ body:has(.meshterm .app.menu-open) {
 		font-size: 13px;
 	}
 	.meshterm .intro-device {
-		height: auto;
+		height: 100%;
 		max-height: 100%;
-		width: min(64vw, 300px);
-		aspect-ratio: 517 / 1116;
+		width: 100%;
 		align-self: start;
 		margin-top: 4px;
 	}
@@ -2159,19 +2152,17 @@ body:has(.meshterm .app.menu-open) {
 	}
 	.meshterm .intro-device {
 		height: 100%;
-		width: auto;
-		max-width: 78vw;
+		width: 100%;
+		max-width: 100%;
 		justify-self: center;
 		align-self: center;
 		margin-top: 0;
 	}
 }
 
-/* ── Intro: paged, and phone-first around the device ──────────────────────
-   Free scrolling through a sticky stage felt dead (nothing moves within a
-   section) and loose (one flick sails past three sections). Mandatory snap
-   with snap-stop makes each gesture land exactly one section, natively
-   animated by the browser — no scroll listener in the way. */
+/* ── Intro: native firmware screen stops ──────────────────────────────────
+   Forty-two stops share the original twelve-viewport track. Browser snap
+   preserves touch momentum while making every LCD frame easy to inspect. */
 .meshterm .intro-scroll {
 	scroll-snap-type: y mandatory;
 	overscroll-behavior: contain;
@@ -2180,7 +2171,7 @@ body:has(.meshterm .app.menu-open) {
 	position: absolute;
 	left: 0;
 	width: 1px;
-	height: calc(100% / var(--intro-n, 8));
+	height: 1px;
 	scroll-snap-align: start;
 	scroll-snap-stop: always;
 	pointer-events: none;
@@ -2203,8 +2194,8 @@ body:has(.meshterm .app.menu-open) {
 	.meshterm .intro-device {
 		order: 1;
 		height: 100%;
-		width: auto;
-		max-width: 92vw;
+		width: 100%;
+		max-width: 100%;
 		justify-self: center;
 		align-self: center;
 	}

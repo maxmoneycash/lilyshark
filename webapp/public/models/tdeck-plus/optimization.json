@@ -1,0 +1,528 @@
+{
+  "source": "tdeck-plus-v5.glb",
+  "sourceSHA256": "618a3eed41ab82ee4d4f78deec544d6d3ab1c6416881755f093ccaf5d75cccad",
+  "sourceBytes": 21480216,
+  "changes": [
+    "LCD local 0..1 UVs moved to TEXCOORD_0; LCD node/material names retained.",
+    "Rear screw texture cropped to its used UV rectangle with a 16-pixel mipmap gutter; no source pixels resampled."
+  ],
+  "textures": [
+    {
+      "name": "back_albedo",
+      "size": [
+        4032,
+        3024
+      ],
+      "sourceBytes": 4529391,
+      "outputBytes": 840912,
+      "encoding": "WebP quality 98",
+      "rmse": 0.7497991983647894,
+      "psnrDB": 50.63190417333642,
+      "maxChannelError": 9
+    },
+    {
+      "name": "front_base_without_keys",
+      "size": [
+        1462,
+        2300
+      ],
+      "sourceBytes": 2921866,
+      "outputBytes": 430830,
+      "encoding": "WebP quality 98",
+      "rmse": 0.9841073907907476,
+      "psnrDB": 48.26995373999167,
+      "maxChannelError": 8
+    },
+    {
+      "name": "key_10_A",
+      "size": [
+        122,
+        133
+      ],
+      "sourceBytes": 6532,
+      "outputBytes": 3414,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_20_alt",
+      "size": [
+        121,
+        135
+      ],
+      "sourceBytes": 6905,
+      "outputBytes": 3528,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_25_B",
+      "size": [
+        108,
+        137
+      ],
+      "sourceBytes": 6154,
+      "outputBytes": 3022,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_19_backspace",
+      "size": [
+        107,
+        141
+      ],
+      "sourceBytes": 7209,
+      "outputBytes": 3418,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_23_C",
+      "size": [
+        110,
+        136
+      ],
+      "sourceBytes": 5981,
+      "outputBytes": 3030,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_12_D",
+      "size": [
+        110,
+        134
+      ],
+      "sourceBytes": 7171,
+      "outputBytes": 3612,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_28_dollar",
+      "size": [
+        108,
+        137
+      ],
+      "sourceBytes": 7907,
+      "outputBytes": 4078,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_02_E",
+      "size": [
+        110,
+        138
+      ],
+      "sourceBytes": 6192,
+      "outputBytes": 3114,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_13_F",
+      "size": [
+        110,
+        135
+      ],
+      "sourceBytes": 6162,
+      "outputBytes": 3116,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_14_G",
+      "size": [
+        110,
+        136
+      ],
+      "sourceBytes": 6940,
+      "outputBytes": 3572,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_15_H",
+      "size": [
+        108,
+        136
+      ],
+      "sourceBytes": 6039,
+      "outputBytes": 2884,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_07_I",
+      "size": [
+        107,
+        142
+      ],
+      "sourceBytes": 3645,
+      "outputBytes": 1818,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_16_J",
+      "size": [
+        108,
+        136
+      ],
+      "sourceBytes": 4563,
+      "outputBytes": 2490,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_17_K",
+      "size": [
+        108,
+        136
+      ],
+      "sourceBytes": 6149,
+      "outputBytes": 2998,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_18_L",
+      "size": [
+        105,
+        137
+      ],
+      "sourceBytes": 4477,
+      "outputBytes": 2474,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_27_M",
+      "size": [
+        107,
+        136
+      ],
+      "sourceBytes": 6976,
+      "outputBytes": 3190,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_31_microphone",
+      "size": [
+        136,
+        109
+      ],
+      "sourceBytes": 6899,
+      "outputBytes": 3528,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_26_N",
+      "size": [
+        109,
+        137
+      ],
+      "sourceBytes": 6513,
+      "outputBytes": 3926,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_08_O",
+      "size": [
+        111,
+        141
+      ],
+      "sourceBytes": 6888,
+      "outputBytes": 3292,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_09_P",
+      "size": [
+        105,
+        139
+      ],
+      "sourceBytes": 7196,
+      "outputBytes": 3234,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_00_Q",
+      "size": [
+        121,
+        137
+      ],
+      "sourceBytes": 8121,
+      "outputBytes": 4048,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_03_R",
+      "size": [
+        110,
+        139
+      ],
+      "sourceBytes": 7194,
+      "outputBytes": 3764,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_29_return",
+      "size": [
+        107,
+        137
+      ],
+      "sourceBytes": 3873,
+      "outputBytes": 1754,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_11_S",
+      "size": [
+        112,
+        134
+      ],
+      "sourceBytes": 6068,
+      "outputBytes": 3102,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_30_shift_left",
+      "size": [
+        137,
+        109
+      ],
+      "sourceBytes": 3553,
+      "outputBytes": 2134,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_34_shift_right",
+      "size": [
+        132,
+        110
+      ],
+      "sourceBytes": 3557,
+      "outputBytes": 1776,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_32_space",
+      "size": [
+        361,
+        111
+      ],
+      "sourceBytes": 6548,
+      "outputBytes": 3486,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_33_sym",
+      "size": [
+        136,
+        110
+      ],
+      "sourceBytes": 7975,
+      "outputBytes": 4186,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_04_T",
+      "size": [
+        109,
+        138
+      ],
+      "sourceBytes": 5265,
+      "outputBytes": 2420,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_06_U",
+      "size": [
+        109,
+        138
+      ],
+      "sourceBytes": 5939,
+      "outputBytes": 2624,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_24_V",
+      "size": [
+        110,
+        136
+      ],
+      "sourceBytes": 6010,
+      "outputBytes": 3042,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_01_W",
+      "size": [
+        109,
+        138
+      ],
+      "sourceBytes": 8546,
+      "outputBytes": 4236,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_22_X",
+      "size": [
+        109,
+        135
+      ],
+      "sourceBytes": 7171,
+      "outputBytes": 3808,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_05_Y",
+      "size": [
+        108,
+        137
+      ],
+      "sourceBytes": 5552,
+      "outputBytes": 3358,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "key_21_Z",
+      "size": [
+        111,
+        135
+      ],
+      "sourceBytes": 5708,
+      "outputBytes": 2974,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "display",
+      "size": [
+        320,
+        240
+      ],
+      "sourceBytes": 5470,
+      "outputBytes": 5470,
+      "encoding": "PNG unchanged"
+    },
+    {
+      "name": "Rear screw photo crop",
+      "size": [
+        92,
+        95
+      ],
+      "sourceBytes": 19343,
+      "outputBytes": 7490,
+      "encoding": "WebP lossless"
+    },
+    {
+      "name": "regulatory_label",
+      "size": [
+        512,
+        205
+      ],
+      "sourceBytes": 167982,
+      "outputBytes": 97526,
+      "encoding": "WebP lossless"
+    }
+  ],
+  "screwCrop": {
+    "originalSize": [
+      4032,
+      3024
+    ],
+    "crop": {
+      "left": 1181,
+      "top": 1325,
+      "width": 92,
+      "height": 95
+    },
+    "originalBytes": 7993847,
+    "croppedBytes": 19343
+  },
+  "geometry": {
+    "meshes": 59,
+    "triangles": 198508,
+    "losslessPositionsNormalsAndTopology": true,
+    "meshDecimation": false,
+    "positionQuantization": false
+  },
+  "outputBytes": 4109100,
+  "outputSHA256": "7894bdf8a315dfbc814969eacb1bd91c2f207657f119aea215213a6c8f249b9f",
+  "reductionPercent": 80.87030409750069,
+  "axes": {
+    "units": "meters",
+    "front": "+Y",
+    "topAndAntenna": "-Z",
+    "threeUprightRotationX": 1.5707963267948966
+  },
+  "bounds": {
+    "assembly": {
+      "min": [
+        -0.03656955063343048,
+        -0.01075000036507845,
+        -0.23827001452445984
+      ],
+      "max": [
+        0.03657051920890808,
+        0.011119999922811985,
+        0.05749371647834778
+      ],
+      "size": [
+        0.07314006984233856,
+        0.021870000287890434,
+        0.2957637310028076
+      ]
+    },
+    "handset": {
+      "min": [
+        -0.03656955063343048,
+        -0.01075000036507845,
+        -0.05749029666185379
+      ],
+      "max": [
+        0.03657051920890808,
+        0.011119999922811985,
+        0.05749371647834778
+      ],
+      "size": [
+        0.07314006984233856,
+        0.021870000287890434,
+        0.11498401314020157
+      ]
+    },
+    "lcd": {
+      "min": [
+        -0.02874000370502472,
+        0.009705000557005405,
+        -0.04081999510526657
+      ],
+      "max": [
+        0.028860002756118774,
+        0.0097850002348423,
+        0.002379998564720154
+      ],
+      "size": [
+        0.057600006461143494,
+        0.00007999967783689499,
+        0.043199993669986725
+      ]
+    }
+  },
+  "screen": {
+    "node": "LCD glass",
+    "material": "LCD display",
+    "textureCoordinate": "TEXCOORD_0",
+    "uvBounds": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "textureFlipY": false
+  },
+  "validation": {
+    "compressed": {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 41
+    },
+    "decoded": {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 40
+    }
+  }
+}
