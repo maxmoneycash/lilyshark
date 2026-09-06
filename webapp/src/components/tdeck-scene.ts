@@ -110,10 +110,10 @@ export function mountTDeck(
     const height = Math.max(canvas.clientHeight, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, width < 600 ? 1.5 : 2));
     renderer.setSize(width, height, false);
-    // Frame the handset so the LCD remains readable. The long whip can extend
-    // above the stage, as a product photograph would crop an aerial.
-    const halfHeight = Math.max(height < 400 ? .084 : .107, .063 * height / width);
-    camera.position.y = height < 400 ? .014 : .027;
+    // Frame the handset so the body fills the stage. The long whip can extend
+    // above the canvas, as a product photograph would crop an aerial.
+    const halfHeight = Math.max(height < 400 ? .072 : .090, .052 * height / width);
+    camera.position.y = height < 400 ? .008 : .018;
     camera.left = -halfHeight * width / height;
     camera.right = halfHeight * width / height;
     camera.top = halfHeight;

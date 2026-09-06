@@ -8,7 +8,7 @@
 .meshterm .tdeck-model-canvas {
   display: block;
   width: 100%;
-  height: calc(100% - 48px);
+  height: 100%;
   touch-action: pan-y pinch-zoom;
   cursor: grab;
   opacity: 0;
@@ -19,7 +19,7 @@
 .meshterm .tdeck-model-canvas:focus-visible { outline: 1px solid var(--fg); }
 .meshterm .tdeck-model-fallback {
   position: absolute;
-  inset: 0 0 48px;
+  inset: 0;
   display: flex;
   justify-content: center;
   pointer-events: none;
@@ -32,17 +32,20 @@
 }
 .meshterm .tdeck-model-controls {
   position: absolute;
-  bottom: 0;
+  bottom: 8px;
+  left: 0;
   width: 100%;
   text-align: center;
   font-size: 10px;
   color: var(--fg-dim);
+  pointer-events: none;
 }
 .meshterm .tdeck-model-hint { letter-spacing: .5px; }
 .meshterm .tdeck-model-buttons {
   display: flex;
   justify-content: center;
   gap: 12px;
+  pointer-events: auto;
 }
 .meshterm .tdeck-model-buttons button:not(.tab) {
   min-height: 30px;
@@ -72,5 +75,5 @@
 }
 @media (pointer: coarse) {
   .meshterm .tdeck-model-buttons button:not(.tab) { min-height: 36px; }
-  .meshterm .tdeck-model-canvas { height: calc(100% - 52px); }
+  .meshterm .tdeck-model-controls { bottom: 6px; }
 }

@@ -2014,15 +2014,16 @@ body:has(.meshterm .app.menu-open) {
 	height: 100%;
 	max-height: calc(100% / var(--intro-n, 5));
 	display: grid;
-	grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-	align-items: center;
-	gap: clamp(16px, 4vw, 56px);
-	padding: 0 clamp(18px, 5vw, 72px);
+	grid-template-columns: minmax(16rem, 0.68fr) minmax(0, 1.32fr);
+	align-items: stretch;
+	gap: clamp(12px, 2.4vw, 32px);
+	padding: 0 clamp(14px, 3vw, 40px) 0 clamp(18px, 4vw, 56px);
 	overflow: hidden;
 }
 .meshterm .intro-copy {
 	position: relative;
 	min-width: 0;
+	align-self: center;
 }
 .meshterm .intro-head {
 	margin: 0 0 18px;
@@ -2089,11 +2090,12 @@ body:has(.meshterm .app.menu-open) {
 }
 .meshterm .intro-device {
 	position: relative;
-	justify-self: center;
+	justify-self: stretch;
+	align-self: stretch;
 	min-width: 0;
 	min-height: 0;
 	width: 100%;
-	height: min(78vh, 640px);
+	height: 100%;
 	max-height: 100%;
 }
 .meshterm .intro-rail {
@@ -2249,12 +2251,11 @@ body:has(.meshterm .app.menu-open) {
 
 @media (max-width: 860px) {
 	/* The radio leads and gets the larger share; all the copy sits under it.
-	   Later block wins over the earlier copy-first rows. The copy's half is
-	   sized so the closing beat's actions land inside the clipped band —
-	   at a larger device share they fell below the fold and could not be
-	   tapped at all. */
+	   Later block wins over the earlier copy-first rows. Keep enough of the
+	   copy band that the closing beat's actions stay inside the clipped
+	   stage — at a still-larger device share they fell below the fold. */
 	.meshterm .intro-stage {
-		grid-template-rows: minmax(0, 50%) minmax(0, 50%);
+		grid-template-rows: minmax(0, 62%) minmax(0, 38%);
 	}
 	.meshterm .intro-copy {
 		order: 2;
@@ -2302,7 +2303,7 @@ body:has(.meshterm .app.menu-open) {
    actions. Fractional rows subtract the gap before sizing either band. */
 @media (max-width: 860px) and (max-height: 720px) {
 	.meshterm .intro-stage {
-		grid-template-rows: minmax(0, 50fr) minmax(0, 50fr);
+		grid-template-rows: minmax(0, 56fr) minmax(0, 44fr);
 		padding-top: 10px;
 		padding-bottom: 6px;
 		gap: 8px;
@@ -2347,7 +2348,7 @@ body:has(.meshterm .app.menu-open) {
 /* Wider landscape phones have room to keep the copy beside the device. */
 @media (min-width: 600px) and (max-width: 860px) and (min-height: 320px) and (max-height: 480px) {
 	.meshterm .intro-stage {
-		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+		grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
 		grid-template-rows: minmax(0, 1fr);
 		padding-top: 6px;
 		padding-bottom: 6px;
@@ -2920,7 +2921,7 @@ body:has(.meshterm .app.menu-open) {
 	}
 	.meshterm .intro-pager {
 		position: absolute;
-		top: 25%;
+		top: 31%;
 		left: 18px;
 		right: 18px;
 		transform: translateY(-50%);
@@ -2965,7 +2966,7 @@ body:has(.meshterm .app.menu-open) {
 @media (min-width: 600px) and (max-width: 860px) and (min-height: 320px) and (max-height: 480px) {
 	.meshterm .intro-pager {
 		top: 12px;
-		left: calc(66.667% + 6px);
+		left: calc(39% + 6px);
 		transform: none;
 	}
 }
