@@ -41,6 +41,34 @@ browser (Vite + React)
   files to and from Shelby. Wallet signing happens client-side via the
   Aptos wallet adapter; the service never custodies keys.
 
+## 3D introduction
+
+[IntroTab.tsx](src/components/IntroTab.tsx) maps native vertical scrolling to all
+42 firmware renders in `public/intro/fw/`, grouped under the original twelve
+narratives. The track remains twelve viewports long, with a snap stop for each
+screen. Section rail buttons jump to the group's first screen. The sequence and
+scroll calculations live in [intro-sequence.ts](src/components/intro-sequence.ts);
+its tests check asset coverage, ordering, section jumps, and reachable endpoints.
+There is no timer advancing the LCD.
+
+[TDeckModel.tsx](src/components/TDeckModel.tsx) owns the React lifecycle, controls,
+and loading/error photo fallback. It loads [tdeck-scene.ts](src/components/tdeck-scene.ts)
+on demand; that module owns Three.js, the LCD texture, pointer input, and GPU
+cleanup. One scene persists while screens change. The device floats and rotates
+independently of scrolling. Drag horizontally to spin it; `touch-action: pan-y`
+keeps vertical touch gestures available for scrolling. Arrow keys rotate and
+Home resets the view. Reduced motion disables automatic movement, and the pause
+control lets other visitors stop it. The photo fallback still receives the
+current firmware screen if WebGL or model loading fails.
+
+The versioned model is
+[`public/models/tdeck-plus/tdeck-plus-v5.glb`](public/models/tdeck-plus/tdeck-plus-v5.glb)
+(4.1 MB). See the [asset README](public/models/tdeck-plus/README.md) for provenance,
+LCD material/UV conventions, validation, and reproduction commands for
+[`scripts/model/optimize-tdeck.mjs`](../scripts/model/optimize-tdeck.mjs).
+Use a new versioned filename when changing the model so caches cannot keep an
+older asset.
+
 ## Develop
 
 ```sh
