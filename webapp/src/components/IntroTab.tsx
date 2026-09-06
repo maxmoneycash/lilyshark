@@ -18,9 +18,9 @@ import { layoutWithLines, prepareWithSegments } from '@chenglou/pretext';
  * positions; the springs give them their entrance.
  */
 
-const DEVICE = '/intro/tdeck.webp';
+import { TDECK_IMAGE as DEVICE, TDECK_SCREEN as SCREEN } from './TDeckPhoto';
 /** The display rectangle inside the device photo, as fractions of its box. */
-const SCREEN = { left: 0.0619, top: 0.3656, width: 0.8704, height: 0.2921 };
+
 
 interface Section {
   /** Firmware renders this beat cycles through on the device's display. */
@@ -240,7 +240,7 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
                       <button className="primary" onClick={() => onOpen('TRAFFIC')}>
                         OPEN THE ANALYZER
                       </button>
-                      <button onClick={() => window.open('/flash/', '_blank')}>
+                      <button onClick={() => onOpen('FLASH')}>
                         FLASH A T-DECK
                       </button>
                       <button className="cta-link" onClick={() => onOpen('PAPER')}>

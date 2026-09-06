@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { connectMeshtasticBle } from "./meshtasticBle";
 import {
@@ -46,45 +46,13 @@ import {
   useDeviceLink,
 } from "../lib/deviceLink";
 import { bindAnalyzerMesh, setNetPublisher } from "./analyzerMesh";
-import { hashRoute } from "../lib/permalink";
+import { NAV_TABS, isTab, parentTab, tabFromLocation, tabHref, type Tab } from "./navigation";
 import { netConnect, publishHeardFrame } from "./net";
 import "./meshterm.css";
 
 const VERSION = "0.1.0";
 
-const TABS = [
-  "INTRO",
-  "PAPER",
-  "DOCS",
-  "TRAFFIC",
-  "SHELBY",
-  "CHAT",
-  "NODES",
-  "MAP",
-  "MESH",
-  "TELEMETRY",
-  "SPECTRUM",
-  "SNIFFER",
-  "CONFIG",
-  "DEBUG",
-] as const;
-type Tab = (typeof TABS)[number];
-
-// Deep links: a shared URL can land straight on a screen instead of the intro.
-// #resolve opens TRAFFIC, where TrafficTab reads the same hash and plays the
-// Shelby resolve demo unattended; the rest are plain entry points. Only the
-// routing token is matched here, so a permalink that carries a query bag
-// (#sniffer?frame=417) still finds its screen and the screen reads the bag
-// itself — see lib/permalink.ts. Tab changes are still never written back:
-// this is an entry point, not a router.
-const HASH_TAB: Partial<Record<string, Tab>> = {
-  "#resolve": "TRAFFIC",
-  "#traffic": "TRAFFIC",
-  "#shelby": "SHELBY",
-  "#docs": "DOCS",
-  "#paper": "PAPER",
-  "#sniffer": "SNIFFER",
-};
+const FlashPage = lazy(() => import("../flash/FlashPage").then(module => ({ default: module.FlashPage })));
 
 // ponytail: an error boundary for a single screen must not take down the app.
 // key={tab} remounts it when switching tabs, clearing the error state.
@@ -223,11 +191,46 @@ function App() {
   const hostBat = useHostBattery();
   // The intro opens first: the device, its screens, and why it exists —
   // unless a deep link asked for a specific screen.
-  const [tab, setTab] = useState<Tab>(
-    () => HASH_TAB[hashRoute(window.location.hash)] ?? "INTRO",
-  );
-  // Phone nav: the ten tabs live behind a hamburger instead of a side-scroll.
+  const [tab, setTabState] = useState<Tab>(() => tabFromLocation(window.location));
+  const setTab = useCallback((next: Tab) => {
+    if (tabFromLocation(window.location) !== next) {
+      window.history.pushState(null, "", tabHref(next));
+    }
+    setTabState(next);
+    // A page selected from the sticky mobile menu starts at its beginning.
+    window.scrollTo(0, 0);
+  }, []);
+  useEffect(() => {
+    document.title = tab === "FLASH" ? "Flash Lilyshark — LILYGO T-Deck" : "Lilyshark — Mesh Radio Analyzer";
+  }, [tab]);
+  // Phone nav: the pages live behind a hamburger instead of a side-scroll.
   const [menuOpen, setMenuOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const nav = navRef.current;
+    const toggle = menuButtonRef.current;
+    if (!nav || !toggle) return;
+    const media = window.matchMedia("(max-width: 860px)");
+    if (!media.matches) { setMenuOpen(false); return; }
+    const links = Array.from(nav.querySelectorAll<HTMLAnchorElement>("a[href]"));
+    const controls = [...links, toggle];
+    (links.find(link => link.getAttribute("aria-current") === "page") ?? links[0])?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault(); setMenuOpen(false); toggle.focus();
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        const current = controls.indexOf(document.activeElement as HTMLAnchorElement | HTMLButtonElement);
+        controls[(current + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
+      }
+    };
+    const onResize = () => { if (!media.matches) setMenuOpen(false); };
+    document.addEventListener("keydown", onKey);
+    media.addEventListener("change", onResize);
+    return () => { document.removeEventListener("keydown", onKey); media.removeEventListener("change", onResize); };
+  }, [menuOpen]);
   // CONNECT opens a sheet with the steps and both transports; the header
   // itself carries no dropdown.
   const [connectOpen, setConnectOpen] = useState(false);
@@ -281,7 +284,7 @@ function App() {
     netConnect();
     const onTab = (e: Event) => {
       const next = (e as CustomEvent<string>).detail;
-      if ((TABS as readonly string[]).includes(next)) setTab(next as Tab);
+      if (isTab(next)) setTab(next);
     };
     window.addEventListener("lilyshark-tab", onTab);
     // A permalink pasted into the address bar of an already-open tab changes
@@ -289,15 +292,17 @@ function App() {
     // well as at mount. Screens update their own part of the hash with
     // replaceState, which fires no event and so cannot loop back through this.
     const onHash = () => {
-      const next = HASH_TAB[hashRoute(window.location.hash)];
-      if (next) setTab(next);
+      setTabState(tabFromLocation(window.location));
+      setMenuOpen(false);
     };
     window.addEventListener("hashchange", onHash);
+    window.addEventListener("popstate", onHash);
     return () => {
       window.removeEventListener("lilyshark-tab", onTab);
       window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("popstate", onHash);
     };
-  }, []);
+  }, [setTab]);
 
   const deviceLink = useDeviceLink();
   const lilyConnecting = deviceLink.status === "connecting";
@@ -340,11 +345,11 @@ function App() {
       // "1".."9" pick tabs 1-9; "0" picks the tenth, the way a browser numbers
       // its own tab shortcuts.
       const n = e.key === "0" ? 10 : Number(e.key);
-      if (Number.isInteger(n) && n >= 1 && n <= TABS.length) {
+      if (Number.isInteger(n) && n >= 1 && n <= NAV_TABS.length) {
         e.preventDefault();
         setNodeFocus(undefined);
         setMapFocus(undefined);
-        setTab(TABS[n - 1]);
+        setTab(NAV_TABS[n - 1]);
       } else if (e.key.toLowerCase() === "f") {
         e.preventDefault();
         setTab("CHAT");
@@ -353,7 +358,7 @@ function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [setTab]);
 
   // Favorite node alerts (low battery / no signal). Once a minute is plenty:
   // these are conditions measured in hours, and evalAlerts has its own cooldown.
@@ -592,7 +597,7 @@ function App() {
     if (deviceLink.status === "error" || deviceLink.status === "off") {
       landOnLilyRef.current = false;
     }
-  }, [deviceLink.status]);
+  }, [deviceLink.status, setTab]);
 
   const onLilyDisconnect = async () => {
     await disconnectDeviceLink();
@@ -604,40 +609,53 @@ function App() {
   const ch0 = s.channels.get(0);
 
   return (
-    <div className={`app ${menuOpen ? "menu-open" : ""}`}>
+    <div className={`app ${menuOpen ? "menu-open" : ""} ${tab === "FLASH" ? "app-flash" : ""}`}>
       <Titlebar />
       <header>
-        <div className="logo">
+        <a className="logo" href={tabHref("INTRO")} aria-label="Lilyshark home" onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          setTab("INTRO");
+          setMenuOpen(false);
+        }}>
           <img className="logo-mark" src="/lilyshark-wordmark-pink.svg" alt="" aria-hidden="true" />
           <span className="wordmark">
             <span className="lily">lily</span>shark
           </span>
-        </div>
-        <nav>
-          {TABS.map((tb, i) => (
-            <button
+        </a>
+        <nav ref={navRef} id="main-navigation" aria-label="Main navigation">
+          {NAV_TABS.map((tb, i) => (
+            <a
               key={tb}
-              className={`tab ${tb === tab ? "active" : ""}`}
-              title={`Ctrl+${i === 9 ? 0 : i + 1}`}
+              className={`tab ${tb === parentTab(tab) ? "active" : ""}`}
+              href={tabHref(tb)}
+              aria-current={tb === parentTab(tab) ? "page" : undefined}
+              title={i < 10 ? `Ctrl+${i === 9 ? 0 : i + 1}` : undefined}
               style={{ "--i": i } as CSSProperties}
-              onClick={() => {
+              onClick={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
                 setNodeFocus(undefined);
                 setMapFocus(undefined);
                 setTab(tb);
                 setMenuOpen(false);
+                if (menuOpen) menuButtonRef.current?.focus();
               }}
             >
               [{t(tb)}]
               {tb === "CHAT" && totalUnread > 0 && (
                 <span className="unread-badge">{totalUnread}</span>
               )}
-            </button>
+            </a>
           ))}
         </nav>
-        {/* Phone-only: the ten tabs live behind this instead of a side-scroll. */}
+        {/* Phone-only: the pages live behind this instead of a side-scroll. */}
         <button
+          ref={menuButtonRef}
+          type="button"
           className="menu-btn"
-          aria-label="Menu"
+          aria-label={menuOpen ? "Close menu" : "Menu"}
+          aria-controls="main-navigation"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
         >
@@ -683,16 +701,12 @@ function App() {
             {t("CONNECT")}
           </button>
         )}
-        <div
+        <button
+          type="button"
           className="conn-pill"
-          role="button"
-          tabIndex={0}
           style={{ cursor: "pointer" }}
           title={t("Connection details")}
           onClick={() => setConnectOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") setConnectOpen(true);
-          }}
         >
           <span className={`led ${ledClass}`} />
           <span
@@ -702,7 +716,7 @@ function App() {
           >
             {connText}
           </span>
-        </div>
+        </button>
       </header>
 
       {/* The connect sheet: the same surface as the tab sheet, holding the
@@ -722,8 +736,10 @@ function App() {
               <span className="flow-n">01</span>
               <span className="flow-k">FLASH</span>
               <span className="flow-v">
-                the radio runs Lilyshark (<a href="/flash/" target="_blank" rel="noreferrer">
-                install it from the browser</a>) or the MeshCore companion
+                the radio runs Lilyshark (<a href={tabHref("FLASH")} onClick={(event) => {
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault(); setConnectOpen(false); setTab("FLASH");
+                }}>install it from the browser</a>) or the MeshCore companion
                 firmware — a T-Deck, Heltec, RAK or any supported LoRa board
               </span>
             </div>
@@ -834,6 +850,16 @@ function App() {
         </p>
       )}
 
+      {(tab === "DOCS" || tab === "PAPER" || tab === "CONFIG" || tab === "DEBUG") && (
+        <nav className="section-tabs" aria-label={parentTab(tab) === "DOCS" ? "Documentation views" : "Configuration views"}>
+          {(parentTab(tab) === "DOCS" ? ["DOCS", "PAPER"] as const : ["CONFIG", "DEBUG"] as const).map((view) => (
+            <a key={view} href={tabHref(view)} aria-current={tab === view ? "page" : undefined} onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault(); setTab(view);
+            }}>{view === "DOCS" ? "Documentation" : view === "PAPER" ? "Whitepaper" : view === "CONFIG" ? "Settings" : "Diagnostics"}</a>
+          ))}
+        </nav>
+      )}
       <ScreenBoundary key={tab}>
       <Suspense
         fallback={
@@ -849,6 +875,7 @@ function App() {
       )}
       {tab === "SHELBY" && <ShelbyScreen />}
       {tab === "INTRO" && <IntroTab onOpen={(next) => setTab(next as Tab)} />}
+      {tab === "FLASH" && <FlashPage onOpen={setTab} />}
       {tab === "PAPER" && <WhitepaperTab />}
       {tab === "DOCS" && <Docs />}
       {tab === "CHAT" && (

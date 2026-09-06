@@ -1,9 +1,13 @@
 import * as RadioGroup from "@radix-ui/react-radio-group";
 import { useEffect, useRef, useState } from "react";
+import { TDeckPhoto } from "../components/TDeckPhoto";
+import { tabHref, type Tab } from "../mesh/navigation";
+import { loadInstaller } from "./installer";
+import "./flash.css";
 
 /**
  * Browser flasher for the T-Deck family, plus the two other ways to run
- * Lilyshark. The esp-web-tools element is loaded by flash/index.html from
+ * Lilyshark. The esp-web-tools element is loaded on demand from
  * /flash/install-button.js; the firmware image, manifest, fonts and the
  * simulator screens stay as static files under public/flash/.
  *
@@ -20,37 +24,6 @@ const FIRMWARE = {
   sha256: "ad7e833f85ae1d94a43b55157d4b8d641b4740a1dbd82fc66e391dd898cb68eb",
   manifest: "/flash/manifest.json",
 };
-
-/** Original line-art of the T-Deck family: body, screen, keyboard, GPS bump. */
-function DeckIcon({ gps }: { gps: boolean }) {
-  return (
-    <svg
-      width="120"
-      height="80"
-      viewBox="0 0 120 80"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <rect x="10" y="6" width="100" height="68" rx="9" />
-      <rect x="20" y="16" width="58" height="28" rx="3" />
-      {gps ? <circle cx="92" cy="22" r="5" /> : null}
-      {[0, 1, 2].map((row) =>
-        [0, 1, 2, 3, 4, 5, 6, 7, 8].map((col) => (
-          <circle
-            key={`${row}-${col}`}
-            cx={24 + col * 8}
-            cy={54 + row * 7}
-            r="1.8"
-            fill="currentColor"
-            stroke="none"
-          />
-        )),
-      )}
-    </svg>
-  );
-}
 
 /** Small original glyphs for the step circles and buttons. */
 const Glyph = {
@@ -119,345 +92,16 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/**
- * Original SVG render of a T-Deck front, drawn to the published hardware
- * proportions — 100 × 68 mm body, 2.8" 320×240 panel, BlackBerry-style
- * keyboard under a trackball — with one of our own simulator frames on the
- * screen, served as a 4x nearest-neighbour blow-up so the pixel grid survives
- * the browser's downscale at any hero width.
- * Scale is 4.4 units per millimetre, so the body is 300 × 440 units.
- */
-function DeviceMock({ screen, alt }: { screen: string; alt: string }) {
-  const COLS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-  const keyX = (col: number) => 35 + col * 25.4;
-  const rowY = [302, 335, 368, 401];
-  const spaceW = 3 * 25.4 + 21.4;
+function BrowserPreview() {
   return (
-    <svg
-      viewBox="0 0 320 462"
-      width="320"
-      height="462"
-      role="img"
-      aria-label={alt}
-      className="device-mock"
-    >
-      <defs>
-        {/* Moulded plastic: catches light along the top edge, falls away below. */}
-        <linearGradient id="deck-body" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#37313a" />
-          <stop offset="0.13" stopColor="#282329" />
-          <stop offset="0.7" stopColor="#1b181d" />
-          <stop offset="1" stopColor="#131115" />
-        </linearGradient>
-        {/* Rim light: bright at the top bevel, gone by the bottom corners. */}
-        <linearGradient id="deck-rim" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="rgba(255,255,255,0.34)" />
-          <stop offset="0.35" stopColor="rgba(255,255,255,0.09)" />
-          <stop offset="1" stopColor="rgba(255,255,255,0.02)" />
-        </linearGradient>
-        <linearGradient id="deck-key" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#39323b" />
-          <stop offset="0.5" stopColor="#282329" />
-          <stop offset="1" stopColor="#191619" />
-        </linearGradient>
-        {/* Fret bars between keyboard rows. */}
-        <linearGradient id="deck-fret" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="rgba(255,255,255,0.07)" />
-          <stop offset="1" stopColor="rgba(0,0,0,0.26)" />
-        </linearGradient>
-        <radialGradient id="deck-ball" cx="0.34" cy="0.28" r="0.85">
-          <stop offset="0" stopColor="#544a53" />
-          <stop offset="0.55" stopColor="#2a252c" />
-          <stop offset="1" stopColor="#141116" />
-        </radialGradient>
-        {/* Sheen across the cover glass. */}
-        <linearGradient id="deck-glass" x1="0" y1="0" x2="0.55" y2="1">
-          <stop offset="0" stopColor="rgba(255,255,255,0.15)" />
-          <stop offset="0.6" stopColor="rgba(255,255,255,0.02)" />
-          <stop offset="1" stopColor="rgba(255,255,255,0)" />
-        </linearGradient>
-        <clipPath id="deck-glass-clip">
-          <rect x="44" y="38" width="232" height="178" rx="9" />
-        </clipPath>
-        {/* Light the panel throws onto the bezel around it. */}
-        <filter id="deck-bloom" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="15" />
-        </filter>
-        <g id="deck-cap">
-          <rect
-            width="21.4"
-            height="24"
-            rx="4.5"
-            fill="url(#deck-key)"
-            stroke="rgba(255,255,255,0.07)"
-            strokeWidth="0.8"
-          />
-          <rect
-            x="3"
-            y="1.5"
-            width="15.4"
-            height="1.4"
-            rx="0.7"
-            fill="rgba(255,255,255,0.09)"
-          />
-        </g>
-      </defs>
-
-      {/* Side key on the right edge. */}
-      <rect
-        x="307"
-        y="118"
-        width="5.5"
-        height="38"
-        rx="2.7"
-        fill="#241f25"
-        stroke="rgba(255,255,255,0.08)"
-        strokeWidth="0.8"
-      />
-
-      {/* Body */}
-      <rect
-        x="10"
-        y="11"
-        width="300"
-        height="440"
-        rx="30"
-        fill="url(#deck-body)"
-      />
-      <rect
-        x="10"
-        y="11"
-        width="300"
-        height="440"
-        rx="30"
-        fill="none"
-        stroke="url(#deck-rim)"
-        strokeWidth="1.6"
-      />
-      <rect
-        x="12.6"
-        y="13.6"
-        width="294.8"
-        height="434.8"
-        rx="27.6"
-        fill="none"
-        stroke="rgba(255,255,255,0.05)"
-        strokeWidth="1"
-      />
-
-      {/* Screen: bloom on the bezel, then glass, then our firmware frame. */}
-      <rect
-        x="52"
-        y="46"
-        width="216"
-        height="162"
-        rx="10"
-        fill="#ff4f9d"
-        opacity="0.2"
-        filter="url(#deck-bloom)"
-      />
-      <rect x="44" y="38" width="232" height="178" rx="9" fill="#08070a" />
-      <rect x="59" y="49" width="202" height="152" rx="2" fill="#000" />
-      <image
-        href={screen}
-        x="60"
-        y="50"
-        width="200"
-        height="150"
-        preserveAspectRatio="xMidYMid slice"
-        className="deck-screen"
-      />
-      <g clipPath="url(#deck-glass-clip)">
-        <polygon
-          points="44,38 166,38 84,216 44,216"
-          fill="url(#deck-glass)"
-          opacity="0.42"
-        />
-        <rect
-          x="44"
-          y="38"
-          width="232"
-          height="1.3"
-          fill="rgba(255,255,255,0.16)"
-        />
-      </g>
-      <rect
-        x="44"
-        y="38"
-        width="232"
-        height="178"
-        rx="9"
-        fill="none"
-        stroke="rgba(255,255,255,0.08)"
-        strokeWidth="1"
-      />
-
-      {/* Trackball */}
-      <circle
-        cx="160"
-        cy="256"
-        r="16.5"
-        fill="#1a171b"
-        stroke="rgba(255,255,255,0.08)"
-        strokeWidth="1"
-      />
-      <circle cx="160" cy="256" r="10.5" fill="url(#deck-ball)" />
-      <circle cx="156.4" cy="252.4" r="2.7" fill="rgba(255,255,255,0.18)" />
-
-      {/* Keyboard: four rows of caps, each row sitting behind a fret bar. */}
-      {rowY.map((y) => (
-        <rect
-          key={`fret-${y}`}
-          x="36"
-          y={y - 6}
-          width="248"
-          height="3"
-          rx="1.5"
-          fill="url(#deck-fret)"
-        />
-      ))}
-      {rowY.slice(0, 3).map((y, row) =>
-        COLS.map((col) => (
-          <g key={`key-${y}-${col}`}>
-            <use href="#deck-cap" x={keyX(col)} y={y} />
-            <text
-              x={keyX(col) + 10.7}
-              y={y + 15}
-              textAnchor="middle"
-              fill="#c9bdc9"
-              fontSize="9"
-              fontFamily="monospace"
-            >
-              {["QWERTYUIOP", "ASDFGHJKL↵", "⇧ZXCVBNM⌫⇧"][row][col]}
-            </text>
-          </g>
-        )),
-      )}
-      {[0, 1, 2, 7, 8, 9].map((col) => (
-        <use
-          key={`key-space-row-${col}`}
-          href="#deck-cap"
-          x={keyX(col)}
-          y={rowY[3]}
-        />
-      ))}
-      <rect
-        x={keyX(3)}
-        y={rowY[3]}
-        width={spaceW}
-        height="24"
-        rx="4.5"
-        fill="url(#deck-key)"
-        stroke="rgba(255,255,255,0.07)"
-        strokeWidth="0.8"
-      />
-      <rect
-        x={keyX(3) + 10}
-        y={rowY[3] + 1.5}
-        width={spaceW - 20}
-        height="1.4"
-        rx="0.7"
-        fill="rgba(255,255,255,0.09)"
-      />
-    </svg>
+    <figure className="analyzer-preview">
+      <div className="preview-titlebar" aria-hidden="true"><span>◦ ◦ ◦</span><span>LILYSHARK / TRAFFIC</span></div>
+      <img className="analyzer-preview-image" src="/flash/analyzer-preview.png" width={1440} height={894} loading="lazy" alt="Lilyshark traffic analyzer showing a synthetic sample capture, airtime graph, and decoded LoRa frame" />
+      <figcaption>Actual analyzer · synthetic sample capture</figcaption>
+    </figure>
   );
 }
 
-/** A browser window holding the analyzer, drawn rather than screenshotted so
- *  it follows the reader's theme instead of freezing one. */
-function BrowserMock() {
-  const tabs = ["TRAFFIC", "NODES", "MAP", "SPECTRUM"];
-  const cols = [
-    { label: "TIME", x: 14, w: 54 },
-    { label: "SRC", x: 96, w: 58 },
-    { label: "DST", x: 176, w: 58 },
-    { label: "KIND", x: 250, w: 40 },
-    { label: "SNR", x: 316, w: 30 },
-  ];
-  return (
-    <svg
-      viewBox="0 0 420 286"
-      role="img"
-      aria-label="The Lilyshark analyzer running as a web page"
-      className="device-mock window-mock"
-    >
-      <rect x="1" y="1" width="418" height="284" fill="none" stroke="currentColor" opacity="0.5" />
-      {/* title bar */}
-      <line x1="1" y1="27" x2="419" y2="27" stroke="currentColor" opacity="0.4" />
-      {[13, 25, 37].map((cx) => (
-        <rect key={cx} x={cx - 3} y="11" width="6" height="6" fill="currentColor" opacity="0.55" />
-      ))}
-      <rect x="132" y="8" width="156" height="12" fill="none" stroke="currentColor" opacity="0.35" />
-      <text x="210" y="17.5" textAnchor="middle" fontSize="8" letterSpacing="1.2" fill="currentColor" opacity="0.75">
-        LILYSHARK.COM
-      </text>
-      {/* tab strip */}
-      {tabs.map((t, i) => (
-        <g key={t}>
-          <rect
-            x={14 + i * 74}
-            y={39}
-            width="66"
-            height="16"
-            fill={i === 0 ? "currentColor" : "none"}
-            stroke="currentColor"
-            opacity={i === 0 ? 0.85 : 0.35}
-          />
-          <text
-            x={47 + i * 74}
-            y={50.5}
-            textAnchor="middle"
-            fontSize="7.5"
-            letterSpacing="0.9"
-            fill={i === 0 ? "var(--panel)" : "currentColor"}
-            opacity={i === 0 ? 1 : 0.75}
-          >
-            [{t}]
-          </text>
-        </g>
-      ))}
-      {/* traffic table: real column names, abstract values */}
-      <line x1="14" y1="70" x2="406" y2="70" stroke="currentColor" opacity="0.35" />
-      {cols.map((c) => (
-        <text key={c.label} x={c.x} y={67} fontSize="7.5" letterSpacing="0.9" fill="currentColor" opacity="0.6">
-          {c.label}
-        </text>
-      ))}
-      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((row) => {
-        const y = 82 + row * 17;
-        const on = row === 3;
-        return (
-          <g key={row}>
-            {on ? <rect x="14" y={y - 9} width="392" height="15" fill="currentColor" opacity="0.14" /> : null}
-            {on ? <rect x="14" y={y - 9} width="2" height="15" fill="currentColor" /> : null}
-            {cols.map((c, i) => (
-              <rect
-                key={c.label}
-                x={c.x}
-                y={y - 4.5}
-                width={c.w - (row % 3) * 5}
-                height="5"
-                fill="currentColor"
-                opacity={on ? 0.75 : 0.3 + ((row + i) % 3) * 0.08}
-              />
-            ))}
-          </g>
-        );
-      })}
-      {/* status bar */}
-      <line x1="1" y1="258" x2="419" y2="258" stroke="currentColor" opacity="0.4" />
-      <text x="14" y="272" fontSize="7.5" letterSpacing="1.1" fill="currentColor" opacity="0.7">
-        CHANNEL 0 · LISTENING
-      </text>
-      <text x="406" y="272" textAnchor="end" fontSize="7.5" letterSpacing="1.1" fill="currentColor" opacity="0.7">
-        USB LINK
-      </text>
-    </svg>
-  );
-}
-
-/** A terminal running the build this page serves. The commands are the ones in
- *  the README, not invented ones. */
 function SourceMock() {
   const lines: [string, string][] = [
     ["$", "git clone github.com/maxmoneycash/lilyshark"],
@@ -473,7 +117,7 @@ function SourceMock() {
       viewBox="0 0 420 286"
       role="img"
       aria-label="A terminal building Lilyshark from source"
-      className="device-mock window-mock"
+      className="window-mock"
     >
       <rect x="1" y="1" width="418" height="284" fill="none" stroke="currentColor" opacity="0.5" />
       <line x1="1" y1="27" x2="419" y2="27" stroke="currentColor" opacity="0.4" />
@@ -505,7 +149,7 @@ function SourceMock() {
   );
 }
 
-/** Line art for the two non-hardware tiles, in the same weight as DeckIcon. */
+/** Line art for the two non-hardware tiles, for the browser and source options. */
 function BrowserIcon() {
   return (
     <svg width="120" height="80" viewBox="0 0 120 80" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -671,10 +315,22 @@ const CLONE_CMD =
 const BUILD_CMD = "./scripts/build_release.sh";
 const REPO = "https://github.com/maxmoneycash/lilyshark";
 
-export function FlashPage() {
+export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
   const [platform, setPlatform] = useState<PlatformId>("tdeck-plus");
   const selected = PLATFORMS.find((p) => p.id === platform) ?? PLATFORMS[0];
   const kind = selected.kind;
+  const [installer, setInstaller] = useState<"loading" | "ready" | "error">("loading");
+  useEffect(() => {
+    if (installer !== "loading") return;
+    let cancelled = false;
+    loadInstaller().then(() => { if (!cancelled) setInstaller("ready"); }, () => { if (!cancelled) setInstaller("error"); });
+    return () => { cancelled = true; };
+  }, [installer]);
+  const openPage = (event: React.MouseEvent<HTMLAnchorElement>, tab: Tab) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onOpen(tab);
+  };
 
   const art = (id: PlatformId, gps: boolean) =>
     id === "browser" ? (
@@ -682,24 +338,11 @@ export function FlashPage() {
     ) : id === "source" ? (
       <SourceIcon />
     ) : (
-      <DeckIcon gps={gps} />
+      <TDeckPhoto alt={gps ? "T-Deck Plus" : "T-Deck family"} />
     );
 
   return (
     <main className="flash-page">
-      <div className="statusbar">
-        <span>
-          <a href="/">
-            <span className="lit">◊ LILYSHARK</span> ·· FLASHER
-          </a>
-        </span>
-        <span className="sb-right">
-          <span className="hide-narrow">{FIRMWARE.version}</span>
-          <a href="/">ANALYZER</a>
-          <a href={REPO}>SOURCE</a>
-        </span>
-      </div>
-
       <div className="page">
         <div className="lede">
           <div className="eyebrow">LILYSHARK / FIRMWARE INSTALLER</div>
@@ -732,7 +375,7 @@ export function FlashPage() {
         >
           {PLATFORMS.map((p) => (
             <RadioGroup.Item key={p.id} value={p.id} className="device-card">
-              <span className="art">{art(p.id, p.gps)}</span>
+              <span className="art" aria-hidden="true">{art(p.id, p.gps)}</span>
               <span className="device-copy">
                 <span className="device-name">{p.name}</span>
                 <span className="device-chip">{p.chip}</span>
@@ -747,22 +390,17 @@ export function FlashPage() {
             <span className="hero-label">{selected.heroLabel}</span>
             <div className="preview-content" key={selected.id}>
               {kind === "firmware" ? (
-                <DeviceMock
-                  screen={
-                    selected.gps
-                      ? "/flash/deck-screen-plus.png"
-                      : "/flash/deck-screen-base.png"
-                  }
-                  alt={`A T-Deck running Lilyshark — ${selected.name}`}
+                <TDeckPhoto
+                  alt="Front view of a LILYGO T-Deck Plus displaying the Lilyshark firmware Home screen"
                 />
               ) : kind === "browser" ? (
-                <BrowserMock />
+                <BrowserPreview />
               ) : (
                 <SourceMock />
               )}
               <div className="hero-caption">
                 <span>
-                  <b>{selected.name}</b> · {selected.caption}
+                  <b>{kind === "firmware" ? "T-Deck Plus pictured" : selected.name}</b> · {kind === "firmware" ? "Firmware Home screen" : selected.caption}
                 </span>
               </div>
             </div>
@@ -804,7 +442,7 @@ export function FlashPage() {
                   </span>
                 </div>
                 <div className="cta">
-                  <esp-web-install-button manifest={FIRMWARE.manifest}>
+                  {installer === "ready" ? <esp-web-install-button manifest={FIRMWARE.manifest}>
                     <button slot="activate" className="flash-btn" type="button">
                       {Glyph.bolt}
                       <span className="cta-text">
@@ -823,7 +461,14 @@ export function FlashPage() {
                       Serial access is blocked here; check the browser's site
                       permissions.
                     </span>
-                  </esp-web-install-button>
+                  </esp-web-install-button> : installer === "loading" ? (
+                  <button className="flash-btn" type="button" disabled>Loading installer…</button>
+                ) : (
+                  <div className="installer-error" role="alert">
+                    <p>The installer could not load. Retry, or download the firmware below.</p>
+                    <button type="button" className="outline-btn" onClick={() => setInstaller("loading")}>Retry installer</button>
+                  </div>
+                )}
                 </div>
 
                 <div className="secondary">
@@ -851,7 +496,7 @@ export function FlashPage() {
             ) : kind === "browser" ? (
               <>
                 <div className="cta">
-                  <a className="flash-btn" href="/">
+                  <a className="flash-btn" href={tabHref("TRAFFIC")} onClick={(event) => openPage(event, "TRAFFIC")}>
                     {Glyph.bolt}
                     <span className="cta-text">
                       Open the analyzer
@@ -862,10 +507,10 @@ export function FlashPage() {
                   </a>
                 </div>
                 <div className="secondary">
-                  <a className="outline-btn" href="/docs">
+                  <a className="outline-btn" href={tabHref("DOCS")} onClick={(event) => openPage(event, "DOCS")}>
                     {Glyph.code} Read the docs
                   </a>
-                  <a className="outline-btn" href="/demo">
+                  <a className="outline-btn" href={tabHref("TRAFFIC")} onClick={(event) => openPage(event, "TRAFFIC")}>
                     {Glyph.download} Try the demo
                   </a>
                 </div>
@@ -985,7 +630,7 @@ export function FlashPage() {
                       and the Shelby off-grid pointer pipeline.
                     </span>
                     <span>
-                      After flashing, open <a href="/">the analyzer</a>, press
+                      After flashing, open <a href={tabHref("TRAFFIC")} onClick={(event) => openPage(event, "TRAFFIC")}>the analyzer</a>, press
                       CONNECT → LILYSHARK T-DECK · USB, and the device links to
                       this site over the same cable.
                     </span>
@@ -1009,14 +654,6 @@ export function FlashPage() {
         ) : null}
       </div>
 
-      <div className="statusbar bottom">
-        <span>
-          GPL-3.0 · <a href={REPO}>SOURCE</a> · <a href="/">LILYSHARK.COM</a>
-        </span>
-        <span className="sb-right">
-          <span className="lit">{PLATFORMS.length} PLATFORMS</span>
-        </span>
-      </div>
     </main>
   );
 }

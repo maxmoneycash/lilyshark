@@ -1,19 +1,4 @@
-/* Fixed Lilyshark palette; independent of the analyzer's saved theme. */
-@font-face {
-  font-family: "JetBrains Mono";
-  src: url("/flash/JetBrainsMono-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "JetBrains Mono";
-  src: url("/flash/JetBrainsMono-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-:root {
+.meshterm .flash-page {
   --fg: #b80062;
   --bg: #f2e2ec;
   --panel: #fbf3f7;
@@ -24,11 +9,11 @@
   --pad: 20px;
   color-scheme: light;
 }
-* {
+.meshterm .flash-page * {
   box-sizing: border-box;
   margin: 0;
 }
-body {
+.meshterm .flash-page {
   background: var(--bg);
   color: var(--ink);
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -36,81 +21,45 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
-button,
-a,
-summary {
+.meshterm .flash-page button,
+.meshterm .flash-page a,
+.meshterm .flash-page summary {
   -webkit-tap-highlight-color: transparent;
 }
-button {
+.meshterm .flash-page button {
   font: inherit;
 }
-::selection {
+.meshterm .flash-page ::selection {
   background: var(--fg);
   color: var(--panel);
 }
-.flash-page {
-  min-height: 100dvh;
+.meshterm .flash-page {
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
-.flash-page a {
+.meshterm .flash-page a {
   color: var(--fg);
   text-underline-offset: 4px;
 }
-.flash-page :is(a, button, summary):focus-visible {
+.meshterm .flash-page :is(a, button, summary):focus-visible {
   outline: 2px solid var(--fg);
   outline-offset: 4px;
 }
-.flash-page .statusbar {
-  min-height: 58px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 8px max(var(--pad), env(safe-area-inset-right)) 8px
-    max(var(--pad), env(safe-area-inset-left));
-  border-bottom: 1px solid var(--border);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-}
-.flash-page .statusbar a {
-  text-decoration: none;
-}
-.flash-page .statusbar .lit {
-  color: var(--fg);
-  font-weight: 700;
-}
-.flash-page .sb-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.flash-page .hide-narrow {
-  display: none;
-}
-.flash-page .statusbar.bottom {
-  min-height: 68px;
-  margin-top: auto;
-  border-top: 1px solid var(--border);
-  border-bottom: 0;
-  color: var(--fg-dim);
-  font-size: 9px;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
-}
-.flash-page .page {
+.meshterm .flash-page .page {
   width: 100%;
   max-width: 1240px;
   margin: 0 auto;
   padding: 38px max(var(--pad), env(safe-area-inset-right)) 56px
     max(var(--pad), env(safe-area-inset-left));
 }
-.flash-page .eyebrow {
+.meshterm .flash-page .eyebrow {
   color: var(--fg-dim);
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.flash-page .lede h1 {
+.meshterm .flash-page .lede h1 {
   margin-top: 16px;
   font-size: clamp(40px, 5.7vw, 72px);
   line-height: 1.06;
@@ -118,17 +67,17 @@ button {
   font-weight: 700;
   text-wrap: balance;
 }
-.flash-page .lede h1 span {
+.meshterm .flash-page .lede h1 span {
   color: var(--fg);
 }
-.flash-page .sub {
+.meshterm .flash-page .sub {
   max-width: 48ch;
   margin-top: 20px;
   color: var(--fg-dim);
   font-size: 13px;
   line-height: 1.8;
 }
-.flash-page .release-note {
+.meshterm .flash-page .release-note {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -137,34 +86,34 @@ button {
   font-size: 9px;
   color: var(--fg-dim);
 }
-.flash-page .status-dot {
+.meshterm .flash-page .status-dot {
   width: 6px;
   height: 6px;
   background: var(--ok);
   border-radius: 50%;
 }
-.flash-page .release-divider {
+.meshterm .flash-page .release-divider {
   color: var(--border);
   margin: 0 3px;
 }
-.flash-page .picker-heading {
+.meshterm .flash-page .picker-heading {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   margin-top: 34px;
   margin-bottom: 12px;
 }
-.flash-page .picker-hint {
+.meshterm .flash-page .picker-hint {
   display: none;
   color: var(--fg-dim);
   font-size: 10px;
 }
-.flash-page .devices {
+.meshterm .flash-page .devices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
-.flash-page .device-card {
+.meshterm .flash-page .device-card {
   position: relative;
   display: flex;
   align-items: center;
@@ -182,39 +131,39 @@ button {
     border-color 150ms ease,
     transform 150ms ease;
 }
-.flash-page .device-card[data-state="checked"] {
+.meshterm .flash-page .device-card[data-state="checked"] {
   background: var(--panel);
   border-color: var(--fg);
   box-shadow: inset 0 0 0 1px var(--fg);
   color: var(--fg);
 }
-.flash-page .art {
+.meshterm .flash-page .art {
   display: none;
   flex: none;
 }
-.flash-page .art svg {
+.meshterm .flash-page .art svg {
   width: 52px;
   height: 42px;
   display: block;
 }
-.flash-page .device-copy {
+.meshterm .flash-page .device-copy {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
-.flash-page .device-name {
+.meshterm .flash-page .device-name {
   font-size: 12px;
   font-weight: 700;
   color: var(--ink);
 }
-.flash-page .device-card[data-state="checked"] .device-name {
+.meshterm .flash-page .device-card[data-state="checked"] .device-name {
   color: var(--fg);
 }
-.flash-page .device-chip {
+.meshterm .flash-page .device-chip {
   font-size: 9px;
   line-height: 1.6;
 }
-.flash-page .selection-dot {
+.meshterm .flash-page .selection-dot {
   position: absolute;
   right: 10px;
   top: 10px;
@@ -223,15 +172,15 @@ button {
   border-radius: 50%;
   background: var(--border);
 }
-.flash-page .device-card[data-state="checked"] .selection-dot {
+.meshterm .flash-page .device-card[data-state="checked"] .selection-dot {
   background: var(--fg);
 }
-.flash-page .install-layout {
+.meshterm .flash-page .install-layout {
   display: grid;
   gap: 28px;
   margin-top: 16px;
 }
-.flash-page .hero {
+.meshterm .flash-page .hero {
   position: relative;
   display: flex;
   align-items: center;
@@ -246,7 +195,7 @@ button {
     linear-gradient(90deg, rgba(184, 0, 98, 0.045) 1px, transparent 1px);
   background-size: 28px 28px;
 }
-.flash-page .hero-label {
+.meshterm .flash-page .hero-label {
   position: absolute;
   top: 16px;
   left: 18px;
@@ -255,23 +204,26 @@ button {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.flash-page .preview-content {
+.meshterm .flash-page .preview-content {
   width: 100%;
 }
-.flash-page .device-mock {
+.meshterm .flash-page .tdeck-photo {
   display: block;
-  width: 192px;
+  width: 210px;
   max-width: 100%;
   height: auto;
   margin: 0 auto;
   filter: drop-shadow(0 14px 12px #49313e38);
 }
-.flash-page .window-mock {
+.meshterm .flash-page .window-mock {
+  display: block;
+  height: auto;
+  margin: 0 auto;
   width: 100%;
   color: var(--fg);
   filter: none;
 }
-.flash-page .hero-caption {
+.meshterm .flash-page .hero-caption {
   margin-top: 16px;
   text-align: center;
   color: var(--fg-dim);
@@ -279,10 +231,10 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.flash-page .hero-caption b {
+.meshterm .flash-page .hero-caption b {
   font-weight: 400;
 }
-.flash-page .hero-footnote {
+.meshterm .flash-page .hero-footnote {
   position: absolute;
   bottom: 14px;
   left: 18px;
@@ -293,41 +245,41 @@ button {
   font-size: 9px;
   letter-spacing: 0.06em;
 }
-.flash-page .product {
+.meshterm .flash-page .product {
   min-width: 0;
   align-self: center;
 }
-.flash-page .product h2 {
+.meshterm .flash-page .product h2 {
   margin-top: 10px;
   font-size: clamp(23px, 2.5vw, 30px);
   line-height: 1.25;
   letter-spacing: -0.045em;
   text-wrap: balance;
 }
-.flash-page .tagline {
+.meshterm .flash-page .tagline {
   margin-top: 12px;
   font-size: 12px;
   color: var(--fg-dim);
   line-height: 1.8;
 }
-.flash-page .checklist {
+.meshterm .flash-page .checklist {
   list-style: none;
   padding: 0;
   margin-top: 20px;
   display: grid;
   gap: 7px;
 }
-.flash-page .checklist li {
+.meshterm .flash-page .checklist li {
   display: flex;
   gap: 10px;
   align-items: baseline;
   font-size: 11px;
 }
-.flash-page .tick {
+.meshterm .flash-page .tick {
   color: var(--fg);
   flex: none;
 }
-.flash-page .install-requirement {
+.meshterm .flash-page .install-requirement {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -338,17 +290,17 @@ button {
   padding-top: 18px;
   border-top: 1px solid var(--border);
 }
-.flash-page .install-requirement svg {
+.meshterm .flash-page .install-requirement svg {
   flex: none;
 }
-.flash-page .cta {
+.meshterm .flash-page .cta {
   margin-top: 16px;
 }
-.flash-page esp-web-install-button {
+.meshterm .flash-page esp-web-install-button {
   display: block;
 }
-.flash-page .flash-btn,
-.flash-page .outline-btn {
+.meshterm .flash-page .flash-btn,
+.meshterm .flash-page .outline-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -367,34 +319,34 @@ button {
     border-color 150ms ease,
     transform 150ms ease;
 }
-.flash-page .flash-btn {
+.meshterm .flash-page .flash-btn {
   background: var(--fg);
   color: var(--panel);
   min-height: 56px;
 }
-.flash-page .cta-text {
+.meshterm .flash-page .cta-text {
   display: grid;
   text-align: left;
 }
-.flash-page .cta-sub {
+.meshterm .flash-page .cta-sub {
   font-weight: 400;
   font-size: 9px;
   opacity: 0.85;
 }
-.flash-page .secondary {
+.meshterm .flash-page .secondary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 8px;
 }
-.flash-page .outline-btn {
+.meshterm .flash-page .outline-btn {
   background: transparent;
   border-color: var(--border);
   color: var(--fg);
   font-size: 10px;
 }
-.flash-page .unsupported,
-.flash-page .not-allowed {
+.meshterm .flash-page .unsupported,
+.meshterm .flash-page .not-allowed {
   display: block;
   padding: 14px;
   background: var(--panel);
@@ -402,51 +354,51 @@ button {
   color: var(--ink);
   font-size: 11px;
 }
-.flash-page .meta {
+.meshterm .flash-page .meta {
   margin-top: 16px;
   color: var(--fg-dim);
   font-size: 9px;
   line-height: 1.9;
   overflow-wrap: anywhere;
 }
-.flash-page .release-meta {
+.meshterm .flash-page .release-meta {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 3px 12px;
 }
-.flash-page .ownership-note {
+.meshterm .flash-page .ownership-note {
   margin-top: 15px;
   color: var(--fg-dim);
   font-size: 9px;
 }
-.flash-page .card {
+.meshterm .flash-page .card {
   min-width: 0;
 }
-.flash-page .steps-card {
+.meshterm .flash-page .steps-card {
   margin-top: 40px;
   padding: 28px 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
-.flash-page h3 {
+.meshterm .flash-page h3 {
   font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1.4;
   margin-top: 8px;
 }
-.flash-page .steps {
+.meshterm .flash-page .steps {
   display: grid;
   gap: 24px;
   margin-top: 26px;
 }
-.flash-page .step {
+.meshterm .flash-page .step {
   display: grid;
   grid-template-columns: 36px 1fr;
   column-gap: 14px;
 }
-.flash-page .glyph {
+.meshterm .flash-page .glyph {
   grid-row: span 2;
   color: var(--fg);
   border: 1px solid var(--border);
@@ -455,33 +407,33 @@ button {
   width: 36px;
   height: 40px;
 }
-.flash-page .name {
+.meshterm .flash-page .name {
   font-weight: 700;
   font-size: 12px;
 }
-.flash-page .hint {
+.meshterm .flash-page .hint {
   color: var(--fg-dim);
   font-size: 10px;
   margin-top: 3px;
 }
-.flash-page .support-layout {
+.meshterm .flash-page .support-layout {
   display: grid;
   gap: 32px;
   margin-top: 32px;
 }
-.flash-page .verify-card {
+.meshterm .flash-page .verify-card {
   padding: 22px;
   border: 1px solid var(--border);
   background: var(--panel);
   scroll-margin-top: 24px;
 }
-.flash-page .card-sub {
+.meshterm .flash-page .card-sub {
   margin-top: 12px;
   font-size: 11px;
   color: var(--fg-dim);
   line-height: 1.8;
 }
-.flash-page .firmware-facts {
+.meshterm .flash-page .firmware-facts {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
@@ -489,7 +441,7 @@ button {
   color: var(--fg-dim);
   margin-top: 18px;
 }
-.flash-page .checksum {
+.meshterm .flash-page .checksum {
   display: block;
   margin-top: 6px;
   font: inherit;
@@ -497,20 +449,20 @@ button {
   overflow-wrap: anywhere;
   color: var(--ink);
 }
-.flash-page .cmd-label {
+.meshterm .flash-page .cmd-label {
   margin-top: 18px;
   font-size: 9px;
   letter-spacing: 0.08em;
   color: var(--fg-dim);
 }
-.flash-page .cmd-row {
+.meshterm .flash-page .cmd-row {
   display: flex;
   gap: 6px;
   margin-top: 8px;
   align-items: stretch;
   min-width: 0;
 }
-.flash-page .verify-cmd {
+.meshterm .flash-page .verify-cmd {
   flex: 1;
   min-width: 0;
   white-space: pre-wrap;
@@ -522,7 +474,7 @@ button {
   background: var(--bg);
   border: 1px solid var(--border);
 }
-.flash-page .copy-btn {
+.meshterm .flash-page .copy-btn {
   flex: none;
   width: 44px;
   min-height: 44px;
@@ -534,30 +486,30 @@ button {
     background-color 150ms ease,
     transform 150ms ease;
 }
-.flash-page .copy-btn.copied {
+.meshterm .flash-page .copy-btn.copied {
   color: var(--ok);
   border-color: var(--ok);
 }
-.flash-page .copy-btn.error {
+.meshterm .flash-page .copy-btn.error {
   color: #a52f26;
 }
-.flash-page .verify-note {
+.meshterm .flash-page .verify-note {
   margin-top: 14px;
   color: var(--fg-dim);
   font-size: 10px;
   line-height: 1.8;
 }
-.flash-page .help-panel {
+.meshterm .flash-page .help-panel {
   padding-top: 4px;
   min-width: 0;
 }
-.flash-page .help-panel h3 {
+.meshterm .flash-page .help-panel h3 {
   margin-bottom: 20px;
 }
-.flash-page details {
+.meshterm .flash-page details {
   border-bottom: 1px solid var(--border);
 }
-.flash-page summary {
+.meshterm .flash-page summary {
   position: relative;
   cursor: pointer;
   list-style: none;
@@ -565,10 +517,10 @@ button {
   font-size: 11px;
   font-weight: 700;
 }
-.flash-page summary::-webkit-details-marker {
+.meshterm .flash-page summary::-webkit-details-marker {
   display: none;
 }
-.flash-page summary::after {
+.meshterm .flash-page summary::after {
   content: "+";
   position: absolute;
   right: 2px;
@@ -577,10 +529,10 @@ button {
   font-weight: 400;
   top: 10px;
 }
-.flash-page details[open] summary::after {
+.meshterm .flash-page details[open] summary::after {
   content: "−";
 }
-.flash-page details > div {
+.meshterm .flash-page details > div {
   display: grid;
   gap: 10px;
   padding-bottom: 18px;
@@ -588,167 +540,258 @@ button {
   line-height: 1.9;
   color: var(--fg-dim);
 }
-.flash-page .help-link {
+.meshterm .flash-page .help-link {
   display: inline-block;
   margin-top: 20px;
   padding: 8px 0;
   font-size: 10px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .flash-page .device-card:hover {
+  .meshterm .flash-page .device-card:hover {
     border-color: var(--fg);
     background: var(--panel);
   }
-  .flash-page .flash-btn:hover {
+  .meshterm .flash-page .flash-btn:hover {
     background: #950050;
     border-color: #950050;
   }
-  .flash-page .outline-btn:hover,
-  .flash-page .copy-btn:hover {
+  .meshterm .flash-page .outline-btn:hover,
+  .meshterm .flash-page .copy-btn:hover {
     background: var(--panel);
     border-color: var(--fg);
   }
-  .flash-page summary:hover {
+  .meshterm .flash-page summary:hover {
     color: var(--fg);
   }
-  .flash-page .statusbar a:hover {
-    text-decoration: underline;
-  }
 }
-.flash-page :is(.device-card, .flash-btn, .outline-btn, .copy-btn):active {
+.meshterm
+  .flash-page
+  :is(.device-card, .flash-btn, .outline-btn, .copy-btn):active {
   transform: scale(0.98);
 }
 @media (min-width: 620px) {
-  :root {
+  .meshterm .flash-page {
     --pad: 32px;
   }
-  .flash-page .statusbar .hide-narrow {
-    display: inline;
-  }
-  .flash-page .lede {
+  .meshterm .flash-page .lede {
     display: grid;
     grid-template-columns: 1.1fr 1fr;
     column-gap: 32px;
   }
-  .flash-page .lede .eyebrow {
+  .meshterm .flash-page .lede .eyebrow {
     grid-column: 1 / -1;
   }
-  .flash-page .lede h1 {
+  .meshterm .flash-page .lede h1 {
     grid-row: 2 / 4;
   }
-  .flash-page .sub {
+  .meshterm .flash-page .sub {
     align-self: end;
     font-size: 14px;
   }
-  .flash-page .release-note {
+  .meshterm .flash-page .release-note {
     align-self: start;
     margin-top: 14px;
   }
-  .flash-page .picker-hint {
+  .meshterm .flash-page .picker-hint {
     display: inline;
   }
-  .flash-page .devices {
+  .meshterm .flash-page .devices {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-  .flash-page .device-card {
+  .meshterm .flash-page .device-card {
     min-height: 88px;
   }
-  .flash-page .hero {
+  .meshterm .flash-page .hero {
     min-height: 420px;
   }
-  .flash-page .device-mock {
-    width: 230px;
+  .meshterm .flash-page .tdeck-photo {
+    width: 225px;
   }
-  .flash-page .window-mock {
+  .meshterm .flash-page .window-mock {
     width: min(470px, 100%);
   }
-  .flash-page .steps {
+  .meshterm .flash-page .steps {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
   }
-  .flash-page .steps-card {
+  .meshterm .flash-page .steps-card {
     margin-top: 48px;
   }
 }
 @media (min-width: 960px) {
-  .flash-page .page {
+  .meshterm .flash-page .page {
     padding-top: 44px;
   }
-  .flash-page .statusbar {
-    padding-left: max(32px, calc((100vw - 1176px) / 2));
-    padding-right: max(32px, calc((100vw - 1176px) / 2));
-  }
-  .flash-page .lede {
+  .meshterm .flash-page .lede {
     grid-template-columns: 1.1fr 1fr;
     column-gap: 64px;
   }
-  .flash-page .lede h1 {
+  .meshterm .flash-page .lede h1 {
     font-size: 62px;
   }
-  .flash-page .sub {
+  .meshterm .flash-page .sub {
     max-width: 45ch;
     font-size: 14px;
   }
-  .flash-page .release-note {
+  .meshterm .flash-page .release-note {
     font-size: 10px;
   }
-  .flash-page .picker-heading {
+  .meshterm .flash-page .picker-heading {
     margin-top: 32px;
   }
-  .flash-page .art {
+  .meshterm .flash-page .art {
     display: block;
   }
-  .flash-page .device-card {
+  .meshterm .flash-page .device-card {
     padding: 12px 16px;
     gap: 12px;
   }
-  .flash-page .install-layout {
+  .meshterm .flash-page .install-layout {
     grid-template-columns: 1.1fr 1fr;
     gap: 48px;
     margin-top: 20px;
   }
-  .flash-page .hero {
+  .meshterm .flash-page .hero {
     min-height: 520px;
   }
-  .flash-page .device-mock {
-    width: 265px;
+  .meshterm .flash-page .tdeck-photo {
+    width: 214px;
   }
-  .flash-page .window-mock {
+  .meshterm .flash-page .window-mock {
     width: 100%;
   }
-  .flash-page .product {
+  .meshterm .flash-page .product {
     padding: 12px 0;
   }
-  .flash-page .product h2 {
+  .meshterm .flash-page .product h2 {
     font-size: 28px;
   }
-  .flash-page .tagline {
+  .meshterm .flash-page .tagline {
     font-size: 12px;
   }
-  .flash-page .hero-caption {
+  .meshterm .flash-page .hero-caption {
     font-size: 9px;
   }
-  .flash-page .support-layout {
+  .meshterm .flash-page .support-layout {
     grid-template-columns: 1.1fr 1fr;
     gap: 48px;
   }
-  .flash-page .verify-card {
+  .meshterm .flash-page .verify-card {
     padding: 28px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .flash-page *,
-  .flash-page *::before,
-  .flash-page *::after {
+  .meshterm .flash-page *,
+  .meshterm .flash-page *::before,
+  .meshterm .flash-page *::after {
     transition: none !important;
     animation: none !important;
   }
 }
 @media (forced-colors: active) {
-  .flash-page .device-card[data-state="checked"] {
+  .meshterm .flash-page .device-card[data-state="checked"] {
     outline: 2px solid Highlight;
   }
-  .flash-page .selection-dot {
+  .meshterm .flash-page .selection-dot {
     background: ButtonText;
   }
+}
+
+/* The shared shell stays fixed while the installer scrolls beneath it. */
+.meshterm main.flash-page {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.meshterm main.flash-page > .page {
+  flex: none;
+  min-height: auto;
+}
+.meshterm .app.app-flash::after {
+  display: none;
+}
+.meshterm .flash-page .device-card {
+  white-space: normal;
+  letter-spacing: normal;
+}
+.meshterm .flash-page .art {
+  display: block;
+}
+.meshterm .flash-page .art .tdeck-photo {
+  width: 25px;
+  margin: 0;
+  filter: none;
+}
+.meshterm .flash-page .art .tdeck-photo img {
+  border-radius: 0;
+}
+.meshterm .flash-page .art svg {
+  width: 36px;
+}
+.meshterm .flash-page .hero {
+  background: radial-gradient(ellipse at 50% 60%, #ddc3d3, transparent 68%);
+  border: 0;
+  padding-top: 38px;
+  padding-bottom: 52px;
+}
+.meshterm .flash-page .hero > .preview-content > .tdeck-photo {
+  filter: drop-shadow(0 16px 20px #49313e30);
+}
+.meshterm .flash-page .flash-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.meshterm .flash-page .installer-error {
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+.meshterm .flash-page .installer-error button {
+  margin-top: 10px;
+}
+@media (max-width: 860px) {
+  .meshterm main.flash-page {
+    flex: 1 0 auto;
+    overflow: visible;
+    padding: 0;
+  }
+  .meshterm main.flash-page > .page {
+    max-width: 1240px !important;
+  }
+  .meshterm .flash-page .device-card {
+    padding: 12px 8px;
+    gap: 8px;
+  }
+}
+
+.meshterm .flash-page .analyzer-preview {
+  width: 100%;
+  margin: 0;
+}
+.meshterm .flash-page .preview-titlebar {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  color: var(--fg-dim);
+  font-size: 9px;
+}
+.meshterm .flash-page .analyzer-preview-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}
+.meshterm .flash-page .analyzer-preview figcaption {
+  margin-top: 12px;
+  font-size: 9px;
+  text-align: center;
+  color: var(--fg-dim);
 }
