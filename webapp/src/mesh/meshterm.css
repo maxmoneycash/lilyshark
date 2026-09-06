@@ -2028,7 +2028,7 @@ body:has(.meshterm .app.menu-open) {
 	max-width: min(32rem, 34%);
 	align-self: center;
 	justify-self: start;
-	padding-right: 12px;
+	padding-right: 28px;
 }
 .meshterm .intro-head {
 	margin: 0 0 18px;
