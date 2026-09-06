@@ -462,6 +462,10 @@ else
   exit 1
 fi
 
+# Exercise the map from local tiles and test fixtures. A missing tile must not
+# make interaction, demo, or soak checks wait on an external map service.
+export LILYSHARK_SATELLITE_FETCH=0
+
 echo "Testing deterministic pixels for all analyzer and shell screens"
 render_log="${test_dir}/simulator-render.log"
 render_result=0
@@ -533,7 +537,7 @@ interaction_result=$?
 set -e
 if [[ ${interaction_result} -ne 0 ]] || \
    ! grep -q '^Lilyshark simulator interaction test passed$' "${interaction_log}"; then
-  echo "Simulator interaction test did not complete" >&2
+  echo "Simulator interaction test failed (exit ${interaction_result})" >&2
   cat "${interaction_log}" >&2
   exit 1
 fi
