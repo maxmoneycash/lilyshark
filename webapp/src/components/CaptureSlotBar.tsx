@@ -57,7 +57,7 @@ export function CaptureSlotBar({ tabs, activeId, onActivate, onClose }: CaptureS
               title={`Close ${tab.name} — it is not saved anywhere unless you downloaded or published it`}
               onClick={() => onClose(tab.id)}
             >
-              ✕
+              CLOSE
             </button>
           </span>
         );

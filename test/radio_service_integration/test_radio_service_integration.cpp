@@ -150,6 +150,35 @@ void testConfigureInterruptReadAndRearm()
     service.stop();
 }
 
+void testUnrepresentableReceiveAirtimeStaysAbsent()
+{
+    auto &fake = radiolib_fake::state();
+    fake.reset();
+
+    RadioProfile profile = testProfile();
+    profile.spreading_factor = 12;
+    profile.bandwidth_hz = 62500;
+    profile.preamble_symbols = 65535;
+
+    CapturedFrame capture{};
+    TDeckRadioService service{};
+    assert(service.begin(profile, captureFrame, &capture));
+    fake.packet.assign(13, 0x11);
+    fake.packet_length = fake.packet.size();
+    fake.irq_flags = RADIOLIB_SX126X_IRQ_HEADER_VALID;
+    fake.header_coding_rate = 1;
+    fake.header_has_crc = true;
+    fake.triggerDio1();
+    service.poll();
+
+    assert(capture.calls == 1U);
+    assert(capture.frame.rf.hasField(RfFieldCodingRate));
+    assert(capture.frame.rf.airtime_us == 0U);
+    assert(!capture.frame.rf.hasField(RfFieldAirtime));
+    assert(service.airtimeUsFor(fake.packet_length) == 0U);
+    service.stop();
+}
+
 void testReceiveArmRetryAndInvalidLengthRearm()
 {
     auto &fake = radiolib_fake::state();
@@ -344,6 +373,7 @@ void testTransmitLeavesReceiverAbleToDeliverPackets()
 int main()
 {
     testConfigureInterruptReadAndRearm();
+    testUnrepresentableReceiveAirtimeStaysAbsent();
     testReceiveArmRetryAndInvalidLengthRearm();
     testSpectrumSweepRestoresReceiver();
     testRestoreFailureSchedulesFullConfigureRecovery();

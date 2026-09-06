@@ -75,9 +75,13 @@ export interface DeviceTelemetry {
   bat: string;
   gps: string;
   profile: string;
-  frames: number;
-  rssiX10: number;
-  snrX10: number;
+  /** Latest capture sequence, including transmissions; not a receive count. */
+  frames?: number;
+  rssiX10?: number;
+  snrX10?: number;
+  /** Latest frame metadata, when provided by firmware or a matching LSK F. */
+  presentFields?: number;
+  direction?: number;
   sim: boolean;
   /** Present only when the firmware sent a GPS fix. */
   lat?: number;
@@ -218,6 +222,8 @@ export interface DevicePointer {
 export interface DeviceLinkState {
   status: 'off' | 'connecting' | 'linked' | 'error';
   firmware?: string;
+  /** Real node number from LSK ID; absent on older firmware. */
+  node?: number;
   error?: string;
   /** True when the error can be cleared by picking a different port. */
   canPick?: boolean;
@@ -235,7 +241,7 @@ export interface DeviceLinkState {
 }
 
 export type ParsedLsk =
-  | { kind: 'ID'; firmware: string }
+  | { kind: 'ID'; firmware: string; node?: number }
   | { kind: 'T'; telemetry: DeviceTelemetry }
   | { kind: 'F'; frame: HeardFrame }
   | { kind: 'S'; sweep: SpectrumSweep }
@@ -268,8 +274,14 @@ export function parseLskLine(line: string): ParsedLsk | undefined {
   } catch {
     return undefined;
   }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined;
   if (kind === 'ID') {
-    return { kind: 'ID', firmware: String(body.fw ?? '') };
+    const match = typeof body.node === 'string' ? /^!([0-9a-f]{8})$/i.exec(body.node) : null;
+    const node = match ? Number.parseInt(match[1], 16) : undefined;
+    return {
+      kind: 'ID', firmware: String(body.fw ?? ''),
+      ...(node !== undefined && node > 0 && node !== 0xffffffff ? { node } : {}),
+    };
   }
   if (kind === 'T') {
     const lat = optionalCoord(body.lat);
@@ -280,9 +292,11 @@ export function parseLskLine(line: string): ParsedLsk | undefined {
         bat: String(body.bat ?? ''),
         gps: String(body.gps ?? ''),
         profile: String(body.profile ?? ''),
-        frames: Number(body.frames ?? 0),
-        rssiX10: Number(body.rssi_x10 ?? 0),
-        snrX10: Number(body.snr_x10 ?? 0),
+        frames: optionalNum(body.frames),
+        rssiX10: optionalNum(body.rssi_x10),
+        snrX10: optionalNum(body.snr_x10),
+        presentFields: optionalNum(body.latest_pf),
+        direction: optionalNum(body.latest_dir),
         sim: body.sim === true,
         ...(lat !== undefined ? { lat } : {}),
         ...(lon !== undefined ? { lon } : {}),
@@ -404,7 +418,7 @@ let reading = false;
 let identified: (() => void) | undefined;
 let streamEnded: (() => void) | undefined;
 let pendingTx:
-  | { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+  | { proto: string; kind: string; resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
   | undefined;
 
 function finishPendingTx(ok: boolean, reason?: string): void {
@@ -416,13 +430,13 @@ function finishPendingTx(ok: boolean, reason?: string): void {
   else waiter.reject(new Error(reason || 'radio rejected TX'));
 }
 
-let onAnalyzerLink: (() => void) | undefined;
+let onAnalyzerLink: ((node?: number) => void) | undefined;
 let onAnalyzerUnlink: (() => void) | undefined;
 let onAnalyzerTelemetry: ((sample: DeviceTelemetry) => void) | undefined;
 let onAnalyzerFrame: ((frame: HeardFrame) => void) | undefined;
 
 export function setAnalyzerMeshSink(sink: {
-  onLink?: () => void;
+  onLink?: (node?: number) => void;
   onUnlink?: () => void;
   onTelemetry?: (sample: DeviceTelemetry) => void;
   onFrame?: (frame: HeardFrame) => void;
@@ -470,16 +484,18 @@ async function send(line: string): Promise<void> {
   await writer?.write(new TextEncoder().encode(line + '\n'));
 }
 
-function markLinked(firmware?: string): void {
+function markLinked(firmware?: string, node?: number): void {
   const wasLinked = state.status === 'linked';
+  const previousNode = state.node;
   set({
     status: 'linked',
     firmware: firmware || state.firmware,
+    node: node ?? state.node,
     error: undefined,
     canPick: undefined,
   });
   identified?.();
-  if (!wasLinked) onAnalyzerLink?.();
+  if (!wasLinked || previousNode !== state.node) onAnalyzerLink?.(state.node);
 }
 
 function handleLine(line: string): void {
@@ -487,14 +503,22 @@ function handleLine(line: string): void {
   const parsed = parseLskLine(line);
   if (!parsed) return;
   if (parsed.kind === 'ID') {
-    markLinked(parsed.firmware);
+    markLinked(parsed.firmware, parsed.node);
   } else if (parsed.kind === 'T') {
     markLinked(state.firmware);
+    // Older telemetry omits the last frame's validity and direction. A
+    // matching raw record supplies those facts; counters cannot supply them.
+    const raw = state.frames.slice().reverse().find((frame) => frame.raw?.seq === parsed.telemetry.frames)?.raw;
+    const telemetry = {
+      ...parsed.telemetry,
+      presentFields: parsed.telemetry.presentFields ?? raw?.presentFields,
+      direction: parsed.telemetry.direction ?? raw?.direction,
+    };
     set({
-      telemetry: parsed.telemetry,
-      history: appendTelemetryHistory(state.history, parsed.telemetry),
+      telemetry,
+      history: appendTelemetryHistory(state.history, telemetry),
     });
-    onAnalyzerTelemetry?.(parsed.telemetry);
+    onAnalyzerTelemetry?.(telemetry);
   } else if (parsed.kind === 'F') {
     markLinked(state.firmware);
     set({
@@ -512,7 +536,9 @@ function handleLine(line: string): void {
   } else if (parsed.kind === 'P') {
     set({ pointer: parsed.pointer });
   } else if (parsed.kind === 'OK') {
-    finishPendingTx(true);
+    if (parsed.proto === pendingTx?.proto && parsed.txKind === pendingTx?.kind) {
+      finishPendingTx(true);
+    }
   } else if (parsed.kind === 'ERR') {
     finishPendingTx(false, parsed.reason);
   }
@@ -520,6 +546,7 @@ function handleLine(line: string): void {
 
 async function teardown(): Promise<void> {
   reading = false;
+  finishPendingTx(false, 'T-Deck disconnected before confirming TX');
   try {
     await activeReader?.cancel();
   } catch {
@@ -761,10 +788,18 @@ export async function sendDeviceLine(line: string): Promise<void> {
   if (state.status !== 'linked') {
     throw new Error('T-Deck is not linked');
   }
-  await send(line);
-  if (!line.startsWith('LSK TX ')) return;
+  // The console has no request IDs. Keep one command in flight so another
+  // command's response cannot be mistaken for this transmission's result.
+  if (pendingTx) throw new Error('A transmission is waiting for the deck. Retry when it finishes.');
+  if (!line.startsWith('LSK TX ')) {
+    await send(line);
+    return;
+  }
+  const [, , proto, kind] = line.split(' ');
   await new Promise<void>((resolve, reject) => {
     pendingTx = {
+      proto,
+      kind,
       resolve,
       reject,
       timer: setTimeout(() => {
@@ -772,6 +807,14 @@ export async function sendDeviceLine(line: string): Promise<void> {
         reject(new Error('radio did not confirm TX'));
       }, 8000),
     };
+    const waiter = pendingTx;
+    // Install the waiter before writing: a local or USB device can answer
+    // while write() is still resolving.
+    void send(line).catch((error: unknown) => {
+      if (pendingTx === waiter) {
+        finishPendingTx(false, error instanceof Error ? error.message : String(error));
+      }
+    });
   });
 }
 
@@ -797,6 +840,7 @@ export async function disconnectDeviceLink(): Promise<void> {
     sweeps: [],
     pointer: undefined,
     firmware: undefined,
+    node: undefined,
     error: undefined,
     canPick: undefined,
   });

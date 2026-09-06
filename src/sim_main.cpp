@@ -445,6 +445,7 @@ bool decode_frame_shelby_pointer(const FrameRecord &record, ShelbyPointer &out) 
 // having to be remembered at each call site.
 bool read_frame_payload(const FrameRecord &record, MeshtasticPayload &payload,
                         MeshtasticKeyState &key_state) noexcept;
+bool read_frame_lxmf(const FrameRecord &record, LxmfMessage &message) noexcept;
 const char *stored_key_name(const MeshtasticKeyState &key_state) noexcept;
 void format_key_provenance(char *out, std::size_t capacity,
                            const MeshtasticKeyState &key_state) noexcept;
@@ -5989,16 +5990,9 @@ void build_packet_detail(lv_obj_t * parent)
                 put_label(parent, line, 49, 182, theme::text(), &font_pixel_6x8);
             }
         }
-        // A Reticulum payload is very often an LXMF message. Without this the
-        // tab could say a data packet arrived and nothing about what it said.
-        if(!has_readable && record->decoded.protocol == ProtocolId::Reticulum &&
-           record->decoded.payload_length > 0U &&
-           record->raw.captured_length >=
-               static_cast<std::uint16_t>(record->decoded.payload_offset +
-                                          record->decoded.payload_length)) {
+        if(!has_readable && record->decoded.protocol == ProtocolId::Reticulum) {
             LxmfMessage lxmf{};
-            if(readLxmfMessage(&record->raw.bytes[record->decoded.payload_offset],
-                               record->decoded.payload_length, lxmf)) {
+            if(read_frame_lxmf(*record, lxmf)) {
                 put_label(parent, "LXMF", 49, 168, theme::pink(), &font_pixel_6x8);
                 if(lxmf.has_title) {
                     put_clipped_label(parent, lxmf.title, 85, 168, 220, theme::lime(),
@@ -6937,7 +6931,8 @@ void build_messages(lv_obj_t * parent)
     const std::size_t node_count = collect_live_nodes(nodes);
     std::array<MessageRow, 16> rows{};
     std::array<char[kChatTextCapacity], 16> texts{};
-    std::array<std::uint32_t, 16> senders{};
+    // Keep full LXMF source hashes separate from Meshtastic node numbers.
+    std::array<std::array<std::uint8_t, kLxmfHashLength + 1>, 16> senders{};
     std::size_t sender_count = 0;
     std::size_t count = 0;
     const auto &store = capture_runtime.frames();
@@ -6958,17 +6953,18 @@ void build_messages(lv_obj_t * parent)
         char lxmf_text[kChatTextCapacity]{};
         MeshtasticPayload payload{};
         MeshtasticKeyState key_state{};
+        LxmfMessage lxmf{};
+        std::array<std::uint8_t, kLxmfHashLength + 1> sender{};
+        sender[0] = static_cast<std::uint8_t>(record->decoded.protocol);
         bool is_lxmf = false;
         if (record->decoded.protocol == ProtocolId::Meshtastic) {
             if (!read_frame_payload(*record, payload, key_state)) continue;
             if (!payload.has_text) continue;
+            std::memcpy(sender.data() + 1, &record->decoded.source, sizeof(record->decoded.source));
         } else if (record->decoded.protocol == ProtocolId::Reticulum) {
-            LxmfMessage lxmf{};
-            if (!readLxmfMessage(record->raw.bytes + record->decoded.payload_offset,
-                                 record->decoded.payload_length, lxmf)) {
-                continue;
-            }
+            if (!read_frame_lxmf(*record, lxmf)) continue;
             if (!lxmf.has_content) continue;
+            std::memcpy(sender.data() + 1, lxmf.source_hash, kLxmfHashLength);
             std::snprintf(lxmf_text, sizeof(lxmf_text), "%s", lxmf.content);
             is_lxmf = true;
         } else {
@@ -6977,8 +6973,12 @@ void build_messages(lv_obj_t * parent)
         MessageRow &row = rows[count];
         const char *key_name = stored_key_name(key_state);
         if (key_name != nullptr) std::snprintf(row.key, sizeof(row.key), "%s", key_name);
-        row.mine = record->decoded.source == localMeshtasticNodeNum();
-        if (row.mine) {
+        row.mine = !is_lxmf && record->decoded.source == localMeshtasticNodeNum();
+        if (is_lxmf) {
+            std::snprintf(row.who, sizeof(row.who), "RNS %02x%02x%02x%02x...",
+                          lxmf.source_hash[0], lxmf.source_hash[1],
+                          lxmf.source_hash[2], lxmf.source_hash[3]);
+        } else if (row.mine) {
             std::snprintf(row.who, sizeof(row.who), "YOU");
         } else {
             const char *label = nullptr;
@@ -7006,9 +7006,9 @@ void build_messages(lv_obj_t * parent)
         row.text = texts[count];
         bool seen = false;
         for (std::size_t index = 0; index < sender_count; ++index) {
-            if (senders[index] == record->decoded.source) { seen = true; break; }
+            if (senders[index] == sender) { seen = true; break; }
         }
-        if (!seen && sender_count < senders.size()) senders[sender_count++] = record->decoded.source;
+        if (!seen && sender_count < senders.size()) senders[sender_count++] = sender;
         ++count;
     }
     draw_message_rows(parent, rows.data(), count, sender_count);
@@ -8865,6 +8865,24 @@ bool read_frame_payload(const FrameRecord &record, MeshtasticPayload &payload,
     return readMeshtasticPayloadWithKeys(
         record.raw.bytes + record.decoded.payload_offset, record.decoded.payload_length,
         record.decoded.source, record.decoded.packet_id, &channel_keys, payload, key_state);
+}
+
+bool read_frame_lxmf(const FrameRecord &record, LxmfMessage &message) noexcept
+{
+    const auto &packet = record.decoded;
+    if(packet.protocol != ProtocolId::Reticulum || packet.state == DecodeState::Malformed ||
+       packet.hasAttribute(AttributeEncrypted) || record.raw.wasTruncated() ||
+       ReticulumDecoder::headerLength(packet) == 0U ||
+       ReticulumDecoder::isRNodeSplitFrame(packet) || ReticulumDecoder::isIfacProtected(packet) ||
+       ReticulumDecoder::packetType(packet) != ReticulumPacketType::Data ||
+       ReticulumDecoder::destinationType(packet) != ReticulumDestinationType::Plain ||
+       ReticulumDecoder::context(packet) != 0U ||
+       static_cast<std::size_t>(packet.payload_offset) + packet.payload_length >
+           record.raw.captured_length) {
+        return false;
+    }
+    return readLxmfMessage(record.raw.bytes + packet.payload_offset, packet.payload_length,
+                           message, LxmfFraming::Opportunistic);
 }
 
 /// The operator's name for the key that opened a payload, or nullptr when the
@@ -14735,7 +14753,7 @@ bool run_simulator_render_test() noexcept
         0xa066240e572f0e6aULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
         0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0xadef2eb28eb36c85ULL,
-        0x88a5b508b56dff44ULL, 0x89c4790ceb689553ULL, 0x1e803963e44d0632ULL,
+        0x88a5b508b56dff44ULL, 0x8328031fef8d34f8ULL, 0x1e803963e44d0632ULL,
         0xde0a7b1d16ecf53aULL, 0x7ed210334475e24aULL, 0x14f80c364b5d4568ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
     }};
@@ -16740,6 +16758,9 @@ void ingest_own_transmission(const std::uint8_t *frame, std::size_t length) noex
 /// beacons, and Routing acknowledgements.
 bool transmit_meshtastic_request(const MeshtasticEncodeRequest &request) noexcept
 {
+    // Startup, USB-link beacons and explicit sends share this path. A
+    // Meshtastic packet must never be sent using a MeshCore or RNode profile.
+    if (radio_service.activeProfile().protocol_hint != ProtocolId::Meshtastic) return false;
     std::uint8_t frame[kMaxFrameBytes]{};
     const std::size_t n = encodeMeshtasticFrame(request, frame, sizeof(frame));
     if (n == 0) return false;
@@ -17319,13 +17340,10 @@ void service_ble_api() noexcept
             //
             // These are Meshtastic's own Routing.Error values, so a stock
             // client shows the right words without knowing anything about us.
-            const std::uint32_t routing_error =
-                sent                                     ? 0U   // NONE
-                : !have_channel                          ? 6U   // NO_CHANNEL
-                : app_settings.simulate_mode             ? 33U  // NOT_AUTHORIZED
-                : !radio_service.status().initialized    ? 4U   // NO_INTERFACE
-                : std::strlen(message.text) > 200U       ? 7U   // TOO_LARGE
-                                                         : 5U;  // MAX_RETRANSMIT
+            const std::uint32_t routing_error = apiTextRoutingError(
+                sent, have_channel, app_settings.simulate_mode,
+                radio_service.status().initialized, std::strlen(message.text),
+                radio_service.activeProfile().protocol_hint == ProtocolId::Meshtastic);
             if (!sent) {
                 char why[96]{};
                 std::snprintf(why, sizeof(why), "TX refused (routing %lu): %.40s",
@@ -17530,10 +17548,18 @@ void loop()
         const HardwareStatusSnapshot &hardware = hardware_status.snapshot();
         const FrameRecord *newest = capture_runtime.frames().newest();
         const RadioProfile &link_profile = radio_service.activeProfile();
+        // Signal numbers share the newest frame's presence and direction. A
+        // transmitted or relayed frame may carry zero-filled storage without
+        // any receive measurement; zero remains valid when its bit is present.
+        const auto latest_fields = static_cast<unsigned long>(
+            newest != nullptr ? newest->raw.rf.present_fields : 0U);
+        const auto latest_direction = static_cast<unsigned>(
+            newest != nullptr ? newest->raw.rf.direction : FrameDirection::Unknown);
         if(hardware.gps.state == GpsState::Fix && hardware.gps.position_valid) {
             Serial.printf(
                 "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
-                "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s,\"lat\":%.6f,\"lon\":%.6f,"
+                "\"rssi_x10\":%d,\"snr_x10\":%d,\"latest_pf\":%lu,\"latest_dir\":%u,"
+                "\"sim\":%s,\"lat\":%.6f,\"lon\":%.6f,"
                 "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"
                 "\"rx\":%lu,\"crc\":%lu,\"drop_crc\":%lu,\"drop_bad\":%lu,"
                 "\"drop_nosrc\":%lu,\"drop_sd\":%lu,\"sd\":\"%s\"}\n",
@@ -17541,6 +17567,7 @@ void loop()
                 static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
                 newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
                 newest != nullptr ? static_cast<int>(newest->raw.rf.snr_db_x10) : 0,
+                latest_fields, latest_direction,
                 app_settings.simulate_mode ? "true" : "false",
                 hardware.gps.latitude_degrees, hardware.gps.longitude_degrees,
                 static_cast<unsigned long>(hardware.battery.voltage_millivolts),
@@ -17559,7 +17586,7 @@ void loop()
         } else {
             Serial.printf(
                 "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
-                "\"rssi_x10\":%d,\"snr_x10\":%d,\"sim\":%s,"
+                "\"rssi_x10\":%d,\"snr_x10\":%d,\"latest_pf\":%lu,\"latest_dir\":%u,\"sim\":%s,"
                 "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"
                 "\"rx\":%lu,\"crc\":%lu,\"drop_crc\":%lu,\"drop_bad\":%lu,"
                 "\"drop_nosrc\":%lu,\"drop_sd\":%lu,\"sd\":\"%s\"}\n",
@@ -17567,6 +17594,7 @@ void loop()
                 static_cast<unsigned long>(newest != nullptr ? newest->sequence : 0U),
                 newest != nullptr ? static_cast<int>(newest->raw.rf.rssi_dbm_x10) : 0,
                 newest != nullptr ? static_cast<int>(newest->raw.rf.snr_db_x10) : 0,
+                latest_fields, latest_direction,
                 app_settings.simulate_mode ? "true" : "false",
                 static_cast<unsigned long>(hardware.battery.voltage_millivolts),
                 static_cast<unsigned>(hardware.battery.approximate_percent),

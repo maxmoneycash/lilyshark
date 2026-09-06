@@ -273,7 +273,7 @@ enum TerrainProfileRenderer {
             let dist = layout.totalDistance * Double(i) / Double(distSteps)
             let x = layout.xForDistance(dist)
             let label = GeoMath.formatDistance(dist)
-            let text = Text(label).font(.system(size: 9)).foregroundColor(.secondary)
+            let text = Text(label).font(.caption2).foregroundColor(.secondary)
             context.draw(text, at: CGPoint(x: x, y: layout.canvasSize.height - 5), anchor: .bottom)
         }
 
@@ -283,7 +283,7 @@ enum TerrainProfileRenderer {
             let elev = layout.minElevation + layout.elevationRange * Double(i) / Double(elevSteps)
             let y = layout.yForElevation(elev)
             let label = GeoMath.formatElevation(elev)
-            let text = Text(label).font(.system(size: 9)).foregroundColor(.secondary)
+            let text = Text(label).font(.caption2).foregroundColor(.secondary)
             context.draw(text, at: CGPoint(x: layout.margin.leading - 5, y: y), anchor: .trailing)
         }
     }
@@ -309,7 +309,7 @@ enum TerrainProfileRenderer {
         let clr = String(format: "%.1fm", nearest.clearance)
         let pct = String(format: "%.0f%%", nearest.fresnelPercent)
         let tooltipText = Text("\(elev) | Clr: \(clr) | F1: \(pct)")
-            .font(.system(size: 10).monospaced())
+            .font(.caption2.monospaced())
             .foregroundColor(.primary)
 
         // Background for tooltip

@@ -1,5 +1,7 @@
 #include "lilyshark/core/lora_airtime.h"
 
+#include <limits>
+
 namespace lilyshark {
 
 namespace {
@@ -43,7 +45,8 @@ std::uint32_t loraTimeOnAirUs(std::uint8_t spreading_factor, std::uint32_t bandw
                               std::uint16_t preamble_symbols, bool implicit_header,
                               bool crc_enabled, std::size_t payload_bytes) noexcept
 {
-    if (bandwidth_hz == 0U || coding_rate_denominator == 0U ||
+    if (bandwidth_hz == 0U || coding_rate_denominator < 5U ||
+        coding_rate_denominator > 8U || payload_bytes > 255U ||
         spreading_factor < kMinimumSpreadingFactor ||
         spreading_factor > kMaximumSpreadingFactor) {
         return 0U;
@@ -71,10 +74,8 @@ std::uint32_t loraTimeOnAirUs(std::uint8_t spreading_factor, std::uint32_t bandw
     constexpr std::int32_t kBitsPerCrc = 16;
     const std::int32_t header_symbols = implicit_header ? 0 : 20;
 
-    // RadioLib accumulates this in an int16_t, which it would overflow past
-    // roughly 4 kB of payload. LoRa tops out at 255 bytes, so a wider
-    // accumulator gives the same answer for everything a radio can carry and
-    // cannot trap on the way there.
+    // The payload bound above keeps this calculation within range before
+    // converting the caller's size_t to the signed accumulator.
     std::int32_t bit_count = 8 * static_cast<std::int32_t>(payload_bytes) +
                              (crc_enabled ? kBitsPerCrc : 0) -
                              4 * static_cast<std::int32_t>(spreading_factor) +
@@ -93,7 +94,13 @@ std::uint32_t loraTimeOnAirUs(std::uint8_t spreading_factor, std::uint32_t bandw
         (static_cast<std::uint32_t>(preamble_symbols) + 8U) * 4U + sf_coeff1_x4 +
         static_cast<std::uint32_t>(coded_symbols) * coding_rate_denominator * 4U;
 
-    return (symbol_length_us * symbols_x4) / 4U;
+    // The quarter-symbol product can exceed 32 bits even when the final
+    // duration fits. Keep RadioLib's rounding without its intermediate wrap.
+    const std::uint64_t airtime_us =
+        (static_cast<std::uint64_t>(symbol_length_us) * symbols_x4) / 4U;
+    return airtime_us <= std::numeric_limits<std::uint32_t>::max()
+               ? static_cast<std::uint32_t>(airtime_us)
+               : 0U;
 }
 
 } // namespace lilyshark

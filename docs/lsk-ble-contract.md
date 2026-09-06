@@ -116,6 +116,17 @@ The BLE link is a carrier for the same session the serial link carries:
 5. `LSK TX …` from the browser is answered with `LSK OK` or `LSK ERR`.
 6. `LSK BYE` ends the session. The browser then disconnects GATT.
 
+`LSK T` describes the newest captured frame with `frames` (its sequence number),
+`rssi_x10`, and `snr_x10`. The additive `latest_pf` field carries that frame's RF
+presence mask, using the same bits as `LSK F.pf`; `latest_dir` carries its direction
+(`0` unknown, `1` receive, `2` transmit), as in `LSK F.dir`. With no captured frame,
+both new fields are zero. Display RSSI or SNR as a received measurement only when
+direction is receive and the corresponding presence bit is set (`1 << 5` for RSSI,
+`1 << 6` for SNR). A present numeric zero is a valid reading. A transmitted frame
+or a network-relayed frame without signal metadata must not appear as 0 dBm/0 dB.
+Older firmware omits these fields; clients may recover them from an `LSK F` record
+only when its sequence exactly matches `T.frames`, otherwise signal is not reported.
+
 Because BLE is a shared connection rather than a re-enumerating CDC device,
 the device must handle the browser disappearing without a `LSK BYE` — on
 `gattserverdisconnected`, clear `analyzer_link_active` so telemetry stops

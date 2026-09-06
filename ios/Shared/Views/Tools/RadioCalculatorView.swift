@@ -15,6 +15,7 @@ import MeshCoreKit
 
 struct RadioCalculatorView: View {
     @Environment(DeviceConfig.self) private var deviceConfig
+    @Environment(ConnectionManager.self) private var connectionManager
     @State private var frequencyMHz: Double = 910.525
     @State private var txPowerDBm: Double = 22
     @State private var distanceKm: Double = 5.0
@@ -23,26 +24,39 @@ struct RadioCalculatorView: View {
     @State private var rxSensitivityDBm: Double = -130
     @State private var useDeviceConfig = true
 
+    private let frequencyRange = 400.0...928.0
+    private let powerRange = -9.0...30.0
+    private let distanceRange = 0.1...200.0
+    private let gainRange = 0.0...20.0
+    private let sensitivityRange = -150.0...(-80.0)
+
+    private var hasRadioSettings: Bool {
+        connectionManager.connectionState == .ready && !connectionManager.isMeshtasticLinkActive
+            && deviceConfig.loadedSections.contains("selfInfo")
+    }
+
     var body: some View {
         Form {
             Section {
                 Toggle("Use Connected Radio Settings", isOn: $useDeviceConfig)
+                    .disabled(!hasRadioSettings)
                     .foregroundStyle(MeshTheme.accent)
                     .listRowBackground(MeshTheme.surface)
                     .onChange(of: useDeviceConfig) { _, use in
                         if use { loadFromDevice() }
                     }
 
-                paramRow("Frequency", value: $frequencyMHz, unit: "MHz", range: 400...928)
-                paramRow("TX Power", value: $txPowerDBm, unit: "dBm", range: -9...30)
-                paramRow("Distance", value: $distanceKm, unit: "km", range: 0.1...200)
-                paramRow("TX Antenna Gain", value: $txAntennaGainDBi, unit: "dBi", range: 0...20)
-                paramRow("RX Antenna Gain", value: $rxAntennaGainDBi, unit: "dBi", range: 0...20)
-                paramRow("RX Sensitivity", value: $rxSensitivityDBm, unit: "dBm", range: -150...(-80))
+                paramRow("Frequency", value: $frequencyMHz, unit: "MHz", range: frequencyRange)
+                paramRow("TX Power", value: $txPowerDBm, unit: "dBm", range: powerRange)
+                paramRow("Distance", value: $distanceKm, unit: "km", range: distanceRange)
+                paramRow("TX Antenna Gain", value: $txAntennaGainDBi, unit: "dBi", range: gainRange)
+                paramRow("RX Antenna Gain", value: $rxAntennaGainDBi, unit: "dBi", range: gainRange)
+                paramRow("RX Sensitivity", value: $rxSensitivityDBm, unit: "dBm", range: sensitivityRange)
             } header: {
                 Text("Parameters")
             }
 
+            if inputsAreValid {
             Section {
                 resultRow("Wavelength", value: String(format: "%.3f m", wavelength))
                 resultRow("Free-Space Path Loss", value: String(format: "%.1f dB", fspl))
@@ -62,7 +76,7 @@ struct RadioCalculatorView: View {
             } header: {
                 Text("Results")
             } footer: {
-                Text("Free-space path loss assumes ideal conditions (no obstacles, reflections, or atmospheric absorption). Real-world loss is typically 10-30 dB higher.")
+                Text("Free-space path loss assumes an unobstructed path. Terrain, buildings, reflections, and atmospheric conditions can change the result.")
             }
 
             Section {
@@ -71,6 +85,12 @@ struct RadioCalculatorView: View {
                 Text("Estimated Range")
             } footer: {
                 Text("Theoretical maximum based on TX power, antenna gains, and RX sensitivity. Actual range depends on terrain, obstructions, and interference.")
+            }
+            } else {
+                Section("Results") {
+                    ContentUnavailableView("Check the parameters", systemImage: "slider.horizontal.3",
+                                           description: Text("Enter values within the ranges shown above to calculate the link budget."))
+                }
             }
         }
         .formStyle(.grouped)
@@ -82,9 +102,22 @@ struct RadioCalculatorView: View {
         .onAppear {
             if useDeviceConfig { loadFromDevice() }
         }
+        .onChange(of: hasRadioSettings) { _, available in
+            if !available { useDeviceConfig = false }
+        }
     }
 
     // MARK: - Calculations
+
+    private var inputsAreValid: Bool {
+        [frequencyMHz, txPowerDBm, distanceKm, txAntennaGainDBi, rxAntennaGainDBi, rxSensitivityDBm].allSatisfy(\.isFinite)
+            && frequencyRange.contains(frequencyMHz)
+            && powerRange.contains(txPowerDBm)
+            && distanceRange.contains(distanceKm)
+            && gainRange.contains(txAntennaGainDBi)
+            && gainRange.contains(rxAntennaGainDBi)
+            && sensitivityRange.contains(rxSensitivityDBm)
+    }
 
     private var wavelength: Double {
         guard frequencyMHz > 0 else { return 0 }
@@ -133,39 +166,39 @@ struct RadioCalculatorView: View {
     // MARK: - Helpers
 
     private func loadFromDevice() {
+        guard hasRadioSettings else {
+            useDeviceConfig = false
+            return
+        }
         frequencyMHz = deviceConfig.frequencyMHz
         txPowerDBm = Double(deviceConfig.radioTXPower)
     }
 
     private func paramRow(_ label: LocalizedStringKey, value: Binding<Double>, unit: LocalizedStringKey, range: ClosedRange<Double>) -> some View {
-        HStack {
+        VStack(alignment: .leading, spacing: Design.Space.tight) {
             Text(label)
-                .foregroundStyle(MeshTheme.accent)
-            Spacer()
-            TextField(unit, value: value, format: .number)
-                .frame(width: 80)
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.primary)
-                #if !os(watchOS)
-                .textFieldStyle(.roundedBorder)
-                #endif
-            Text(unit)
-                .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
-                .frame(width: 35, alignment: .leading)
+            HStack(spacing: Design.Space.tight) {
+                TextField(label, value: value, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .monospacedDigit()
+                    .frame(minHeight: Design.minimumTouchTarget)
+                Text(unit)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                    .fixedSize()
+            }
+            if !value.wrappedValue.isFinite || !range.contains(value.wrappedValue) {
+                Text("Enter a value from \(range.lowerBound.formatted()) to \(range.upperBound.formatted()).")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .listRowBackground(MeshTheme.surface)
     }
 
     private func resultRow(_ label: LocalizedStringKey, value: String, color: Color = MeshTheme.textSecondary) -> some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(MeshTheme.accent)
-            Spacer()
-            Text(value)
-                .font(.body.monospaced())
-                .foregroundStyle(color)
-        }
+        MeshValueRow(label: label, value: value, valueColor: color)
         .listRowBackground(MeshTheme.surface)
     }
 }

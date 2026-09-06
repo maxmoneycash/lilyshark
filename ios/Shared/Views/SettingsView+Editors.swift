@@ -30,9 +30,9 @@ extension SettingsView {
                         .foregroundStyle(MeshTheme.accent)
                     Spacer()
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
         } header: {
             sectionInfoHeader("Troubleshooting", info: "Tools to help diagnose connection problems between your phone and radio.")
@@ -89,9 +89,9 @@ extension SettingsView {
                     Image(systemName: "book.pages")
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
 
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -106,9 +106,9 @@ extension SettingsView {
                         .font(.caption)
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             .sheet(isPresented: $showDebugLog) {
                 NavigationStack {
@@ -192,9 +192,9 @@ struct UpstreamCreditRows: View {
                 showLicense = true
             } label: {
                 licenseRowLabel
-                    .contentShape(Rectangle())
+                    .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             .sheet(isPresented: $showLicense) {
                 NavigationStack {
@@ -303,9 +303,9 @@ struct DangerZoneSection: View {
                         .foregroundStyle(.orange)
                     Spacer()
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             .alert("Reboot Device?", isPresented: $showRebootConfirm) {
                 Button("Cancel", role: .cancel) {}
@@ -316,7 +316,7 @@ struct DangerZoneSection: View {
                 Text("The radio will disconnect and restart. You'll need to reconnect via Bluetooth.")
             }
 
-            Button {
+            Button(role: .destructive) {
                 resetConfirmText = ""
                 showResetConfirm = true
             } label: {
@@ -328,9 +328,9 @@ struct DangerZoneSection: View {
                         .foregroundStyle(.red)
                     Spacer()
                 }
-                .contentShape(Rectangle())
+                .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             .alert("Factory Reset?", isPresented: $showResetConfirm) {
                 TextField("Type RESET to confirm", text: $resetConfirmText)
@@ -482,9 +482,9 @@ struct FirmwareDetailSheet: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("Version", value: version.isEmpty ? "\u{2014}" : version)
-                LabeledContent("Build Date", value: buildDate.isEmpty ? "\u{2014}" : buildDate)
-                LabeledContent("Model", value: model.isEmpty ? "\u{2014}" : model)
+                LabeledContent("Version", value: version.isEmpty ? "Not reported" : version)
+                LabeledContent("Build Date", value: buildDate.isEmpty ? "Not reported" : buildDate)
+                LabeledContent("Model", value: model.isEmpty ? "Not reported" : model)
             } header: {
                 SectionInfoHeader(info: "Hardware and firmware details from your radio.")
             }
@@ -719,8 +719,8 @@ struct GPSEditorSheet: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Latitude", value: latitude.isEmpty ? "\u{2014}" : latitude)
-                LabeledContent("Longitude", value: longitude.isEmpty ? "\u{2014}" : longitude)
+                LabeledContent("Latitude", value: latitude.isEmpty ? "Not reported" : latitude)
+                LabeledContent("Longitude", value: longitude.isEmpty ? "Not reported" : longitude)
             } header: {
                 SectionInfoHeader(info: "Your radio\u{2019}s stored coordinates. These are shared with other radios when advertising.")
             }
@@ -856,7 +856,7 @@ struct BatteryEditorSheet: View {
     private var voltageText: String {
         deviceConfig.batteryMillivolts > 0
             ? String(format: "%.2fV", deviceConfig.batteryVoltage)
-            : "\u{2014}"
+            : String(localized: "Not reported")
     }
 
     private var percentText: String {
@@ -900,18 +900,11 @@ struct BlockedContactsView: View {
     var body: some View {
         List {
             if contactStore.blockedContacts.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "hand.raised.slash")
-                        .font(.system(size: 32))
-                        .foregroundStyle(MeshTheme.textSecondary)
-                    Text("No Blocked Contacts")
-                        .font(.headline)
-                    Text("Blocked contacts won't appear in your contact list and their messages will be suppressed.")
-                        .font(.caption)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                        .multilineTextAlignment(.center)
+                ContentUnavailableView {
+                    Label("No Blocked Contacts", systemImage: "hand.raised.slash")
+                } description: {
+                    Text("Block a contact from their details to hide them and suppress their messages. You can unblock them here.")
                 }
-                .padding(.vertical, 8)
                 .listRowBackground(MeshTheme.surface)
             } else {
                 ForEach(contactStore.blockedContacts) { contact in

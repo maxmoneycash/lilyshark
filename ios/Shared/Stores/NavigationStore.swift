@@ -27,12 +27,33 @@ enum SidebarSelection: Hashable {
     #endif
 }
 
+enum AppSection: Hashable {
+    case messages, map, radio, settings
+}
+
 /// Observable store for app-wide navigation state.
 /// Injected via .environment() so all views can read/write sidebar selection
 /// without going through the ViewModel.
 @MainActor @Observable
 final class NavigationStore {
-    var sidebarSelection: SidebarSelection? = nil
+    var section: AppSection = .messages
+    var visibleConversationKey: Data?
+
+    var isMessagesSectionVisible: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        section == .messages
+        #else
+        true
+        #endif
+    }
+    var sidebarSelection: SidebarSelection? = nil {
+        didSet {
+            switch sidebarSelection {
+            case .contact, .channel, .publicChannel: section = .messages
+            default: break
+            }
+        }
+    }
 
     /// Convenience: the currently selected channel index (non-public).
     var selectedChannelIndex: UInt8? {

@@ -35,7 +35,11 @@ struct USBTerminalLine: Identifiable {
 
 /// Whether iCloud sync is enabled (stored locally per device, defaults to true).
 var iCloudSyncEnabled: Bool {
+    #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+    return false
+    #else
     UserDefaults.standard.object(forKey: "iCloudSyncEnabled") == nil ? true : UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+    #endif
 }
 
 // RadioConfigVerification, RegionCheck, RadioRegion moved to ConnectionManager
@@ -289,7 +293,7 @@ final class PommeCoreViewModel: ObservableObject {
             guard let self else { return }
             self.connectionManager.sendAdvertise(type: 1)
             let name = self.deviceConfig.deviceName.isEmpty ? "Unknown" : self.deviceConfig.deviceName
-            var text = "\u{1F198} DISTRESS from \(name)"
+            var text = "DISTRESS from \(name)"
             if let loc = SharedLocation.manager.location {
                 text += String(format: " at %.5f, %.5f", loc.coordinate.latitude, loc.coordinate.longitude)
             }

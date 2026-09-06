@@ -56,9 +56,11 @@ struct PointSelectionView: View {
 
             case .contact:
                 if contactsWithLocation.isEmpty {
-                    Text("No contacts with GPS coordinates")
-                        .font(.caption)
-                        .foregroundStyle(MeshTheme.textSecondary)
+                    ContentUnavailableView(
+                        "Contact positions not reported",
+                        systemImage: "mappin.slash",
+                        description: Text("Choose a map pin or enter coordinates to plan a path. Contacts appear here when a usable position is shared.")
+                    )
                         .listRowBackground(MeshTheme.surface)
                 } else {
                     Picker("Contact", selection: $contact) {
@@ -125,7 +127,10 @@ struct PointSelectionView: View {
     }
 
     private func parseCoordinates() {
-        guard !latText.isEmpty, !lonText.isEmpty else { return }
+        guard !latText.isEmpty, !lonText.isEmpty else {
+            coordinates = nil
+            return
+        }
         guard let lat = Double(latText), let lon = Double(lonText),
               lat >= -90, lat <= 90, lon >= -180, lon <= 180 else {
             if coordinates != nil { coordinates = nil }

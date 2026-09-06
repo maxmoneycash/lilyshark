@@ -15,6 +15,7 @@ import MeshCoreKit
 
 struct LoRaAirtimeView: View {
     @Environment(DeviceConfig.self) private var deviceConfig
+    @Environment(ConnectionManager.self) private var connectionManager
 
     @State private var spreadingFactor: Int = 7
     @State private var bandwidthKHz: Double = 62.5
@@ -26,13 +27,21 @@ struct LoRaAirtimeView: View {
     @State private var lowDataRateOptimize = false
     @State private var useDeviceConfig = true
 
+    private var hasRadioSettings: Bool {
+        connectionManager.connectionState == .ready && !connectionManager.isMeshtasticLinkActive
+            && deviceConfig.loadedSections.contains("selfInfo")
+    }
+
     private let sfRange = 5...12
+    private let payloadRange = 1...255
+    private let preambleRange = 6...65535
     private let bandwidthOptions: [Double] = [7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125, 250, 500]
 
     var body: some View {
         Form {
             Section {
                 Toggle("Use Connected Radio Settings", isOn: $useDeviceConfig)
+                    .disabled(!hasRadioSettings)
                     .foregroundStyle(MeshTheme.accent)
                     .listRowBackground(MeshTheme.surface)
                     .onChange(of: useDeviceConfig) { _, use in
@@ -66,8 +75,8 @@ struct LoRaAirtimeView: View {
                 .tint(.primary)
                 .listRowBackground(MeshTheme.surface)
 
-                paramRow("Payload Size", value: $payloadBytes, unit: "bytes", range: 1...255)
-                paramRow("Preamble", value: $preambleSymbols, unit: "symbols", range: 6...65535)
+                paramRow("Payload Size", value: $payloadBytes, unit: "bytes", range: payloadRange)
+                paramRow("Preamble", value: $preambleSymbols, unit: "symbols", range: preambleRange)
 
                 Toggle("Explicit Header", isOn: $explicitHeader)
                     .foregroundStyle(MeshTheme.accent)
@@ -83,25 +92,32 @@ struct LoRaAirtimeView: View {
             }
 
             Section {
-                resultRow("Symbol Duration", value: String(format: "%.3f ms", symbolDurationMs))
-                resultRow("Preamble Time", value: formatDuration(preambleTimeMs))
-                resultRow("Payload Symbols", value: "\(payloadSymbolCount)")
-                resultRow("Payload Time", value: formatDuration(payloadTimeMs))
-                resultRow("Total Airtime", value: formatDuration(totalAirtimeMs),
-                          color: MeshTheme.accent)
-                resultRow("Bit Rate", value: String(format: "%.0f bps", bitRate))
+                if let estimate {
+                    resultRow("Symbol Duration", value: String(format: "%.3f ms", estimate.symbolDurationMs))
+                    resultRow("Preamble Time", value: formatDuration(estimate.preambleTimeMs))
+                    resultRow("Payload Symbols", value: "\(estimate.payloadSymbolCount)")
+                    resultRow("Payload Time", value: formatDuration(estimate.payloadTimeMs))
+                    resultRow("Total Airtime", value: formatDuration(estimate.totalAirtimeMs),
+                              color: MeshTheme.accent)
+                    resultRow("Bit Rate", value: String(format: "%.0f bps", estimate.bitRate))
+                } else {
+                    ContentUnavailableView("Check the parameters", systemImage: "slider.horizontal.3",
+                                           description: Text("Choose supported radio settings and valid payload and preamble lengths to calculate airtime."))
+                }
             } header: {
                 Text("Airtime")
             }
 
+            if let estimate {
             Section {
-                resultRow("1% Duty Cycle", value: "\(packetsPerHour(dutyCycle: 0.01)) packets/hr")
-                resultRow("10% Duty Cycle", value: "\(packetsPerHour(dutyCycle: 0.10)) packets/hr")
-                resultRow("100% (no limit)", value: "\(packetsPerHour(dutyCycle: 1.0)) packets/hr")
+                resultRow("1% Duty Cycle", value: packetsPerHourText(estimate, dutyCycle: 0.01))
+                resultRow("10% Duty Cycle", value: packetsPerHourText(estimate, dutyCycle: 0.10))
+                resultRow("100% (no limit)", value: packetsPerHourText(estimate, dutyCycle: 1.0))
             } header: {
                 Text("Duty Cycle")
             } footer: {
-                Text("EU 868 MHz band: 1\u{0025} duty cycle. US 915 MHz: no duty cycle limit (FCC dwell time applies instead).")
+                Text("These are calculated airtime budgets. Applicable duty cycle and dwell-time rules depend on your location, band, and operating mode.")
+            }
             }
         }
         .formStyle(.grouped)
@@ -113,64 +129,36 @@ struct LoRaAirtimeView: View {
         .onAppear {
             if useDeviceConfig { loadFromDevice() }
         }
+        .onChange(of: hasRadioSettings) { _, available in
+            if !available { useDeviceConfig = false }
+        }
         .onChange(of: spreadingFactor) { _, _ in autoLDRO() }
         .onChange(of: bandwidthKHz) { _, _ in autoLDRO() }
     }
 
     // MARK: - LoRa Airtime Math
-    // Reference: Semtech AN1200.13 "LoRa Modem Designer's Guide"
-
-    private var symbolDurationMs: Double {
-        let bw = bandwidthKHz * 1000 // Hz
-        guard bw > 0 else { return 0 }
-        return (pow(2.0, Double(spreadingFactor)) / bw) * 1000
+    private var estimate: LoRaAirtimeEstimate? {
+        guard payloadRange.contains(payloadBytes), preambleRange.contains(preambleSymbols) else { return nil }
+        return LoRaAirtimeEstimate(
+            spreadingFactor: spreadingFactor, bandwidthKHz: bandwidthKHz,
+            codingRateDenominator: codingRate, payloadBytes: payloadBytes,
+            preambleSymbols: preambleSymbols, explicitHeader: explicitHeader,
+            crcEnabled: crcEnabled, lowDataRateOptimize: lowDataRateOptimize
+        )
     }
 
-    private var preambleTimeMs: Double {
-        (Double(preambleSymbols) + 4.25) * symbolDurationMs
-    }
-
-    private var payloadSymbolCount: Int {
-        let sf = Double(spreadingFactor)
-        let de: Double = lowDataRateOptimize ? 1 : 0
-        let ih: Double = explicitHeader ? 0 : 1
-        let crc: Double = crcEnabled ? 1 : 0
-        let cr = Double(codingRate)
-
-        let numerator = 8.0 * Double(payloadBytes) - 4.0 * sf + 28.0 + 16.0 * crc - 20.0 * ih
-        let denominator = 4.0 * (sf - 2.0 * de)
-        guard denominator > 0 else { return 8 }
-
-        let symbolCount = 8 + max(Int(ceil(numerator / denominator)) * Int(cr - 4 + 1), 0)
-        return symbolCount
-    }
-
-    private var payloadTimeMs: Double {
-        Double(payloadSymbolCount) * symbolDurationMs
-    }
-
-    private var totalAirtimeMs: Double {
-        preambleTimeMs + payloadTimeMs
-    }
-
-    private var bitRate: Double {
-        let sf = Double(spreadingFactor)
-        let cr = Double(codingRate)
-        let bw = bandwidthKHz * 1000
-        guard bw > 0 else { return 0 }
-        return sf * (4.0 / cr) * bw / pow(2.0, sf)
-    }
-
-    private func packetsPerHour(dutyCycle: Double) -> Int {
-        guard totalAirtimeMs > 0 else { return 0 }
-        let airtimeSeconds = totalAirtimeMs / 1000
-        let availableSeconds = 3600.0 * dutyCycle
-        return Int(availableSeconds / airtimeSeconds)
+    private func packetsPerHourText(_ estimate: LoRaAirtimeEstimate, dutyCycle: Double) -> String {
+        guard let count = estimate.packetsPerHour(dutyCycle: dutyCycle) else { return String(localized: "Unavailable") }
+        return "\(count) packets/hr"
     }
 
     // MARK: - Helpers
 
     private func loadFromDevice() {
+        guard hasRadioSettings else {
+            useDeviceConfig = false
+            return
+        }
         spreadingFactor = Int(deviceConfig.radioSpreadingFactor)
         bandwidthKHz = deviceConfig.bandwidthKHz
         codingRate = Int(deviceConfig.radioCodingRate)
@@ -179,7 +167,8 @@ struct LoRaAirtimeView: View {
 
     /// Auto-enable LDRO when symbol duration exceeds 16ms (Semtech recommendation)
     private func autoLDRO() {
-        lowDataRateOptimize = symbolDurationMs > 16
+        guard bandwidthKHz.isFinite, bandwidthKHz > 0, (5...12).contains(spreadingFactor) else { return }
+        lowDataRateOptimize = pow(2, Double(spreadingFactor)) / bandwidthKHz >= 16
     }
 
     private func formatBW(_ bw: Double) -> String {
@@ -190,34 +179,30 @@ struct LoRaAirtimeView: View {
     }
 
     private func paramRow(_ label: LocalizedStringKey, value: Binding<Int>, unit: LocalizedStringKey, range: ClosedRange<Int>) -> some View {
-        HStack {
+        VStack(alignment: .leading, spacing: Design.Space.tight) {
             Text(label)
-                .foregroundStyle(MeshTheme.accent)
-            Spacer()
-            TextField(unit, value: value, format: .number)
-                .frame(width: 70)
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.primary)
-                #if !os(watchOS)
-                .textFieldStyle(.roundedBorder)
-                #endif
-            Text(unit)
-                .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
-                .frame(width: 55, alignment: .leading)
+            HStack(spacing: Design.Space.tight) {
+                TextField(label, value: value, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .monospacedDigit()
+                    .frame(minHeight: Design.minimumTouchTarget)
+                Text(unit)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                    .fixedSize()
+            }
+            if !range.contains(value.wrappedValue) {
+                Text("Enter a value from \(range.lowerBound.formatted()) to \(range.upperBound.formatted()).")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .listRowBackground(MeshTheme.surface)
     }
 
     private func resultRow(_ label: LocalizedStringKey, value: String, color: Color = MeshTheme.textSecondary) -> some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(MeshTheme.accent)
-            Spacer()
-            Text(value)
-                .font(.body.monospaced())
-                .foregroundStyle(color)
-        }
+        MeshValueRow(label: label, value: value, valueColor: color)
         .listRowBackground(MeshTheme.surface)
     }
 }

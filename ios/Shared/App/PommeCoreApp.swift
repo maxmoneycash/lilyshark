@@ -22,6 +22,7 @@ import MeshCoreKit
 import PommeCoreWatchKit
 #endif
 
+#if !(DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS))
 @main
 struct PommeCoreApp: App {
     #if os(watchOS)
@@ -56,6 +57,7 @@ struct PommeCoreApp: App {
 
     var body: some Scene {
         WindowGroup {
+            Group {
             #if os(watchOS)
             WatchRootView()
                 .environment(watchContactStore)
@@ -122,6 +124,12 @@ struct PommeCoreApp: App {
                     #endif
             }
             #endif
+            }
+            #if DEBUG && LILYSHARK_UI_LARGE_TYPE
+            // Deterministic layout QA when the automation bridge cannot change
+            // the simulator's text-size slider. Absent from normal builds.
+            .dynamicTypeSize(.accessibility3)
+            #endif
         }
         #if !os(watchOS)
         .onChange(of: scenePhase) { _, newPhase in
@@ -152,6 +160,7 @@ struct PommeCoreApp: App {
     }
     #endif
 }
+#endif
 
 #if os(iOS)
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -240,7 +249,11 @@ struct ContentView: View {
     @AppStorage("openSettingsAfterOnboarding") private var openSettingsAfterOnboarding = false
 
     var body: some View {
-        #if os(watchOS)
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Exercise the production Messages routes without startup services,
+        // auto-scan, external URL handlers, or the other app sections.
+        messagesNavigation
+        #elseif os(watchOS)
         NavigationStack {
             ContactListView(showScanner: $showScanner)
                 .sheet(isPresented: $showScanner) {
@@ -265,118 +278,7 @@ struct ContentView: View {
                 }
         }
         #else
-        NavigationSplitView {
-            ContactListView(
-                showScanner: $showScanner,
-                showDiscover: $showDiscover,
-                showSettings: $showSettings,
-                showRemoteManagement: $showRemoteManagement,
-                showAdvertSent: $showAdvertSent
-            )
-            // Column width MUST be on the view inside the sidebar builder, not on
-            // NavigationSplitView itself — the outer position is silently ignored.
-            // ideal = first-launch default; macOS window restoration remembers any
-            // user resize automatically via WindowGroup state persistence.
-            #if os(macOS) || targetEnvironment(macCatalyst)
-            .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 400)
-            #endif
-        } detail: {
-            switch navigationStore.sidebarSelection {
-            case .publicChannel:
-                ChannelChatView(channelIndex: 0, channelName: "Public Channel")
-            case .channel(let chIdx):
-                if let channel = channelStore.channels.first(where: { $0.index == chIdx }) {
-                    ChannelChatView(channelIndex: channel.index, channelName: channel.name)
-                } else {
-                    ChannelChatView(channelIndex: chIdx, channelName: "Channel \(chIdx)")
-                }
-            case .contact(let key):
-                if let contact = contactStore.contacts.first(where: { $0.publicKeyPrefix == key }) {
-                    switch contact.type {
-                    case .room:
-                        RoomChatView(
-                            contact: contact,
-                            session: remoteSessionManager.remoteSession(for: contact)
-                        )
-                    case .repeater:
-                        RepeaterLoginView(
-                            contact: contact,
-                            session: remoteSessionManager.remoteSession(for: contact)
-                        )
-                    default:
-                        ChatView(contact: contact)
-                    }
-                } else {
-                    Text("Contact not found")
-                }
-            case .settings:
-                SettingsView()
-            #if !os(watchOS)
-            case .map:
-                if #available(iOS 17.0, macOS 14.0, *) {
-                    MeshMapView()
-                } else {
-                    Text("Map requires iOS 17+ or macOS 14+")
-                }
-            case .tools:
-                ToolsView()
-            #endif
-            #if os(macOS) || targetEnvironment(macCatalyst)
-            case .usbTerminal:
-                USBTerminalView()
-            case .usbDevice:
-                if let contact = remoteSessionManager.usbDeviceContact, let session = remoteSessionManager.usbDeviceSession {
-                    RemoteManagementView(contact: contact, session: session)
-                } else {
-                    Text("USB device not connected")
-                        .foregroundStyle(MeshTheme.textSecondary)
-                }
-            #endif
-            case nil:
-                if connectionManager.connectionState == .disconnected {
-                    VStack(spacing: 16) {
-                        Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                            .font(.system(size: 48))
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        Text("No Radio Connected")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        Text("Turn on your MeshCore radio and tap the button below to scan for nearby devices.")
-                            .font(.subheadline)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                        Button {
-                            showScanner = true
-                        } label: {
-                            Label("Scan for Devices", systemImage: "magnifyingglass")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(MeshTheme.interactiveGreen)
-                        .foregroundStyle(.black)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    VStack(spacing: 16) {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .font(.system(size: 48))
-                            .foregroundStyle(MeshTheme.textSecondary)
-                        Text("Select a Contact")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        Text("Choose a contact or channel from the sidebar to start messaging.")
-                            .font(.subheadline)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
-        }
-        #if os(iOS)
-        .navigationSplitViewStyle(.balanced)
-        #endif
+        appNavigation
         #if os(macOS) || targetEnvironment(macCatalyst)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -433,6 +335,14 @@ struct ContentView: View {
             .frame(minWidth: 360, minHeight: 400)
             #endif
         }
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        .onChange(of: showSettings) { _, requested in
+            if requested {
+                navigationStore.section = .settings
+                showSettings = false
+            }
+        }
+        #else
         .sheet(isPresented: $showSettings) {
             NavigationStack {
                 SettingsView()
@@ -443,6 +353,7 @@ struct ContentView: View {
             .frame(minWidth: 360, minHeight: 400)
             #endif
         }
+        #endif
         .sheet(isPresented: $showDiscover) {
             NavigationStack {
                 DiscoverView()
@@ -523,6 +434,148 @@ struct ContentView: View {
                 contactStore.requestContacts(fullSync: true)
             }
         }
+        #endif
+    }
+
+    @ViewBuilder
+    private var appNavigation: some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        @Bindable var navigation = navigationStore
+        TabView(selection: $navigation.section) {
+            Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: AppSection.messages) {
+                messagesNavigation
+            }
+            Tab("Map", systemImage: "map", value: AppSection.map) {
+                NavigationStack { MeshMapView() }
+            }
+            Tab("Radio", systemImage: "antenna.radiowaves.left.and.right", value: AppSection.radio) {
+                NavigationStack { ToolsView() }
+            }
+            Tab("Settings", systemImage: "gearshape", value: AppSection.settings) {
+                NavigationStack { SettingsView() }
+            }
+        }
+        #else
+        messagesNavigation
+        #endif
+    }
+
+    private var messagesNavigation: some View {
+        NavigationSplitView {
+            ContactListView(
+                showScanner: $showScanner,
+                showDiscover: $showDiscover,
+                showSettings: $showSettings,
+                showRemoteManagement: $showRemoteManagement,
+                showAdvertSent: $showAdvertSent
+            )
+            // Column width MUST be on the view inside the sidebar builder, not on
+            // NavigationSplitView itself — the outer position is silently ignored.
+            // ideal = first-launch default; macOS window restoration remembers any
+            // user resize automatically via WindowGroup state persistence.
+            #if os(macOS) || targetEnvironment(macCatalyst)
+            .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 400)
+            #endif
+        } detail: {
+            switch navigationStore.sidebarSelection {
+            case .publicChannel:
+                ChannelChatView(channelIndex: 0, channelName: "Public Channel")
+                    .id(0)
+            case .channel(let chIdx):
+                if let channel = channelStore.channels.first(where: { $0.index == chIdx }) {
+                    ChannelChatView(channelIndex: channel.index, channelName: channel.name)
+                        .id(channel.index)
+                } else {
+                    ChannelChatView(channelIndex: chIdx, channelName: "Channel \(chIdx)")
+                        .id(chIdx)
+                }
+            case .contact(let key):
+                if let contact = contactStore.contacts.first(where: { $0.publicKeyPrefix == key }) {
+                    switch contact.type {
+                    case .room:
+                        RoomChatView(
+                            contact: contact,
+                            session: remoteSessionManager.remoteSession(for: contact)
+                        )
+                        .id(contact.publicKeyPrefix)
+                    case .repeater:
+                        RepeaterLoginView(
+                            contact: contact,
+                            session: remoteSessionManager.remoteSession(for: contact)
+                        )
+                        .id(contact.publicKeyPrefix)
+                    default:
+                        ChatView(contact: contact)
+                            .id(contact.publicKeyPrefix)
+                    }
+                } else {
+                    Text("Contact not found")
+                }
+            case .settings:
+                SettingsView()
+            #if !os(watchOS)
+            case .map:
+                if #available(iOS 17.0, macOS 14.0, *) {
+                    MeshMapView()
+                } else {
+                    Text("Map requires iOS 17+ or macOS 14+")
+                }
+            case .tools:
+                ToolsView()
+            #endif
+            #if os(macOS) || targetEnvironment(macCatalyst)
+            case .usbTerminal:
+                USBTerminalView()
+            case .usbDevice:
+                if let contact = remoteSessionManager.usbDeviceContact, let session = remoteSessionManager.usbDeviceSession {
+                    RemoteManagementView(contact: contact, session: session)
+                } else {
+                    ContentUnavailableView(
+                        "USB device not connected",
+                        systemImage: "cable.connector",
+                        description: Text("Connect a supported radio through the USB terminal to open remote management.")
+                    )
+                }
+            #endif
+            case nil:
+                if connectionManager.connectionState == .disconnected {
+                    VStack(spacing: 16) {
+                        ContentUnavailableView(
+                            "Connect a deck or radio",
+                            systemImage: "antenna.radiowaves.left.and.right.slash",
+                            description: Text("Power on a Lilyshark deck or MeshCore radio, then scan for nearby devices.")
+                        )
+                        Button {
+                            showScanner = true
+                        } label: {
+                            Label("Scan for Devices", systemImage: "magnifyingglass")
+                                .touchable()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(MeshTheme.interactiveGreen)
+                        .foregroundStyle(.black)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    VStack(spacing: 16) {
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.largeTitle)
+                            .foregroundStyle(MeshTheme.textSecondary)
+                        Text("Select a Contact")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        Text("Choose a contact or channel from the sidebar to start messaging.")
+                            .font(.subheadline)
+                            .foregroundStyle(MeshTheme.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        #if os(iOS)
+        .navigationSplitViewStyle(.balanced)
         #endif
     }
 
@@ -680,7 +733,7 @@ struct AppLockView: View {
         VStack(spacing: 24) {
             Spacer()
             Image(systemName: "lock.shield.fill")
-                .font(.system(size: 72))
+                .font(.largeTitle)
                 .foregroundStyle(MeshTheme.accent)
             Text("Lilyshark is Locked")
                 .font(.title2.bold())

@@ -139,7 +139,7 @@ struct MapPointPickerView: View {
             // Fixed crosshair overlay
             VStack(spacing: 0) {
                 Image(systemName: "mappin")
-                    .font(.system(size: 32, weight: .bold))
+                    .font(.title.weight(.bold))
                     .foregroundStyle(.red)
                     .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
 

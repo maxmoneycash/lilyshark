@@ -75,6 +75,8 @@ final class RemoteSessionManager {
     var pingTotal: Int = 0
     private var pingSendTime: Date?
     private var pingContact: Contact?
+    var pingContactKey: Data? { pingContact?.publicKeyPrefix }
+    var pendingTraceContactKey: Data? { pendingTraceContact?.publicKeyPrefix }
     private var pingTask: Task<Void, Never>?
 
     var pingStats: (sent: Int, received: Int, avgMs: Double, minMs: Double, maxMs: Double)? {
@@ -157,6 +159,11 @@ final class RemoteSessionManager {
     // MARK: - Reset
 
     func reset() {
+        cancelPing()
+        pingContact = nil
+        pingResults = []
+        pingCount = 0
+        pingTotal = 0
         fetchTask?.cancel()
         fetchTask = nil
         loginTimeoutTask?.cancel()
@@ -171,6 +178,7 @@ final class RemoteSessionManager {
         discoverUnsupported = false
         discoverFallbackMessage = nil
         lastTraceResult = nil
+        detailContactForTrace = nil
         pendingTraceTag = nil
         pendingTraceContact = nil
         pendingStatusKey = nil
@@ -901,16 +909,7 @@ final class RemoteSessionManager {
         let contactKeyHex = contact.publicKeyPrefix.hexCompact
         if !selfKeyHex.isEmpty && selfKeyHex.hasPrefix(contactKeyHex) { return }
 
-        let node = DiscoveredNode(
-            publicKey: Data(contact.publicKeyPrefix),
-            name: contact.name,
-            type: contact.type,
-            snr: 0,
-            rssi: 0,
-            pathLen: UInt8(clamping: contact.outPathLen),
-            latitude: contact.latitude,
-            longitude: contact.longitude
-        )
+        let node = DiscoveredNode(advert: contact)
         if let idx = discoveredNodes.firstIndex(where: { $0.publicKey == node.publicKey }) {
             discoveredNodes[idx] = node
         } else {
@@ -1016,6 +1015,7 @@ final class RemoteSessionManager {
                 : "No path known for this contact — cannot trace route.")
             return
         }
+        cancelPing()
         let tag = UInt32.random(in: 0..<UInt32.max)
         pendingTraceTag = tag
         pendingTraceContact = contact
@@ -1030,6 +1030,7 @@ final class RemoteSessionManager {
             try? await Task.sleep(nanoseconds: 15_000_000_000)
             guard !Task.isCancelled, let self, self.pendingTraceTag == tag else { return }
             self.pendingTraceTag = nil
+            self.pendingTraceContact = nil
             if self.lastTraceResult == nil {
                 self.showError?("Trace route timed out — the path may not be reachable.")
             }
@@ -1037,16 +1038,20 @@ final class RemoteSessionManager {
     }
 
     func handleTraceData(_ result: TraceResult) {
+        // A delayed reply from an earlier request cannot complete the current
+        // request or acquire its peer's name and ping timing.
+        guard result.tag == pendingTraceTag, let contact = pendingTraceContact else {
+            Self.logger.debug("Ignoring trace reply with no matching request tag")
+            return
+        }
         traceTimeoutTask?.cancel()
         lastTraceResult = result
         pendingTraceTag = nil
-        if let contact = pendingTraceContact {
-            detailContactForTrace = contact
-        }
+        detailContactForTrace = contact
         pendingTraceContact = nil
 
         // If ping is in progress, record the result
-        if isPinging, let sendTime = pingSendTime {
+        if isPinging, contact.publicKeyPrefix == pingContactKey, let sendTime = pingSendTime {
             let latency = Date().timeIntervalSince(sendTime) * 1000
             pingResults.append(PingResult(seq: pingCount, latencyMs: latency, hops: result.hops.count, timestamp: Date()))
             pingSendTime = nil
@@ -1068,6 +1073,12 @@ final class RemoteSessionManager {
 
     func cancelPing() {
         pingTask?.cancel()
+        pingTask = nil
+        if isPinging {
+            traceTimeoutTask?.cancel()
+            pendingTraceTag = nil
+            pendingTraceContact = nil
+        }
         isPinging = false
         pingSendTime = nil
     }
@@ -1077,6 +1088,7 @@ final class RemoteSessionManager {
             showError?("Cannot ping — no route known. Try a direct neighbor with Status Request instead.")
             return
         }
+        cancelPing()
         pingResults = []
         pingCount = 0
         pingTotal = count
@@ -1106,10 +1118,11 @@ final class RemoteSessionManager {
         traceTimeoutTask?.cancel()
         traceTimeoutTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 15_000_000_000)
-            guard !Task.isCancelled, let self, self.isPinging, self.pingSendTime != nil else { return }
+            guard !Task.isCancelled, let self, self.isPinging, self.pingSendTime != nil, self.pendingTraceTag == tag else { return }
             self.pingResults.append(PingResult(seq: self.pingCount, latencyMs: nil, hops: 0, timestamp: Date()))
             self.pingSendTime = nil
             self.pendingTraceTag = nil
+            self.pendingTraceContact = nil
             self.continueMultiPing()
         }
     }

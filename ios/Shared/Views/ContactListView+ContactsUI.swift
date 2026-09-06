@@ -50,15 +50,19 @@ extension ContactListView {
                     } label: {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(MeshTheme.connected)
+                            .touchable()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
+                    .accessibilityLabel("Accept \(contact.name)")
                     Button {
                         contactStore.rejectPendingContact(contact)
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(MeshTheme.disconnected)
+                            .touchable()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
+                    .accessibilityLabel("Dismiss \(contact.name)")
                 }
                 .listRowBackground(MeshTheme.surface)
             }
@@ -75,9 +79,11 @@ extension ContactListView {
                 DisclosureGroup {
                     let members = sortedGroupMembers(contactStore.contactsInGroup(group))
                     if members.isEmpty {
-                        Text("No contacts in this group")
-                            .font(.caption)
-                            .foregroundStyle(MeshTheme.textSecondary)
+                        ContentUnavailableView(
+                            "This group is empty",
+                            systemImage: "person.2",
+                            description: Text("Use a contact's menu to add it to this group.")
+                        )
                             .listRowBackground(MeshTheme.surface)
                     } else {
                         ForEach(members) { contact in
@@ -99,7 +105,7 @@ extension ContactListView {
                 } label: {
                     HStack {
                         if !group.emoji.isEmpty {
-                            Text(group.emoji)
+                            Image(systemName: GroupIcon.symbolName(for: group.emoji))
                         }
                         Text(group.name)
                             .foregroundStyle(MeshTheme.textPrimary)
@@ -205,23 +211,40 @@ extension ContactListView {
                     Image(systemName: "plus.circle")
                         .foregroundStyle(MeshTheme.accent)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
             }
         }
     }
 
     var contactsSectionHeader: some View {
-        HStack {
-            Text("Contacts")
-                .foregroundStyle(MeshTheme.textSecondary)
-            Spacer()
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                contactsHeaderTitle.fixedSize()
+                Spacer(minLength: Design.Space.tight)
+                contactsHeaderActions.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: Design.Space.tight) {
+                contactsHeaderTitle
+                contactsHeaderActions
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var contactsHeaderTitle: some View {
+        Text("Contacts")
+            .foregroundStyle(MeshTheme.textSecondary)
+    }
+
+    private var contactsHeaderActions: some View {
+        HStack(spacing: Design.Space.tight) {
             Button {
                 sortByLastSeen.toggle()
             } label: {
                 Image(systemName: sortByLastSeen ? "clock" : "textformat.abc")
                     .foregroundStyle(MeshTheme.accent)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .accessibilityLabel(sortByLastSeen ? Text("Sort alphabetically") : Text("Sort by last seen"))
             Menu {
                 Button { showImportSheet = true } label: {
@@ -233,42 +256,34 @@ extension ContactListView {
             } label: {
                 Image(systemName: "plus")
                     .foregroundStyle(MeshTheme.accent)
+                    .touchable()
             }
             .accessibilityLabel("Add contact")
             .menuIndicator(.hidden)
-            Button(String(localized: isSelecting ? "Done" : "Edit")) {
+            Button {
                 isSelecting.toggle()
                 if !isSelecting { selectedContacts.removeAll() }
+            } label: {
+                Text(isSelecting ? "Done" : "Edit")
+                    .font(.caption)
+                    .foregroundStyle(MeshTheme.accent)
+                    .touchable()
             }
-            .font(.caption)
-            .foregroundStyle(MeshTheme.accent)
+            .buttonStyle(.meshPlain)
+            .accessibilityLabel(isSelecting ? Text("Finish selecting contacts") : Text("Select contacts"))
         }
     }
 
     var contactsSection: some View {
         Section(isExpanded: $contactsExpanded) {
             if ungroupedContacts.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "person.2.slash")
-                        .font(.title)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                    Text("No Contacts Yet")
-                        .font(.headline)
-                    Text("Send an advertisement to announce your presence on the mesh. Other nodes will appear here as they respond.")
-                        .font(.caption)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                    Button {
-                        connectionManager.sendAdvertise(type: 0)
-                    } label: {
-                        Label("Send Advertisement", systemImage: "antenna.radiowaves.left.and.right")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(MeshTheme.interactiveGreen)
-                    .foregroundStyle(.black)
-                    .controlSize(.small)
+                ContentUnavailableView {
+                    Label(contactStore.contacts.isEmpty ? "Waiting for contacts" : "Contacts are in groups", systemImage: "person.2")
+                } description: {
+                    Text(contactStore.contacts.isEmpty
+                         ? "Connect to a deck. Contacts appear when it shares saved nodes or reports someone heard on the mesh."
+                         : "Open a group above to see its contacts. Ungrouped contacts will appear here.")
                 }
-                .padding(.vertical, 8)
                 .listRowBackground(MeshTheme.surface)
             } else {
                 ForEach(ungroupedContacts) { contact in
@@ -290,7 +305,7 @@ extension ContactListView {
                                 contactRow(contact)
                             }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                     } else {
                     NavigationLink(value: SidebarSelection.contact(contact.publicKeyPrefix)) {
                         contactRow(contact)

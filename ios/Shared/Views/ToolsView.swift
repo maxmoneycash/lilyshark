@@ -13,6 +13,7 @@ import SwiftUI
 import MeshCoreKit
 
 struct ToolsView: View {
+    @Environment(ConnectionManager.self) private var connectionManager
     @State private var showLineOfSight = false
     @State private var showNoiseFloor = false
     @State private var showRadioCalc = false
@@ -33,8 +34,7 @@ struct ToolsView: View {
                 toolButton(
                     icon: "function",
                     title: "Radio Calculator",
-                    subtitle: "Link budget, path loss, wavelength, and range estimation",
-                    badge: "No Radio"
+                    subtitle: "Link budget, path loss, wavelength, and range estimation"
                 ) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showRadioCalc = true }
                 }
@@ -42,8 +42,7 @@ struct ToolsView: View {
                 toolButton(
                     icon: "timer",
                     title: "Airtime Calculator",
-                    subtitle: "LoRa time-on-air, duty cycle, and packets per hour",
-                    badge: "No Radio"
+                    subtitle: "LoRa time-on-air, duty cycle, and packets per hour"
                 ) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showAirtime = true }
                 }
@@ -51,8 +50,7 @@ struct ToolsView: View {
                 toolButton(
                     icon: "chart.bar",
                     title: "SF/BW Reference",
-                    subtitle: "Sensitivity, bit rate, and range by spreading factor",
-                    badge: "No Radio"
+                    subtitle: "Sensitivity, bit rate, and range by spreading factor"
                 ) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showSensitivity = true }
                 }
@@ -74,7 +72,7 @@ struct ToolsView: View {
                 toolButton(
                     icon: "antenna.radiowaves.left.and.right.slash",
                     title: "Frequency Scanner",
-                    subtitle: "Scan regional presets to detect which frequencies have mesh activity nearby"
+                    subtitle: "Request regional presets and watch for contact updates"
                 ) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showFreqScanner = true }
                 }
@@ -82,7 +80,7 @@ struct ToolsView: View {
             } header: {
                 Text("Monitoring")
             } footer: {
-                Text("These tools require a radio connection.")
+                Text("Monitoring requires a connected MeshCore radio. Lilyshark deck monitoring is available in the web app over USB.")
             }
         }
         .meshTheme()
@@ -125,7 +123,13 @@ struct ToolsView: View {
         }
         .sheet(isPresented: $showFreqScanner) {
             NavigationStack {
-                FrequencyScannerView()
+                Group {
+                    if supportsMonitoring {
+                        FrequencyScannerView()
+                    } else {
+                        monitoringUnavailable
+                    }
+                }
                     .lilysharkSheet { showFreqScanner = false }
             }
             .meshTheme()
@@ -136,8 +140,12 @@ struct ToolsView: View {
         .sheet(isPresented: $showNoiseFloor) {
             NavigationStack {
                 ScrollView {
-                    NoiseFloorMonitorView()
-                        .padding()
+                    if supportsMonitoring {
+                        NoiseFloorMonitorView()
+                            .padding()
+                    } else {
+                        monitoringUnavailable
+                    }
                 }
                 .background(MeshTheme.background)
                 .navigationTitle("RF Monitor")
@@ -150,7 +158,19 @@ struct ToolsView: View {
         }
     }
 
-    private func toolButton(icon: String, title: LocalizedStringKey, subtitle: LocalizedStringKey, badge: LocalizedStringKey? = nil, action: @escaping () -> Void) -> some View {
+    private var supportsMonitoring: Bool {
+        connectionManager.connectionState == .ready && !connectionManager.isMeshtasticLinkActive
+    }
+
+    private var monitoringUnavailable: some View {
+        ContentUnavailableView(
+            "Connect a MeshCore radio",
+            systemImage: "antenna.radiowaves.left.and.right.slash",
+            description: Text("These tools use MeshCore radio reports and controls. For a Lilyshark deck, open the web app and connect over USB to monitor radio traffic.")
+        )
+    }
+
+    private func toolButton(icon: String, title: LocalizedStringKey, subtitle: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 ZStack {
@@ -161,29 +181,20 @@ struct ToolsView: View {
                         .foregroundStyle(MeshTheme.accent)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(title)
-                            .font(.body)
-                            .foregroundStyle(MeshTheme.textPrimary)
-                        if let badge {
-                            Text(badge)
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(MeshTheme.accent)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(MeshTheme.accent.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
-                    }
+                    Text(title)
+                        .font(.body)
+                        .foregroundStyle(MeshTheme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(MeshTheme.textSecondary)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .contentShape(Rectangle())
+            .touchable()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.meshPlain)
         .listRowBackground(MeshTheme.surface)
     }
 }

@@ -134,6 +134,9 @@ public enum MeshtasticProto {
         public var snr: Float?
         public var latitude: Double?
         public var longitude: Double?
+        public var lastHeard: UInt32?
+        public var hopsAway: UInt32?
+        public var viaMQTT: Bool?
 
         public init(
             num: UInt32,
@@ -142,7 +145,10 @@ public enum MeshtasticProto {
             shortName: String,
             snr: Float? = nil,
             latitude: Double? = nil,
-            longitude: Double? = nil
+            longitude: Double? = nil,
+            lastHeard: UInt32? = nil,
+            hopsAway: UInt32? = nil,
+            viaMQTT: Bool? = nil
         ) {
             self.num = num
             self.id = id
@@ -151,6 +157,9 @@ public enum MeshtasticProto {
             self.snr = snr
             self.latitude = latitude
             self.longitude = longitude
+            self.lastHeard = lastHeard
+            self.hopsAway = hopsAway
+            self.viaMQTT = viaMQTT
         }
 
         /// What to call this node on screen. The deck fills `longName` from
@@ -175,6 +184,9 @@ public enum MeshtasticProto {
         public var text: String
         public var rxSNR: Float?
         public var rxRSSI: Int32?
+        public var rxTime: UInt32?
+        public var hopsAway: UInt32?
+        public var viaMQTT: Bool?
 
         public init(
             from: UInt32,
@@ -183,7 +195,10 @@ public enum MeshtasticProto {
             channel: UInt32,
             text: String,
             rxSNR: Float? = nil,
-            rxRSSI: Int32? = nil
+            rxRSSI: Int32? = nil,
+            rxTime: UInt32? = nil,
+            hopsAway: UInt32? = nil,
+            viaMQTT: Bool? = nil
         ) {
             self.from = from
             self.to = to
@@ -192,6 +207,9 @@ public enum MeshtasticProto {
             self.text = text
             self.rxSNR = rxSNR
             self.rxRSSI = rxRSSI
+            self.rxTime = rxTime
+            self.hopsAway = hopsAway
+            self.viaMQTT = viaMQTT
         }
     }
 
@@ -244,11 +262,21 @@ public enum MeshtasticProto {
         public var from: UInt32
         public var latitude: Double
         public var longitude: Double
+        public var rxSNR: Float?
+        public var rxRSSI: Int32?
+        public var rxTime: UInt32?
+        public var hopsAway: UInt32?
+        public var viaMQTT: Bool?
 
-        public init(from: UInt32, latitude: Double, longitude: Double) {
+        public init(from: UInt32, latitude: Double, longitude: Double, rxSNR: Float? = nil, rxRSSI: Int32? = nil, rxTime: UInt32? = nil, hopsAway: UInt32? = nil, viaMQTT: Bool? = nil) {
             self.from = from
             self.latitude = latitude
             self.longitude = longitude
+            self.rxSNR = rxSNR
+            self.rxRSSI = rxRSSI
+            self.rxTime = rxTime
+            self.hopsAway = hopsAway
+            self.viaMQTT = viaMQTT
         }
     }
 
@@ -329,10 +357,26 @@ public enum MeshtasticProto {
                     if entry.number == 2 { info.longitude = degrees(entry.value) }
                 }
             case (4, ProtoWriter.wireFixed32):
-                info.snr = Float(bitPattern: truncate(field.value))
+                let snr = Float(bitPattern: truncate(field.value))
+                info.snr = snr.isFinite ? snr : nil
+            // meshtastic/mesh.proto NodeInfo: last_heard=5, via_mqtt=8,
+            // optional hops_away=9. An omitted hop count is not a direct link.
+            case (5, ProtoWriter.wireFixed32):
+                info.lastHeard = field.value > 0 ? truncate(field.value) : nil
+            case (8, ProtoWriter.wireVarint):
+                info.viaMQTT = field.value != 0
+            case (9, ProtoWriter.wireVarint):
+                info.hopsAway = UInt32(exactly: field.value)
             default:
                 break
             }
+        }
+        if let latitude = info.latitude, let longitude = info.longitude,
+           (-90...90).contains(latitude), (-180...180).contains(longitude) {
+            // Keep explicitly reported zero coordinates, including (0, 0).
+        } else {
+            info.latitude = nil
+            info.longitude = nil
         }
         return .nodeInfo(info)
     }
@@ -344,6 +388,10 @@ public enum MeshtasticProto {
         var channel: UInt32 = 0
         var rxSNR: Float?
         var rxRSSI: Int32?
+        var rxTime: UInt32?
+        var hopStart: UInt32?
+        var hopLimit: UInt32?
+        var viaMQTT: Bool?
         var decoded: [UInt8]?
         for field in readFields(bytes) ?? [] {
             switch (field.number, field.wireType) {
@@ -352,7 +400,11 @@ public enum MeshtasticProto {
             case (3, ProtoWriter.wireVarint): channel = truncate(field.value)
             case (4, ProtoWriter.wireLength): decoded = field.bytes
             case (6, ProtoWriter.wireFixed32): packetID = truncate(field.value)
-            case (8, ProtoWriter.wireFixed32): rxSNR = Float(bitPattern: truncate(field.value))
+            case (7, ProtoWriter.wireFixed32): rxTime = field.value > 0 ? truncate(field.value) : nil
+            case (8, ProtoWriter.wireFixed32):
+                let snr = Float(bitPattern: truncate(field.value))
+                rxSNR = snr.isFinite ? snr : nil
+            case (9, ProtoWriter.wireVarint): hopLimit = UInt32(exactly: field.value)
             case (12, ProtoWriter.wireVarint):
                 // rx_rssi is a protobuf int32, so a negative one arrives as a
                 // ten-byte varint sign-extended to 64 bits -- which is exactly
@@ -360,11 +412,21 @@ public enum MeshtasticProto {
                 // bits back as signed recovers it, and also handles the
                 // truncated five-byte form other implementations emit.
                 rxRSSI = Int32(truncatingIfNeeded: field.value)
+            case (14, ProtoWriter.wireVarint): viaMQTT = field.value != 0
+            case (15, ProtoWriter.wireVarint): hopStart = UInt32(exactly: field.value)
             default:
                 break
             }
         }
 
+        // Older senders omit hop_start or leave it at zero. Only infer a
+        // traveled count when both wire fields support the subtraction.
+        let hopsAway: UInt32?
+        if let hopStart, let hopLimit, hopStart > 0, hopStart <= 7, hopLimit <= hopStart {
+            hopsAway = hopStart - hopLimit
+        } else {
+            hopsAway = nil
+        }
         guard let decoded else { return .other }
         var portnum: UInt64 = 0
         var payload: [UInt8] = []
@@ -388,18 +450,23 @@ public enum MeshtasticProto {
                     channel: channel,
                     text: string(payload),
                     rxSNR: rxSNR,
-                    rxRSSI: rxRSSI
+                    rxRSSI: rxRSSI,
+                    rxTime: rxTime,
+                    hopsAway: hopsAway,
+                    viaMQTT: viaMQTT
                 )
             )
         case portPosition:
-            var latitude = 0.0
-            var longitude = 0.0
+            var latitude: Double?
+            var longitude: Double?
             for field in readFields(payload) ?? []
             where field.wireType == ProtoWriter.wireFixed32 {
                 if field.number == 1 { latitude = degrees(field.value) }
                 if field.number == 2 { longitude = degrees(field.value) }
             }
-            return .position(Position(from: from, latitude: latitude, longitude: longitude))
+            guard let latitude, let longitude,
+                  (-90...90).contains(latitude), (-180...180).contains(longitude) else { return .other }
+            return .position(Position(from: from, latitude: latitude, longitude: longitude, rxSNR: rxSNR, rxRSSI: rxRSSI, rxTime: rxTime, hopsAway: hopsAway, viaMQTT: viaMQTT))
         case portTelemetry:
             // Telemetry.device_metrics is field 2. Other variants exist
             // (environment, power) and are not read here; a Telemetry with
@@ -416,7 +483,8 @@ public enum MeshtasticProto {
                     case (1, ProtoWriter.wireVarint):
                         parsed.batteryPercent = truncate(metric.value)
                     case (2, ProtoWriter.wireFixed32):
-                        parsed.voltage = Float(bitPattern: truncate(metric.value))
+                        let voltage = Float(bitPattern: truncate(metric.value))
+                        parsed.voltage = voltage.isFinite && voltage >= 0 ? voltage : nil
                     case (5, ProtoWriter.wireVarint):
                         parsed.uptimeSeconds = truncate(metric.value)
                     default:
@@ -428,8 +496,11 @@ public enum MeshtasticProto {
             if let metrics { return .deviceMetrics(metrics) }
             return .other
         case portRouting:
+            guard let fields = readFields(payload) else { return .other }
+            // A valid empty Routing message is the legacy NONE acknowledgement.
+            // Malformed bytes are not an acknowledgement of any kind.
             var error: UInt32 = 0
-            for field in readFields(payload) ?? []
+            for field in fields
             where field.number == 3 && field.wireType == ProtoWriter.wireVarint {
                 error = truncate(field.value)
             }

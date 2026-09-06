@@ -21,25 +21,48 @@ struct ContactRowView: View {
     /// Passed from parent list — ticks every 30s to refresh relative time text.
     var refreshTick: Date = Date()
 
+    private var latestMessage: Message? {
+        messageStoreManager.messages(for: contact).last
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             contactIcon
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(contactStore.displayName(for: contact))
-                        .font(.body)
+                        .font(.headline)
                         .foregroundStyle(MeshTheme.textPrimary)
+                        .lineLimit(1)
                     loginBadge
-                    pathIndicator
                 }
                 if contactStore.nickname(for: contact) != nil, !contact.name.isEmpty {
                     Text(contact.name)
                         .font(.caption2)
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
-                lastSeenLine
+                if let latestMessage {
+                    Text(latestMessage.isOutgoing ? "You: \(latestMessage.text)" : latestMessage.text)
+                        .font(.subheadline)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .lineLimit(2)
+                    if latestMessage.status == .failed && latestMessage.isOutgoing {
+                        Label("Delivery not confirmed", systemImage: "exclamationmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(MeshTheme.disconnected)
+                    }
+                } else {
+                    lastSeenLine
+                }
             }
             Spacer()
+            VStack(alignment: .trailing, spacing: 6) {
+                if let latestMessage {
+                    Text(latestMessage.timestamp, format: .dateTime.hour().minute())
+                        .font(.caption)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .accessibilityLabel(latestMessage.timestamp.formatted(date: .abbreviated, time: .shortened))
+                }
             if messageStoreManager.hasDraft(for: contact.publicKeyPrefix) {
                 Text("Draft")
                     .font(.caption2)
@@ -64,6 +87,8 @@ struct ContactRowView: View {
                     .accessibilityLabel("Favourite")
             }
             unreadBadge
+            }
+
         }
         .contentShape(Rectangle())
         // Collapse the row into a single VoiceOver element so name, status,
@@ -96,17 +121,17 @@ struct ContactRowView: View {
             if isManaged {
                 if loggedIn {
                     Image(systemName: "lock.open.fill")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundStyle(MeshTheme.connected)
                         .offset(x: 14, y: 14)
                 } else if KeychainManager.hasPassword(forDevice: contact.publicKey) {
                     Image(systemName: "key.fill")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundStyle(MeshTheme.textSecondary)
                         .offset(x: 14, y: 14)
                 } else {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundStyle(MeshTheme.textSecondary)
                         .offset(x: 14, y: 14)
                 }
@@ -176,7 +201,7 @@ struct ContactRowView: View {
                 .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
         } else {
-            Text("Never seen")
+            Text("Last heard not reported")
                 .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
         }
@@ -234,8 +259,8 @@ struct ContactRowView: View {
         let liveContact = contactStore.contacts.first(where: { $0.publicKeyPrefix == contact.publicKeyPrefix }) ?? contact
         var latest = TimeInterval(liveContact.lastAdvert)
         // Also consider last received message as a "seen" event
-        if let activityDate = messageStoreManager.latestActivityDate(for: contact.publicKeyPrefix) {
-            latest = max(latest, activityDate.timeIntervalSince1970)
+        if let received = messageStoreManager.messages(for: contact).last(where: { !$0.isOutgoing }) {
+            latest = max(latest, received.timestamp.timeIntervalSince1970)
         }
         guard latest > 1_000_000_000 else { return nil }
         let date = Date(timeIntervalSince1970: latest)

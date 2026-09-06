@@ -196,7 +196,7 @@ struct AddZoneView: View {
                         Label("Use Current Location", systemImage: "location.fill")
                             .foregroundStyle(MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .listRowBackground(MeshTheme.surface)
                     #endif
                 } header: {

@@ -1,14 +1,11 @@
-import { disconnectDeviceLink, useDeviceLink, type DeviceTelemetry } from "../lib/deviceLink";
+import { disconnectDeviceLink, useDeviceLink } from "../lib/deviceLink";
+import { RF_FIELD } from "../lib/lscap";
+import { reportedLabel, telemetryBattery, telemetryCount, telemetrySignal, telemetryVoltage, unattributedFrames } from "./deviceTelemetry";
 import { fmtHemisphere } from "./fmt";
 
 export function SimulateBadge({ on }: { on?: boolean }) {
 	if (!on) return null;
 	return <span className="sim-badge">SIMULATE MODE · SYNTHETIC</span>;
-}
-
-function batteryPct(bat: string): number | undefined {
-	const m = bat.match(/(\d+)\s*%/);
-	return m ? Number(m[1]) : undefined;
 }
 
 function Spark({ values }: { values: number[] }) {
@@ -37,24 +34,21 @@ function Spark({ values }: { values: number[] }) {
 	);
 }
 
-function rssi(t0: DeviceTelemetry): number {
-	return t0.rssiX10 / 10;
-}
-
-function snr(t0: DeviceTelemetry): number {
-	return t0.snrX10 / 10;
-}
-
 export function ThisDevicePanel() {
 	const link = useDeviceLink();
 	if (link.status !== "linked") return null;
 	const telem = link.telemetry;
 	const hist = link.history;
 	const batSeries = hist
-		.map((h) => batteryPct(h.bat))
+		.map(telemetryBattery)
 		.filter((n): n is number => n !== undefined);
-	const rssiSeries = hist.map(rssi);
-	const snrSeries = hist.map(snr);
+	const rssiSeries = hist.map((h) => telemetrySignal(h, "rssi")).filter((n): n is number => n !== undefined);
+	const snrSeries = hist.map((h) => telemetrySignal(h, "snr")).filter((n): n is number => n !== undefined);
+	const rssi = telem && telemetrySignal(telem, "rssi");
+	const snr = telem && telemetrySignal(telem, "snr");
+	const voltage = telem && telemetryVoltage(telem);
+	const dropped = telem && unattributedFrames(telem);
+	const count = (n: number | undefined) => telemetryCount(n)?.toLocaleString() ?? "Not reported";
 	return (
 		<div className="panel this-device">
 			<div className="panel-title">
@@ -62,7 +56,7 @@ export function ThisDevicePanel() {
 					THIS DEVICE
 					<SimulateBadge on={telem?.sim} />
 				</span>
-				<span>LILYSHARK {link.firmware ?? "—"} OVER USB</span>
+				<span>LILYSHARK {link.firmware || "VERSION NOT REPORTED"} OVER USB · {link.node !== undefined ? `!${link.node.toString(16).padStart(8, "0")}` : "NODE ID NOT REPORTED"}</span>
 			</div>
 			{telem ? (
 				<>
@@ -70,9 +64,9 @@ export function ThisDevicePanel() {
 						<div className="stat-tile">
 							<div className="label">BATTERY</div>
 							<div className="value">
-								{telem.bat}
-								{telem.mv !== undefined && (
-									<small>{(telem.mv / 1000).toFixed(2)} V</small>
+								{reportedLabel(telem.bat)}
+								{voltage !== undefined && (
+									<small>{voltage.toFixed(2)} V</small>
 								)}
 								<Spark values={batSeries} />
 							</div>
@@ -80,64 +74,68 @@ export function ThisDevicePanel() {
 						<div className="stat-tile">
 							<div className="label">GPS</div>
 							<div className="value">
-								{telem.gps}
+								{reportedLabel(telem.gps)}
 								{telem.sat !== undefined && <small>{telem.sat} SAT</small>}
 								{telem.lat !== undefined && telem.lon !== undefined ? (
 									<small>
 										{fmtHemisphere(telem.lat, telem.lon, 5, 5)}
 									</small>
 								) : telem.gps.includes("SEARCH") ? (
-									<small>RECEIVER FOUND · WAITING FOR SATELLITES · NEEDS SKY</small>
+									<small>Waiting for a GPS fix.</small>
 								) : (
-									<small>NO FIX YET</small>
+									<small>Position not reported</small>
 								)}
 							</div>
 						</div>
 						<div className="stat-tile">
 							<div className="label">RADIO</div>
 							<div className="value">
-								{telem.profile}
+								{reportedLabel(telem.profile)}
 								<small>
 									{telem.freqHz
 										? `${(telem.freqHz / 1e6).toFixed(3)} MHz`
-										: "freq —"}
+										: "Frequency not reported"}
 									{telem.sf !== undefined ? ` · SF${telem.sf}` : ""}
 									{telem.bwHz ? ` · ${(telem.bwHz / 1000).toFixed(0)} kHz` : ""}
 								</small>
 							</div>
 						</div>
 						<div className="stat-tile">
-							<div className="label">HEARD</div>
+							<div className="label">RADIO RX</div>
 							<div className="value">
-								{(telem.rx ?? telem.frames) === 0
-									? "NONE YET"
-									: `#${telem.frames}`}
-								<small>
-									{(telem.rx ?? 0) === 0
-										? "listening · nothing on this profile yet"
-										: `RX ${telem.rx} · CRC ${telem.crc ?? 0}`}
-								</small>
+								{count(telem.rx)}
+								<small>Frames received by the radio</small>
 							</div>
 						</div>
 						<div className="stat-tile">
-							<div className="label">RSSI</div>
+							<div className="label">LATEST FRAME RSSI</div>
 							<div className="value">
-								{(telem.rx ?? 0) === 0 && telem.frames === 0
-									? "—"
-									: `${rssi(telem).toFixed(1)} dBm`}
+								{rssi === undefined ? "Not reported" : `${rssi.toFixed(1)} dBm`}
+								{telem.direction === 2 && <small>Transmitted frame · no receive signal</small>}
 								<Spark values={rssiSeries} />
 							</div>
 						</div>
 						<div className="stat-tile">
-							<div className="label">SNR</div>
+							<div className="label">LATEST FRAME SNR</div>
 							<div className="value">
-								{(telem.rx ?? 0) === 0 && telem.frames === 0
-									? "—"
-									: `${snr(telem).toFixed(1)} dB`}
+								{snr === undefined ? "Not reported" : `${snr.toFixed(1)} dB`}
+								{telem.direction === 2 && <small>Transmitted frame · no receive signal</small>}
 								<Spark values={snrSeries} />
 							</div>
 						</div>
 					</div>
+					<div className="device-counters" aria-label="Capture and attribution counters">
+						<span>LATEST CAPTURE SEQUENCE <b>{count(telem.frames)}</b></span>
+						<span>RADIO CRC ERRORS <b>{count(telem.crc)}</b></span>
+						<span>CRC REJECTED <b>{count(telem.dropCrc)}</b></span>
+						<span>MALFORMED <b>{count(telem.dropMalformed)}</b></span>
+						<span>NO SOURCE <b>{count(telem.dropNoSource)}</b></span>
+					</div>
+					<p className="dim device-note">
+						{dropped === undefined ? "The full count of frames without node attribution is not reported."
+							: `${dropped.toLocaleString()} analyzer frames have no node attribution.`}{" "}
+						These frames do not appear as nodes. The capture sequence includes transmissions.
+					</p>
 					<div className="device-actions">
 						<button
 							className="primary"
@@ -170,14 +168,12 @@ export function ThisDevicePanel() {
 						<button onClick={() => void disconnectDeviceLink()}>UNLINK</button>
 					</div>
 					<p className="dim device-note">
-						This firmware chats on Meshtastic LongFast (default key) from the
-						web CHAT tab and from the T-Deck itself (Home → C CHAT). Direct
-						messages go to a heard node. MeshCore send still needs a MeshCore
-						identity — same radio, next encoder.
+						Use Chat to send Meshtastic messages through the deck. Choose a node
+						for a direct message. A successful transmission leaves delivery unconfirmed.
 					</p>
 					{link.frames.length > 0 && (
 						<div className="device-heard">
-							<div className="label">LAST HEARD ON AIR</div>
+							<div className="label">RECENT ANALYZER FRAMES</div>
 							{link.frames
 								.slice(-6)
 								.reverse()
@@ -190,7 +186,9 @@ export function ThisDevicePanel() {
 											{f.lat !== undefined ? " · POS" : ""}
 										</span>
 										<span className="dim">
-											{(f.rssiX10 / 10).toFixed(0)} dBm
+											{f.raw?.direction === 2 ? "TX · delivery unconfirmed"
+												: f.raw?.direction === 1 && (f.raw.presentFields & RF_FIELD.rssi) !== 0
+													? `${(f.rssiX10 / 10).toFixed(0)} dBm` : "RSSI not reported"}
 										</span>
 									</div>
 								))}
@@ -210,25 +208,22 @@ export function ThisDeviceRow() {
 	const link = useDeviceLink();
 	if (link.status !== "linked") return null;
 	const telem = link.telemetry;
-	const heard = (telem?.rx ?? 0) > 0 || (telem?.frames ?? 0) > 0;
 	return (
 		<tr className="this-device-row">
 			<td>
-				THIS DEVICE · LILYSHARK {link.firmware ?? "—"} OVER USB
+				THIS DEVICE · {link.node !== undefined ? `!${link.node.toString(16).padStart(8, "0")}` : "NODE ID NOT REPORTED"} · LILYSHARK {link.firmware || "VERSION NOT REPORTED"} OVER USB
 				<SimulateBadge on={telem?.sim} />
 			</td>
 			<td style={{ fontWeight: 700 }}>USB</td>
-			<td className={heard ? "" : "dim"}>
-				{heard && telem ? `${snr(telem).toFixed(2)} dB` : "—"}
-			</td>
-			<td>{telem?.bat ?? "—"}</td>
-			<td>—</td>
+			<td className="dim">Not measured</td>
+			<td>{reportedLabel(telem?.bat)}</td>
+			<td>Local</td>
 			<td>
 				{telem?.lat !== undefined && telem.lon !== undefined
 					? fmtHemisphere(telem.lat, telem.lon)
 					: telem?.gps === "GPS SEARCH"
 						? "GPS SEARCH · NO FIX"
-						: (telem?.gps ?? "NO GPS FIX")}
+						: reportedLabel(telem?.gps)}
 			</td>
 			<td>LIVE</td>
 		</tr>

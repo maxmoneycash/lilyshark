@@ -49,6 +49,9 @@ public struct Message: Identifiable, Codable, Sendable {
     /// Delivery status for outgoing messages.
     public var status: DeliveryStatus
 
+    /// The reported refusal or local transport failure, when available.
+    public var failureReason: String?
+
     /// Expected ACK code from the device (for tracking delivery confirmation).
     public var expectedACK: UInt32?
 
@@ -104,7 +107,8 @@ public struct Message: Identifiable, Codable, Sendable {
         isSigned: Bool = false,
         suggestedTimeoutMs: UInt32? = nil,
         didResetPath: Bool = false,
-        reactions: [String] = []
+        reactions: [String] = [],
+        failureReason: String? = nil
     ) {
         self.id = id
         self.senderKeyHash = senderKeyHash
@@ -113,6 +117,7 @@ public struct Message: Identifiable, Codable, Sendable {
         self.timestamp = timestamp
         self.isOutgoing = isOutgoing
         self.status = status
+        self.failureReason = failureReason
         self.expectedACK = expectedACK
         self.snr = snr
         self.hops = hops
@@ -127,6 +132,18 @@ public struct Message: Identifiable, Codable, Sendable {
         self.reactions = reactions
     }
 
+    /// Recover persisted work when there is no live local send attempt behind it.
+    /// Call only for a newly activated store or a newly imported cloud message;
+    /// reloading the active radio must preserve its in-flight message state.
+    @discardableResult
+    public mutating func recoverInterruptedSend() -> Bool {
+        guard isOutgoing, status == .sending || status == .retrying || status == .flooding else { return false }
+        status = .failed
+        expectedACK = nil
+        failureReason = "Sending was interrupted. Delivery is unconfirmed; retrying may send a duplicate."
+        return true
+    }
+
     // Backward-compatible decoder — reactions may not exist in older persisted data
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -137,6 +154,7 @@ public struct Message: Identifiable, Codable, Sendable {
         timestamp = try container.decode(Date.self, forKey: .timestamp)
         isOutgoing = try container.decode(Bool.self, forKey: .isOutgoing)
         status = try container.decode(DeliveryStatus.self, forKey: .status)
+        failureReason = try container.decodeIfPresent(String.self, forKey: .failureReason)
         expectedACK = try container.decodeIfPresent(UInt32.self, forKey: .expectedACK)
         snr = try container.decodeIfPresent(Int8.self, forKey: .snr)
         hops = try container.decodeIfPresent(UInt8.self, forKey: .hops)

@@ -103,7 +103,13 @@ final class MessageStoreManager {
 
     // MARK: - Private State
 
+    #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+    @ObservationIgnored private lazy var persistenceStore = MessageStore()
+    private var fixtureDrafts: [Data: String] = [:]
+    private var fixtureLastRead: [Data: Double] = [:]
+    #else
     private var persistenceStore = MessageStore()
+    #endif
     private let iCloudStore = NSUbiquitousKeyValueStore.default
 
     /// The 12-char hex prefix of the connected radio's public key.
@@ -142,6 +148,19 @@ final class MessageStoreManager {
     /// Activate message storage for a specific radio. Called after SELF_INFO provides the radio's public key.
     /// Migrates flat files if needed, loads persisted messages, and merges iCloud data.
     func activateForRadio(_ prefix: String) {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        guard radioPrefix12 != prefix else { return }
+        radioPrefix12 = prefix
+        messagesByContact.removeAll()
+        unreadCounts.removeAll()
+        #else
+        if radioPrefix12 == prefix {
+            // A settings refresh can report SELF_INFO during an active send.
+            // Keep its current row and pending timers instead of loading an
+            // older disk snapshot (which may not contain that message yet).
+            mergeMessagesForCurrentRadio()
+            return
+        }
         radioPrefix12 = prefix
         persistenceStore = MessageStore(radioPrefix: prefix)
         MessageStore.migrateToPerRadioStorage(radioPrefix: prefix)
@@ -151,6 +170,7 @@ final class MessageStoreManager {
         }
         loadPersistedMessages()
         mergeMessagesForCurrentRadio()
+        #endif
     }
 
     /// Deactivate message storage on disconnect. Clears in-memory messages so the UI shows empty state.
@@ -180,10 +200,14 @@ final class MessageStoreManager {
         unreadCounts[contactKey] = 0
         updateAppBadge()
         onUnreadChanged?()
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        fixtureLastRead[contactKey] = Date().timeIntervalSince1970
+        #else
         guard let prefix = radioPrefix12 else { return }
         let contactHex = contactKey.hexCompact
         let key = "lastRead.\(prefix).\(contactHex)"
         iCloudStore.setAndSync(Date().timeIntervalSince1970, forKey: key)
+        #endif
     }
 
     func firstUnreadIndex(in messages: [Message], for contactKey: Data) -> Int? {
@@ -201,7 +225,11 @@ final class MessageStoreManager {
 
     /// Read lastRead timestamp, trying scoped key first then falling back to legacy.
     private func lastReadValue(for contactKey: Data) -> Double {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        fixtureLastRead[contactKey] ?? 0
+        #else
         iCloudStore.scopedDouble(base: "lastRead", contactHex: contactKey.hexCompact, radioPrefix: radioPrefix12)
+        #endif
     }
 
     /// Latest activity date for a contact (for ContactStore activity status).
@@ -231,16 +259,28 @@ final class MessageStoreManager {
     private var persistDebounceTask: Task<Void, Never>?
 
     private func loadPersistedMessages() {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Fixture builds keep all state in memory and do not notify the system.
+        #else
         messagesByContact = persistenceStore.loadAllMessages()
-        // Prune any contacts over the limit on load
-        for (key, msgs) in messagesByContact where msgs.count > self.maxMessagesPerContact {
-            messagesByContact[key] = Array(msgs.suffix(self.maxMessagesPerContact))
+        for (key, stored) in messagesByContact {
+            var messages = Array(stored.suffix(maxMessagesPerContact))
+            var changed = messages.count != stored.count
+            for index in messages.indices {
+                if messages[index].recoverInterruptedSend() { changed = true }
+            }
+            messagesByContact[key] = messages
+            if changed { persistMessages(for: key) }
         }
+        #endif
     }
 
     /// Mark a contact's messages as needing persistence. Writes are coalesced
     /// and flushed after a short delay to avoid excessive disk I/O.
     func persistMessages(for contactKeyHash: Data) {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Fixture builds keep all state in memory and do not notify the system.
+        #else
         dirtyContactKeys.insert(contactKeyHash)
         persistDebounceTask?.cancel()
         persistDebounceTask = Task { @MainActor [weak self] in
@@ -248,10 +288,14 @@ final class MessageStoreManager {
             guard !Task.isCancelled, let self else { return }
             self.flushDirtyMessages()
         }
+        #endif
     }
 
     /// Immediately write all dirty messages to disk.
     func flushDirtyMessages() {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Fixture builds keep all state in memory and do not notify the system.
+        #else
         let keys = dirtyContactKeys
         dirtyContactKeys.removeAll()
         persistDebounceTask?.cancel()
@@ -267,11 +311,15 @@ final class MessageStoreManager {
                 syncMessagesToiCloud(for: key)
             }
         }
+        #endif
     }
 
     // MARK: - Drafts
 
     func saveDraft(_ text: String, for contactKey: Data) {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        fixtureDrafts[contactKey] = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+        #else
         guard let prefix = radioPrefix12 else { return }
         let contactHex = contactKey.hexCompact
         let key = "draft.\(prefix).\(contactHex)"
@@ -281,22 +329,35 @@ final class MessageStoreManager {
             iCloudStore.set(text, forKey: key)
         }
         iCloudStore.synchronize()
+        #endif
     }
 
     func loadDraft(for contactKey: Data) -> String {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        fixtureDrafts[contactKey] ?? ""
+        #else
         iCloudStore.scopedString(base: "draft", contactHex: contactKey.hexCompact, radioPrefix: radioPrefix12) ?? ""
+        #endif
     }
 
     func hasDraft(for contactKey: Data) -> Bool {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        fixtureDrafts[contactKey] != nil
+        #else
         iCloudStore.scopedString(base: "draft", contactHex: contactKey.hexCompact, radioPrefix: radioPrefix12) != nil
+        #endif
     }
 
     func clearAllDrafts() {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        fixtureDrafts.removeAll()
+        #else
         let keys = iCloudStore.dictionaryRepresentation.keys.filter { $0.hasPrefix("draft.") }
         for key in keys {
             iCloudStore.removeObject(forKey: key)
         }
         iCloudStore.synchronize()
+        #endif
     }
 
     // MARK: - Send Messages
@@ -469,13 +530,14 @@ final class MessageStoreManager {
         _ text: String,
         to destination: UInt32,
         channelIndex: UInt8?,
-        conversationKey: Data
+        conversationKey: Data,
+        retrying message: Message? = nil
     ) {
         // Zero is the id the firmware reads as "no id wanted", and it would
         // leave the message waiting on a result that is never sent.
         let packetID = UInt32.random(in: 1...UInt32.max)
 
-        let outgoing = Message(
+        var outgoing = message ?? Message(
             contactKeyHash: conversationKey,
             text: text,
             timestamp: Date(),
@@ -484,7 +546,14 @@ final class MessageStoreManager {
             expectedACK: packetID,
             channelIndex: channelIndex
         )
-        messagesByContact[conversationKey, default: []].append(outgoing)
+        outgoing.status = .sending
+        outgoing.expectedACK = packetID
+        outgoing.failureReason = nil
+        if let message, let index = messagesByContact[conversationKey]?.firstIndex(where: { $0.id == message.id }) {
+            messagesByContact[conversationKey]?[index] = outgoing
+        } else {
+            messagesByContact[conversationKey, default: []].append(outgoing)
+        }
         persistMessages(for: conversationKey)
 
         let payload = MeshtasticProto.encodeTextPacket(
@@ -498,18 +567,21 @@ final class MessageStoreManager {
         Self.logger.info("MT SEND: to=\(String(format: "%08x", destination)) id=\(packetID) [\(payload.count) bytes]")
         DebugLogger.shared.log("MT TX: to=\(String(format: "%08x", destination)) '\(text.prefix(40))'", level: .tx)
 
+        pendingMeshtasticPackets[packetID] = (conversationKey: conversationKey, messageID: outgoing.id)
         guard sendToRadio?(payload, label) == true else {
-            markMeshtasticMessage(outgoing.id, in: conversationKey, as: .failed)
+            pendingMeshtasticPackets.removeValue(forKey: packetID)
+            markMeshtasticMessage(outgoing.id, in: conversationKey, as: .failed,
+                                  reason: "The message could not reach the deck. Reconnect and retry.")
             return
         }
 
-        pendingMeshtasticPackets[packetID] = (conversationKey: conversationKey, messageID: outgoing.id)
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: Self.meshtasticRoutingTimeoutSeconds * 1_000_000_000)
             guard let self,
                   let pending = self.pendingMeshtasticPackets.removeValue(forKey: packetID) else { return }
             Self.logger.warning("MT SEND: no routing result for id \(packetID) — marking failed")
-            self.markMeshtasticMessage(pending.messageID, in: pending.conversationKey, as: .failed)
+            self.markMeshtasticMessage(pending.messageID, in: pending.conversationKey, as: .failed,
+                                       reason: "The deck did not confirm transmission. Retrying may send a duplicate.")
         }
     }
 
@@ -533,7 +605,7 @@ final class MessageStoreManager {
         case 8: return "no response"
         case 9: return "duty cycle limit reached — wait and retry"
         case 32: return "the deck rejected the request"
-        case 33: return "not allowed (the deck is in simulate mode)"
+        case 33: return "the request is not authorized"
         default: return "refused, routing error \(error)"
         }
     }
@@ -563,14 +635,16 @@ final class MessageStoreManager {
         markMeshtasticMessage(
             pending.messageID,
             in: pending.conversationKey,
-            as: error == 0 ? .sent : .failed
+            as: error == 0 ? .sent : .failed,
+            reason: error == 0 ? nil : Self.routingErrorText(error)
         )
     }
 
-    private func markMeshtasticMessage(_ id: UUID, in conversationKey: Data, as status: DeliveryStatus) {
+    private func markMeshtasticMessage(_ id: UUID, in conversationKey: Data, as status: DeliveryStatus, reason: String? = nil) {
         guard var messages = messagesByContact[conversationKey],
               let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index].status = status
+        messages[index].failureReason = reason
         messagesByContact[conversationKey] = messages
         persistMessages(for: conversationKey)
     }
@@ -688,12 +762,7 @@ final class MessageStoreManager {
                 resetPathForContact?(contact)
             }
 
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                guard let self else { return }
-                let frame = MeshCoreProtocol.buildSendTextMessage(text: message.text, recipientKeyHash: contactKey, attempt: 0)
-                self.sendCommand?(frame, "FLOOD_RETRY_TXT")
-            }
+            scheduleFloodRetry(message, expectedStatus: .flooding, attempt: 0, label: "FLOOD_RETRY_TXT")
             return
         }
 
@@ -910,13 +979,17 @@ final class MessageStoreManager {
     func clearMessages(for contactKey: Data) {
         messagesByContact.removeValue(forKey: contactKey)
         unreadCounts.removeValue(forKey: contactKey)
+        #if !(DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS))
         persistenceStore.deleteMessages(for: contactKey)
+        #endif
         updateAppBadge()
     }
 
     func clearAllMessages() {
         messagesByContact.removeAll()
+        #if !(DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS))
         persistenceStore.deleteAllMessages()
+        #endif
         unreadCounts.removeAll()
         updateAppBadge()
     }
@@ -924,9 +997,31 @@ final class MessageStoreManager {
     func retryMessage(_ message: Message) {
         guard message.isOutgoing, message.status == .failed else { return }
         let contactKey = message.contactKeyHash
+        guard messagesByContact[contactKey]?.first(where: { $0.id == message.id })?.status == .failed else { return }
+
+        #if canImport(MeshtasticKit)
+        if meshtasticNodeNum != 0 {
+            let destination: UInt32
+            if message.channelIndex != nil {
+                destination = MeshtasticProto.broadcast
+            } else if let contact = contactProvider?(contactKey),
+                      let node = MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) {
+                destination = node
+            } else {
+                markMeshtasticMessage(message.id, in: contactKey, as: .failed,
+                                      reason: "This contact has no Meshtastic node address.")
+                return
+            }
+            sendMeshtasticText(message.text, to: destination, channelIndex: message.channelIndex,
+                               conversationKey: contactKey, retrying: message)
+            return
+        }
+        #endif
 
         if var messages = messagesByContact[contactKey],
            let idx = messages.firstIndex(where: { $0.id == message.id }) {
+
+            messages[idx].failureReason = nil
 
             if message.channelIndex == nil {
                 if let contact = contactProvider?(contactKey) {
@@ -938,14 +1033,7 @@ final class MessageStoreManager {
                 messages[idx].didResetPath = true
                 messagesByContact[contactKey] = messages
 
-                let msgID = message.id
-                Task { @MainActor [weak self] in
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    guard let self else { return }
-                    Self.logger.info("RETRY: sending flood for \(msgID) with attempt=2")
-                    let frame = MeshCoreProtocol.buildSendTextMessage(text: message.text, recipientKeyHash: contactKey, attempt: 2)
-                    self.sendCommand?(frame, "MANUAL_RETRY_FLOOD")
-                }
+                scheduleFloodRetry(message, expectedStatus: .sending, attempt: 2, label: "MANUAL_RETRY_FLOOD")
             } else {
                 guard let channelIndex = message.channelIndex else { return }
                 messages[idx].status = .sending
@@ -955,6 +1043,23 @@ final class MessageStoreManager {
                 sendCommand?(frame, "MANUAL_RETRY_CHANNEL")
             }
             persistMessages(for: contactKey)
+        }
+    }
+
+    /// Path reset needs time to reach the deck. Revalidate the pending message
+    /// and radio after that delay so an obsolete retry cannot reach a new session.
+    private func scheduleFloodRetry(_ message: Message, expectedStatus: DeliveryStatus, attempt: UInt8, label: String) {
+        let retryRadioPrefix = radioPrefix12
+        let contactKey = message.contactKeyHash
+        Task { @MainActor [weak self] in
+            do { try await Task.sleep(nanoseconds: 500_000_000) }
+            catch { return }
+            guard let self,
+                  self.radioPrefix12 == retryRadioPrefix,
+                  self.meshtasticNodeNum == 0,
+                  self.messagesByContact[contactKey]?.first(where: { $0.id == message.id })?.status == expectedStatus else { return }
+            let frame = MeshCoreProtocol.buildSendTextMessage(text: message.text, recipientKeyHash: contactKey, attempt: attempt)
+            self.sendCommand?(frame, label)
         }
     }
 
@@ -979,6 +1084,9 @@ final class MessageStoreManager {
     // MARK: - iCloud Message Sync
 
     func syncMessagesToiCloud(for contactKeyHash: Data) {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Fixture builds keep all state in memory and do not notify the system.
+        #else
         guard iCloudSyncEnabled else { return }
         let radioKey = radioPublicKeyHexProvider?() ?? ""
         guard !radioKey.isEmpty else { return }
@@ -992,9 +1100,13 @@ final class MessageStoreManager {
         if let data = try? JSONEncoder().encode(recent), data.count < 60_000 {
             iCloudStore.set(data, forKey: key)
         }
+        #endif
     }
 
     func mergeMessagesForCurrentRadio() {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Fixture builds keep all state in memory and do not notify the system.
+        #else
         let radioKey = radioPublicKeyHexProvider?() ?? ""
         guard !radioKey.isEmpty else { return }
         let prefix = "msg.\(radioKey.prefix(12))."
@@ -1014,7 +1126,11 @@ final class MessageStoreManager {
             var merged = localMessages
 
             for msg in cloudMessages where !localIDs.contains(msg.id) {
-                merged.append(msg)
+                // This ID has no local send attempt to resume. Preserve sent
+                // outcomes, but expose interrupted pending work for retry.
+                var imported = msg
+                imported.recoverInterruptedSend()
+                merged.append(imported)
                 mergedCount += 1
             }
 
@@ -1028,11 +1144,15 @@ final class MessageStoreManager {
         if mergedCount > 0 {
             Self.logger.info("iCloud sync: merged \(mergedCount) messages from other devices")
         }
+        #endif
     }
 
     // MARK: - Notifications
 
     func postLocalNotification(for message: Message) {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Fixture builds keep all state in memory and do not notify the system.
+        #else
 
         let prefs = NotificationPreferences.shared
         let isChannel = message.channelIndex != nil
@@ -1127,6 +1247,7 @@ final class MessageStoreManager {
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
+        #endif
     }
 
     #if os(iOS)
@@ -1177,6 +1298,9 @@ final class MessageStoreManager {
     // MARK: - Badge
 
     func updateAppBadge() {
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        // Fixture builds keep all state in memory and do not notify the system.
+        #else
         let totalUnread = unreadCounts.values.reduce(0, +)
         #if os(macOS)
         NSApplication.shared.dockTile.badgeLabel = totalUnread > 0 ? "\(totalUnread)" : nil
@@ -1185,6 +1309,7 @@ final class MessageStoreManager {
         Task { @MainActor in
             try? await UNUserNotificationCenter.current().setBadgeCount(totalUnread)
         }
+        #endif
         #endif
     }
 

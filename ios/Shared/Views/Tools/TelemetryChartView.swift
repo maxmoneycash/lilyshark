@@ -34,20 +34,11 @@ struct TelemetryChartView: View {
             }
 
             if availableReadings.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "chart.line.downtrend.xyaxis")
-                        .font(.title2)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                    Text("No telemetry data yet")
-                        .font(.caption)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                    Text("Request telemetry from the device to start collecting history.")
-                        .font(.caption2)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
+                ContentUnavailableView(
+                    "No saved readings",
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    description: Text("Readings from \(contactName) appear here as they arrive. Request telemetry if the node supports it and permits sharing.")
+                )
             } else {
                 // Reading type picker
                 Picker("Reading", selection: Binding(

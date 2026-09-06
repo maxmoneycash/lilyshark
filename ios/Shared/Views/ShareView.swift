@@ -98,7 +98,7 @@ struct QRCodeView: View {
                 Label("Copy Link", systemImage: "doc.on.doc")
                     .foregroundStyle(MeshTheme.accent)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
         }
         .padding()
     }
@@ -399,7 +399,7 @@ struct ShareChannelSheet: View {
                             .foregroundStyle(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                         #elseif os(macOS)
                         Button {
                             if let image = generateQRCodeImage(from: channelURL) {
@@ -416,7 +416,7 @@ struct ShareChannelSheet: View {
                                 .foregroundStyle(copiedQR ? MeshTheme.interactiveGreen : MeshTheme.accent)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                         #endif
                     }
                     .padding(.horizontal)
@@ -502,7 +502,7 @@ struct ShareAllChannelsSheet: View {
                             .foregroundStyle(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                         #elseif os(macOS)
                         Button {
                             if let image = generateQRCodeImage(from: channelsURL) {
@@ -519,7 +519,7 @@ struct ShareAllChannelsSheet: View {
                                 .foregroundStyle(copiedQR ? MeshTheme.interactiveGreen : MeshTheme.accent)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.meshPlain)
                         #endif
                     }
                     .padding(.horizontal)

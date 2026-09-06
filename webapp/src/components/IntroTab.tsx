@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValueEvent, useReducedMotion, useScroll } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { layoutWithLines, prepareWithSegments } from '@chenglou/pretext';
@@ -144,6 +144,7 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
   const textRef = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
   const [textW, setTextW] = useState(0);
+  const reduceMotion = useReducedMotion();
 
   const { scrollYProgress } = useScroll({ container: scrollRef });
   useMotionValueEvent(scrollYProgress, 'change', (p) => {
@@ -162,6 +163,13 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
   const headlines = useHeadlines(textW, fontPx);
   const s = SECTIONS[idx];
   const last = idx === SECTIONS.length - 1;
+  const goToSection = (section: number) => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({
+      top: (el.scrollHeight - el.clientHeight) * (section / (SECTIONS.length - 1)),
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+  };
 
   // While a section is up, the device pages through that beat's screens —
   // this is how all 38 firmware renders get shown without 38 sections.
@@ -201,7 +209,7 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
             />
           ))}
           <div className="intro-stage">
-            <div className="intro-copy" ref={textRef}>
+            <div className="intro-copy" ref={textRef} tabIndex={0} role="region" aria-label="About Lilyshark">
               <AnimatePresence mode="wait">
                 <motion.div key={idx} exit={{ opacity: 0, transition: { duration: 0.07 } }}>
                   <h1 className="intro-head" style={{ fontSize: fontPx }} aria-label={s.head}>
@@ -211,7 +219,7 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
                           <motion.span
                             className="intro-word"
                             key={w + wi}
-                            initial={{ opacity: 0, y: 26 }}
+                            initial={reduceMotion ? false : { opacity: 0, y: 26 }}
                             animate={{
                               opacity: 1,
                               y: 0,
@@ -226,7 +234,7 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
                   </h1>
                   <motion.p
                     className="intro-body"
-                    initial={{ opacity: 0, y: 14 }}
+                    initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0, transition: { ...wordSpring, delay: 0.28 } }}
                   >
                     {s.body}
@@ -234,7 +242,7 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
                   {last && (
                     <motion.div
                       className="intro-cta"
-                      initial={{ opacity: 0, y: 14 }}
+                      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                       animate={{ opacity: 1, y: 0, transition: { ...wordSpring, delay: 0.42 } }}
                     >
                       <button className="primary" onClick={() => onOpen('TRAFFIC')}>
@@ -255,6 +263,11 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
                   SCROLL ▾
                 </div>
               )}
+              <div className="intro-pager" aria-label="Introduction sections">
+                <button disabled={idx === 0} onClick={() => goToSection(idx - 1)}>PREVIOUS</button>
+                <span>{idx + 1} / {SECTIONS.length}</span>
+                <button disabled={last} onClick={() => goToSection(idx + 1)}>NEXT</button>
+              </div>
             </div>
 
             <div className="intro-device">
@@ -281,20 +294,14 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
               </div>
             </div>
 
-            <div className="intro-rail" aria-hidden="true">
+            <div className="intro-rail" aria-label="Introduction sections">
               {SECTIONS.map((sec, i) => (
                 <button
                   key={sec.head}
                   className={i === idx ? 'on' : ''}
-                  tabIndex={-1}
-                  onClick={() => {
-                    const el = scrollRef.current;
-                    if (el)
-                      el.scrollTo({
-                        top: (el.scrollHeight - el.clientHeight) * (i / (SECTIONS.length - 1)),
-                        behavior: 'smooth',
-                      });
-                  }}
+                  aria-label={`Section ${i + 1}: ${sec.head}`}
+                  aria-current={i === idx ? 'step' : undefined}
+                  onClick={() => goToSection(i)}
                 />
               ))}
             </div>

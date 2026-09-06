@@ -198,6 +198,10 @@ struct MeshThemeModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            #if DEBUG && LILYSHARK_UI_LARGE_TYPE
+            // Presented screens have their own environment boundary during QA.
+            .dynamicTypeSize(.accessibility3)
+            #endif
             .tint(MeshTheme.accent)
             // BOTH mechanisms, deliberately.
             //
@@ -323,11 +327,12 @@ extension NSUbiquitousKeyValueStore {
 
 // MARK: - Feedback Utility
 
-/// Set a Bool binding to true, then reset to false after a delay. Animates both transitions.
-func showFeedback(_ state: Binding<Bool>, duration: TimeInterval = 2) {
-    withAnimation { state.wrappedValue = true }
+/// Set a Bool binding, then reset it after a delay. Callers can pass the view's
+/// Reduce Motion preference; feedback stays still when no preference is supplied.
+func showFeedback(_ state: Binding<Bool>, duration: TimeInterval = 2, reduceMotion: Bool = true) {
+    withMeshAnimation(reduceMotion: reduceMotion) { state.wrappedValue = true }
     DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-        withAnimation { state.wrappedValue = false }
+        withMeshAnimation(reduceMotion: reduceMotion) { state.wrappedValue = false }
     }
 }
 
@@ -346,7 +351,7 @@ struct LinearProgressBar: View {
                 Capsule()
                     .fill(tint)
                     .frame(width: geo.size.width * max(0, min(progress, 1)))
-                    .animation(.linear(duration: 0.15), value: progress)
+                    .meshAnimation(.linear(duration: 0.15), value: progress)
             }
         }
         .frame(height: 6)
@@ -357,6 +362,7 @@ struct LinearProgressBar: View {
 
 /// Reusable copy-to-clipboard button with timed "Copied!" feedback and consistent styling.
 struct CopyButton: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let text: String
     let label: LocalizedStringKey
     let icon: String
@@ -367,7 +373,7 @@ struct CopyButton: View {
     var body: some View {
         Button {
             copyToClipboard(text)
-            showFeedback($copied)
+            showFeedback($copied, reduceMotion: reduceMotion)
         } label: {
             Label(copied ? copiedLabel : label, systemImage: copied ? copiedIcon : icon)
                 .frame(maxWidth: .infinity)
@@ -375,8 +381,9 @@ struct CopyButton: View {
                 .background(MeshTheme.accent.opacity(0.1))
                 .foregroundStyle(copied ? MeshTheme.interactiveGreen : MeshTheme.accent)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                .touchable()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.meshPlain)
     }
 }
 
@@ -471,13 +478,19 @@ func formatCoordinate(_ value: Double) -> String {
 }
 
 func formatUptime(_ seconds: UInt32) -> String {
-    guard seconds > 0 else { return "—" }
+    guard seconds > 0 else { return String(localized: "Not reported") }
     let s = Int(seconds)
     let d = s / 86400; let h = (s % 86400) / 3600; let m = (s % 3600) / 60
     if d > 0 { return "\(d)d \(h)h \(m)m" }
     if h > 0 { return "\(h)h \(m)m" }
     if m > 0 { return "\(m)m \(s % 60)s" }
     return "\(s % 60)s"
+}
+
+/// Optional telemetry preserves a real zero-second uptime after boot.
+func formatUptime(_ seconds: UInt32?) -> String {
+    guard let seconds else { return String(localized: "Not reported") }
+    return seconds == 0 ? "0s" : formatUptime(seconds)
 }
 
 /// The three things a battery row needs — text, glyph, colour — resolved from
@@ -517,7 +530,7 @@ func batteryRowContent(_ reading: BatteryReading, voltage: Double = 0) -> (text:
     case .unknown:
         // Deliberately not a battery glyph. Every battery glyph reads as a
         // charge level, and the point of this case is that there isn't one.
-        return ("\u{2014}", "questionmark.circle", MeshTheme.textSecondary)
+        return (String(localized: "Not reported"), "questionmark.circle", MeshTheme.textSecondary)
     }
 }
 
@@ -559,19 +572,17 @@ struct SaveButton: View {
             HStack(spacing: 4) {
                 if state == .saved {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
                     Text("Saved")
-                        .foregroundStyle(.green)
                 } else {
                     Text(label)
-                        .foregroundStyle(MeshTheme.accent)
                 }
             }
+            .frame(maxWidth: .infinity)
+            .touchable()
         }
-        .buttonStyle(.plain)
-        .contentShape(Rectangle())
+        .buttonStyle(.meshPrimary)
         .listRowBackground(MeshTheme.surface)
-        .animation(.easeInOut(duration: 0.2), value: state)
+        .meshAnimation(Design.Motion.quick, value: state)
     }
 }
 
@@ -613,8 +624,10 @@ struct InfoButton: View {
         } label: {
             Image(systemName: "info.circle")
                 .foregroundStyle(MeshTheme.textSecondary.opacity(0.75))
+                .touchable()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.meshPlain)
+        .accessibilityLabel("More information")
         .popover(isPresented: $showPopover) {
             InfoPopoverContent(text: text)
         }
@@ -638,7 +651,7 @@ struct SectionInfoHeader: View {
     }
 
     var body: some View {
-        let color = titleColor ?? MeshTheme.textSecondary
+        let color = titleColor ?? MeshTheme.textPrimary
         HStack(spacing: 4) {
             if let action {
                 // Title + spacer + ↺ icon are one large button — whole row is tappable
@@ -646,22 +659,24 @@ struct SectionInfoHeader: View {
                     HStack(spacing: 6) {
                         if let title {
                             Text(title)
+                                .font(.headline)
                                 .foregroundStyle(color)
                         }
                         Spacer(minLength: 0)
                         Image(systemName: actionIcon)
                             .foregroundStyle(color.opacity(0.75))
                     }
-                    .contentShape(Rectangle())
+                    .touchable()
                 }
                 #if os(macOS) || targetEnvironment(macCatalyst)
                 .buttonStyle(.borderless)
                 #else
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 #endif
             } else {
                 if let title {
                     Text(title)
+                        .font(.headline)
                         .foregroundStyle(color)
                 }
                 Spacer(minLength: 0)
@@ -672,12 +687,15 @@ struct SectionInfoHeader: View {
             } label: {
                 Image(systemName: "info.circle")
                     .foregroundStyle(color.opacity(0.75))
+                    .touchable()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
+            .accessibilityLabel(title.map { Text("About \(Text($0))") } ?? Text("More information"))
             .popover(isPresented: $showInfo) {
                 InfoPopoverContent(text: info)
             }
         }
+        .textCase(nil)
     }
 }
 
@@ -701,12 +719,12 @@ struct CLICommandButton: View {
                     .foregroundStyle(color)
                 Spacer()
             }
-            .contentShape(Rectangle())
+            .touchable()
         }
         #if os(macOS) || targetEnvironment(macCatalyst)
         .buttonStyle(.borderless)
         #else
-        .buttonStyle(.plain)
+        .buttonStyle(.meshPlain)
         #endif
         .listRowBackground(MeshTheme.surface)
     }
@@ -750,7 +768,7 @@ struct CLIToggleRow: View {
                             .padding(.vertical, 5)
                             .background(isOn == true ? toggleActive : Color.clear)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
 
                     Button {
                         sendCLI(offCommand)
@@ -762,12 +780,12 @@ struct CLIToggleRow: View {
                             .padding(.vertical, 5)
                             .background(isOn == false ? toggleActive : Color.clear)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
                 .background(MeshTheme.background)
                 .clipShape(Capsule())
             } else {
-                Text(isOn == true ? "On" : isOn == false ? "Off" : "\u{2014}")
+                Text(isOn == true ? "On" : isOn == false ? "Off" : "Not reported")
                     .foregroundStyle(MeshTheme.textPrimary)
             }
         }
@@ -904,8 +922,8 @@ enum BrandFont {
     /// proportional font.
     static func wordmark(size: CGFloat) -> Font {
         registered
-            ? .custom(postScriptName, size: size)
-            : .system(size: size, weight: .bold, design: .monospaced)
+            ? .custom(postScriptName, size: size, relativeTo: .headline)
+            : .system(.headline, design: .monospaced, weight: .bold)
     }
 }
 
@@ -933,12 +951,18 @@ struct LilysharkLockup: View {
             Image("LilysharkWordmark")
                 .resizable()
                 .scaledToFit()
-                .frame(height: size * 1.05)
+                // The bundled mark is 296 × 141. Give the resizable image
+                // its real aspect-ratio width so it cannot consume the text's
+                // proposal and force the brand name into an ellipsis.
+                .frame(width: size * 1.05 * (296.0 / 141.0), height: size * 1.05)
             (Text("lily").foregroundColor(lilyColour)
                 + Text("shark").foregroundColor(Self.sharkPink))
                 .font(BrandFont.wordmark(size: size))
                 .tracking(-0.035 * size)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
+        .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Lilyshark")
     }

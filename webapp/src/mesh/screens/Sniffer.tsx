@@ -552,21 +552,21 @@ function ExportButtons({
 				title="Download these frames as a LoRaTap pcap — the file Wireshark opens. The format has no field for a note, so notes are not written into it."
 				onClick={() => save("pcap")}
 			>
-				⭳ PCAP ({frameCount(pcap.written)})
+				EXPORT PCAP ({frameCount(pcap.written)})
 			</button>
 			<button
 				disabled={records.length === 0}
 				title="Download one row per frame, with the columns of the table above — for a spreadsheet. Notes come along in a note column."
 				onClick={() => save("csv")}
 			>
-				⭳ CSV ({frameCount(records.length)})
+				EXPORT CSV ({frameCount(records.length)})
 			</button>
 			<button
 				disabled={records.length === 0}
 				title="Download those same columns as a JSON array — for a script. Notes come along in a note field."
 				onClick={() => save("json")}
 			>
-				⭳ JSON ({frameCount(records.length)})
+				EXPORT JSON ({frameCount(records.length)})
 			</button>
 			{omitted && (
 				<span className="warn" style={{ fontSize: 11 }}>
@@ -617,7 +617,7 @@ function CopyFrameLink({ seq }: { seq: number | undefined }) {
 		<>
 			<button
 				title="Copy a link that reopens this screen with this frame selected"
-				style={{ fontSize: 10, letterSpacing: 1 }}
+				style={{ letterSpacing: 1 }}
 				onClick={() => void copy()}
 			>
 				COPY LINK
@@ -657,7 +657,7 @@ function NoteCell({
 						: undefined
 			}
 		>
-			{marker === "same" ? "✎" : marker === "other" ? "✎?" : ""}
+			{marker === "same" ? "NOTE" : marker === "other" ? "NOTE?" : ""}
 		</td>
 	);
 }
@@ -748,7 +748,7 @@ function FrameNoteEditor({
 				<button
 					disabled={trimmed === stored}
 					title="Keep this note in this browser, beside the capture — the frame's own bytes are never touched"
-					style={{ fontSize: 10, letterSpacing: 1 }}
+					style={{ letterSpacing: 1 }}
 					onClick={() => onCommit(draft)}
 				>
 					SAVE NOTE
@@ -1082,7 +1082,7 @@ export default function Sniffer() {
 					title="Save the listed frames as a .lscap capture — the TRAFFIC screen opens it, and only frames that carry their raw bytes can be written"
 					onClick={onSave}
 				>
-					⭳ CAPTURE ({frameCount(rawRecords.length)})
+					EXPORT CAPTURE ({frameCount(rawRecords.length)})
 				</button>
 				<ExportButtons
 					records={rawRecords}
@@ -1144,9 +1144,9 @@ export default function Sniffer() {
 							<button
 								title="Close this frame"
 								onClick={() => pickFrame(undefined)}
-								style={{ width: 22, height: 22, padding: 0, fontSize: 12, minWidth: 22 }}
+								style={{ width: 22, height: 22, minWidth: 22 }}
 							>
-								✕
+								CLOSE
 							</button>
 						</div>
 						<div className="scroll-y" style={{ padding: "10px 12px" }}>

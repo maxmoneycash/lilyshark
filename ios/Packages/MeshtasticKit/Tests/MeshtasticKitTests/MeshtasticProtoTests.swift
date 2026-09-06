@@ -45,6 +45,38 @@ final class MeshtasticProtoTests: XCTestCase {
         XCTAssertFalse(metrics.isPluggedIn, "no reading is not the same as plugged in")
     }
 
+    func testInvalidTelemetryVoltageStaysNil() {
+        for voltage in [Float.nan, Float.infinity, -Float.infinity, -1] {
+            guard case .deviceMetrics(let metrics)? = MeshtasticProto.parseFromRadio(telemetryWithVoltage(voltage)) else {
+                return XCTFail("telemetry with invalid voltage did not parse")
+            }
+            XCTAssertNil(metrics.voltage, "invalid voltage must remain unknown: \(voltage)")
+            XCTAssertEqual(metrics.batteryPercent, 87, "a bad voltage must not discard other readings")
+            XCTAssertEqual(metrics.uptimeSeconds, 3600)
+        }
+    }
+
+    func testZeroTelemetryVoltageRemainsAReportedReading() {
+        guard case .deviceMetrics(let metrics)? = MeshtasticProto.parseFromRadio(telemetryWithVoltage(0)) else {
+            return XCTFail("telemetry with zero voltage did not parse")
+        }
+        XCTAssertEqual(metrics.voltage, 0)
+    }
+
+    private func telemetryWithVoltage(_ voltage: Float) -> Data {
+        // Firmware telemetry fixture above, with only its fixed32 voltage changed.
+        var bytes: [UInt8] = [
+            0x12, 0x1c, 0x0d, 0x01, 0x4b, 0x53, 0x4c, 0x22,
+            0x10, 0x08, 0x43, 0x12, 0x0c, 0x12, 0x0a, 0x08,
+            0x57, 0x15, 0x48, 0xe1, 0x7a, 0x40, 0x28, 0x90,
+            0x1c, 0x35, 0xcd, 0xab, 0x34, 0x12,
+        ]
+        for byte in 0..<4 {
+            bytes[18 + byte] = UInt8(truncatingIfNeeded: voltage.bitPattern >> (byte * 8))
+        }
+        return Data(bytes)
+    }
+
     func testAboveFullMeansPluggedIn() {
         // Meshtastic sends >100 to mean external power, not a battery fuller
         // than full.
@@ -196,6 +228,28 @@ final class MeshtasticProtoTests: XCTestCase {
         )
     }
 
+    func testMalformedRoutingPayloadIsNotTransmissionSuccess() {
+        // The outer packet and Data are complete; Routing has a tag without
+        // its varint value. Previously readFields(nil) became error NONE.
+        let bytes = Data([
+            0x12, 0x0c, 0x22, 0x0a,
+            0x08, 0x05,
+            0x12, 0x01, 0x18,
+            0x35, 0x44, 0x33, 0x22, 0x11
+        ])
+        XCTAssertEqual(MeshtasticProto.parseFromRadio(bytes), .other)
+    }
+
+    func testValidEmptyRoutingPayloadRemainsALegacyAcknowledgement() {
+        let bytes = Data([
+            0x12, 0x0b, 0x22, 0x09,
+            0x08, 0x05,
+            0x12, 0x00,
+            0x35, 0x44, 0x33, 0x22, 0x11
+        ])
+        XCTAssertEqual(MeshtasticProto.parseFromRadio(bytes), .routing(requestID: 0x1122_3344, error: 0))
+    }
+
     func testHeardBroadcastTextSurfacesFromChannelAndBody() {
         var echo = Array(
             MeshtasticProto.encodeTextPacket(
@@ -291,6 +345,99 @@ final class MeshtasticProtoTests: XCTestCase {
             MeshtasticProto.parseFromRadio(bytes),
             .metadata(firmware: "2.6.0-lilyshark")
         )
+    }
+
+    func testNodeMetadataKeepsMissingFieldsAndExplicitZeroHopsDistinct() {
+        // Tags from the upstream mesh.proto NodeInfo schema. num=1 alone
+        // contains no evidence of a direct neighbor or a reception timestamp.
+        guard case .nodeInfo(let sparse)? = MeshtasticProto.parseFromRadio(Data([0x22, 2, 0x08, 1])) else {
+            return XCTFail("expected a sparse node")
+        }
+        XCTAssertNil(sparse.snr)
+        XCTAssertNil(sparse.hopsAway)
+        XCTAssertNil(sparse.lastHeard)
+        XCTAssertNil(sparse.viaMQTT)
+        XCTAssertNil(sparse.latitude)
+        XCTAssertNil(sparse.longitude)
+
+        let fields: [UInt8] = [
+            0x08, 1,                         // num
+            0x25, 0, 0, 0, 0,               // explicitly reported 0 dB SNR
+            0x2d, 0x00, 0xF1, 0x53, 0x65,  // last_heard = 1700000000
+            0x40, 1,                         // via_mqtt
+            0x48, 0,                         // explicitly reported direct neighbor
+        ]
+        guard case .nodeInfo(let complete)? = MeshtasticProto.parseFromRadio(Data([0x22, UInt8(fields.count)] + fields)) else {
+            return XCTFail("expected node metadata")
+        }
+        XCTAssertEqual(complete.snr, 0)
+        XCTAssertEqual(complete.lastHeard, 1_700_000_000)
+        XCTAssertEqual(complete.hopsAway, 0)
+        XCTAssertEqual(complete.viaMQTT, true)
+    }
+
+    func testNonfiniteSNRAndIncompleteNodePositionStayUnknown() {
+        let fields: [UInt8] = [
+            0x08, 1,
+            0x25, 0, 0, 0x80, 0x7f, // positive infinity
+            0x1a, 5, 0x0d, 0, 0, 0, 0, // latitude without longitude
+        ]
+        guard case .nodeInfo(let node)? = MeshtasticProto.parseFromRadio(Data([0x22, UInt8(fields.count)] + fields)) else {
+            return XCTFail("expected a node")
+        }
+        XCTAssertNil(node.snr)
+        XCTAssertNil(node.latitude)
+        XCTAssertNil(node.longitude)
+    }
+
+    func testPacketReceptionRetainsTimeSignalHopsAndInternetProvenance() {
+        let fields: [UInt8] = [
+            0x0d, 1, 0, 0, 0, // sender
+            0x22, 6, 0x08, 1, 0x12, 2, 0x68, 0x69, // text "hi"
+            0x3d, 0x00, 0xF1, 0x53, 0x65, // rx_time
+            0x45, 0, 0, 0x08, 0xc1, // SNR -8.5 dB
+            0x60, 0x8a, 0xff, 0xff, 0xff, 0x0f, // RSSI -118 dBm
+            0x48, 1, 0x78, 3, // hop_limit=1, hop_start=3
+            0x70, 1, // via_mqtt
+        ]
+        guard case .text(let message)? = MeshtasticProto.parseFromRadio(Data([0x12, UInt8(fields.count)] + fields)) else {
+            return XCTFail("expected text with reception metadata")
+        }
+        XCTAssertEqual(message.rxTime, 1_700_000_000)
+        XCTAssertEqual(message.rxSNR, -8.5)
+        XCTAssertEqual(message.rxRSSI, -118)
+        XCTAssertEqual(message.hopsAway, 2)
+        XCTAssertEqual(message.viaMQTT, true)
+    }
+
+    func testMissingLegacyAndInconsistentHopFieldsNeverInventDirectReception() {
+        let text: [UInt8] = [0x22, 6, 0x08, 1, 0x12, 2, 0x68, 0x69]
+        for hops: [UInt8] in [[], [0x48, 0], [0x78, 3], [0x48, 0, 0x78, 0], [0x48, 3, 0x78, 1], [0x48, 1, 0x78, 8]] {
+            let fields = text + hops
+            guard case .text(let message)? = MeshtasticProto.parseFromRadio(Data([0x12, UInt8(fields.count)] + fields)) else {
+                return XCTFail("expected text")
+            }
+            XCTAssertNil(message.hopsAway)
+            XCTAssertNil(message.rxTime)
+            XCTAssertNil(message.viaMQTT)
+        }
+    }
+
+    func testPositionRequiresBothCoordinatesAndPreservesAnExplicitOrigin() {
+        for coordinates: [UInt8] in [[], [0x0d, 0, 0, 0, 0], [0x15, 0, 0, 0, 0]] {
+            let decoded: [UInt8] = [0x08, 3, 0x12, UInt8(coordinates.count)] + coordinates
+            let packet: [UInt8] = [0x22, UInt8(decoded.count)] + decoded
+            XCTAssertEqual(MeshtasticProto.parseFromRadio(Data([0x12, UInt8(packet.count)] + packet)), .other)
+        }
+        let coordinates: [UInt8] = [0x0d, 0, 0, 0, 0, 0x15, 0, 0, 0, 0]
+        let decoded: [UInt8] = [0x08, 3, 0x12, UInt8(coordinates.count)] + coordinates
+        let packet: [UInt8] = [0x22, UInt8(decoded.count)] + decoded + [0x70, 1]
+        guard case .position(let position)? = MeshtasticProto.parseFromRadio(Data([0x12, UInt8(packet.count)] + packet)) else {
+            return XCTFail("expected an explicit (0, 0) position")
+        }
+        XCTAssertEqual(position.latitude, 0)
+        XCTAssertEqual(position.longitude, 0)
+        XCTAssertEqual(position.viaMQTT, true)
     }
 
     // MARK: - Transport

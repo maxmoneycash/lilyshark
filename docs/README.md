@@ -70,6 +70,7 @@ The quantitative case, kept separate from the claims it supports.
 | [protocol/field-receipts.md](protocol/field-receipts.md) | How a field receipt is produced and what it proves. |
 | [protocol/witness-graph-method.md](protocol/witness-graph-method.md) | The witness graph, and its method. |
 | [protocol/season-0.md](protocol/season-0.md) | Season 0, with its rules in `protocol/season-0-rules.json`. |
+| [verification/continuation-2026-09-06.md](verification/continuation-2026-09-06.md) | Recovered work, verification results, and remaining work from the September 6 continuation. |
 
 ## Plans and direction
 

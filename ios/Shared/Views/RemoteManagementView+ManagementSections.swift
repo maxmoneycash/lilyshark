@@ -56,7 +56,7 @@ struct RemoteRoomSection: View {
                         Image(systemName: "pencil")
                             .foregroundStyle(MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
             }
             .listRowBackground(MeshTheme.surface)
@@ -82,7 +82,7 @@ struct RemoteRoomSection: View {
                         Image(systemName: guestPwFeedback ? "checkmark.circle.fill" : "checkmark.circle")
                             .foregroundStyle(guestPwFeedback ? .green : MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
                 .listRowBackground(MeshTheme.surface)
             }
@@ -118,7 +118,7 @@ struct RemoteRoomSection: View {
                         }
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .listRowBackground(MeshTheme.surface)
                     #endif
                 }
@@ -164,7 +164,7 @@ struct RemoteRoomSection: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .disabled(setPermPubkey.isEmpty)
                 .listRowBackground(MeshTheme.surface)
             } header: {
@@ -208,13 +208,13 @@ struct RemoteSensorSection: View {
                 #endif
                 Button("Set") { sendCLI("io s\(gpioPin)") }
                     .foregroundStyle(MeshTheme.accent)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 Button("Reset") { sendCLI("io r\(gpioPin)") }
                     .foregroundStyle(.orange)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 Button("Toggle") { sendCLI("io t\(gpioPin)") }
                     .foregroundStyle(MeshTheme.accent)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
             }
             .listRowBackground(MeshTheme.surface)
             .disabled(gpioPin.isEmpty)
@@ -260,12 +260,12 @@ struct RemoteMaintenanceSection: View {
                     Button { sendCLI("log start") } label: {
                         Text("Start Log").foregroundStyle(MeshTheme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
 
                     Button { sendCLI("log stop") } label: {
                         Text("Stop Log").foregroundStyle(MeshTheme.textSecondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                 }
                 .listRowBackground(MeshTheme.surface)
 
@@ -286,7 +286,7 @@ struct RemoteMaintenanceSection: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
 
                 if let onFirmwareUpdate {
@@ -303,7 +303,7 @@ struct RemoteMaintenanceSection: View {
                         }
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.meshPlain)
                     .listRowBackground(MeshTheme.surface)
                 }
 
@@ -320,7 +320,7 @@ struct RemoteMaintenanceSection: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .listRowBackground(MeshTheme.surface)
             }
         }
@@ -378,7 +378,7 @@ struct SerialOnlySection: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
 
             Button {
@@ -394,7 +394,7 @@ struct SerialOnlySection: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             .alert("Restore Identity Key", isPresented: $showRestoreKeyAlert) {
                 TextField("Hex private key", text: $restoreKeyText)
@@ -426,7 +426,7 @@ struct SerialOnlySection: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
             .confirmationDialog("Factory Reset?", isPresented: $showFactoryResetConfirm, titleVisibility: .visible) {
                 Button("Erase All Data", role: .destructive) {
@@ -505,7 +505,7 @@ struct CLITerminalSection: View {
                             commandText.isEmpty ? MeshTheme.textSecondary : MeshTheme.accent
                         )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .disabled(commandText.isEmpty)
             }
             .listRowBackground(MeshTheme.surface)

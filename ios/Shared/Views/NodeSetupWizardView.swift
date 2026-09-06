@@ -26,6 +26,7 @@ struct RemoteWizardContext {
 }
 
 struct NodeSetupWizardView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
     #if !os(watchOS)
     @Environment(\.openURL) private var openURL
@@ -75,7 +76,7 @@ struct NodeSetupWizardView: View {
                 // Header
                 VStack(spacing: 8) {
                     Image(systemName: "tag.fill")
-                        .font(.system(size: 40))
+                        .font(.largeTitle)
                         .foregroundStyle(MeshTheme.accent)
                     Text("Name Wizard")
                         .font(.title2)
@@ -124,7 +125,7 @@ struct NodeSetupWizardView: View {
                     .foregroundStyle(.black)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 #endif
 
                 // Paste name field
@@ -181,7 +182,7 @@ struct NodeSetupWizardView: View {
                     .foregroundStyle(nameApplied ? .green : .black)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.meshPlain)
                 .disabled(!isNameValid || nameApplied)
             }
             .padding()
@@ -204,20 +205,20 @@ struct NodeSetupWizardView: View {
             if remote.currentName?.lowercased() != name.lowercased() {
                 remote.sendCLI("set name \(name)")
                 remote.onNameApplied?(name)
-                withAnimation { nameApplied = true }
+                withMeshAnimation(reduceMotion: reduceMotion) { nameApplied = true }
                 showRebootPrompt = true
             } else {
-                withAnimation { nameApplied = true }
+                withMeshAnimation(reduceMotion: reduceMotion) { nameApplied = true }
                 dismiss()
             }
         } else {
             // Local (BLE / USB binary): send via binary protocol
             if currentAdvertName.lowercased() != name.lowercased() {
                 onApplyName?(name)
-                withAnimation { nameApplied = true }
+                withMeshAnimation(reduceMotion: reduceMotion) { nameApplied = true }
                 showRebootPrompt = true
             } else {
-                withAnimation { nameApplied = true }
+                withMeshAnimation(reduceMotion: reduceMotion) { nameApplied = true }
                 dismiss()
             }
         }

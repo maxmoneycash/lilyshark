@@ -514,6 +514,9 @@ final class ConnectionManager {
 
     /// Refresh all device settings by sending all request commands.
     func refreshAllSettings() {
+        // MeshCore requests cannot refresh a Meshtastic deck. In particular,
+        // do not clear its loaded sections and leave isLoading stuck forever.
+        guard !isMeshtasticLinkActive else { return }
         deviceConfig?.isLoading = true
         deviceConfig?.loadedSections = []
         requestDeviceInfo()

@@ -12,7 +12,17 @@ import {
 	encodeTextPacket,
 	encodeWantConfig,
 	parseFromRadio,
+	routingErrorText,
 } from "./meshtasticProto";
+
+test("routing errors preserve actionable reasons and unknown codes", () => {
+	assert.match(routingErrorText(4), /no working radio/i);
+	assert.match(routingErrorText(6), /channel is not on the deck/i);
+	assert.match(routingErrorText(7), /too long/i);
+	assert.match(routingErrorText(9), /duty cycle/i);
+	assert.match(routingErrorText(33), /simulate mode/i);
+	assert.match(routingErrorText(123), /routing error 123/);
+});
 
 test("want_config encodes to the firmware's expected bytes", () => {
 	// ToRadio.want_config_id (field 3 varint) = 42: 0x18 0x2a.

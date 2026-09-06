@@ -1,345 +1,172 @@
-//
-//  OnboardingView.swift
-//  PommeCore
-//
-//  First-launch onboarding flow with connection guide and region selection.
-//
-//  Created by Michael P. Bedworth on 3/16/26.
-//  Copyright © 2026 Michael P. Bedworth. All rights reserved.
-//
-
 import SwiftUI
 
+/// A short introduction with scrollable content and a persistent action bar.
 struct OnboardingView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var hasCompletedOnboarding: Bool
-    /// Optional closure called when the user taps "Open Settings" on the Configure page.
     var navigateToSettings: (() -> Void)? = nil
     @State private var currentPage = 0
-    private let lastPage = 5
+    private let lastPage = 3
 
     var body: some View {
-        ZStack(alignment: .top) {
-            TabView(selection: $currentPage) {
-                welcomePage.tag(0)
-                connectPage.tag(1)
-                communicatePage.tag(2)
-                regionPage.tag(3)
-                configurePage.tag(4)
-                getStartedPage.tag(5)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Design.Space.loose) {
+                pageContent
             }
-            #if os(watchOS)
-            .tabViewStyle(.carousel)
-            #elseif os(iOS)
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            #endif
-            .background(MeshTheme.background)
-            .animation(.easeInOut, value: currentPage)
-
-            // Skip button (top-right, all pages except last)
-            if currentPage < lastPage {
-                HStack {
-                    Spacer()
-                    Button {
-                        withAnimation { hasCompletedOnboarding = true }
-                    } label: {
-                        Text("Skip")
-                            .font(.subheadline)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 8)
-                .padding(.trailing, 8)
-            }
+            .frame(maxWidth: 560, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(Design.Space.loose)
+            .transition(.opacity)
         }
+        .id(currentPage)
+        .background(MeshTheme.background)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack {
+                Text("Step \(currentPage + 1) of \(lastPage + 1)")
+                    .font(.subheadline)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                Spacer()
+                if currentPage < lastPage {
+                    Button { complete() } label: {
+                        Text("Skip").touchable()
+                    }
+                    .buttonStyle(.meshSecondary)
+                    .accessibilityLabel("Skip introduction")
+                }
+            }
+            .padding(.horizontal, Design.Space.loose)
+            .padding(.vertical, Design.Space.tight)
+            .background(MeshTheme.background)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            navigationControls
+                .padding(Design.Space.regular)
+                .background(MeshTheme.surface)
+        }
+        .tint(MeshTheme.interactiveGreen)
+        .meshAnimation(Design.Motion.quick, value: currentPage)
     }
 
-    // MARK: - Pages
-
-    private var welcomePage: some View {
-        VStack(spacing: 24) {
-            Spacer()
+    @ViewBuilder
+    private var pageContent: some View {
+        switch currentPage {
+        case 0:
             ZStack {
                 MeshAnimationBackdrop()
-                    .frame(height: 210)
                 Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 72))
+                    .font(.largeTitle)
                     .foregroundStyle(MeshTheme.accent)
             }
-            Text("Welcome to Lilyshark")
-                .font(.largeTitle.bold())
-                .foregroundStyle(MeshTheme.textPrimary)
-            Text("Off-Grid Mesh Messaging")
-                .font(.title3)
-                .foregroundStyle(MeshTheme.accent)
-            Text("Send messages, share channels, and connect with others using LoRa radio \u{2014} no internet or cell service needed.")
-                .font(.body)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            Spacer()
-            navigationControls
-        }
-        .padding()
-    }
-
-    private var connectPage: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "cable.connector")
-                .font(.system(size: 60))
-                .foregroundStyle(MeshTheme.accent)
-            Text("Connect Your Radio")
-                .font(.title2.bold())
-                .foregroundStyle(MeshTheme.textPrimary)
-
-            VStack(alignment: .leading, spacing: 10) {
-                stepRow(number: "1", text: "Power on your MeshCore radio and make sure Bluetooth is enabled on your device.")
-                stepRow(number: "2", text: "Lilyshark will scan for nearby radios automatically.")
-                stepRow(number: "3", text: "Tap your radio\u{2019}s name when it appears.")
-                stepRow(number: "4", text: "Enter the BLE PIN shown on your radio\u{2019}s screen (if required).")
-                stepRow(number: "5", text: "Once connected, your contacts and channels will sync automatically.")
-            }
-            .padding(.horizontal, 24)
-
-            Text("TIP: Name your radio with your initials + first 4 of your public key (e.g., NMA-5abd). You can change this in Settings after connecting.")
-                .font(.caption)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            Spacer()
-            navigationControls
-        }
-        .padding()
-    }
-
-    private var communicatePage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 60))
-                .foregroundStyle(MeshTheme.accent)
-            Text("Communicate Off-Grid")
-                .font(.title2.bold())
-                .foregroundStyle(MeshTheme.textPrimary)
-            Text("Send direct messages, join channels, and connect with others across the mesh network without internet or cell service.")
-                .font(.body)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            HStack(spacing: 32) {
-                VStack {
-                    Image(systemName: "person.2")
-                        .font(.title2)
-                        .foregroundStyle(MeshTheme.accent)
-                    Text("Direct")
-                        .font(.caption)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                }
-                VStack {
-                    Image(systemName: "number")
-                        .font(.title2)
-                        .foregroundStyle(MeshTheme.accent)
-                    Text("Channels")
-                        .font(.caption)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                }
-                VStack {
-                    Image(systemName: "server.rack")
-                        .font(.title2)
-                        .foregroundStyle(MeshTheme.accent)
-                    Text("Rooms")
-                        .font(.caption)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                }
-            }
-            Spacer()
-            navigationControls
-        }
-        .padding()
-    }
-
-    private var regionPage: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "globe.americas")
-                .font(.system(size: 60))
-                .foregroundStyle(MeshTheme.accent)
-            Text("Set Your Region")
-                .font(.title2.bold())
-                .foregroundStyle(MeshTheme.textPrimary)
-
-            Text("Your radio must use the correct frequency for your country. Using the wrong frequency may violate local regulations.")
-                .font(.subheadline)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            VStack(spacing: 6) {
-                frequencyRow(region: "\u{1F1FA}\u{1F1F8} Americas (US, CA, AU, NZ)", freq: "915 MHz")
-                frequencyRow(region: "\u{1F1EA}\u{1F1FA} Europe (EU, UK)", freq: "868 MHz")
-                frequencyRow(region: "\u{1F1EF}\u{1F1F5} Japan", freq: "920 MHz")
-                frequencyRow(region: "\u{1F1EE}\u{1F1F3} India", freq: "865 MHz")
-            }
-            .padding(.horizontal, 24)
-
-            Text("Your radio\u{2019}s frequency is set during flashing. If you need to change it, go to Settings \u{2192} Radio after connecting. All radios on your mesh must use the same frequency, bandwidth, spreading factor, and coding rate.")
-                .font(.caption)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            Link("View MeshCore Frequency Guide", destination: URL(string: "https://meshcore.co.uk")!)
-                .font(.caption)
-                .foregroundStyle(MeshTheme.accent)
-
-            Spacer()
-            navigationControls
-        }
-        .padding()
-    }
-
-    private var configurePage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "gearshape.2")
-                .font(.system(size: 72))
-                .foregroundStyle(MeshTheme.accent)
-            Text("Configure Your Device")
-                .font(.title2.bold())
-                .foregroundStyle(MeshTheme.textPrimary)
-            Text("Once connected, tap the gear icon at the top of the sidebar — or tap the connection bar — to open Settings. From there you can set your radio frequency, display name, privacy options, and more.")
-                .font(.body)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            .frame(height: dynamicTypeSize.isAccessibilitySize ? 100 : 160)
+            .accessibilityHidden(true)
+            pageTitle("Welcome to Lilyshark")
+            paragraph("Message nearby people through your deck or radio, even without internet or cell service.")
+            feature("Messages", symbol: "bubble.left.and.bubble.right", detail: "Direct conversations and shared channels.")
+            feature("Map", symbol: "map", detail: "Positions shared by nodes on your mesh.")
+        case 1:
+            pageTitle("Connect your radio")
+            paragraph("Use a Lilyshark deck or a MeshCore radio with Bluetooth enabled.")
+            feature("Power on", symbol: "power", detail: "Keep the radio close to your phone.")
+            feature("Choose your device", symbol: "antenna.radiowaves.left.and.right", detail: "Open Connect and select its name.")
+            feature("Pair if asked", symbol: "lock", detail: "Enter the PIN displayed by your radio.")
+            paragraph("Contacts and channels appear as the radio reports them.")
+        case 2:
+            pageTitle("Start a conversation")
+            feature("Direct messages", symbol: "person", detail: "Choose a contact to send a message.")
+            feature("Channels", symbol: "number", detail: "Share messages with people using the same channel.")
+            feature("Delivery status", symbol: "checkmark.message", detail: "A send confirmation can come from your deck. It does not always confirm the recipient received your message.")
+        default:
+            pageTitle("Check your setup")
+            paragraph("Choose the radio profile used by your local mesh. Nearby radios need compatible protocol and channel settings.")
+            feature("Deck controls", symbol: "gearshape", detail: "Configure a Lilyshark deck on the deck itself. MeshCore radios also offer device controls in Settings.")
+            feature("App preferences", symbol: "slider.horizontal.3", detail: "Open Settings for appearance, notifications, and your connected device.")
             #if !os(watchOS)
             if navigateToSettings != nil {
                 Button {
-                    withAnimation { hasCompletedOnboarding = true }
+                    complete()
                     navigateToSettings?()
                 } label: {
-                    Text("Open Settings Now")
-                        .font(.headline)
-                        .foregroundStyle(.white)
+                    Label("Open Settings", systemImage: "gearshape")
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(MeshTheme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .touchable()
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 40)
+                .buttonStyle(.meshSecondary)
             }
             #endif
-            Spacer()
-            navigationControls
         }
-        .padding()
     }
 
-    private var getStartedPage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "checkmark.circle")
-                .font(.system(size: 72))
-                .foregroundStyle(MeshTheme.accent)
-            Text("Get Started")
-                .font(.title.bold())
+    private func pageTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.title.bold())
+            .foregroundStyle(MeshTheme.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func paragraph(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.body)
+            .foregroundStyle(MeshTheme.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func feature(_ title: LocalizedStringKey, symbol: String, detail: LocalizedStringKey) -> some View {
+        VStack(alignment: .leading, spacing: Design.Space.tight) {
+            Label(title, systemImage: symbol)
+                .font(.headline)
                 .foregroundStyle(MeshTheme.textPrimary)
-            Text("Turn on your MeshCore radio and tap Connect to begin.")
-                .font(.body)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            Spacer()
-            Button {
-                withAnimation { hasCompletedOnboarding = true }
-            } label: {
-                Text("Get Started")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(MeshTheme.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 40)
-
-            navigationControls
+            paragraph(detail)
         }
-        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
-
-    // MARK: - Helpers
-
-    private func stepRow(number: String, text: LocalizedStringKey) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(number + ".")
-                .fontWeight(.bold)
-                .frame(width: 20, alignment: .trailing)
-                .foregroundStyle(MeshTheme.accent)
-            Text(text)
-                .foregroundStyle(MeshTheme.textSecondary)
-        }
-        .font(.subheadline)
-    }
-
-    private func frequencyRow(region: LocalizedStringKey, freq: String) -> some View {
-        HStack {
-            Text(region)
-                .foregroundStyle(MeshTheme.textSecondary)
-            Spacer()
-            Text(freq)
-                .fontWeight(.medium)
-                .foregroundStyle(MeshTheme.textPrimary)
-        }
-        .font(.subheadline)
-        .padding(.vertical, 4)
-    }
-
-    // MARK: - Navigation Controls
 
     private var navigationControls: some View {
-        HStack(spacing: 20) {
-            // Back arrow
-            Button {
-                withAnimation { currentPage = max(0, currentPage - 1) }
-            } label: {
-                Image(systemName: "chevron.left.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(currentPage > 0 ? MeshTheme.accent : MeshTheme.textSecondary.opacity(0.3))
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: Design.Space.tight) { navigationButtons }
+            } else {
+                HStack(spacing: Design.Space.regular) { navigationButtons }
             }
-            .buttonStyle(.plain)
-            .disabled(currentPage == 0)
-
-            // Page dots
-            HStack(spacing: 8) {
-                ForEach(0...lastPage, id: \.self) { page in
-                    Circle()
-                        .fill(page == currentPage ? MeshTheme.accent : MeshTheme.textSecondary.opacity(0.3))
-                        .frame(width: 8, height: 8)
-                }
-            }
-
-            // Forward arrow
-            Button {
-                if currentPage < lastPage {
-                    withAnimation { currentPage += 1 }
-                } else {
-                    withAnimation { hasCompletedOnboarding = true }
-                }
-            } label: {
-                Image(systemName: "chevron.right.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(MeshTheme.accent)
-            }
-            .buttonStyle(.plain)
         }
-        .padding(.bottom, 20)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var navigationButtons: some View {
+        if currentPage > 0 {
+            Button {
+                withMeshAnimation(reduceMotion: reduceMotion) { currentPage -= 1 }
+            } label: {
+                Text("Back")
+                    .frame(maxWidth: .infinity)
+                    .touchable()
+            }
+            .buttonStyle(.meshSecondary)
+            .accessibilityLabel("Previous introduction page")
+        }
+        Button {
+            if currentPage < lastPage {
+                withMeshAnimation(reduceMotion: reduceMotion) { currentPage += 1 }
+            } else {
+                complete()
+            }
+        } label: {
+            Text(currentPage < lastPage ? "Continue" : "Get Started")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .touchable()
+        }
+        .buttonStyle(.meshPrimary)
+        .foregroundStyle(MeshTheme.textOnAccent)
+        .accessibilityLabel(currentPage < lastPage ? "Next introduction page" : "Get started with Lilyshark")
+    }
+
+    private func complete() {
+        withMeshAnimation(reduceMotion: reduceMotion) { hasCompletedOnboarding = true }
     }
 }
 

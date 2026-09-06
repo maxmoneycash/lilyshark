@@ -1,5 +1,6 @@
 import * as RadioGroup from "@radix-ui/react-radio-group";
 import { useEffect, useRef, useState } from "react";
+import { UiIcon } from "../components/UiIcon";
 import { TDeckPhoto } from "../components/TDeckPhoto";
 import { tabHref, type Tab } from "../mesh/navigation";
 import { loadInstaller } from "./installer";
@@ -86,7 +87,7 @@ function CopyButton({ text }: { text: string }) {
       }}
     >
       <span aria-live="polite">
-        {status === "copied" ? "✓" : status === "error" ? "!" : Glyph.copy}
+        {status === "copied" ? <UiIcon name="check" /> : status === "error" ? "!" : Glyph.copy}
       </span>
     </button>
   );
@@ -406,7 +407,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
             </div>
             <div className="hero-footnote">
               <span>DESIGNED FOR THE FIELD</span>
-              <span>↗ LILYSHARK</span>
+              <span>LILYSHARK</span>
             </div>
           </div>
 
@@ -425,7 +426,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
             <ul className="checklist">
               {CHECKLISTS[kind].map((item) => (
                 <li key={item}>
-                  <span className="tick">✓</span>
+                  <span className="tick"><UiIcon name="check" /></span>
                   {item}
                 </li>
               ))}
@@ -436,8 +437,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                 <div className="install-requirement">
                   {Glyph.usb}
                   <span>
-                    Connect your board with a USB data cable.
-                    <br />
+                    Connect your board with a USB data cable.{" "}
                     Open this page in Chrome or Edge on a computer.
                   </span>
                 </div>
@@ -487,7 +487,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                 <p className="meta release-meta">
                   <span>{FIRMWARE.version}</span>
                   <span>977 KiB · Factory image</span>
-                  <a href="#verify">Verify checksum ↗</a>
+                  <a href="#verify">Verify checksum</a>
                 </p>
                 <p className="ownership-note">
                   No account. No cloud. Yours to explore.
@@ -647,7 +647,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                   </div>
                 </details>
                 <a className="help-link" href={`${REPO}/issues`}>
-                  Still stuck? Open an issue ↗
+                  Still stuck? Open an issue
                 </a>
               </div>
             </div>
