@@ -120,9 +120,9 @@ export function mountTDeck(
     // the copy so it does not sit in an empty column. The whip can crop off
     // the top.
     const aspect = width / height;
-    const halfHeight = Math.max(height < 400 ? .056 : .062, .038 * height / width);
-    const pan = aspect > 1 ? halfHeight * aspect * .16 : 0;
-    camera.position.y = height < 400 ? .004 : .01;
+    const halfHeight = Math.max(height < 400 ? .06 : .07, .042 * height / width);
+    const pan = aspect > 1 ? halfHeight * aspect * .14 : 0;
+    camera.position.y = height < 400 ? -.004 : -.008;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
     camera.top = halfHeight;

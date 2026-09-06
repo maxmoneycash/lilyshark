@@ -32,18 +32,19 @@
 }
 .meshterm .tdeck-model-controls {
   position: absolute;
-  bottom: 8px;
+  bottom: 28px;
   left: 0;
-  width: 100%;
-  text-align: center;
+  width: min(32rem, 34%);
+  text-align: left;
   font-size: 10px;
   color: var(--fg-dim);
   pointer-events: none;
+  z-index: 2;
 }
 .meshterm .tdeck-model-hint { letter-spacing: .5px; }
 .meshterm .tdeck-model-buttons {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 12px;
   pointer-events: auto;
 }
@@ -75,5 +76,14 @@
 }
 @media (pointer: coarse) {
   .meshterm .tdeck-model-buttons button:not(.tab) { min-height: 36px; }
-  .meshterm .tdeck-model-controls { bottom: 6px; }
+}
+@media (max-width: 860px) {
+  .meshterm .tdeck-model-controls {
+    left: 0;
+    right: 0;
+    width: 100%;
+    bottom: 4px;
+    text-align: center;
+  }
+  .meshterm .tdeck-model-buttons { justify-content: center; }
 }
