@@ -11,7 +11,8 @@ export interface TDeckViewer {
 }
 
 const MODEL_URL = '/models/tdeck-plus/tdeck-plus-v5.glb';
-const INITIAL_YAW = -0.24;
+const INITIAL_YAW = -0.12;
+const INITIAL_PITCH = .06;
 
 /** Owns GPU resources and input for one mounted intro. No global render loop. */
 export function mountTDeck(
@@ -77,8 +78,7 @@ export function mountTDeck(
   let lastTime = 0;
   let time = 0;
   let yaw = INITIAL_YAW;
-  let pitch = .06;
-  let velocity = 0;
+  let pitch = INITIAL_PITCH;
   let screenUrl = '';
   let screenRequest = 0;
   let pointer: { id: number; x: number; y: number; startX: number; startY: number; time: number; touch: boolean; dragging: boolean } | undefined;
@@ -92,16 +92,17 @@ export function mountTDeck(
     lastTime = now;
     if (moving && !pointer) {
       time += dt;
-      velocity *= Math.exp(-3.4 * dt);
-      yaw += velocity * dt;
-      // Keep the LCD toward the camera. A full spin parks the hero on the
-      // battery door. Drag can still turn it; idle eases back to a 3/4 front.
-      const facing = INITIAL_YAW + Math.sin(time * .55) * .4;
-      yaw += (facing - yaw) * (1 - Math.exp(-1.7 * dt));
-      pitch += (.06 - pitch) * (1 - Math.exp(-1.5 * dt));
+      yaw += (INITIAL_YAW - yaw) * (1 - Math.exp(-4.2 * dt));
+      pitch += (INITIAL_PITCH - pitch) * (1 - Math.exp(-4.2 * dt));
     }
-    rig.rotation.set(pitch + Math.sin(time * .7) * .045, yaw, -.055 + Math.sin(time * .55) * .035, 'YXZ');
-    rig.position.set(Math.sin(time * .6) * .002, Math.sin(time * 1.1) * .004, 0);
+    const breathe = moving ? 1 : 0;
+    rig.rotation.set(
+      pitch + Math.sin(time * .55) * .012 * breathe,
+      yaw,
+      -.03 + Math.sin(time * .4) * .008 * breathe,
+      'YXZ',
+    );
+    rig.position.set(0, Math.sin(time * .7) * .0015 * breathe, 0);
     renderer.render(scene, camera);
     if (moving && ready) requestRender();
   }
@@ -225,9 +226,6 @@ export function mountTDeck(
 
   function release(event: PointerEvent) {
     if (pointer?.id !== event.pointerId) return;
-    velocity = event.type === 'pointerup'
-      ? velocity * Math.exp(-5 * Math.max(0, event.timeStamp - pointer.time) / 1000)
-      : 0;
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
     pointer = undefined;
     requestRender();
@@ -235,7 +233,6 @@ export function mountTDeck(
   function pointerDown(event: PointerEvent) {
     if (!ready || !event.isPrimary || event.button !== 0) return;
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp, touch: event.pointerType === 'touch', dragging: event.pointerType !== 'touch' };
-    velocity = 0;
     if (!pointer.touch) canvas.setPointerCapture(event.pointerId);
   }
   function pointerMove(event: PointerEvent) {
@@ -251,7 +248,6 @@ export function mountTDeck(
     const delta = (event.clientX - pointer.x) * .012;
     yaw += delta;
     if (!pointer.touch) pitch = THREE.MathUtils.clamp(pitch + (event.clientY - pointer.y) * .008, -.65, .65);
-    velocity = THREE.MathUtils.clamp(delta / Math.max((event.timeStamp - pointer.time) / 1000, .016), -2.5, 2.5);
     pointer.x = event.clientX;
     pointer.y = event.clientY;
     pointer.time = event.timeStamp;
@@ -259,8 +255,7 @@ export function mountTDeck(
   }
   function reset() {
     yaw = INITIAL_YAW;
-    pitch = .06;
-    velocity = 0;
+    pitch = INITIAL_PITCH;
     time = 0;
     requestRender();
   }
@@ -272,7 +267,6 @@ export function mountTDeck(
     else if (event.key === 'Home') reset();
     else return;
     event.preventDefault();
-    velocity = 0;
     requestRender();
   }
   function visibilityChanged() {
@@ -302,7 +296,7 @@ export function mountTDeck(
 
   return {
     setScreen,
-    setMotion(enabled) { moving = enabled; velocity = 0; lastTime = 0; requestRender(); },
+    setMotion(enabled) { moving = enabled; lastTime = 0; requestRender(); },
     reset,
     dispose() {
       disposed = true;

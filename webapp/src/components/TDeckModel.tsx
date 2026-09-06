@@ -57,13 +57,13 @@ export function TDeckModel({ screen }: { screen: string }) {
       />
       <div className="tdeck-model-controls" hidden={status !== 'ready'}>
         <span id={instructions} className="tdeck-model-hint">
-          Drag to spin · Scroll to explore
-          <span className="tdeck-model-sr">. Arrow keys rotate. Home resets the view.</span>
+          Drag to turn · Scroll to explore
+          <span className="tdeck-model-sr">. Arrow keys turn the radio. Home faces the screen.</span>
         </span>
         <div className="tdeck-model-buttons">
           {!reduceMotion && (
             <button type="button" onClick={() => setPaused(value => !value)}>
-              {paused ? 'Resume rotation' : 'Pause rotation'}
+              {paused ? 'Resume motion' : 'Pause motion'}
             </button>
           )}
           <button type="button" onClick={() => viewer.current?.reset()}>Reset view</button>
