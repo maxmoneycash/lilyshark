@@ -22,6 +22,7 @@ import {
 	encodeTextPacket,
 	encodeWantConfig,
 	parseFromRadio,
+	routingErrorText,
 	type FromRadio,
 } from "./meshtasticProto";
 import {
@@ -175,11 +176,15 @@ function handle(message: FromRadio): void {
 			pending.delete(message.requestId);
 			mutate((s) => {
 				s.messages = s.messages.map((m) =>
-					m.id === localId ? { ...m, state: message.error === 0 ? "sent" : "failed" } : m,
+					m.id === localId ? {
+						...m,
+						state: message.error === 0 ? "sent" : "failed",
+						failureReason: message.error === 0 ? undefined : routingErrorText(message.error),
+					} : m,
 				);
 			});
 			if (message.error !== 0) {
-				addLog("T-Deck could not transmit (error {0})", message.error);
+				addLog("T-Deck could not transmit: {0}", routingErrorText(message.error));
 			}
 			break;
 		}
@@ -293,9 +298,21 @@ export async function meshtasticBleSendText(text: string, convo: string): Promis
 		s.messages = [...s.messages, msg];
 	});
 	pending.set(packetId, msg.id);
-	await writeToRadio(
-		encodeTextPacket({ to, channel, packetId, text, wantAck: to !== BROADCAST }),
-	);
+	try {
+		await writeToRadio(
+			encodeTextPacket({ to, channel, packetId, text, wantAck: to !== BROADCAST }),
+		);
+	} catch (error) {
+		pending.delete(packetId);
+		mutate((s) => {
+			s.messages = s.messages.map((m) => m.id === msg.id ? {
+				...m,
+				state: "failed",
+				failureReason: error instanceof Error ? error.message : String(error),
+			} : m);
+		});
+		throw error;
+	}
 }
 
 /** Resend a failed message as a fresh packet that still resolves to the
@@ -309,9 +326,14 @@ export async function meshtasticBleRetry(msg: {
 	const channel = msg.convo.startsWith("ch:") ? Number(msg.convo.slice(3)) : 0;
 	const packetId = randomPacketId();
 	pending.set(packetId, msg.id);
-	await writeToRadio(
-		encodeTextPacket({ to, channel, packetId, text: msg.text, wantAck: to !== BROADCAST }),
-	);
+	try {
+		await writeToRadio(
+			encodeTextPacket({ to, channel, packetId, text: msg.text, wantAck: to !== BROADCAST }),
+		);
+	} catch (error) {
+		pending.delete(packetId);
+		throw error;
+	}
 }
 
 export function disconnectMeshtasticBle(): void {

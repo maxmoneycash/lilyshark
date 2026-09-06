@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { clearUnread, getSnapshot, subscribe, type Message } from "../store";
 import { clearConvo, retryMessage, sendText } from "../radio";
 import { saveText, stamp } from "../export";
@@ -57,6 +57,10 @@ export default function Chat({
   // the 3 s disarm of the CLEAR confirmation
   const clearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [replyTo, setReplyTo] = useState<Message | undefined>();
+  const followLatest = useRef(true);
+  const previousView = useRef("");
+  const previousLast = useRef("");
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   useEffect(() => {
     if (focusSearch) searchRef.current?.select();
@@ -75,11 +79,24 @@ export default function Chat({
   // Scroll the list, not the page. scrollIntoView asks the nearest scrollable
   // ancestor to move, and on a phone — where the panes have stacked and the
   // document is the scroller — that yanked the whole page down on every message.
-  useEffect(() => {
+  const lastMessage = msgs[msgs.length - 1];
+  const lastMessageKey = lastMessage ? `${lastMessage.id}:${lastMessage.ts}` : "";
+  useLayoutEffect(() => {
+    const viewChanged = previousView.current !== `${convo}:${q}`;
+    previousView.current = `${convo}:${q}`;
+    const messageArrived = previousLast.current !== lastMessageKey;
+    previousLast.current = lastMessageKey;
     if (q) return;
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs.length, q]);
+    if (!el) return;
+    if (viewChanged || followLatest.current || (messageArrived && lastMessage?.mine)) {
+      el.scrollTop = el.scrollHeight;
+      followLatest.current = true;
+      setHasNewMessages(false);
+    } else if (messageArrived) {
+      setHasNewMessages(true);
+    }
+  }, [convo, lastMessageKey, lastMessage?.mine, q]);
 
   // Viewing a conversation (or a message arriving while open) clears unread
   useEffect(() => {
@@ -123,6 +140,8 @@ export default function Chat({
   const onSend = async () => {
     const text = draft.trim();
     if (!text) return;
+    const existing = new Set(getSnapshot().messages.map((m) => `${m.id}:${m.ts}`));
+    const reply = replyTo;
     setDraft("");
     setError("");
     const rid = replyTo?.id;
@@ -131,6 +150,15 @@ export default function Chat({
       await sendText(text, convo, rid);
     } catch (e) {
       setError(t("TX FAILED: {0}", String(e)));
+      // A disconnected link can reject before creating a retryable chat row.
+      // Keep that draft available without duplicating messages already stored.
+      const stored = getSnapshot().messages.some((m) =>
+        m.mine && m.convo === convo && m.text === text && !existing.has(`${m.id}:${m.ts}`),
+      );
+      if (!stored) {
+        setDraft((current) => current || draft);
+        setReplyTo((current) => current ?? reply);
+      }
     }
   };
 
@@ -140,16 +168,18 @@ export default function Chat({
         <div className="panel-title">{t("PANEL // CHANNELS")}</div>
         <div style={{ padding: "8px 0" }}>
           {channelConvos.map((c) => (
-            <div
+            <button
+              type="button"
               key={c.key}
               className={`convo-item ${c.key === convo ? "active" : ""}`}
+              aria-pressed={c.key === convo}
               onClick={() => setConvo(c.key)}
             >
               <span>{c.label}</span>
               {(s.unread.get(c.key) ?? 0) > 0 && (
                 <span className="unread-badge">{s.unread.get(c.key)}</span>
               )}
-            </div>
+            </button>
           ))}
         </div>
         <div className="panel-title" style={{ borderTop: "1px solid var(--border)" }}>
@@ -158,20 +188,22 @@ export default function Chat({
         <div style={{ padding: "8px 0" }}>
           {dmConvos.length === 0 && (
             <div className="convo-item dim" style={{ cursor: "default" }}>
-              <span>{t("— NONE —")}</span>
+              <span>{t("Choose a node to start a direct message.")}</span>
             </div>
           )}
           {dmConvos.map((c) => (
-            <div
+            <button
+              type="button"
               key={c.key}
               className={`convo-item ${c.key === convo ? "active" : ""}`}
+              aria-pressed={c.key === convo}
               onClick={() => setConvo(c.key)}
             >
               <span>{c.label}</span>
               {(s.unread.get(c.key) ?? 0) > 0 && (
                 <span className="unread-badge">{s.unread.get(c.key)}</span>
               )}
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -182,18 +214,18 @@ export default function Chat({
             PANEL // CHAT · {convoLabel}
             {convo.startsWith("dm:") &&
               (s.nodes.get(Number(convo.slice(3)))?.publicKey ? (
-                <span title={t("END-TO-END ENCRYPTED (PKI)")}> 🔒 PKI</span>
+                <span title={t("END-TO-END ENCRYPTED (PKI)")}> PKI</span>
               ) : (
                 <span
                   className="warn"
                   title={t("NO PUBLIC KEY: ENCRYPTED WITH THE CHANNEL PSK ONLY")}
                 >
                   {" "}
-                  {t("⚠ NO PKI")}
+                  {t("NO PKI")}
                 </span>
               ))}
           </span>
-          <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <span className="chat-tools">
             <input
               ref={searchRef}
               value={search}
@@ -205,11 +237,12 @@ export default function Chat({
                 }
               }}
               placeholder={t("SEARCH THE WHOLE HISTORY_")}
+              aria-label={t("Search message history")}
               title={t("CTRL+F · ESC CLEARS")}
               style={{ width: 190, fontSize: 11 }}
             />
             <button
-              style={{ fontSize: 10, padding: "0 6px" }}
+
               title={t("EXPORT THIS CONVERSATION TO A TEXT FILE")}
               disabled={msgs.length === 0}
               onClick={async () => {
@@ -219,7 +252,7 @@ export default function Chat({
                     msgs
                       .map(
                         (m) =>
-                          `${new Date(m.ts).toISOString()} [${convoLabel}] <${nodeShort(m.from)}> ${m.text}${m.mine ? ` (${m.state})` : ""}`,
+                          `${new Date(m.ts).toISOString()} [${convoLabel}] <${m.mine ? t("ME") : nodeShort(m.from)}> ${m.text}${m.mine ? ` (${m.state})` : ""}`,
                       )
                       .join("\n"),
                   );
@@ -229,11 +262,11 @@ export default function Chat({
                 }
               }}
             >
-              {t("⭳ EXPORT")}
+              {t("EXPORT")}
             </button>
             <button
               className="danger"
-              style={{ fontSize: 10, padding: "0 6px" }}
+
               title={t("DELETE ALL MESSAGES IN THIS CONVERSATION")}
               disabled={convoCount === 0}
               onClick={() => {
@@ -244,7 +277,7 @@ export default function Chat({
                 } else {
                   setConfirmClear(true);
                   setError(
-                    t("⚠ {0} MESSAGES WILL BE DELETED · PRESS AGAIN", convoCount),
+                    t("{0} MESSAGES WILL BE DELETED · PRESS AGAIN", convoCount),
                   );
                   clearTimeout(clearTimer.current);
                   clearTimer.current = setTimeout(
@@ -254,14 +287,22 @@ export default function Chat({
                 }
               }}
             >
-              {confirmClear ? t("SURE?") : t("🗑 CLEAR")}
+              {confirmClear ? t("SURE?") : t("CLEAR")}
             </button>
-            {t("{0} NODES LISTENING", s.nodes.size)}
+            <span>{t("{0} KNOWN NODES", s.nodes.size)}</span>
           </span>
         </div>
         <div
           ref={listRef}
           className="scroll-y chat-msgs"
+          tabIndex={0}
+          role="region"
+          aria-label={t("Messages in {0}", convoLabel)}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            followLatest.current = el.scrollHeight - el.clientHeight - el.scrollTop < 48;
+            if (followLatest.current) setHasNewMessages(false);
+          }}
           style={{
             padding: "12px 14px",
             display: "flex",
@@ -324,7 +365,7 @@ export default function Chat({
                   const orig = s.messages.find((x) => x.id === m.replyId);
                   return (
                     <div className="reply-ref dim">
-                      ↩{" "}
+                      {t("Reply to")}{" "}
                       {orig
                         ? `<${nodeShort(orig.from)}> ${orig.text}`
                         : t("(ORIGINAL MESSAGE)")}
@@ -341,7 +382,7 @@ export default function Chat({
                   setMenu({ num: m.from, x: e.clientX, y: e.clientY });
                 }}
               >
-                &lt;{nodeShort(m.from)}&gt;
+                &lt;{m.mine ? t("ME") : nodeShort(m.from)}&gt;
               </span>{" "}
               {!m.mine &&
                 (m.hops !== undefined || m.snr !== undefined) &&
@@ -372,20 +413,26 @@ export default function Chat({
                 <span className="warn">{t("⧗ QUEUED")}</span>
               )}
               {m.mine && m.state === "sent" && (
-                <span className="dim">{t("➤ ON AIR LONGFAST · NO REPLY YET")}</span>
+                <span className="dim">{t("➤ SENT · DELIVERY UNCONFIRMED")}</span>
               )}
               {m.mine && m.state === "delivered" && (
-                <span className="dim">{t("✓ DELIVERED")}</span>
+                <span className="dim">{t("DELIVERED")}</span>
               )}
               {m.mine && m.state === "failed" && (
                 <>
-                  <span className="err">{t("✗ FAILED")}</span>{" "}
+                  <span className="err">{t("FAILED")}{m.failureReason ? ` · ${m.failureReason}` : ""}</span>{" "}
                   <button
-                    style={{ fontSize: 10, padding: "0 6px" }}
+
                     title={t("RETRY SEND")}
-                    onClick={() => retryMessage(m).catch(() => {})}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setError("");
+                      void retryMessage(m).catch((error) => setError(
+                        t("Retry failed: {0}", error instanceof Error ? error.message : String(error)),
+                      ));
+                    }}
                   >
-                    {t("↻ RETRY")}
+                    {t("RETRY")}
                   </button>
                 </>
               )}
@@ -393,12 +440,13 @@ export default function Chat({
                 <button
                   className="quote-btn"
                   title={t("REPLY")}
+                  aria-label={t("Reply to {0}", nodeShort(m.from))}
                   onClick={() => {
                     setReplyTo(m);
                     inputRef.current?.focus();
                   }}
                 >
-                  ↩
+                  {t("REPLY")}
                 </button>
               )}
             </div>
@@ -406,18 +454,33 @@ export default function Chat({
             );
           })}
         </div>
-        {error && <p className="error">{error}</p>}
+        {!q && hasNewMessages && (
+          <button
+            type="button"
+            className="chat-latest"
+            onClick={() => {
+              const el = listRef.current;
+              if (el) el.scrollTop = el.scrollHeight;
+              followLatest.current = true;
+              setHasNewMessages(false);
+            }}
+          >
+            {t("New messages · Jump to latest")}
+          </button>
+        )}
+        {error && <p className="error" role="status">{error}</p>}
         {replyTo && (
           <div className="reply-bar">
             <span className="dim">
-              ↩ {t("REPLYING TO")} &lt;{nodeShort(replyTo.from)}&gt;:{" "}
+              {t("REPLYING TO")} &lt;{nodeShort(replyTo.from)}&gt;:{" "}
               {replyTo.text.slice(0, 60)}
             </span>
             <button
-              style={{ fontSize: 10, padding: "0 6px" }}
+
+              aria-label={t("Cancel reply")}
               onClick={() => setReplyTo(undefined)}
             >
-              ✕
+              CLOSE
             </button>
           </div>
         )}
@@ -429,6 +492,7 @@ export default function Chat({
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSend()}
             placeholder={t("TYPE A MESSAGE")}
+            aria-label={t("Message")}
             maxLength={200}
           />
           <span
@@ -470,7 +534,7 @@ export default function Chat({
                       close();
                     }}
                   >
-                    {t("✉ SEND DM")}
+                    {t("SEND DM")}
                   </button>
                 )}
                 <button
@@ -479,7 +543,7 @@ export default function Chat({
                     close();
                   }}
                 >
-                  {t("☷ VIEW IN NODES")}
+                  {t("VIEW IN NODES")}
                 </button>
                 {hasPos && (
                   <button
@@ -488,7 +552,7 @@ export default function Chat({
                       close();
                     }}
                   >
-                    {t("⚲ VIEW ON MAP")}
+                    {t("VIEW ON MAP")}
                   </button>
                 )}
               </div>

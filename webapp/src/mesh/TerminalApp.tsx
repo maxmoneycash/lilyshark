@@ -1,3 +1,4 @@
+import { UiIcon } from "../components/UiIcon";
 import { Component, lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { connectMeshtasticBle } from "./meshtasticBle";
@@ -149,8 +150,9 @@ function Titlebar() {
           className="tb-btn"
           onClick={toggleFullscreen}
           title={fs ? t("Exit fullscreen") : t("Fullscreen")}
+          aria-label={fs ? t("Exit fullscreen") : t("Fullscreen")}
         >
-          ⛶
+          <UiIcon name="expand" />
         </button>
       </div>
     </div>
@@ -714,7 +716,7 @@ function App() {
             aria-label="Close"
             onClick={() => setConnectOpen(false)}
           >
-            ✕
+            CLOSE
           </button>
           <div className="sheet-title">CONNECT A RADIO</div>
           <div className="flow">
@@ -898,7 +900,7 @@ function App() {
               <span>PANEL // DEBUG · SERIAL 115200 8N1</span>
               <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <button
-                  style={{ fontSize: 10, padding: "0 6px" }}
+
                   title={t("Export the log to a text file")}
                   disabled={s.log.length === 0}
                   onClick={() =>
@@ -907,7 +909,7 @@ function App() {
                       .catch((e) => setError(t("EXPORT FAILED: {0}", String(e))))
                   }
                 >
-                  {t("⭳ EXPORT")}
+                  {t("EXPORT")}
                 </button>
                 {t("{0} LINES", s.log.length)}
               </span>

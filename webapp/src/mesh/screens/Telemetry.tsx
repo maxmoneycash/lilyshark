@@ -9,6 +9,7 @@ import { useDeviceLink, type DeviceTelemetry } from "../../lib/deviceLink";
 import { getSnapshot, subscribe } from "../store";
 import { ThisDevicePanel } from "../ThisDevice";
 import { accent, fg, isLight, useThemeTick } from "../theme";
+import { telemetryBattery, telemetryCount, telemetrySignal, telemetryVoltage, unattributedFrames } from "../deviceTelemetry";
 
 type DeckMetric = {
 	id: string;
@@ -20,16 +21,12 @@ const DECK_METRICS: DeckMetric[] = [
 	{
 		id: "voltage",
 		label: "BATTERY VOLTAGE (V)",
-		pick: (s) => (s.mv !== undefined ? s.mv / 1000 : undefined),
+		pick: telemetryVoltage,
 	},
 	{
 		id: "battery",
 		label: "BATTERY (%)",
-		pick: (s) => {
-			if (s.pct !== undefined) return s.pct;
-			const m = s.bat.match(/(\d+)\s*%/);
-			return m ? Number(m[1]) : undefined;
-		},
+		pick: telemetryBattery,
 	},
 	{
 		id: "sats",
@@ -39,7 +36,7 @@ const DECK_METRICS: DeckMetric[] = [
 	{
 		id: "rx",
 		label: "FRAMES HEARD",
-		pick: (s) => s.rx,
+		pick: (s) => telemetryCount(s.rx),
 	},
 	{
 		// The gap between FRAMES HEARD and what the node list shows. A deck
@@ -50,21 +47,21 @@ const DECK_METRICS: DeckMetric[] = [
 		// than a fault -- it is traffic this build cannot attribute, not
 		// traffic that was not there.
 		id: "unattributed",
-		label: "HEARD, NOT ATTRIBUTED",
-		pick: (s) =>
-			s.dropCrc === undefined && s.dropMalformed === undefined && s.dropNoSource === undefined
-				? undefined
-				: (s.dropCrc ?? 0) + (s.dropMalformed ?? 0) + (s.dropNoSource ?? 0),
+		label: "ANALYZER UNATTRIBUTED",
+		pick: unattributedFrames,
 	},
+	{ id: "dropCrc", label: "ANALYZER CRC REJECTED", pick: (s) => telemetryCount(s.dropCrc) },
+	{ id: "dropMalformed", label: "ANALYZER MALFORMED", pick: (s) => telemetryCount(s.dropMalformed) },
+	{ id: "dropNoSource", label: "ANALYZER NO SOURCE", pick: (s) => telemetryCount(s.dropNoSource) },
 	{
 		id: "rssi",
 		label: "LAST PACKET RSSI (dBm)",
-		pick: (s) => ((s.rx ?? 0) > 0 || s.frames > 0 ? s.rssiX10 / 10 : undefined),
+		pick: (s) => telemetrySignal(s, "rssi"),
 	},
 	{
 		id: "snr",
 		label: "LAST PACKET SNR (dB)",
-		pick: (s) => ((s.rx ?? 0) > 0 || s.frames > 0 ? s.snrX10 / 10 : undefined),
+		pick: (s) => telemetrySignal(s, "snr"),
 	},
 ];
 
@@ -157,8 +154,10 @@ function DeckTrend() {
 	return (
 		<>
 			<div
+				className="telemetry-controls"
 				style={{
 					display: "flex",
+					flexWrap: "wrap",
 					gap: 10,
 					alignItems: "center",
 					flexShrink: 0,
@@ -167,7 +166,7 @@ function DeckTrend() {
 				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
 					T-DECK // LIVE
 				</span>
-				<select value={metric.id} onChange={(e) => setMetricId(e.target.value)}>
+				<select aria-label="Deck telemetry metric" value={metric.id} onChange={(e) => setMetricId(e.target.value)}>
 					{DECK_METRICS.map((m) => (
 						<option key={m.id} value={m.id}>
 							{m.label}
@@ -195,12 +194,15 @@ function DeckTrend() {
 					<div className="scroll-y" style={{ padding: 14, position: "relative" }}>
 						{rows.length === 0 && (
 							<p className="dim" style={{ position: "absolute" }}>
-								Waiting for the next USB sample_
+								{link.history.length === 0 ? "Waiting for telemetry from the linked deck."
+									: metric.id === "rssi" || metric.id === "snr"
+										? "No received frame with a reported signal measurement is available."
+										: "This measurement has not been reported by the deck."}
 							</p>
 						)}
 						<div
 							ref={plotDiv}
-							style={{ width: "100%", height: "100%", minHeight: 248 }}
+							className="telemetry-plot"
 						/>
 					</div>
 				</div>
@@ -222,7 +224,7 @@ function DeckTrend() {
 					).map(([label, v]) => (
 						<div key={label} className="panel stat-tile">
 							<div className="label">{label}</div>
-							<div className="value">{v !== undefined ? fmt(v) : "—"}</div>
+							<div className="value">{v !== undefined ? fmt(v) : "Not reported"}</div>
 						</div>
 					))}
 					<div
@@ -237,11 +239,7 @@ function DeckTrend() {
 						}}
 					>
 						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
-							USB SAMPLES FROM THIS T-DECK
-							<br />
-							HEARD-NODE TRENDS APPEAR
-							<br />
-							WHEN THE AIR IS BUSY
+							USB samples from this deck. Node trends appear when nodes report telemetry.
 						</span>
 					</div>
 				</div>
@@ -306,8 +304,8 @@ const seriesColors = (): string[] => [
 // first build and every later resize, so the two can never disagree and fight
 // each other through the ResizeObserver.
 const plotSize = (box: HTMLElement) => ({
-	width: Math.max(100, box.clientWidth - 28),
-	height: Math.max(220, box.clientHeight - 28),
+	width: Math.max(100, box.clientWidth),
+	height: Math.max(220, box.clientHeight - 80),
 });
 
 export default function Telemetry() {
@@ -578,8 +576,10 @@ export default function Telemetry() {
 		<main style={{ flexDirection: "column" }}>
 			<ThisDevicePanel />
 			<div
+				className="telemetry-controls"
 				style={{
 					display: "flex",
+					flexWrap: "wrap",
 					gap: 10,
 					alignItems: "center",
 					flexShrink: 0,
@@ -637,16 +637,11 @@ export default function Telemetry() {
 				{compare.map((n, i) => (
 					<button
 						key={n}
-						style={{
-							fontSize: 10,
-							padding: "0 6px",
-							borderColor: seriesColors()[i % SERIES_MAX],
-							color: seriesColors()[i % SERIES_MAX],
-						}}
+						style={{ borderColor: seriesColors()[i % SERIES_MAX], color: seriesColors()[i % SERIES_MAX] }}
 						title={t("Remove from the comparison")}
 						onClick={() => setCompare((c) => c.filter((x) => x !== n))}
 					>
-						{shortName(n)} ✕
+						{shortName(n)} · REMOVE
 					</button>
 				))}
 				<div style={{ display: "flex", gap: 4 }}>
@@ -662,12 +657,12 @@ export default function Telemetry() {
 				</div>
 				<span className="spacer" />
 				<button
-					style={{ fontSize: 10, padding: "0 6px" }}
+
 					title={t("Export what the chart shows to CSV")}
 					disabled={!stats || exporting}
 					onClick={onExportCsv}
 				>
-					{t("⭳ CSV")}
+					{t("EXPORT CSV")}
 				</button>
 				<span
 					className={csvMsg.startsWith("ERROR") ? "err" : "dim"}
@@ -709,16 +704,8 @@ export default function Telemetry() {
 								)}
 							</p>
 						)}
-						{/* ponytail: div dedicado a uPlot, SIN hijos de React — si React
-                y uPlot comparten contenedor, removeChild casca y tumba la app.
-                minHeight: once the panes have stacked on a phone the parent's
-                height comes from its content, so a bare height:100% would
-                resolve to whatever the canvas already is and the observer
-                would walk the plot down to nothing. */}
-						<div
-							ref={plotDiv}
-							style={{ width: "100%", height: "100%", minHeight: 248 }}
-						/>
+						{/* Keep the host's height independent of the canvas and legend. */}
+						<div ref={plotDiv} className="telemetry-plot" />
 					</div>
 				</div>
 
@@ -745,7 +732,7 @@ export default function Telemetry() {
 					).map(([label, v]) => (
 						<div key={label} className="panel stat-tile">
 							<div className="label">{label}</div>
-							<div className="value">{v !== undefined ? fmt(v) : "—"}</div>
+							<div className="value">{v !== undefined ? fmt(v) : "Not reported"}</div>
 						</div>
 					))}
 					<div
@@ -760,11 +747,7 @@ export default function Telemetry() {
 						}}
 					>
 						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
-							{t("PASSIVE SAMPLING —")}
-							<br />
-							{t("EVERYTHING THE MESH")}
-							<br />
-							{t("TRANSMITS IS STORED")}
+							{t("Telemetry is saved as the connected radio reports it.")}
 						</span>
 					</div>
 				</div>

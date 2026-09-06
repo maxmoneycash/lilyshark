@@ -312,3 +312,22 @@ export function parseFromRadio(data: Uint8Array): FromRadio | null {
 	}
 	return { kind: "other" };
 }
+
+/** The deck's Routing.Error result describes its own transmission. */
+export function routingErrorText(error: number): string {
+	const reasons: Record<number, string> = {
+		0: "Sent",
+		1: "No route to that node",
+		2: "The recipient rejected the message",
+		3: "The transmission timed out",
+		4: "The deck has no working radio",
+		5: "The radio could not transmit",
+		6: "That channel is not on the deck",
+		7: "The message is too long for one packet",
+		8: "No response",
+		9: "Duty cycle limit reached. Wait and retry",
+		32: "The deck rejected the request",
+		33: "The deck is in simulate mode. Switch to radio mode to transmit",
+	};
+	return reasons[error] ?? `The deck refused the message (routing error ${error})`;
+}

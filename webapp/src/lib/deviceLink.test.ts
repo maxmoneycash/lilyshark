@@ -46,6 +46,17 @@ test('parseLskLine reads a firmware telemetry line', () => {
   assert.equal(parsed.telemetry.lon, undefined);
 });
 
+test('the LSK identity preserves the real unsigned node ID and rejects placeholders', () => {
+  const parsed = parseLskLine('LSK ID {"fw":"test","node":"!96f61b44"}');
+  assert.ok(parsed?.kind === 'ID');
+  assert.equal(parsed.node, 0x96f61b44);
+  for (const node of [undefined, 123, '!00000000', '!ffffffff', '!123', '!xyz12345']) {
+    const missing = parseLskLine(`LSK ID ${JSON.stringify({ fw: 'test', node })}`);
+    assert.ok(missing?.kind === 'ID');
+    assert.equal(missing.node, undefined);
+  }
+});
+
 test('parseLskLine keeps lat/lon when the firmware sends a fix', () => {
   const parsed = parseLskLine(T_LINE_WITH_FIX);
   assert.ok(parsed);

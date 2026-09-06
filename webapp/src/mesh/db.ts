@@ -174,10 +174,11 @@ export async function saveMessage(m: Message): Promise<void> {
 export async function updateMessageState(
   id: number,
   stateVal: Message["state"],
+  failureReason?: string,
 ): Promise<void> {
   const { os, tx } = await store("messages", "readwrite");
   const rows = await collect<MessageRow>(os.index("id"), IDBKeyRange.only(id));
-  for (const r of rows) os.put({ ...r, state: stateVal });
+  for (const r of rows) os.put({ ...r, state: stateVal, failureReason });
   await txDone(tx);
 }
 

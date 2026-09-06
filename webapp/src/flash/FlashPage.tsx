@@ -1,6 +1,7 @@
 import * as RadioGroup from "@radix-ui/react-radio-group";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
+import { UiIcon } from "../components/UiIcon";
 
 /**
  * Browser flasher for the T-Deck family, plus the two other ways to run
@@ -93,6 +94,7 @@ function CopyButton({ text }: { text: string }) {
       type="button"
       className={`copy-btn ${copied ? "copied" : ""}`}
       title={copied ? "Copied" : "Copy"}
+      aria-label={copied ? "Copied" : "Copy command"}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
@@ -103,7 +105,7 @@ function CopyButton({ text }: { text: string }) {
         }
       }}
     >
-      {copied ? "✓" : Glyph.copy}
+      {copied ? <UiIcon name="check" /> : Glyph.copy}
     </button>
   );
 }
@@ -657,7 +659,7 @@ export function FlashPage() {
           <ul className="checklist">
             {CHECKLISTS[kind].map((item) => (
               <li key={item}>
-                <span className="tick">✓</span>
+                <span className="tick"><UiIcon name="check" /></span>
                 {item}
               </li>
             ))}
