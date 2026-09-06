@@ -149,11 +149,12 @@ struct DeviceScannerView: View {
                         saveWiFiConnection(host: host, port: port)
                         dismiss()
                     } label: {
-                        Label("Connect with Wi-Fi", systemImage: "wifi")
+                        Label("Connect", systemImage: "wifi")
                             .frame(maxWidth: .infinity)
                             .touchable()
                     }
                     .disabled(wifiHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || UInt16(wifiPort).map { $0 == 0 } != false)
+                    .accessibilityLabel("Connect with Wi-Fi")
                     .buttonStyle(.meshPrimary)
                     .tint(MeshTheme.interactiveGreen)
                     .listRowBackground(MeshTheme.surface)
@@ -302,7 +303,13 @@ struct DeviceScannerView: View {
     private var bluetoothScanStatus: some View {
         if !connectionManager.bleManager.isPoweredOn {
             ContentUnavailableView {
-                Label("Bluetooth Unavailable", systemImage: "antenna.radiowaves.left.and.right.slash")
+                Label {
+                    Text("Bluetooth unavailable")
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                }
             } description: {
                 Text(connectionManager.bleStatusMessage ?? "Waiting for Bluetooth. Turn it on and allow Lilyshark to find nearby radios.")
             }
@@ -322,7 +329,13 @@ struct DeviceScannerView: View {
             .accessibilityElement(children: .combine)
         } else if !hasBluetoothResults {
             ContentUnavailableView {
-                Label("No Nearby Radios Found", systemImage: "antenna.radiowaves.left.and.right.slash")
+                Label {
+                    Text("No radios found")
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                }
             } description: {
                 Text("Keep your radio powered on and nearby, with Bluetooth enabled, then scan again. This scan only looks for Bluetooth devices.")
             } actions: {
