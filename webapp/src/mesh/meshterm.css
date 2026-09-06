@@ -1935,7 +1935,7 @@ body:has(.meshterm .app.menu-open) {
 	overflow-y: auto;
 	overflow-x: hidden;
 	-webkit-overflow-scrolling: touch;
-	touch-action: pan-y;
+	touch-action: pan-y pinch-zoom;
 	scrollbar-width: thin;
 	scrollbar-color: var(--border) transparent;
 }
@@ -2225,6 +2225,70 @@ body:has(.meshterm .app.menu-open) {
 	}
 	.meshterm .intro-head {
 		margin-bottom: 6px;
+	}
+}
+
+/* Compact phones reserve a stable band for the longest closing copy and its
+   actions. Fractional rows subtract the gap before sizing either band. */
+@media (max-width: 860px) and (max-height: 720px) {
+	.meshterm .intro-stage {
+		grid-template-rows: minmax(0, 50fr) minmax(0, 50fr);
+		padding-top: 10px;
+		padding-bottom: 6px;
+		gap: 8px;
+	}
+	.meshterm .intro-copy {
+		padding-top: 0;
+	}
+	.meshterm .intro-head {
+		margin-bottom: 6px;
+	}
+	.meshterm .intro-body {
+		font-size: 12px;
+		line-height: 1.5;
+	}
+	.meshterm .intro-cta {
+		margin-top: 6px;
+		gap: 5px;
+	}
+	.meshterm .intro-cta button {
+		min-height: 36px;
+		padding: 0 9px;
+		font-size: 10px;
+		letter-spacing: 0.3px;
+	}
+	.meshterm .intro-cta .cta-link {
+		min-height: 0;
+		padding: 0;
+	}
+	.meshterm .intro-hint {
+		margin-top: 6px;
+	}
+}
+
+/* On the shortest portrait screens, the controls and full ending still fit
+   without a second scroll area or a section-dependent device resize. */
+@media (max-width: 860px) and (max-height: 620px) {
+	.meshterm .intro-stage {
+		grid-template-rows: minmax(0, 38fr) minmax(0, 62fr);
+	}
+}
+
+/* Wider landscape phones have room to keep the copy beside the device. */
+@media (min-width: 600px) and (max-width: 860px) and (min-height: 320px) and (max-height: 480px) {
+	.meshterm .intro-stage {
+		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr);
+		padding-top: 6px;
+		padding-bottom: 6px;
+		gap: 12px;
+	}
+	.meshterm .intro-copy {
+		order: 1;
+		align-self: center;
+	}
+	.meshterm .intro-device {
+		order: 2;
 	}
 }
 

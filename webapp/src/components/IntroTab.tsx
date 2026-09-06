@@ -1,4 +1,5 @@
-import { AnimatePresence, motion, useMotionValueEvent, useReducedMotion, useScroll } from 'framer-motion';
+import { motion, useMotionValueEvent, useScroll } from 'framer-motion';
+import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { layoutWithLines, prepareWithSegments } from '@chenglou/pretext';
@@ -143,7 +144,8 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
   const textRef = useRef<HTMLDivElement>(null);
   const [frameIndex, setFrameIndex] = useState(0);
   const [textW, setTextW] = useState(0);
-  const reducedMotion = useReducedMotion();
+  const [compactPhone, setCompactPhone] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
 
   const { scrollYProgress } = useScroll({
     container: scrollRef,
@@ -161,7 +163,18 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
     return () => ro.disconnect();
   }, []);
 
-  const fontPx = textW > 700 ? 46 : textW > 420 ? 34 : 27;
+  useEffect(() => {
+    // Match the compact CSS breakpoint so pretext measures the displayed size.
+    const query = window.matchMedia('(max-width: 860px) and (max-height: 720px)');
+    const update = () => setCompactPhone(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  const fontPx = compactPhone
+    ? textW > 330 ? 22 : 20
+    : textW > 700 ? 46 : textW > 420 ? 34 : 27;
   const headlines = useHeadlines(textW, fontPx);
   const { sectionIndex: idx, screen: screenSrc } = INTRO_FRAMES[frameIndex];
   const s = SECTIONS[idx];
@@ -206,56 +219,56 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
           ))}
           <div className="intro-stage">
             <div className="intro-copy" ref={textRef}>
-              <AnimatePresence mode="wait">
-                <motion.div key={idx} exit={{ opacity: 0, transition: { duration: reducedMotion ? 0 : 0.07 } }}>
-                  <h1 className="intro-head" style={{ fontSize: fontPx }} aria-label={s.head}>
-                    {(headlines?.[idx] ?? [s.head]).map((line, li) => (
-                      <span className="intro-line" key={line + li}>
-                        {line.split(' ').map((w, wi) => (
-                          <motion.span
-                            className="intro-word"
-                            key={w + wi}
-                            initial={reducedMotion ? false : { opacity: 0, y: 26 }}
-                            animate={{
-                              opacity: 1,
-                              y: 0,
-                              transition: reducedMotion
-                                ? { duration: 0 }
-                                : { ...wordSpring, delay: (li * 3 + wi) * 0.05 },
-                            }}
-                          >
-                            {w}
-                          </motion.span>
-                        ))}
-                      </span>
-                    ))}
-                  </h1>
-                  <motion.p
-                    className="intro-body"
+              {/* Replace copy immediately when scrolling interrupts an entrance.
+                  Waiting for an exit can leave an earlier section beside the LCD. */}
+              <div key={idx}>
+                <h1 className="intro-head" style={{ fontSize: fontPx }} aria-label={s.head}>
+                  {(headlines?.[idx] ?? [s.head]).map((line, li) => (
+                    <span className="intro-line" key={line + li}>
+                      {line.split(' ').map((w, wi) => (
+                        <motion.span
+                          className="intro-word"
+                          key={w + wi}
+                          initial={reducedMotion ? false : { opacity: 0, y: 26 }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                            transition: reducedMotion
+                              ? { duration: 0 }
+                              : { ...wordSpring, delay: (li * 3 + wi) * 0.05 },
+                          }}
+                        >
+                          {w}
+                        </motion.span>
+                      ))}
+                    </span>
+                  ))}
+                </h1>
+                <motion.p
+                  className="intro-body"
+                  initial={reducedMotion ? false : { opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0, transition: reducedMotion ? { duration: 0 } : { ...wordSpring, delay: 0.28 } }}
+                >
+                  {s.body}
+                </motion.p>
+                {last && (
+                  <motion.div
+                    className="intro-cta"
                     initial={reducedMotion ? false : { opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0, transition: reducedMotion ? { duration: 0 } : { ...wordSpring, delay: 0.28 } }}
+                    animate={{ opacity: 1, y: 0, transition: reducedMotion ? { duration: 0 } : { ...wordSpring, delay: 0.42 } }}
                   >
-                    {s.body}
-                  </motion.p>
-                  {last && (
-                    <motion.div
-                      className="intro-cta"
-                      initial={reducedMotion ? false : { opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0, transition: reducedMotion ? { duration: 0 } : { ...wordSpring, delay: 0.42 } }}
-                    >
-                      <button className="primary" onClick={() => onOpen('TRAFFIC')}>
-                        OPEN THE ANALYZER
-                      </button>
-                      <button onClick={() => onOpen('FLASH')}>
-                        FLASH A T-DECK
-                      </button>
-                      <button className="cta-link" onClick={() => onOpen('PAPER')}>
-                        READ THE PAPER
-                      </button>
-                    </motion.div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
+                    <button className="primary" onClick={() => onOpen('TRAFFIC')}>
+                      OPEN THE ANALYZER
+                    </button>
+                    <button onClick={() => onOpen('FLASH')}>
+                      FLASH A T-DECK
+                    </button>
+                    <button className="cta-link" onClick={() => onOpen('PAPER')}>
+                      READ THE PAPER
+                    </button>
+                  </motion.div>
+                )}
+              </div>
               {idx === 0 && (
                 <div className="intro-hint dim" aria-hidden="true">
                   SCROLL ▾

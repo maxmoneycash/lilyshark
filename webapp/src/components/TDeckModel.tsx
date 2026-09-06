@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { useReducedMotion } from 'framer-motion';
+import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 import { TDeckPhoto } from './TDeckPhoto';
 import type { TDeckViewer } from './tdeck-scene';
 import './tdeck-model.css';
@@ -8,7 +8,7 @@ import './tdeck-model.css';
 export function TDeckModel({ screen }: { screen: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const viewer = useRef<TDeckViewer>();
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = usePrefersReducedMotion();
   const [paused, setPaused] = useState(false);
   const [status, setStatus] = useState<'loading' | 'ready' | 'fallback'>('loading');
   const instructions = useId();
