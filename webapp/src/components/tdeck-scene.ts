@@ -119,9 +119,9 @@ export function mountTDeck(
     // Fill the stage with the body. Sit the radio next to the copy; leftover
     // space belongs on the far right, not between the headline and the handset.
     const aspect = width / height;
-    const halfHeight = Math.max(height < 400 ? .06 : .07, .042 * height / width);
-    const pan = aspect > 1 ? halfHeight * aspect * .3 : 0;
-    camera.position.y = height < 400 ? -.004 : -.008;
+    const halfHeight = Math.max(height < 400 ? .055 : .062, .038 * height / width);
+    const pan = aspect > 1 ? halfHeight * aspect * .2 : 0;
+    camera.position.y = height < 400 ? -.01 : -.014;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
     camera.top = halfHeight;
