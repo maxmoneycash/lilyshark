@@ -11,7 +11,7 @@ export interface TDeckViewer {
 }
 
 const MODEL_URL = '/models/tdeck-plus/tdeck-plus-v5.glb';
-const INITIAL_YAW = -0.12;
+const INITIAL_YAW = -0.06;
 const INITIAL_PITCH = .06;
 
 /** Owns GPU resources and input for one mounted intro. No global render loop. */
@@ -120,8 +120,8 @@ export function mountTDeck(
     // canvas width stays on the right. The whip can crop off the top.
     const aspect = width / height;
     const halfHeight = Math.max(height < 400 ? .058 : .066, .04 * height / width);
-    const bodyAspect = .58;
-    const pan = aspect > bodyAspect ? halfHeight * (aspect - bodyAspect) * .9 : 0;
+    const bodyAspect = .54;
+    const pan = aspect > bodyAspect ? halfHeight * (aspect - bodyAspect) * .95 : 0;
     camera.position.y = height < 400 ? -.004 : -.006;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
