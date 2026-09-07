@@ -342,7 +342,7 @@ function FrameTable({ frames, sel, onPick, notes }: FrameTableProps) {
 
 	return (
 		<div className="scroll-y" ref={rows.scrollRef}>
-			<table className="grid">
+			<table className="grid sniffer-table">
 				<thead ref={rows.headRef}>
 					<tr>
 						{/* Always present, even with no notes: a column that came
@@ -1015,10 +1015,8 @@ export default function Sniffer() {
 	};
 
 	return (
-		<main style={{ flexDirection: "column" }}>
-			<div
-				style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}
-			>
+		<main className="sniffer" style={{ flexDirection: "column" }}>
+			<div className="sniffer-bar">
 				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
 					SNIFFER // EVERY FRAME THE RADIO HEARS
 				</span>
@@ -1065,15 +1063,7 @@ export default function Sniffer() {
 			{/* Exports get their own row: four buttons and their counts do not
 			    belong in the same line as the controls that change what is
 			    listed. */}
-			<div
-				style={{
-					display: "flex",
-					gap: 10,
-					alignItems: "center",
-					flexShrink: 0,
-					flexWrap: "wrap",
-				}}
-			>
+			<div className="sniffer-bar">
 				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
 					EXPORT //
 				</span>
@@ -1142,9 +1132,9 @@ export default function Sniffer() {
 						<div className="panel-title">
 							<span>FRAME // {sel.short ?? nodeId(sel.src)}</span>
 							<button
+								className="sniffer-close"
 								title="Close this frame"
 								onClick={() => pickFrame(undefined)}
-								style={{ width: 22, height: 22, minWidth: 22 }}
 							>
 								CLOSE
 							</button>

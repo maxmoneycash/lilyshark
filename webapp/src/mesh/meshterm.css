@@ -3819,6 +3819,29 @@ body:has(.meshterm .app.menu-open) {
 }
 
 @media (max-width: 860px) {
+	.meshterm .sniffer-bar {
+		gap: 8px;
+	}
+	.meshterm .sniffer-bar > .spacer {
+		display: none;
+	}
+	.meshterm .sniffer-bar button {
+		flex: 1 1 calc(50% - 8px);
+		min-width: 0;
+	}
+	.meshterm .sniffer-close {
+		min-width: 44px;
+		min-height: 44px;
+		width: auto;
+		height: auto;
+	}
+	.meshterm .sniffer .panel.hot {
+		flex: 1 1 auto !important;
+		min-width: 0 !important;
+	}
+}
+
+@media (max-width: 860px) {
 	.meshterm .section-tabs {
 		position: sticky;
 		top: 0;
@@ -3841,6 +3864,54 @@ body:has(.meshterm .app.menu-open) {
 
 .meshterm .anim-num {
 	font-variant-numeric: tabular-nums;
+}
+
+.meshterm .sniffer-bar {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+	flex-shrink: 0;
+}
+.meshterm .sniffer-table {
+	--sniffer-col-note: 4.5rem;
+	--sniffer-col-time: 6.5rem;
+	border-collapse: separate;
+	border-spacing: 0;
+}
+.meshterm .sniffer-table th:nth-child(1),
+.meshterm .sniffer-table td:nth-child(1),
+.meshterm .sniffer-table th:nth-child(2),
+.meshterm .sniffer-table td:nth-child(2) {
+	position: sticky;
+	z-index: 2;
+	background: var(--panel);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+.meshterm .sniffer-table th:nth-child(1),
+.meshterm .sniffer-table td:nth-child(1) {
+	left: 0;
+	width: var(--sniffer-col-note);
+	min-width: var(--sniffer-col-note);
+	max-width: var(--sniffer-col-note);
+}
+.meshterm .sniffer-table th:nth-child(2),
+.meshterm .sniffer-table td:nth-child(2) {
+	left: var(--sniffer-col-note);
+	width: var(--sniffer-col-time);
+	min-width: var(--sniffer-col-time);
+	max-width: var(--sniffer-col-time);
+	box-shadow: 2px 0 0 var(--border);
+}
+.meshterm .sniffer-table thead th:nth-child(1),
+.meshterm .sniffer-table thead th:nth-child(2) {
+	z-index: 3;
+}
+.meshterm .sniffer-table tbody tr:hover td:nth-child(-n + 2),
+.meshterm .sniffer-table tbody tr.sel td:nth-child(-n + 2) {
+	background: var(--fg);
+	color: var(--bg);
 }
 
 .meshterm .overlay-sheet .error {
