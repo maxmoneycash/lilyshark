@@ -126,6 +126,11 @@ export default function Chat({
     return { key, label: `@${s.nodes.get(num)?.shortName ?? num.toString(16)}` };
   });
 
+  const openNodeMenu = (num: number, el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    setMenu({ num, x: r.left, y: r.bottom });
+  };
+
   const nodeShort = (num: number) =>
     num === s.myNodeNum
       ? t("ME")
@@ -380,9 +385,19 @@ export default function Chat({
                 className={`nodelink ${m.mine ? "" : "warn"}`}
                 style={m.mine ? { fontWeight: 700 } : undefined}
                 title={t("NODE ACTIONS")}
+                role="button"
+                tabIndex={0}
+                aria-haspopup="menu"
+                aria-label={t("NODE ACTIONS")}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setMenu({ num: m.from, x: e.clientX, y: e.clientY });
+                  openNodeMenu(m.from, e.currentTarget);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" && e.key !== " ") return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openNodeMenu(m.from, e.currentTarget);
                 }}
               >
                 &lt;{m.mine ? t("ME") : nodeShort(m.from)}&gt;
@@ -531,10 +546,23 @@ export default function Chat({
           return (
             <>
               <div className="menu-overlay" onClick={close} />
-              <div className="node-menu" style={{ left: menu.x, top: menu.y }}>
+              <div
+                className="node-menu"
+                role="menu"
+                aria-label={t("NODE ACTIONS")}
+                style={{ left: menu.x, top: menu.y }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Escape") return;
+                  e.stopPropagation();
+                  close();
+                }}
+              >
                 <div className="node-menu-title">{nodeShort(menu.num)}</div>
                 {menu.num !== s.myNodeNum && (
                   <button
+                    type="button"
+                    role="menuitem"
+                    autoFocus
                     onClick={() => {
                       setConvo(`dm:${menu.num}`);
                       setSearch("");
@@ -545,6 +573,9 @@ export default function Chat({
                   </button>
                 )}
                 <button
+                  type="button"
+                  role="menuitem"
+                  autoFocus={menu.num === s.myNodeNum}
                   onClick={() => {
                     onViewNode(menu.num);
                     close();
@@ -554,6 +585,8 @@ export default function Chat({
                 </button>
                 {hasPos && (
                   <button
+                    type="button"
+                    role="menuitem"
                     onClick={() => {
                       onViewOnMap(menu.num);
                       close();

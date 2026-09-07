@@ -367,9 +367,9 @@
 	/* Inert controls sit flush with the ground. */
 	box-shadow: none;
 }
-.meshterm input:focus,
-.meshterm select:focus,
-.meshterm textarea:focus {
+.meshterm input:focus-visible,
+.meshterm select:focus-visible,
+.meshterm textarea:focus-visible {
 	outline: 1px solid var(--fg);
 	outline-offset: -1px;
 }
@@ -408,6 +408,21 @@
 .meshterm button:focus-visible {
 	outline: 2px solid var(--fg);
 	outline-offset: 3px;
+}
+.meshterm a:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: 2px;
+}
+.meshterm [role="treeitem"]:focus-visible,
+.meshterm table.grid tbody tr:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: -2px;
+}
+.meshterm .intro-scroll:focus-visible,
+.meshterm .intro-copy:focus-visible,
+.meshterm .chat-msgs:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: -2px;
 }
 .meshterm button > svg {
 	vertical-align: middle;
@@ -737,6 +752,10 @@
 .meshterm .nodelink:hover {
 	text-decoration: underline;
 }
+.meshterm .nodelink:focus-visible {
+	outline: 1px solid var(--fg);
+	outline-offset: 2px;
+}
 
 /* node actions context menu */
 .meshterm .menu-overlay {
@@ -767,8 +786,12 @@
 	padding: 7px 10px;
 	font-size: 12px;
 }
-.meshterm .node-menu button:hover {
+.meshterm .node-menu button:hover,
+.meshterm .node-menu button:focus-visible {
 	background: color-mix(in srgb, var(--fg) 15%, transparent);
+}
+.meshterm .node-menu button:focus-visible {
+	outline-offset: -2px;
 }
 
 /* reference to the message being replied to, shown above the reply */
@@ -886,8 +909,9 @@
 	font-size: 13px;
 	caret-color: var(--fg);
 }
-.meshterm .chat-input input:focus {
-	outline: none;
+.meshterm .chat-input input:focus-visible {
+	outline: 1px solid var(--fg);
+	outline-offset: 2px;
 }
 .meshterm .cursor {
 	animation: meshterm-blink 1.1s step-end infinite;
