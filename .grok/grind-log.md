@@ -22,9 +22,9 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Spectrum waterfall fills the phone; Telemetry plot no longer donates 80px to a missing legend; controls wrap
 - Config theme tiles with swatches; duration fields as unit-suffixed inputs
 - Traffic table freezes # and TIME; filter wraps as a phone row
+- CONNECT morphs CONNECT / CANCEL / LINKED in place
 
 ## Next (pick one per round)
 
 1. Intro: DialKit-tuned constants copied into code; drop unused knobs
-2. Header CONNECT label morph (CONNECT / CANCEL / LINKED)
-3. Docs/Paper: measure, images, sticky section tabs
+2. Docs/Paper: measure, images, sticky section tabs

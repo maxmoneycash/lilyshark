@@ -637,43 +637,54 @@ function App() {
           <span />
         </button>
         <span className="spacer" />
-        {connected ? (
-          <button
-            className="primary"
-            title={t("Open this device's telemetry — disconnect from the status pill")}
-            onClick={() => {
-              setNodeFocus(undefined);
-              setMapFocus(undefined);
-              setMenuOpen(false);
-              setTab("TELEMETRY");
-            }}
-          >
-            {s.myNodeNum !== undefined
+        {(() => {
+          const linking = connecting || lilyConnecting;
+          const label = connected
+            ? s.myNodeNum !== undefined
               ? `!${s.myNodeNum.toString(16).padStart(8, "0")} · ${/t-deck/i.test(s.deviceInfo?.model ?? "") ? "T-DECK" : (s.deviceInfo?.model?.split(" ")[0]?.toUpperCase() ?? "RADIO")}`
-              : t("LINKED")}
-          </button>
-        ) : lilyLinked ? (
-          <button className="primary" onClick={() => void onLilyDisconnect()}>
-            T-DECK LINKED
-          </button>
-        ) : connecting || lilyConnecting ? (
-          <button
-            className="primary"
-            onClick={() => {
-              if (lilyConnecting) void onLilyDisconnect();
-              else void onCancel();
-            }}
-          >
-            {t("CANCEL")}
-          </button>
-        ) : (
-          <button
-            className="primary"
-            onClick={() => setConnectOpen(true)}
-          >
-            {t("CONNECT")}
-          </button>
-        )}
+              : t("LINKED")
+            : lilyLinked
+              ? "T-DECK LINKED"
+              : linking
+                ? t("CANCEL")
+                : t("CONNECT");
+          const title = connected
+            ? t("Open this device's telemetry — disconnect from the status pill")
+            : lilyLinked
+              ? "Disconnect the T-Deck"
+              : linking
+                ? t("CANCEL")
+                : t("CONNECT");
+          return (
+            <button
+              className="primary connect-act"
+              title={title}
+              onClick={() => {
+                if (connected) {
+                  setNodeFocus(undefined);
+                  setMapFocus(undefined);
+                  setMenuOpen(false);
+                  setTab("TELEMETRY");
+                  return;
+                }
+                if (lilyLinked) {
+                  void onLilyDisconnect();
+                  return;
+                }
+                if (linking) {
+                  if (lilyConnecting) void onLilyDisconnect();
+                  else void onCancel();
+                  return;
+                }
+                setConnectOpen(true);
+              }}
+            >
+              <span key={label} className="connect-act-label">
+                {label}
+              </span>
+            </button>
+          );
+        })()}
         <button
           type="button"
           className="conn-pill"
@@ -683,6 +694,7 @@ function App() {
         >
           <span className={`led ${ledClass}`} />
           <span
+            key={connText}
             className={
               pillLive ? "" : connecting || configuring || lilyConnecting ? "txt-connecting" : "txt-off"
             }

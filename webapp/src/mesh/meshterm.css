@@ -457,6 +457,33 @@
 .meshterm .conn-pill .txt-off {
 	color: var(--fg-dim);
 }
+.meshterm .connect-act {
+	min-width: 11ch;
+	overflow: hidden;
+}
+.meshterm .connect-act-label,
+.meshterm .conn-pill > span:not(.led) {
+	display: inline-block;
+	animation: meshterm-connect-in 180ms var(--ease-out);
+}
+@keyframes meshterm-connect-in {
+	from {
+		opacity: 0;
+		filter: blur(2px);
+		transform: translateY(5px);
+	}
+	to {
+		opacity: 1;
+		filter: none;
+		transform: none;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.meshterm .connect-act-label,
+	.meshterm .conn-pill > span:not(.led) {
+		animation: none;
+	}
+}
 
 /* ── paneles con muescas ── */
 .meshterm .panel {

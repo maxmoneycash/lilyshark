@@ -73,8 +73,9 @@ assert.match(shelby, /from synthetic sample metadata/);
 assert.match(shelby, /DECODED FROM SYNTHETIC SAMPLE/);
 
 assert.match(terminal, /disconnectDeviceLink/);
-assert.match(terminal, /lilyLinked \? \(/);
+assert.match(terminal, /lilyLinked/);
 assert.match(terminal, /T-DECK LINKED/);
+assert.match(terminal, /connect-act-label/);
 assert.match(terminal, /bindAnalyzerMesh/);
 assert.match(terminal, /void connectDeviceLink\(\)/);
 assert.match(nodes, /DEMO MESH IN PALO ALTO/);
