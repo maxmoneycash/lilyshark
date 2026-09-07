@@ -483,12 +483,23 @@
   color: var(--fg);
   cursor: pointer;
   transition:
-    background-color 150ms ease,
-    transform 150ms ease;
+    background-color 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    border-color 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    color 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    transform 140ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)),
+    filter 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+}
+.meshterm .flash-page .copy-btn span {
+  display: grid;
+  place-items: center;
+  transition: filter 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)), opacity 160ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
 }
 .meshterm .flash-page .copy-btn.copied {
-  color: var(--ok);
-  border-color: var(--ok);
+  color: var(--ok, #0c6b3d);
+  border-color: var(--ok, #0c6b3d);
+}
+.meshterm .flash-page .copy-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .meshterm .flash-page .copy-btn.error {
   color: #a52f26;

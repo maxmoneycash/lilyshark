@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { getTDeckTune, subscribeTDeckTune } from './tdeck-tune';
 
 export interface TDeckViewer {
   setScreen(url: string): void;
@@ -115,10 +116,11 @@ export function mountTDeck(
       pitch += (INITIAL_PITCH - pitch) * (1 - Math.exp(-4.2 * dt));
     }
     const breathe = moving ? 1 : 0;
+    const amp = getTDeckTune().breathe;
     rig.rotation.set(
-      pitch + Math.sin(time * .55) * .012 * breathe,
+      pitch + Math.sin(time * .55) * amp * breathe,
       yaw,
-      -.03 + Math.sin(time * .4) * .008 * breathe,
+      -.03 + Math.sin(time * .4) * (amp * .67) * breathe,
       'YXZ',
     );
     rig.position.set(0, Math.sin(time * .7) * .0015 * breathe, 0);
@@ -138,9 +140,12 @@ export function mountTDeck(
     // The radio is the stage. On a wide canvas it sits slightly right so
     // the copy can live in the left margin. The whip can crop off the top.
     const aspect = width / height;
-    const halfHeight = Math.max(height < 400 ? .056 : .064, .04 * height / width);
-    const pan = aspect > 1 ? halfHeight * aspect * .3 : 0;
+    const tune = getTDeckTune();
+    const halfHeight = Math.max(height < 400 ? tune.halfHeight * 0.875 : tune.halfHeight, .04 * height / width);
+    const pan = aspect > 1 ? halfHeight * aspect * tune.pan : 0;
     camera.position.y = height < 400 ? -.004 : -.006;
+    renderer.toneMappingExposure = tune.exposure;
+    scene.environmentIntensity = tune.envIntensity;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
     camera.top = halfHeight;
@@ -319,6 +324,7 @@ export function mountTDeck(
   function contextLost(event: Event) { event.preventDefault(); fail(); }
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(canvas);
+  const unsubTune = subscribeTDeckTune(() => { resize(); requestRender(); });
   const intersection = new IntersectionObserver(entries => {
     visible = entries[0].isIntersecting;
     lastTime = 0;
@@ -346,6 +352,7 @@ export function mountTDeck(
       ++screenRequest;
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
+      unsubTune();
       intersection.disconnect();
       canvas.removeEventListener('pointerdown', pointerDown);
       canvas.removeEventListener('pointermove', pointerMove);

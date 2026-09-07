@@ -67,6 +67,7 @@ import { CaptureSlotBar, type SlotTab } from './CaptureSlotBar';
 import { IoGraphPanel } from './IoGraphPanel';
 import { TrafficFrameTable } from './TrafficFrameTable';
 import { crcClass, fmtFreq } from './trafficFormat';
+import { AnimatedNumber } from './AnimatedNumber';
 import { dissectRNode } from '../lib/dissect/rnode';
 import { reportedLabel, telemetrySignal } from '../mesh/deviceTelemetry';
 
@@ -736,7 +737,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
     <main>
       <div className="panel" style={{ flex: 1 }}>
         <div className="panel-title">
-          PANEL // TRAFFIC{name ? ` · ${name}` : ''}
+          <span className="panel-title-label">PANEL // TRAFFIC{name ? ` · ${name}` : ''}</span>
           <span className="spacer" />
           <button onClick={() => fileRef.current?.click()} disabled={busy}>
             OPEN
@@ -981,24 +982,24 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             <div className="stat-strip">
               {(
                 [
-                  ['FRAMES', <>{stats.frames}</>],
-                  ['PAYLOAD', <>{stats.bytes.toLocaleString()} B</>],
+                  ['FRAMES', <AnimatedNumber key="f" value={stats.frames} />],
+                  ['PAYLOAD', <><AnimatedNumber value={stats.bytes} format={(n) => Math.round(n).toLocaleString()} /> B</>],
                   [
                     'CRC',
                     <>
-                      <span className="ok">{stats.crcValid} OK</span>
+                      <span className="ok"><AnimatedNumber value={stats.crcValid} /> OK</span>
                       {' · '}
                       <span className={stats.crcInvalid ? 'err' : 'dim'}>
-                        {stats.crcInvalid} BAD
+                        <AnimatedNumber value={stats.crcInvalid} /> BAD
                       </span>
                     </>,
                   ],
                   ['BEST SNR', <>{stats.bestSnrDb === null ? 'Not reported' : `${stats.bestSnrDb.toFixed(1)} dB`}</>],
                   ['MEDIAN RSSI', <>{stats.medianRssiDbm === null ? 'Not reported' : `${stats.medianRssiDbm.toFixed(1)} dBm`}</>],
-                  ['AIRTIME', <>{stats.airtimeMs.toFixed(0)} ms</>],
+                  ['AIRTIME', <><AnimatedNumber value={stats.airtimeMs} format={(n) => n.toFixed(0)} /> ms</>],
                   [
                     'SHELBY PTRS',
-                    <span className={pointerCount > 0 ? 'ok' : 'dim'}>{pointerCount}</span>,
+                    <span className={pointerCount > 0 ? 'ok' : 'dim'}><AnimatedNumber value={pointerCount} /></span>,
                   ],
                 ] as [string, ReactNode][]
               ).map(([k, v]) => (

@@ -38,6 +38,9 @@ const Docs = lazy(() => import("./screens/Docs"));
 // they load on first visit like the other heavy screens.
 const Spectrum = lazy(() => import("./screens/Spectrum"));
 const Sniffer = lazy(() => import("./screens/Sniffer"));
+const DialKitDev = import.meta.env.DEV
+  ? lazy(() => import("../components/DialKitDev").then((m) => ({ default: m.DialKitDev })))
+  : null;
 import { useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
@@ -623,7 +626,8 @@ function App() {
           ref={menuButtonRef}
           type="button"
           className="menu-btn"
-          aria-label={menuOpen ? "Close menu" : "Menu"}
+          data-unread={totalUnread > 0 ? "" : undefined}
+          aria-label={menuOpen ? "Close menu" : totalUnread > 0 ? `Menu, ${totalUnread} unread` : "Menu"}
           aria-controls="main-navigation"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
@@ -910,6 +914,11 @@ function App() {
       )}
       </Suspense>
       </ScreenBoundary>
+      {DialKitDev && (
+        <Suspense fallback={null}>
+          <DialKitDev />
+        </Suspense>
+      )}
     </div>
   );
 }

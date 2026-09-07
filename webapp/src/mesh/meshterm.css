@@ -41,6 +41,8 @@
 	font-size: 13px;
 	line-height: 1.45;
 	position: relative;
+	--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+	--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 /* Alto contraste: theme.ts pone --fg vivo y el fondo negro puro; aquí suben
@@ -329,10 +331,10 @@
 	/* A control never wraps — a two-line button reads as a box, not a key. */
 	white-space: nowrap;
 	transition:
-		background-color 120ms ease-out,
-		color 120ms ease-out,
-		box-shadow 120ms ease-out,
-		transform 120ms ease-out;
+		background-color 140ms var(--ease-out),
+		color 140ms var(--ease-out),
+		box-shadow 140ms var(--ease-out),
+		transform 140ms var(--ease-out);
 }
 /* Raised key: a fill one step off the ground and a hard 2px ledge below.
    This is what separates "clickable" from "printed" at a glance — the flat
@@ -342,17 +344,21 @@
 	background: color-mix(in srgb, var(--fg) 8%, var(--bg));
 	box-shadow: 0 2px 0 var(--border);
 }
-.meshterm button:hover:not(:disabled) {
-	background: var(--fg);
-	color: var(--bg);
-	border-color: var(--fg);
+@media (hover: hover) and (pointer: fine) {
+	.meshterm button:hover:not(:disabled) {
+		background: var(--fg);
+		color: var(--bg);
+		border-color: var(--fg);
+	}
 }
-.meshterm button:not(.tab):hover:not(:disabled) {
-	box-shadow: 0 2px 0 color-mix(in srgb, var(--fg) 55%, transparent);
+@media (hover: hover) and (pointer: fine) {
+	.meshterm button:not(.tab):hover:not(:disabled) {
+		box-shadow: 0 2px 0 color-mix(in srgb, var(--fg) 55%, transparent);
+	}
 }
 /* The key presses down: the ledge collapses under the travel. */
 .meshterm button:not(.tab):active:not(:disabled) {
-	transform: translateY(2px);
+	transform: translateY(2px) scale(0.97);
 	box-shadow: 0 0 0 transparent;
 }
 .meshterm button:disabled {
@@ -1522,6 +1528,7 @@ body {
 	}
 	.meshterm .menu-btn {
 		display: flex;
+		position: relative;
 		flex-direction: column;
 		justify-content: center;
 		gap: 5px;
@@ -3024,5 +3031,67 @@ body:has(.meshterm .app.menu-open) {
 		display: inline-flex;
 		align-items: center;
 		min-height: 44px;
+	}
+}
+
+.meshterm .anim-num {
+	font-variant-numeric: tabular-nums;
+}
+
+.meshterm .overlay-sheet .error {
+	animation: meshterm-sheet-err 420ms var(--ease-out);
+}
+@keyframes meshterm-sheet-err {
+	0%, 100% { transform: translateX(0); }
+	20% { transform: translateX(-6px); }
+	40% { transform: translateX(5px); }
+	60% { transform: translateX(-3px); }
+	80% { transform: translateX(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.meshterm .overlay-sheet .error {
+		animation: none;
+	}
+}
+
+.meshterm .menu-btn[data-unread]::after {
+	content: "";
+	position: absolute;
+	top: 7px;
+	right: 7px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--warn);
+	box-shadow: 0 0 0 2px var(--bg);
+	pointer-events: none;
+}
+
+@media (max-width: 860px) {
+	.meshterm .panel-title-label {
+		flex: 1 1 100%;
+		min-width: 0;
+	}
+	.meshterm .panel-title button {
+		flex: 1 1 calc(50% - 6px);
+		min-width: 0;
+	}
+	.meshterm .stat-strip {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px 14px;
+	}
+	.meshterm .stat-strip .stat {
+		white-space: normal;
+	}
+	.meshterm .chat-input {
+		position: sticky;
+		bottom: 0;
+		background: var(--panel);
+		padding-bottom: max(10px, env(safe-area-inset-bottom));
+		z-index: 3;
+	}
+	.meshterm .chat-send {
+		flex-shrink: 0;
 	}
 }
