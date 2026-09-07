@@ -25,9 +25,9 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - CONNECT morphs CONNECT / CANCEL / LINKED in place
 - Intro T-Deck look baked as TDECK_SCENE; DialKit keeps only framing/breathe; camera faces the LCD
 - Docs/Paper: sticky Docs/Paper tabs, sticky PDF toolbar, phone-width pages, 44px doc nav
+- Mesh graph lays out in CSS pixels with 18px hit targets; toolbar wraps; activity name column stays put
 
 ## Next (pick one per round)
 
-1. Mesh screen phone layout
-2. Sniffer / capture tools on a phone
-3. Shelby screen measure and tables
+1. Sniffer / capture tools on a phone
+2. Shelby screen measure and tables

@@ -3547,6 +3547,232 @@ body:has(.meshterm .app.menu-open) {
 	}
 }
 
+.meshterm .mesh-summary {
+	flex-shrink: 0;
+}
+.meshterm .mesh-tiles {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	padding: 12px;
+	align-items: stretch;
+}
+.meshterm .mesh-hops,
+.meshterm .mesh-silent {
+	padding: 8px 12px;
+	min-width: 190px;
+	flex: 1 1 190px;
+}
+.meshterm .mesh-kicker {
+	font-size: 10px;
+	letter-spacing: 2px;
+	margin-bottom: 4px;
+}
+.meshterm .mesh-hop-row,
+.meshterm .mesh-silent-row {
+	display: flex;
+	gap: 8px;
+	font-size: 12px;
+	align-items: baseline;
+}
+.meshterm .mesh-hop-row > span:first-child {
+	width: 70px;
+	flex: none;
+}
+.meshterm .mesh-hop-bar {
+	flex: 1;
+	min-width: 0;
+}
+.meshterm .mesh-silent-row > span:first-child {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.meshterm .mesh-silent-list {
+	max-height: 92px;
+	overflow-y: auto;
+}
+.meshterm .mesh-view {
+	flex: 1;
+	min-width: 0;
+}
+.meshterm .mesh-toolbar {
+	flex-wrap: wrap;
+	row-gap: 8px;
+}
+.meshterm .mesh-tabs,
+.meshterm .mesh-ranges {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+.meshterm .mesh-count,
+.meshterm .mesh-note {
+	font-size: 11px;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.meshterm .mesh-stage {
+	display: flex;
+	flex-wrap: wrap;
+}
+.meshterm .mesh-graph {
+	flex: 999 1 320px;
+	min-width: 0;
+	min-height: 260px;
+	height: 100%;
+	overflow: hidden;
+}
+.meshterm .mesh-svg {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+.meshterm .mesh-detail {
+	flex: 1 1 260px;
+	min-width: 240px;
+	font-size: 12px;
+}
+.meshterm .mesh-detail-body {
+	padding: 10px 12px;
+}
+.meshterm .mesh-detail-name {
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+.meshterm .mesh-detail-id {
+	font-size: 11px;
+	margin-bottom: 8px;
+}
+.meshterm .mesh-detail-links {
+	max-height: 320px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.meshterm .mesh-link-row {
+	display: flex;
+	width: 100%;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	min-height: 32px;
+	padding: 4px 8px;
+	background: none;
+	border: 0;
+	box-shadow: none;
+	letter-spacing: 0;
+	font-weight: 400;
+	text-align: left;
+}
+@media (hover: hover) and (pointer: fine) {
+	.meshterm .mesh-link-row:hover:not(:disabled) {
+		background: var(--fg);
+		color: var(--bg);
+		border: 0;
+		box-shadow: none;
+	}
+}
+.meshterm .mesh-empty {
+	margin: 0;
+	padding: 16px;
+	font-size: 12px;
+	min-height: 8rem;
+	overflow-wrap: anywhere;
+}
+.meshterm .mesh-activity-scroll {
+	flex: 1;
+	overflow: auto;
+	padding: 12px;
+}
+.meshterm .mesh-activity {
+	border-collapse: separate;
+	border-spacing: 0;
+	font-size: 11px;
+}
+.meshterm .mesh-activity td:first-child {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: var(--panel);
+	padding-right: 10px;
+	white-space: nowrap;
+	box-shadow: 2px 0 0 var(--border);
+}
+.meshterm .mesh-cell {
+	width: 9px;
+	height: 14px;
+	padding: 0;
+	border: 1px solid var(--border);
+}
+.meshterm .mesh-activity-total {
+	padding-left: 10px;
+	white-space: nowrap;
+}
+.meshterm .mesh-foot {
+	flex-wrap: wrap;
+	gap: 8px 16px;
+}
+
+@media (max-width: 860px) {
+	.meshterm main:has(.mesh-view) {
+		min-height: calc(100dvh - 52px);
+	}
+	.meshterm main:not(.fill) > .mesh-view {
+		flex: 1 1 auto !important;
+		min-height: 22rem;
+	}
+	.meshterm .mesh-tiles .stat-tile {
+		flex: 1 1 calc(50% - 10px);
+		max-width: none;
+		min-width: 0;
+	}
+	.meshterm .mesh-hops,
+	.meshterm .mesh-silent {
+		flex: 1 1 100%;
+		min-width: 0;
+	}
+	.meshterm .mesh-tabs {
+		flex: 1 1 100%;
+	}
+	.meshterm .mesh-tabs button,
+	.meshterm .mesh-ranges button {
+		flex: 1 1 calc(50% - 6px);
+		min-height: 44px;
+		min-width: 0;
+	}
+	.meshterm .mesh-ranges {
+		flex: 1 1 100%;
+	}
+	.meshterm .mesh-count,
+	.meshterm .mesh-note {
+		flex: 1 1 100%;
+		font-size: 12px;
+		line-height: 1.45;
+	}
+	.meshterm .mesh-graph {
+		flex: 1 1 100%;
+		height: min(52dvh, 28rem);
+		min-height: 18rem;
+	}
+	.meshterm .mesh-detail {
+		flex: 1 1 100%;
+		min-width: 0;
+	}
+	.meshterm .mesh-link-row {
+		min-height: 44px;
+	}
+	.meshterm .mesh-cell {
+		width: 11px;
+		height: 18px;
+	}
+	.meshterm .panel:has(.mesh-activity) {
+		overflow-x: visible;
+	}
+}
+
 .meshterm .uplot .u-legend {
 	min-width: 0;
 	font-size: 11px;

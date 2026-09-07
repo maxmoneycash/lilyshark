@@ -131,5 +131,9 @@ assert.doesNotMatch(dialkit, /envIntensity:/);
 assert.match(tdeckTune, /TDECK_SCENE/);
 assert.match(tdeckScene, /TDECK_SCENE\.cameraY/);
 assert.match(tdeckScene, /lookAt\(0, camera\.position\.y, 0\)/);
+const mesh = readFileSync(new URL("./screens/Mesh.tsx", import.meta.url), "utf8");
+assert.match(mesh, /mesh-toolbar/);
+assert.match(mesh, /mesh-graph/);
+assert.match(mesh, /Math.max\(mark, 18\)/);
 
 console.log("web_truth.test.ts OK");
