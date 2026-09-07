@@ -899,10 +899,9 @@ function App() {
               theme's dark text unreadable */}
           <div className="panel" style={{ flex: 1 }}>
             <div className="panel-title">
-              <span>PANEL // DEBUG · SERIAL 115200 8N1</span>
-              <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span className="panel-title-label">PANEL // DEBUG · SERIAL 115200 8N1</span>
+              <span className="debug-actions">
                 <button
-
                   title={t("Export the log to a text file")}
                   disabled={s.log.length === 0}
                   onClick={() =>
@@ -913,7 +912,7 @@ function App() {
                 >
                   {t("EXPORT")}
                 </button>
-                {t("{0} LINES", s.log.length)}
+                <span className="dim">{t("{0} LINES", s.log.length)}</span>
               </span>
             </div>
             <pre className="debuglog">

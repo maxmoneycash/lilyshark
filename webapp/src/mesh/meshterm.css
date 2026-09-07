@@ -1020,12 +1020,20 @@
 .meshterm .debuglog {
 	flex: 1;
 	overflow-y: auto;
+	overflow-x: auto;
 	margin: 0;
 	padding: 10px 14px;
 	font-size: 12px;
 	line-height: 1.55;
 	font-family: inherit;
 	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.meshterm .debug-actions {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
 }
 
 /* ── mapa ── */
@@ -3982,6 +3990,17 @@ body:has(.meshterm .app.menu-open) {
 	}
 	.meshterm .dissect-split > * {
 		flex: 1 1 100% !important;
+	}
+	.meshterm .debug-actions {
+		flex: 1 1 100%;
+	}
+	.meshterm .debug-actions button {
+		flex: 1 1 auto;
+	}
+	.meshterm .debuglog {
+		padding: 12px;
+		font-size: 13px;
+		min-height: 50vh;
 	}
 }
 
