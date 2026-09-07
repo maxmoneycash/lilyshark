@@ -112,8 +112,16 @@ interface HexPaneProps {
  * is a real ARIA tree and drives the same selection from the keyboard.
  */
 function HexPane({ bytes, highlight, onHoverByte, onPickByte }: HexPaneProps) {
+	const [rowBytes, setRowBytes] = useState(HEX_ROW_BYTES);
+	useEffect(() => {
+		const query = window.matchMedia("(max-width: 860px)");
+		const update = () => setRowBytes(query.matches ? 4 : HEX_ROW_BYTES);
+		update();
+		query.addEventListener("change", update);
+		return () => query.removeEventListener("change", update);
+	}, []);
 	const rowOffsets: number[] = [];
-	for (let off = 0; off < bytes.length; off += HEX_ROW_BYTES) rowOffsets.push(off);
+	for (let off = 0; off < bytes.length; off += rowBytes) rowOffsets.push(off);
 
 	const lit = (index: number): boolean =>
 		highlight !== null &&
@@ -128,6 +136,7 @@ function HexPane({ bytes, highlight, onHoverByte, onPickByte }: HexPaneProps) {
 
 	return (
 		<div
+			className="hex-pane"
 			style={{ fontSize: 11, lineHeight: 1.7, whiteSpace: "pre" }}
 			onMouseLeave={() => onHoverByte(null)}
 		>
@@ -135,7 +144,7 @@ function HexPane({ bytes, highlight, onHoverByte, onPickByte }: HexPaneProps) {
 				<div key={off}>
 					<span className="dim">{off.toString(16).padStart(4, "0")}</span>
 					{"  "}
-					{Array.from({ length: HEX_ROW_BYTES }, (_, i) => off + i).map((at) =>
+					{Array.from({ length: rowBytes }, (_, i) => off + i).map((at) =>
 						at < bytes.length ? (
 							// The separator space rides inside the byte's own element so a
 							// run of highlighted bytes reads as one bar, not a dotted line.
@@ -152,7 +161,7 @@ function HexPane({ bytes, highlight, onHoverByte, onPickByte }: HexPaneProps) {
 						),
 					)}
 					{" |"}
-					{Array.from({ length: HEX_ROW_BYTES }, (_, i) => off + i).map((at) =>
+					{Array.from({ length: rowBytes }, (_, i) => off + i).map((at) =>
 						at < bytes.length ? (
 							<span
 								key={`a${at}`}
@@ -1236,6 +1245,7 @@ export default function Sniffer() {
 							)}
 							{sel.raw && dissection ? (
 								<div
+									className="dissect-split"
 									style={{
 										display: "flex",
 										gap: 14,

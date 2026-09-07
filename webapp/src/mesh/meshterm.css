@@ -3941,6 +3941,9 @@ body:has(.meshterm .app.menu-open) {
 		flex: 1 1 auto !important;
 		min-width: 0 !important;
 	}
+	.meshterm .dissect-split > * {
+		flex: 1 1 100% !important;
+	}
 }
 
 @media (max-width: 860px) {
@@ -3966,6 +3969,15 @@ body:has(.meshterm .app.menu-open) {
 
 .meshterm .anim-num {
 	font-variant-numeric: tabular-nums;
+}
+
+.meshterm .hex-pane {
+	overflow-x: auto;
+	max-width: 100%;
+	font-variant-numeric: tabular-nums;
+}
+.meshterm .dissect-split {
+	min-width: 0;
 }
 
 .meshterm .sniffer-bar {
