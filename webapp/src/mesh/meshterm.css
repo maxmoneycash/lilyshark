@@ -1044,16 +1044,44 @@
 	pointer-events: none;
 	background: color-mix(in srgb, var(--bg) 80%, transparent);
 	padding: 1px 6px;
+	max-width: calc(100% - 20px);
+	text-wrap: pretty;
+}
+.meshterm .map-hud-top {
+	right: 10px;
+	top: 8px;
+}
+.meshterm .map-hud-bottom {
+	left: 10px;
+	bottom: 10px;
+}
+.meshterm .map-coverage-legend {
+	position: absolute;
+	z-index: 1000;
+	right: 10px;
+	bottom: 10px;
+	width: 268px;
+	font-size: 11px;
+}
+.meshterm .map-waypoint-sheet {
+	position: absolute;
+	z-index: 1000;
+	right: 10px;
+	top: 34px;
+	width: 260px;
+	font-size: 12px;
 }
 .meshterm .map-toolbar {
 	display: flex;
 	gap: 12px;
 	align-items: center;
+	flex-wrap: wrap;
 }
 .meshterm .map-chip-row {
 	display: inline-flex;
 	gap: 4px;
 	align-items: center;
+	flex-wrap: wrap;
 }
 .meshterm .map-chip-row button {
 	font-size: 10px;
@@ -2292,6 +2320,52 @@ body:has(.meshterm .app.menu-open) {
 		flex: 1;
 		min-height: 0;
 		height: auto;
+	}
+	.meshterm .map-toolbar {
+		flex: 1 1 100%;
+		gap: 8px;
+	}
+	.meshterm .map-chip-row button {
+		min-height: 44px;
+		padding: 0 10px;
+		font-size: 11px;
+	}
+	.meshterm .map-hud-top {
+		left: 8px;
+		right: 8px;
+		top: 8px;
+		max-width: none;
+		line-height: 1.4;
+	}
+	.meshterm .map-hud-bottom {
+		left: 8px;
+		right: 8px;
+		bottom: 8px;
+		max-width: none;
+		line-height: 1.4;
+	}
+	.meshterm .map-coverage-legend {
+		left: 8px;
+		right: 8px;
+		bottom: 44px;
+		width: auto;
+		max-height: 38%;
+		overflow: auto;
+	}
+	.meshterm .map-waypoint-sheet {
+		left: 8px;
+		right: 8px;
+		top: 8px;
+		width: auto;
+	}
+	.meshterm .map-wait {
+		left: 8px;
+		right: 8px;
+		top: 8px;
+		max-width: none;
+	}
+	.meshterm .map-wrap:has(.map-coverage-legend) .map-hud-bottom {
+		display: none;
 	}
 }
 

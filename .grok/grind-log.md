@@ -18,11 +18,12 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Flash installer scaled for a 390px phone
 - Chat phone dock: wrapping tools, 44px targets, failed-send --err shake
 - Nodes roster: wrapping rows, no sideways page scroll, empty state copy
+- Map HUD/chips wrap; phone hint is tap/long-press, not right-click
 
 ## Next (pick one per round)
 
-1. Map: HUD overlap, full-height wrap, chip row wrap
-2. Telemetry/Spectrum plots: height, controls wrapping
+1. Telemetry/Spectrum plots: height, controls wrapping
+2. Config: duration fields, theme tiles press
 3. Config: duration fields, theme tiles press
 4. Traffic table: freeze first columns, filter row
 5. Intro: DialKit-tuned constants copied into code; drop unused knobs

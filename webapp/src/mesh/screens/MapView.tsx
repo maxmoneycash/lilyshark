@@ -754,6 +754,14 @@ export default function MapView({
 				(filter === "active" && nowS - n.lastHeard < 3600)),
 	);
 	const points = new Set(drawn.map((n) => `${n.lat},${n.lon}`)).size;
+	const [coarse, setCoarse] = useState(false);
+	useEffect(() => {
+		const query = window.matchMedia("(pointer: coarse)");
+		const update = () => setCoarse(query.matches);
+		update();
+		query.addEventListener("change", update);
+		return () => query.removeEventListener("change", update);
+	}, []);
 
 	// map-main: on phones this screen becomes a full app-window (the page does
 	// not scroll), so the map takes everything between header and footer and a
@@ -762,7 +770,7 @@ export default function MapView({
 		<main className="map-main">
 			<div className="panel" style={{ flex: 1 }}>
 				<div className="panel-title">
-					<span>
+					<span className="panel-title-label">
 						{t("PANEL // TACTICAL MAP")} · {t("{0} NODES", s.nodes.size)} ·{" "}
 						{t("{0} WITH FIX", withFix)}
 						{junk > 0 && ` · ${t("{0} DISCARDED (0,0)", junk)}`}
@@ -860,7 +868,7 @@ export default function MapView({
 							</div>
 						</div>
 					)}
-					<div className="map-hud" style={{ right: 10, top: 8 }}>
+					<div className="map-hud map-hud-top">
 						{t("{0} NODES · {1} POINTS", drawn.length, points)} ·{" "}
 						{basemap === "sat"
 							? "ESRI SAT"
@@ -896,25 +904,21 @@ export default function MapView({
 							</>
 						)}
 					</div>
-					<div className="map-hud" style={{ left: 10, bottom: 10 }}>
+					<div className="map-hud map-hud-bottom">
 						{wpMsg ||
 							(deviceLink.status === "linked" && drawn.length === 0
 								? "Listening. Your T-Deck plots when GPS has a fix. Other nodes plot when they transmit a position."
 								: coverage
-									? t("CLICK A CELL FOR ITS EVIDENCE · RIGHT CLICK = NEW WAYPOINT")
-									: t("RIGHT CLICK = NEW WAYPOINT"))}
+									? coarse
+										? t("TAP A CELL FOR ITS EVIDENCE · LONG PRESS = NEW WAYPOINT")
+										: t("CLICK A CELL FOR ITS EVIDENCE · RIGHT CLICK = NEW WAYPOINT")
+									: coarse
+										? t("LONG PRESS = NEW WAYPOINT")
+										: t("RIGHT CLICK = NEW WAYPOINT"))}
 					</div>
 					{coverage && (
 						<div
-							className="panel"
-							style={{
-								position: "absolute",
-								zIndex: 1000,
-								right: 10,
-								bottom: 10,
-								width: 268,
-								fontSize: 11,
-							}}
+							className="panel map-coverage-legend"
 						>
 							<div className="panel-title">
 								<span>{t("COVERAGE")}</span>
@@ -1038,15 +1042,7 @@ export default function MapView({
 					)}
 					{draft && (
 						<div
-							className="panel"
-							style={{
-								position: "absolute",
-								zIndex: 1000,
-								right: 10,
-								top: 34,
-								width: 260,
-								fontSize: 12,
-							}}
+							className="panel map-waypoint-sheet"
 						>
 							<div className="panel-title">
 								{draft.id ? t("EDIT WAYPOINT") : t("NEW WAYPOINT")}
