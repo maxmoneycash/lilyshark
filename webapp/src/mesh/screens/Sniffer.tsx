@@ -1107,13 +1107,28 @@ export default function Sniffer() {
 						<span>CLICK A ROW TO TAKE IT APART</span>
 					</div>
 					{frames.length === 0 ? (
-						<p className="dim" style={{ padding: 16, fontSize: 12 }}>
-							{linked
-								? "Listening — the next frame the radio hears lands here_"
-								: "Nothing captured yet — connect a T-Deck over USB with the CONNECT button, and every frame its radio hears lands here_"}
-						</p>
+						<div className="chat-empty sniffer-empty">
+							<div className="chat-empty-title">
+								{linked ? "LISTENING" : "NOTHING CAPTURED"}
+							</div>
+							<div className="dim">
+								{linked
+									? "The next frame the radio hears lands in this table."
+									: "Connect a T-Deck over USB. Every frame its radio hears lands here, ready to take apart."}
+							</div>
+							{!linked && (
+								<button
+									className="primary"
+									onClick={() =>
+										window.dispatchEvent(new CustomEvent("lilyshark-connect"))
+									}
+								>
+									CONNECT
+								</button>
+							)}
+						</div>
 					) : (
-<FrameTable
+					<FrameTable
 							frames={frames}
 							sel={sel}
 							onPick={pickFrame}

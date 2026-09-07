@@ -142,5 +142,9 @@ const mesh = readFileSync(new URL("./screens/Mesh.tsx", import.meta.url), "utf8"
 assert.match(mesh, /mesh-toolbar/);
 assert.match(mesh, /mesh-graph/);
 assert.match(mesh, /Math.max\(mark, 18\)/);
+const sniffer = readFileSync(new URL("./screens/Sniffer.tsx", import.meta.url), "utf8");
+assert.match(sniffer, /sniffer-empty/);
+assert.match(sniffer, /lilyshark-connect/);
+assert.match(terminal, /lilyshark-connect/);
 
 console.log("web_truth.test.ts OK");

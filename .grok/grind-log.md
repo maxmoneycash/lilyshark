@@ -31,8 +31,8 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Sniffer hex uses 4-byte rows on a phone; dissection stacks above bytes
 - ThisDevice tiles sit two-up; sparks fill the tile; LIVE AIR / MAP / UNLINK are 44px keys
 - Debug log wraps long lines; EXPORT is a full-width thumb key
+- Sniffer empty table is a titled empty with a CONNECT key that opens the sheet
 
 ## Next (pick one per round)
 
-1. Onboarding / empty states that still read as blank panels
-2. Keyboard-focus rings on remaining unlabeled controls
+1. Keyboard-focus rings on remaining unlabeled controls

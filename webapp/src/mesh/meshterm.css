@@ -3984,6 +3984,15 @@ body:has(.meshterm .app.menu-open) {
 		width: auto;
 		height: auto;
 	}
+	.meshterm .sniffer-empty {
+		margin: 12px;
+		padding: 20px 14px;
+		min-height: 14rem;
+	}
+	.meshterm .sniffer-empty button {
+		align-self: stretch;
+		min-height: 44px;
+	}
 	.meshterm .sniffer .panel.hot {
 		flex: 1 1 auto !important;
 		min-width: 0 !important;
@@ -4044,6 +4053,18 @@ body:has(.meshterm .app.menu-open) {
 	align-items: center;
 	flex-wrap: wrap;
 	flex-shrink: 0;
+}
+.meshterm .sniffer-empty {
+	margin: 14px;
+	max-width: none;
+	min-height: 12rem;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 10px;
+}
+.meshterm .sniffer-empty button {
+	align-self: flex-start;
 }
 .meshterm .sniffer-table {
 	--sniffer-col-note: 4.5rem;

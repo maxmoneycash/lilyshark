@@ -264,6 +264,8 @@ function App() {
       if (isTab(next)) setTab(next);
     };
     window.addEventListener("lilyshark-tab", onTab);
+    const onConnect = () => setConnectOpen(true);
+    window.addEventListener("lilyshark-connect", onConnect);
     // A permalink pasted into the address bar of an already-open tab changes
     // the hash without reloading, so the deep link has to be honoured here as
     // well as at mount. Screens update their own part of the hash with
@@ -276,6 +278,7 @@ function App() {
     window.addEventListener("popstate", onHash);
     return () => {
       window.removeEventListener("lilyshark-tab", onTab);
+      window.removeEventListener("lilyshark-connect", onConnect);
       window.removeEventListener("hashchange", onHash);
       window.removeEventListener("popstate", onHash);
     };
