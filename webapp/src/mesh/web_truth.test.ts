@@ -113,5 +113,12 @@ assert.match(chat, /sendShake/);
 assert.match(mapView, /useDeviceLink/);
 assert.match(mapView, /THIS DEVICE/);
 assert.match(traffic, /sim-badge/);
+assert.match(traffic, /traffic-filter/);
+const trafficTable = readFileSync(
+  new URL("../components/TrafficFrameTable.tsx", import.meta.url),
+  "utf8",
+);
+assert.match(trafficTable, /traffic-table/);
+assert.match(trafficTable, /traffic-scroll/);
 
 console.log("web_truth.test.ts OK");

@@ -3387,6 +3387,117 @@ body:has(.meshterm .app.menu-open) {
 	}
 }
 
+/* TRAFFIC: freeze # and TIME while the rest of the row scrolls, and let the
+   filter wrap as a row of keys instead of a single overflowing strip.
+   border-collapse: separate is required — collapse drops position:sticky on
+   table cells in Chromium and Safari. */
+.meshterm .traffic-table {
+	--traffic-col-n: 7rem;
+	--traffic-col-time: 8rem;
+	border-collapse: separate;
+	border-spacing: 0;
+}
+.meshterm .traffic-table th:nth-child(1),
+.meshterm .traffic-table td:nth-child(1),
+.meshterm .traffic-table th:nth-child(2),
+.meshterm .traffic-table td:nth-child(2) {
+	position: sticky;
+	z-index: 2;
+	background: var(--panel);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+.meshterm .traffic-table th:nth-child(1),
+.meshterm .traffic-table td:nth-child(1) {
+	left: 0;
+	width: var(--traffic-col-n);
+	min-width: var(--traffic-col-n);
+	max-width: var(--traffic-col-n);
+}
+.meshterm .traffic-table th:nth-child(2),
+.meshterm .traffic-table td:nth-child(2) {
+	left: var(--traffic-col-n);
+	width: var(--traffic-col-time);
+	min-width: var(--traffic-col-time);
+	max-width: var(--traffic-col-time);
+	box-shadow: 2px 0 0 var(--border);
+}
+.meshterm .traffic-table thead th:nth-child(1),
+.meshterm .traffic-table thead th:nth-child(2) {
+	z-index: 3;
+}
+.meshterm .traffic-table tbody tr:hover td:nth-child(-n + 2),
+.meshterm .traffic-table tbody tr.sel td:nth-child(-n + 2) {
+	background: var(--fg);
+	color: var(--bg);
+}
+/* Virtualisation spacers are one cell spanning the row; they must not pick
+   up the frozen-column widths or the scrollbar lies. */
+.meshterm .traffic-table td[colspan],
+.meshterm .traffic-table tbody tr:hover td[colspan],
+.meshterm .traffic-table tbody tr.sel td[colspan] {
+	position: static;
+	width: auto;
+	min-width: 0;
+	max-width: none;
+	background: transparent;
+	box-shadow: none;
+}
+.meshterm .traffic-filter {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 10px;
+	align-items: center;
+}
+.meshterm .traffic-filter-k {
+	font-size: 10px;
+	letter-spacing: 2px;
+	color: var(--fg-dim);
+	flex: 0 0 auto;
+}
+.meshterm .traffic-filter-input {
+	flex: 1 1 16rem;
+	min-width: 12rem;
+}
+.meshterm .traffic-filter-clear {
+	flex: 0 0 auto;
+}
+.meshterm .traffic-filter-status {
+	flex: 1 1 12rem;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 860px) {
+	/* The table keeps its own sideways scroller; the panel must not nest one. */
+	.meshterm .panel:has(.traffic-table) {
+		overflow-x: visible;
+	}
+	.meshterm .traffic-scroll {
+		max-width: 100%;
+	}
+	.meshterm .traffic-table {
+		--traffic-col-n: 5.5rem;
+		--traffic-col-time: 6.5rem;
+	}
+	.meshterm .traffic-filter-k {
+		flex: 1 1 100%;
+	}
+	.meshterm .traffic-filter-input {
+		flex: 1 1 100%;
+		min-width: 0;
+	}
+	.meshterm .traffic-filter-clear {
+		flex: 1 1 calc(50% - 6px);
+		min-width: 0;
+	}
+	.meshterm .traffic-filter-status {
+		flex: 1 1 100%;
+		font-size: 12px;
+		line-height: 1.45;
+	}
+}
+
 .meshterm .uplot .u-legend {
 	min-width: 0;
 	font-size: 11px;

@@ -141,8 +141,8 @@ export function TrafficFrameTable({
 
   return (
     <div className="scroll-y" ref={rows.scrollRef}>
-      <div className="scroll-x">
-        <table className="grid">
+      <div className="scroll-x traffic-scroll">
+        <table className="grid traffic-table">
           <thead ref={rows.headRef}>
             <tr>
               <th>#</th>

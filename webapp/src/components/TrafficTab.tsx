@@ -1026,50 +1026,48 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             {/* The display filter. A conversation is one expression in this
                 same box, so following one and typing one are the same act —
                 and CLEAR is the single way back to the whole capture. */}
-            <div
-              className="panel-foot"
-              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}
-            >
-              <span className="k">FILTER</span>
+            <div className="panel-foot traffic-filter">
+              <span className="traffic-filter-k">FILTER</span>
               <input
+                className={filter.ok ? 'traffic-filter-input' : 'traffic-filter-input err'}
                 value={filterText}
                 spellCheck={false}
                 placeholder="proto == meshtastic && snr > -5_"
+                aria-label="Display filter"
                 title={`Fields: ${FILTER_FIELDS.join(', ')}. Comparisons == != < <= > >= with k/M/G suffixes on numbers; combine with && || ! (or the words and / or / not).`}
-                style={{
-                  flex: '1 1 260px',
-                  minWidth: 160,
-                  color: filter.ok ? undefined : 'var(--err, #ff6b6b)',
-                }}
                 onChange={(e) => setFilterText(e.target.value)}
               />
-              <button disabled={filterText === ''} onClick={() => setFilterText('')}>
+              <button
+                className="traffic-filter-clear"
+                disabled={filterText === ''}
+                onClick={() => setFilterText('')}
+              >
                 {following ? 'SHOW ALL FRAMES' : 'CLEAR'}
               </button>
-              {!filter.ok ? (
-                <span className="err">
-                  {filter.error.message} · column {filter.error.start + 1}
-                </span>
-              ) : following ? (
-                <span className="ok">
-                  FOLLOWING {conversationLabel(following)} · {filtered.length} OF{' '}
-                  {frames.length} FRAMES
-                </span>
-              ) : filter.empty ? (
-                <span className="dim">no filter — every frame in the capture</span>
-              ) : (
-                <span>
-                  {filtered.length} OF {frames.length} FRAMES MATCH
-                </span>
-              )}
-              {/* Each control reports its own effect: this line counts what
-                  the expression leaves, the graph's line counts what the
-                  brush leaves of that. */}
-              {brush && (
-                <span className="dim">
-                  · a time range is also brushed on the IO graph
-                </span>
-              )}
+              <span
+                className={`traffic-filter-status${!filter.ok ? ' err' : following ? ' ok' : filter.empty ? ' dim' : ''}`}
+              >
+                {!filter.ok ? (
+                  <>
+                    {filter.error.message} · column {filter.error.start + 1}
+                  </>
+                ) : following ? (
+                  <>
+                    FOLLOWING {conversationLabel(following)} · {filtered.length} OF{' '}
+                    {frames.length} FRAMES
+                  </>
+                ) : filter.empty ? (
+                  <>no filter — every frame in the capture</>
+                ) : (
+                  <>
+                    {filtered.length} OF {frames.length} FRAMES MATCH
+                  </>
+                )}
+                {/* Each control reports its own effect: this line counts what
+                    the expression leaves, the graph's line counts what the
+                    brush leaves of that. */}
+                {brush && <> · a time range is also brushed on the IO graph</>}
+              </span>
             </div>
 
             {following && coverage.undecodable > 0 && (
