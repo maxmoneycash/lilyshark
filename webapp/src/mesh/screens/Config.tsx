@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { CSSProperties } from "react";
 import { type AlertCfg, getAlertCfg, setAlertCfg } from "../alerts";
 import {
 	dbStats,
@@ -433,35 +434,32 @@ export default function Config() {
 								<option value="12">12 H · 3:04 PM</option>
 							</select>
 							<label>{t("COLOR")}</label>
-							<div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-								<select
-									value={theme}
-									style={{ width: 140 }}
-									onChange={(e) => {
-										const v = e.target.value as Theme;
-										setTheme(v);
-										setThemeSel(v);
-									}}
-								>
+							<div className="theme-picker">
+								<div className="theme-tiles" role="group" aria-label={t("COLOR")}>
 									{(Object.keys(THEMES) as Theme[]).map((name) => (
-										<option key={name} value={name}>
+										<button
+											key={name}
+											type="button"
+											className={theme === name ? "primary theme-tile" : "theme-tile"}
+											style={{ "--swatch": THEMES[name].fg } as CSSProperties}
+											aria-pressed={theme === name}
+											onClick={() => {
+												setTheme(name);
+												setThemeSel(name);
+											}}
+										>
+											<span className="theme-swatch" aria-hidden="true" />
 											{t(THEME_LABELS[name])}
-										</option>
+										</button>
 									))}
-								</select>
+								</div>
 								<label
-									style={{
-										display: "flex",
-										gap: 6,
-										alignItems: "center",
-										whiteSpace: "nowrap",
-									}}
+									className="hc-check"
 									title={t("Same color, pure black background and a more vivid stroke")}
 								>
 									<input
 										type="checkbox"
 										checked={hc}
-										style={{ width: "auto" }}
 										onChange={(e) => {
 											setHiContrast(e.target.checked);
 											setHcSel(e.target.checked);
@@ -484,14 +482,13 @@ export default function Config() {
 								onChange={(e) => saveAlerts({ on: e.target.checked })}
 							/>
 							<label>{t("WARN BATTERY <")}</label>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<div className="duration-field">
 								<input
 									type="number"
 									min={1}
 									max={100}
 									disabled={!alerts.on}
 									value={alerts.battery}
-									style={{ width: 80 }}
 									onChange={(e) =>
 										saveAlerts({ battery: Number(e.target.value) })
 									}
@@ -499,13 +496,12 @@ export default function Config() {
 								<span className="dim">%</span>
 							</div>
 							<label>{t("WARN NO SIGNAL")}</label>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<div className="duration-field">
 								<input
 									type="number"
 									min={1}
 									disabled={!alerts.on}
 									value={alerts.silentH}
-									style={{ width: 80 }}
 									onChange={(e) =>
 										saveAlerts({ silentH: Number(e.target.value) })
 									}
@@ -518,13 +514,12 @@ export default function Config() {
 							>
 								{t("WARN RUNTIME <")}
 							</label>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<div className="duration-field">
 								<input
 									type="number"
 									min={0}
 									disabled={!alerts.on}
 									value={alerts.runtimeH}
-									style={{ width: 80 }}
 									onChange={(e) =>
 										saveAlerts({ runtimeH: Number(e.target.value) })
 									}

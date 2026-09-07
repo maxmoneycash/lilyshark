@@ -913,6 +913,54 @@
 .meshterm .form-grid label {
 	color: var(--fg-dim);
 }
+.meshterm .theme-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+}
+.meshterm .theme-tiles {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.meshterm .theme-tile {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	letter-spacing: 0.4px;
+}
+.meshterm .theme-swatch {
+	width: 10px;
+	height: 10px;
+	flex: none;
+	background: var(--swatch, var(--fg));
+	box-shadow: 0 0 0 1px var(--border);
+}
+.meshterm .theme-tile.primary .theme-swatch {
+	box-shadow: 0 0 0 1px var(--bg);
+}
+.meshterm .hc-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	white-space: nowrap;
+	color: var(--fg-dim);
+}
+.meshterm .hc-check input {
+	width: auto;
+}
+.meshterm .duration-field {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+.meshterm .form-grid .duration-field input {
+	width: 8ch;
+	font-variant-numeric: tabular-nums;
+}
 .meshterm .panel-actions {
 	display: flex;
 	align-items: center;
@@ -1519,6 +1567,13 @@ body {
 		grid-template-columns: minmax(0, 1fr);
 		gap: 6px;
 		padding: 10px;
+	}
+	.meshterm .theme-tile {
+		min-height: 44px;
+	}
+	.meshterm .form-grid .duration-field input {
+		width: 9ch;
+		min-height: 44px;
 	}
 	.meshterm .panel-title {
 		flex-wrap: wrap;
