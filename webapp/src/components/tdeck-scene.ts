@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { getTDeckTune, subscribeTDeckTune } from './tdeck-tune';
+import { getTDeckTune, subscribeTDeckTune, TDECK_SCENE } from './tdeck-tune';
 
 export interface TDeckViewer {
   setScreen(url: string): void;
@@ -36,28 +36,28 @@ export function mountTDeck(
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.AgXToneMapping;
-  renderer.toneMappingExposure = 1;
+  renderer.toneMappingExposure = TDECK_SCENE.exposure;
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-.12, .12, .17, -.17, .001, 5);
-  camera.position.set(0, .027, 1);
-  camera.lookAt(0, .027, 0);
+  camera.position.set(0, TDECK_SCENE.cameraY, 1);
+  camera.lookAt(0, TDECK_SCENE.cameraY, 0);
   const rig = new THREE.Group();
   scene.add(rig);
   const environment = new RoomEnvironment();
   const pmrem = new THREE.PMREMGenerator(renderer);
   const environmentMap = pmrem.fromScene(environment, .015, .1, 100, { size: 512 });
   scene.environment = environmentMap.texture;
-  scene.environmentIntensity = 1.05;
+  scene.environmentIntensity = TDECK_SCENE.envIntensity;
   environment.dispose();
   pmrem.dispose();
-  scene.add(new THREE.HemisphereLight(0xfff3ea, 0x2a2428, .28));
-  const key = new THREE.DirectionalLight(0xfff6ee, 2.6);
+  scene.add(new THREE.HemisphereLight(0xfff3ea, 0x2a2428, TDECK_SCENE.hemiIntensity));
+  const key = new THREE.DirectionalLight(0xfff6ee, TDECK_SCENE.keyIntensity);
   key.position.set(-.45, .6, .85);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xb7c6e4, .38);
+  const fill = new THREE.DirectionalLight(0xb7c6e4, TDECK_SCENE.fillIntensity);
   fill.position.set(.6, .05, .4);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffffff, 1.55);
+  const rim = new THREE.DirectionalLight(0xffffff, TDECK_SCENE.rimIntensity);
   rim.position.set(.15, .45, -.7);
   scene.add(rim);
 
@@ -80,8 +80,8 @@ export function mountTDeck(
     map: lcdTexture,
     emissiveMap: lcdTexture,
     emissive: 0xffffff,
-    emissiveIntensity: 1,
-    roughness: 0.32,
+    emissiveIntensity: TDECK_SCENE.lcdEmissive,
+    roughness: TDECK_SCENE.lcdRoughness,
     metalness: 0,
     toneMapped: false,
     dithering: true,
@@ -143,9 +143,10 @@ export function mountTDeck(
     const tune = getTDeckTune();
     const halfHeight = Math.max(height < 400 ? tune.halfHeight * 0.875 : tune.halfHeight, .04 * height / width);
     const pan = aspect > 1 ? halfHeight * aspect * tune.pan : 0;
-    camera.position.y = height < 400 ? -.004 : -.006;
-    renderer.toneMappingExposure = tune.exposure;
-    scene.environmentIntensity = tune.envIntensity;
+    camera.position.y = height < 400 ? TDECK_SCENE.cameraYPhone : TDECK_SCENE.cameraY;
+    camera.lookAt(0, camera.position.y, 0);
+    renderer.toneMappingExposure = TDECK_SCENE.exposure;
+    scene.environmentIntensity = TDECK_SCENE.envIntensity;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
     camera.top = halfHeight;
@@ -211,7 +212,7 @@ export function mountTDeck(
               material.map = lcdTexture;
               material.emissiveMap = lcdTexture;
               material.emissive.set(0xffffff);
-              material.emissiveIntensity = Math.max(material.emissiveIntensity, 1);
+              material.emissiveIntensity = Math.max(material.emissiveIntensity, TDECK_SCENE.lcdEmissive);
               material.toneMapped = false;
               material.dithering = true;
               material.needsUpdate = true;
@@ -220,7 +221,7 @@ export function mountTDeck(
             return lcdMaterial;
           }
           if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
-            material.envMapIntensity = 1.15;
+            material.envMapIntensity = TDECK_SCENE.envMapIntensity;
             material.dithering = true;
             for (const map of [material.map, material.normalMap, material.roughnessMap, material.metalnessMap, material.aoMap]) {
               if (map) {

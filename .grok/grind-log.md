@@ -23,8 +23,8 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Config theme tiles with swatches; duration fields as unit-suffixed inputs
 - Traffic table freezes # and TIME; filter wraps as a phone row
 - CONNECT morphs CONNECT / CANCEL / LINKED in place
+- Intro T-Deck look baked as TDECK_SCENE; DialKit keeps only framing/breathe; camera faces the LCD
 
 ## Next (pick one per round)
 
-1. Intro: DialKit-tuned constants copied into code; drop unused knobs
-2. Docs/Paper: measure, images, sticky section tabs
+1. Docs/Paper: measure, images, sticky section tabs

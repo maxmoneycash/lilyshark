@@ -121,5 +121,15 @@ const trafficTable = readFileSync(
 );
 assert.match(trafficTable, /traffic-table/);
 assert.match(trafficTable, /traffic-scroll/);
+const dialkit = readFileSync(new URL("../components/DialKitDev.tsx", import.meta.url), "utf8");
+const tdeckTune = readFileSync(new URL("../components/tdeck-tune.ts", import.meta.url), "utf8");
+const tdeckScene = readFileSync(new URL("../components/tdeck-scene.ts", import.meta.url), "utf8");
+assert.match(dialkit, /halfHeight/);
+assert.match(dialkit, /TDECK_SCENE/);
+assert.doesNotMatch(dialkit, /exposure:/);
+assert.doesNotMatch(dialkit, /envIntensity:/);
+assert.match(tdeckTune, /TDECK_SCENE/);
+assert.match(tdeckScene, /TDECK_SCENE\.cameraY/);
+assert.match(tdeckScene, /lookAt\(0, camera\.position\.y, 0\)/);
 
 console.log("web_truth.test.ts OK");
