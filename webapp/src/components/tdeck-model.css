@@ -32,9 +32,9 @@
 }
 .meshterm .tdeck-model-controls {
   position: absolute;
-  bottom: 16px;
+  bottom: 24px;
   left: 0;
-  width: 100%;
+  width: min(34rem, 38%);
   text-align: left;
   font-size: 10px;
   color: var(--fg-dim);

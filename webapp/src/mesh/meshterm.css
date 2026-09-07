@@ -2014,17 +2014,22 @@ body:has(.meshterm .app.menu-open) {
 	height: 100%;
 	max-height: calc(100% / var(--intro-n, 5));
 	display: grid;
-	grid-template-columns: minmax(22rem, 36rem) minmax(0, 1fr);
+	grid-template-columns: minmax(0, 1fr);
 	align-items: stretch;
-	gap: 8px;
-	padding: 0 clamp(12px, 3vw, 36px) 0 clamp(18px, 4vw, 48px);
+	gap: 0;
+	padding: 0 clamp(18px, 4vw, 56px);
 	overflow: hidden;
 }
 .meshterm .intro-copy {
 	position: relative;
+	grid-area: 1 / 1;
+	z-index: 2;
 	min-width: 0;
+	max-width: min(34rem, 38%);
 	align-self: center;
-	justify-self: stretch;
+	justify-self: start;
+	padding: 18px 36px 18px 0;
+	background: linear-gradient(90deg, var(--bg) 62%, transparent);
 }
 .meshterm .intro-head {
 	margin: 0 0 18px;
@@ -2091,6 +2096,8 @@ body:has(.meshterm .app.menu-open) {
 }
 .meshterm .intro-device {
 	position: relative;
+	grid-area: 1 / 1;
+	z-index: 1;
 	justify-self: stretch;
 	align-self: stretch;
 	min-width: 0;
@@ -2146,6 +2153,13 @@ body:has(.meshterm .app.menu-open) {
 		align-items: start;
 		padding: 18px 18px 8px;
 		gap: 8px;
+	}
+	.meshterm .intro-copy,
+	.meshterm .intro-device {
+		grid-area: auto;
+		max-width: none;
+		background: none;
+		padding: 0;
 	}
 	.meshterm .intro-copy {
 		padding-top: 6px;
