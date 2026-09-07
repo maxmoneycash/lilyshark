@@ -3773,6 +3773,108 @@ body:has(.meshterm .app.menu-open) {
 	}
 }
 
+.meshterm .shelby-story {
+	flex: 1;
+	min-width: 0;
+}
+.meshterm .shelby-aside {
+	flex: 0 0 360px;
+	width: 360px;
+	min-width: 0;
+}
+.meshterm .shelby-hex {
+	overflow-wrap: anywhere;
+	word-break: break-all;
+	font-variant-numeric: tabular-nums;
+}
+.meshterm .shelby-wire-scroll {
+	max-width: 100%;
+}
+.meshterm .shelby-wire {
+	width: 100%;
+	min-width: 0;
+	table-layout: fixed;
+}
+.meshterm .shelby-wire th:nth-child(1),
+.meshterm .shelby-wire td:nth-child(1) {
+	width: 7.5ch;
+	white-space: nowrap;
+}
+.meshterm .shelby-wire th:nth-child(2),
+.meshterm .shelby-wire td:nth-child(2) {
+	width: 12ch;
+	white-space: nowrap;
+}
+.meshterm .shelby-wire td:nth-child(3) {
+	overflow-wrap: anywhere;
+	white-space: normal;
+}
+.meshterm .shelby-registry {
+	border-collapse: separate;
+	border-spacing: 0;
+	min-width: 36rem;
+}
+.meshterm .shelby-registry th:nth-child(1),
+.meshterm .shelby-registry td:nth-child(1) {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: var(--panel);
+	box-shadow: 2px 0 0 var(--border);
+	overflow-wrap: anywhere;
+	white-space: normal;
+	min-width: 10rem;
+	max-width: 16rem;
+}
+.meshterm .shelby-registry tbody tr:hover td:nth-child(1) {
+	background: var(--fg);
+	color: var(--bg);
+}
+.meshterm .shelby-fetch {
+	display: inline-flex;
+	align-items: center;
+}
+
+@media (max-width: 860px) {
+	.meshterm .panel:has(.shelby-wire) {
+		overflow-x: visible;
+	}
+	.meshterm .shelby-wire-scroll {
+		overflow-x: visible;
+	}
+	.meshterm .shelby-aside {
+		width: auto;
+		flex: 1 1 auto;
+	}
+	.meshterm .prose {
+		max-width: none;
+		font-size: 14px;
+		line-height: 1.65;
+	}
+	.meshterm .shelby-registry {
+		min-width: 0;
+		width: 100%;
+		table-layout: fixed;
+	}
+	.meshterm .shelby-registry th:nth-child(1),
+	.meshterm .shelby-registry td:nth-child(1) {
+		width: 36%;
+		max-width: none;
+		min-width: 0;
+	}
+	.meshterm .shelby-registry th:nth-child(5),
+	.meshterm .shelby-registry td:nth-child(5) {
+		display: none;
+	}
+	.meshterm .shelby-registry th:nth-child(n + 2),
+	.meshterm .shelby-registry td:nth-child(n + 2) {
+		white-space: nowrap;
+	}
+	.meshterm .shelby-fetch {
+		min-height: 44px;
+	}
+}
+
 .meshterm .uplot .u-legend {
 	min-width: 0;
 	font-size: 11px;

@@ -165,10 +165,10 @@ export function ShelbyScreen() {
   }, [bps, live]);
 
   return (
-    <main>
-      <div className="panel" style={{ flex: 1 }}>
+    <main className="shelby-main">
+      <div className="panel shelby-story">
         <div className="panel-title">
-          PANEL // SHELBY · OFF-GRID STORAGE
+          <span>PANEL // SHELBY · OFF-GRID STORAGE</span>
           <span className="spacer" />
           <span className={err ? "warn" : stats ? "ok" : "dim"}>
             {err ? "INDEXER UNREACHABLE" : stats ? "LIVE" : "READING…"}
@@ -211,8 +211,8 @@ export function ShelbyScreen() {
           <div className="panel-title">
             WIRE FORMAT · {SHELBY_POINTER_SIZE} BYTES
           </div>
-          <div className="scroll-x">
-            <table className="grid">
+          <div className="shelby-wire-scroll">
+            <table className="grid shelby-wire">
               <thead>
                 <tr>
                   <th>BYTES</th>
@@ -257,8 +257,8 @@ export function ShelbyScreen() {
           ) : registry.length === 0 ? (
             <div className="panel-foot dim">no captures anchored yet</div>
           ) : (
-            <div className="scroll-x">
-              <table className="grid">
+            <div className="scroll-x shelby-registry-scroll">
+              <table className="grid shelby-registry">
                 <thead>
                   <tr>
                     <th>OBJECT</th>
@@ -275,7 +275,7 @@ export function ShelbyScreen() {
                       <td>{r.sizeBytes.toLocaleString()} B</td>
                       <td>{utcDay(r.registeredAtUnix)}</td>
                       <td>{utcDay(r.expiresAtUnix)}</td>
-                      <td>{shortHex(r.commitment)}</td>
+                      <td className="shelby-hex">{shortHex(r.commitment)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -296,7 +296,7 @@ export function ShelbyScreen() {
         </div>
       </div>
 
-      <div className="panel" style={{ width: 360, flexShrink: 0 }}>
+      <div className="panel shelby-aside">
         <div className="panel-title">WHY A POINTER</div>
         <div className="scroll-y">
           <div className="kv">
@@ -339,6 +339,7 @@ export function ShelbyScreen() {
                     <span className="v ok">
                       live on shelbynet —{' '}
                       <a
+                        className="shelby-fetch"
                         href={`${SHELBY_RPC_BLOBS}/${DEMO_BLOB.owner}/${DEMO_BLOB.name}`}
                         target="_blank"
                         rel="noreferrer"
@@ -351,9 +352,9 @@ export function ShelbyScreen() {
                   </>
                 )}
                 <span className="k">COMMITMENT</span>
-                <span className="v">{live.ptr.commitment}</span>
+                <span className="v shelby-hex">{live.ptr.commitment}</span>
                 <span className="k">OWNER</span>
-                <span className="v">{live.ptr.owner}</span>
+                <span className="v shelby-hex">{live.ptr.owner}</span>
                 <span className="k">SIZE</span>
                 <span className="v">{live.ptr.sizeBytes.toLocaleString()} B</span>
                 <span className="k">CHUNK</span>

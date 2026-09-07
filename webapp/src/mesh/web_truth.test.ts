@@ -71,6 +71,9 @@ assert.doesNotMatch(shelby, /\bmeasured\b/i);
 assert.match(shelby, />DEMO RATE</);
 assert.match(shelby, /from synthetic sample metadata/);
 assert.match(shelby, /DECODED FROM SYNTHETIC SAMPLE/);
+assert.match(shelby, /shelby-wire/);
+assert.match(shelby, /shelby-registry/);
+assert.match(shelby, /shelby-hex/);
 
 assert.match(terminal, /disconnectDeviceLink/);
 assert.match(terminal, /lilyLinked/);

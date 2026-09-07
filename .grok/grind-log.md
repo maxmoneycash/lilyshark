@@ -27,8 +27,8 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Docs/Paper: sticky Docs/Paper tabs, sticky PDF toolbar, phone-width pages, 44px doc nav
 - Mesh graph lays out in CSS pixels with 18px hit targets; toolbar wraps; activity name column stays put
 - Sniffer bars wrap as 44px keys; NOTE/TIME freeze; CLOSE is thumb-sized
+- Shelby wire format wraps to the measure; registry freezes OBJECT; hex breaks instead of shoving the page
 
 ## Next (pick one per round)
 
-1. Shelby screen measure and tables
-2. Hex dump / dissection pane on a phone
+1. Hex dump / dissection pane on a phone
