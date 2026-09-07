@@ -119,10 +119,10 @@ export function mountTDeck(
     // Fill the column with the body and pin it to the copy side. Extra
     // canvas width stays on the right. The whip can crop off the top.
     const aspect = width / height;
-    const halfHeight = Math.max(height < 400 ? .058 : .066, .04 * height / width);
-    const bodyAspect = .54;
-    const pan = aspect > bodyAspect ? halfHeight * (aspect - bodyAspect) * .95 : 0;
-    camera.position.y = height < 400 ? -.004 : -.006;
+    const halfHeight = Math.max(height < 400 ? .054 : .06, .038 * height / width);
+    const bodyAspect = .52;
+    const pan = aspect > bodyAspect ? halfHeight * (aspect - bodyAspect) * .97 : 0;
+    camera.position.y = height < 400 ? -.008 : -.01;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
     camera.top = halfHeight;
