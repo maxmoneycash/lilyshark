@@ -19,13 +19,12 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Chat phone dock: wrapping tools, 44px targets, failed-send --err shake
 - Nodes roster: wrapping rows, no sideways page scroll, empty state copy
 - Map HUD/chips wrap; phone hint is tap/long-press, not right-click
+- Spectrum waterfall fills the phone; Telemetry plot no longer donates 80px to a missing legend; controls wrap
 
 ## Next (pick one per round)
 
-1. Telemetry/Spectrum plots: height, controls wrapping
-2. Config: duration fields, theme tiles press
-3. Config: duration fields, theme tiles press
-4. Traffic table: freeze first columns, filter row
-5. Intro: DialKit-tuned constants copied into code; drop unused knobs
-6. Header CONNECT label morph (CONNECT / CANCEL / LINKED)
-7. Docs/Paper: measure, images, sticky section tabs
+1. Config: duration fields, theme tiles press
+2. Traffic table: freeze first columns, filter row
+3. Intro: DialKit-tuned constants copied into code; drop unused knobs
+4. Header CONNECT label morph (CONNECT / CANCEL / LINKED)
+5. Docs/Paper: measure, images, sticky section tabs

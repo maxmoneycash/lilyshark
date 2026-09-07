@@ -153,19 +153,8 @@ function DeckTrend() {
 
 	return (
 		<>
-			<div
-				className="telemetry-controls"
-				style={{
-					display: "flex",
-					flexWrap: "wrap",
-					gap: 10,
-					alignItems: "center",
-					flexShrink: 0,
-				}}
-			>
-				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
-					T-DECK // LIVE
-				</span>
+			<div className="telemetry-controls">
+				<span className="telemetry-kicker dim">T-DECK // LIVE</span>
 				<select aria-label="Deck telemetry metric" value={metric.id} onChange={(e) => setMetricId(e.target.value)}>
 					{DECK_METRICS.map((m) => (
 						<option key={m.id} value={m.id}>
@@ -174,26 +163,18 @@ function DeckTrend() {
 					))}
 				</select>
 				<span className="spacer" />
-				<span className="dim" style={{ fontSize: 11 }}>
+				<span className="telemetry-count dim">
 					{rows.length} SAMPLES · EVERY 2s
 				</span>
 			</div>
-			<div
-				style={{
-					flex: 1,
-					display: "flex",
-					gap: 12,
-					minHeight: 0,
-					flexWrap: "wrap",
-				}}
-			>
-				<div className="panel" style={{ flex: "999 1 320px", minWidth: 0 }}>
+			<div className="telemetry-body">
+				<div className="panel telemetry-chart">
 					<div className="panel-title">
 						CHART // T-DECK · {metric.label}
 					</div>
-					<div className="scroll-y" style={{ padding: 14, position: "relative" }}>
+					<div className="scroll-y telemetry-plot-host">
 						{rows.length === 0 && (
-							<p className="dim" style={{ position: "absolute" }}>
+							<p className="dim telemetry-empty">
 								{link.history.length === 0 ? "Waiting for telemetry from the linked deck."
 									: metric.id === "rssi" || metric.id === "snr"
 										? "No received frame with a reported signal measurement is available."
@@ -206,15 +187,7 @@ function DeckTrend() {
 						/>
 					</div>
 				</div>
-				<div
-					style={{
-						flex: "1 1 200px",
-						minWidth: 200,
-						display: "flex",
-						flexDirection: "column",
-						gap: 12,
-					}}
-				>
+				<div className="telemetry-stats">
 					{(
 						[
 							["MIN", rows.length ? min : undefined],
@@ -227,18 +200,8 @@ function DeckTrend() {
 							<div className="value">{v !== undefined ? fmt(v) : "Not reported"}</div>
 						</div>
 					))}
-					<div
-						style={{
-							flex: 1,
-							border: "1px dashed var(--border)",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							padding: 12,
-							textAlign: "center",
-						}}
-					>
-						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+					<div className="telemetry-aside">
+						<span className="dim">
 							USB samples from this deck. Node trends appear when nodes report telemetry.
 						</span>
 					</div>
@@ -303,9 +266,13 @@ const seriesColors = (): string[] => [
 // uPlot wants pixels, so the box has to be measured. One helper for both the
 // first build and every later resize, so the two can never disagree and fight
 // each other through the ResizeObserver.
-const plotSize = (box: HTMLElement) => ({
+// Height is the plotting area (axes included, legend excluded). Subtract a
+// legend row only when one is actually drawn — the old flat −80 left a blank
+// band under every single-series chart.
+const LEGEND_ROW_PX = 36;
+const plotSize = (box: HTMLElement, withLegend = false) => ({
 	width: Math.max(100, box.clientWidth),
-	height: Math.max(220, box.clientHeight - 80),
+	height: Math.max(200, box.clientHeight - (withLegend ? LEGEND_ROW_PX : 0)),
 });
 
 export default function Telemetry() {
@@ -329,6 +296,7 @@ export default function Telemetry() {
 	} | null>(null);
 	const plotDiv = useRef<HTMLDivElement>(null);
 	const plotRef = useRef<uPlot | null>(null);
+	const plotLegend = useRef(false);
 	const [withData, setWithData] = useState<Set<number>>(new Set());
 	// ponytail: periodic refresh instead of reacting to s.version — the mesh
 	// mutates dozens of times/s and rebuilding the chart each time hangs the webview
@@ -445,9 +413,11 @@ export default function Telemetry() {
 					}),
 				] as uPlot.AlignedData;
 			}
+			const withLegend = dual || compare.length > 0;
+			plotLegend.current = withLegend;
 			plotRef.current = new uPlot(
 				{
-					...plotSize(plotDiv.current),
+					...plotSize(plotDiv.current, withLegend),
 					series: [
 						{},
 						{
@@ -492,7 +462,7 @@ export default function Telemetry() {
 							font: "11px JetBrains Mono",
 						},
 					],
-					legend: { show: dual || compare.length > 0 },
+					legend: { show: withLegend },
 				},
 				data,
 				plotDiv.current,
@@ -513,7 +483,7 @@ export default function Telemetry() {
 		const box = plotDiv.current;
 		if (!box || typeof ResizeObserver === "undefined") return;
 		const ro = new ResizeObserver(() => {
-			plotRef.current?.setSize(plotSize(box));
+			plotRef.current?.setSize(plotSize(box, plotLegend.current));
 		});
 		ro.observe(box);
 		return () => ro.disconnect();
@@ -565,7 +535,7 @@ export default function Telemetry() {
 
 	if (link.status === "linked") {
 		return (
-			<main style={{ flexDirection: "column" }}>
+			<main className="telemetry-main" style={{ flexDirection: "column" }}>
 				<ThisDevicePanel />
 				<DeckTrend />
 			</main>
@@ -573,21 +543,10 @@ export default function Telemetry() {
 	}
 
 	return (
-		<main style={{ flexDirection: "column" }}>
+		<main className="telemetry-main" style={{ flexDirection: "column" }}>
 			<ThisDevicePanel />
-			<div
-				className="telemetry-controls"
-				style={{
-					display: "flex",
-					flexWrap: "wrap",
-					gap: 10,
-					alignItems: "center",
-					flexShrink: 0,
-				}}
-			>
-				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
-					{t("TELEMETRY //")}
-				</span>
+			<div className="telemetry-controls">
+				<span className="telemetry-kicker dim">{t("TELEMETRY //")}</span>
 				<select
 					value={effectiveNode ?? ""}
 					onChange={(e) => setNode(Number(e.target.value))}
@@ -637,6 +596,7 @@ export default function Telemetry() {
 				{compare.map((n, i) => (
 					<button
 						key={n}
+						className="telemetry-chip"
 						style={{ borderColor: seriesColors()[i % SERIES_MAX], color: seriesColors()[i % SERIES_MAX] }}
 						title={t("Remove from the comparison")}
 						onClick={() => setCompare((c) => c.filter((x) => x !== n))}
@@ -644,7 +604,7 @@ export default function Telemetry() {
 						{shortName(n)} · REMOVE
 					</button>
 				))}
-				<div style={{ display: "flex", gap: 4 }}>
+				<div className="telemetry-ranges">
 					{RANGES.map(([label, d]) => (
 						<button
 							key={label}
@@ -657,7 +617,6 @@ export default function Telemetry() {
 				</div>
 				<span className="spacer" />
 				<button
-
 					title={t("Export what the chart shows to CSV")}
 					disabled={!stats || exporting}
 					onClick={onExportCsv}
@@ -665,8 +624,7 @@ export default function Telemetry() {
 					{t("EXPORT CSV")}
 				</button>
 				<span
-					className={csvMsg.startsWith("ERROR") ? "err" : "dim"}
-					style={{ fontSize: 11 }}
+					className={`telemetry-count ${csvMsg.startsWith("ERROR") ? "err" : "dim"}`}
 				>
 					{csvMsg || (stats ? t("{0} SAMPLES", stats.n) : t("NO DATA"))}
 				</span>
@@ -674,32 +632,18 @@ export default function Telemetry() {
 
 			{/* wraps on a phone: a 200 px stats column beside the chart leaves the
 			    chart a sliver, and neither is readable */}
-			<div
-				style={{
-					flex: 1,
-					display: "flex",
-					gap: 12,
-					minHeight: 0,
-					flexWrap: "wrap",
-				}}
-			>
+			<div className="telemetry-body">
 				{/* the chart absorbs all the free width, so the stats column stays at
 				    its 200 px basis on desktop and only widens once it has wrapped */}
-				<div className="panel" style={{ flex: "999 1 320px", minWidth: 0 }}>
+				<div className="panel telemetry-chart">
 					<div className="panel-title">
 						{t("CHART")} // {nodeLabel}
 						{compare.length > 0 && ` + ${compare.map(shortName).join(" + ")}`} ·{" "}
 						{LABELS[metric] ?? (metric || "—")}
 					</div>
-					<div
-						className="scroll-y"
-						style={{
-							padding: 14,
-							position: "relative",
-						}}
-					>
+					<div className="scroll-y telemetry-plot-host">
 						{!stats && (
-							<p className="dim" style={{ position: "absolute" }}>
+							<p className="dim telemetry-empty">
 								{t("NO DATA — telemetry accumulates while the app is connected_",
 								)}
 							</p>
@@ -709,17 +653,9 @@ export default function Telemetry() {
 					</div>
 				</div>
 
-				<div
-					style={{
-						flex: "1 1 200px",
-						minWidth: 200,
-						display: "flex",
-						flexDirection: "column",
-						gap: 12,
-					}}
-				>
+				<div className="telemetry-stats">
 					{compare.length > 0 && (
-						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+						<span className="telemetry-stats-note dim">
 							{t("{0} ONLY", nodeLabel)}
 						</span>
 					)}
@@ -735,18 +671,8 @@ export default function Telemetry() {
 							<div className="value">{v !== undefined ? fmt(v) : "Not reported"}</div>
 						</div>
 					))}
-					<div
-						style={{
-							flex: 1,
-							border: "1px dashed var(--border)",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							padding: 12,
-							textAlign: "center",
-						}}
-					>
-						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+					<div className="telemetry-aside">
+						<span className="dim">
 							{t("Telemetry is saved as the connected radio reports it.")}
 						</span>
 					</div>

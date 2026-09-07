@@ -127,6 +127,10 @@ test('freqTicks spans the band ends inclusively', () => {
   assert.equal(ticks[4].hz, 928e6);
   assert.equal(ticks[2].frac, 0.5);
   assert.equal(ticks[2].hz, 915e6);
+  const phone = freqTicks(902e6, 928e6, 3);
+  assert.equal(phone.length, 3);
+  assert.equal(phone[0].hz, 902e6);
+  assert.equal(phone[2].hz, 928e6);
 });
 
 test('fmtMHz and hexToRgb format for the axis and the canvas', () => {

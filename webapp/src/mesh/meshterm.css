@@ -3098,19 +3098,237 @@ body:has(.meshterm .app.menu-open) {
 	}
 }
 
-.meshterm .telemetry-plot {
+.meshterm .spectrum-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+	flex-shrink: 0;
+}
+.meshterm .spectrum-kicker {
+	font-size: 10px;
+	letter-spacing: 2px;
+}
+.meshterm .spectrum-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+.meshterm .spectrum-note,
+.meshterm .spectrum-count {
+	font-size: 11px;
+	overflow-wrap: anywhere;
+	min-width: 0;
+}
+.meshterm .spectrum-panel {
+	flex: 1;
+	min-width: 0;
+}
+.meshterm .spectrum-stage {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	padding: 14px;
+	gap: 6px;
+}
+.meshterm .spectrum-trace {
 	width: 100%;
-	height: clamp(248px, 48dvh, 480px);
+	height: 150px;
+	flex-shrink: 0;
+	display: block;
+}
+.meshterm .spectrum-water {
+	flex: 1;
+	min-height: 180px;
+	position: relative;
+}
+.meshterm .spectrum-empty {
+	position: absolute;
+	margin: 0;
+	padding-right: 8px;
+	max-width: 100%;
+	overflow-wrap: anywhere;
+}
+.meshterm .spectrum-water-canvas {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+.meshterm .spectrum-ticks {
+	display: flex;
+	justify-content: space-between;
+	gap: 6px;
+	font-size: 10px;
+	letter-spacing: 1px;
+	flex-shrink: 0;
+	min-width: 0;
+}
+.meshterm .spectrum-ticks span {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.meshterm .spectrum-ticks span:first-child {
+	text-align: left;
+}
+.meshterm .spectrum-ticks span:last-child {
+	text-align: right;
+}
+.meshterm .spectrum-ticks span:not(:first-child):not(:last-child) {
+	text-align: center;
+}
+.meshterm .spectrum-panel .panel-foot {
+	flex-wrap: wrap;
+	gap: 8px 16px;
+}
+
+.meshterm .telemetry-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+	flex-shrink: 0;
 }
 .meshterm .telemetry-controls select {
 	max-width: 100%;
 }
-@media (max-width: 560px) {
+.meshterm .telemetry-kicker {
+	font-size: 10px;
+	letter-spacing: 2px;
+}
+.meshterm .telemetry-count {
+	font-size: 11px;
+}
+.meshterm .telemetry-ranges {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+.meshterm .telemetry-body {
+	flex: 1;
+	display: flex;
+	gap: 12px;
+	min-height: 0;
+	flex-wrap: wrap;
+}
+.meshterm .telemetry-chart {
+	flex: 999 1 320px;
+	min-width: 0;
+}
+.meshterm .telemetry-plot-host {
+	padding: 14px;
+	position: relative;
+}
+.meshterm .telemetry-empty {
+	position: absolute;
+	margin: 0;
+	max-width: calc(100% - 28px);
+	overflow-wrap: anywhere;
+}
+.meshterm .telemetry-stats {
+	flex: 1 1 200px;
+	min-width: 200px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.meshterm .telemetry-aside {
+	flex: 1;
+	border: 1px dashed var(--border);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 12px;
+	text-align: center;
+}
+.meshterm .telemetry-aside .dim {
+	font-size: 10px;
+	letter-spacing: 1px;
+	overflow-wrap: anywhere;
+}
+.meshterm .telemetry-stats-note {
+	font-size: 10px;
+	letter-spacing: 1px;
+}
+.meshterm .telemetry-plot {
+	width: 100%;
+	height: clamp(260px, 46dvh, 520px);
+}
+
+@media (max-width: 860px) {
+	.meshterm main:has(.spectrum-panel) {
+		min-height: calc(100dvh - 52px);
+	}
+	.meshterm main:not(.fill) > .spectrum-panel {
+		flex: 1 1 auto !important;
+		min-height: 22rem;
+	}
+	.meshterm .spectrum-actions {
+		flex: 1 1 100%;
+	}
+	.meshterm .spectrum-actions button {
+		flex: 1 1 calc(50% - 6px);
+		min-width: 0;
+	}
+	.meshterm .spectrum-note {
+		flex: 1 1 100%;
+		font-size: 12px;
+		line-height: 1.45;
+	}
+	.meshterm .spectrum-trace {
+		height: 120px;
+	}
+	.meshterm .spectrum-water {
+		min-height: min(38dvh, 280px);
+	}
+	.meshterm .spectrum-stage {
+		padding: 10px;
+	}
+	.meshterm .spectrum-panel .panel-title > span {
+		overflow-wrap: anywhere;
+	}
 	.meshterm .telemetry-controls > select {
-		width: 100%;
+		flex: 1 1 calc(50% - 8px);
+		min-width: 0;
+	}
+	.meshterm .telemetry-ranges {
+		flex: 1 1 100%;
+	}
+	.meshterm .telemetry-ranges button {
+		flex: 1 1 4.2rem;
+		min-width: 0;
+	}
+	.meshterm .telemetry-chip {
+		flex: 1 1 auto;
 	}
 	.meshterm .telemetry-plot {
-		height: 300px;
+		height: clamp(240px, 40dvh, 380px);
+	}
+	.meshterm .telemetry-stats {
+		flex: 1 1 100%;
+		min-width: 0;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+	.meshterm .telemetry-stats .stat-tile {
+		flex: 1 1 30%;
+		max-width: none;
+		min-width: 0;
+	}
+	.meshterm .telemetry-stats-note,
+	.meshterm .telemetry-aside {
+		flex: 1 1 100%;
+	}
+	.meshterm .telemetry-chart .panel-title {
+		overflow-wrap: anywhere;
+	}
+}
+@media (max-width: 560px) {
+	.meshterm .telemetry-controls > select {
+		flex: 1 1 100%;
+		width: 100%;
 	}
 }
 

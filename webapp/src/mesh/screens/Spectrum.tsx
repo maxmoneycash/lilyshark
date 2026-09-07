@@ -25,6 +25,8 @@ const SWEEP_SILENT_MS = 5000;
 
 const TRACE_HEIGHT = 150;
 
+type PlotSize = { w: number; h: number; th: number };
+
 export default function Spectrum() {
 	const link = useDeviceLink();
 	// Both canvases paint with fg()/accent(), which no CSS var repaints.
@@ -42,7 +44,7 @@ export default function Spectrum() {
 	const [note, setNote] = useState("");
 	// When START was pressed, so silence afterwards can be reported.
 	const [startedAt, setStartedAt] = useState<number | undefined>();
-	const [size, setSize] = useState({ w: 0, h: 0 });
+	const [size, setSize] = useState<PlotSize>({ w: 0, h: 0, th: TRACE_HEIGHT });
 	const [, setTick] = useState(0);
 
 	const linked = link.status === "linked";
@@ -68,12 +70,19 @@ export default function Spectrum() {
 	}, [linked]);
 
 	useEffect(() => {
-		const box = waterBoxRef.current;
-		if (!box || typeof ResizeObserver === "undefined") return;
-		const measure = () => setSize({ w: box.clientWidth, h: box.clientHeight });
+		const water = waterBoxRef.current;
+		const trace = traceRef.current;
+		if (!water || typeof ResizeObserver === "undefined") return;
+		const measure = () =>
+			setSize({
+				w: water.clientWidth,
+				h: water.clientHeight,
+				th: trace?.clientHeight || TRACE_HEIGHT,
+			});
 		measure();
 		const ro = new ResizeObserver(measure);
-		ro.observe(box);
+		ro.observe(water);
+		if (trace) ro.observe(trace);
 		return () => ro.disconnect();
 	}, []);
 
@@ -84,7 +93,7 @@ export default function Spectrum() {
 		const water = waterRef.current;
 		if (!trace || !water || size.w === 0) return;
 		trace.width = size.w;
-		trace.height = TRACE_HEIGHT;
+		trace.height = Math.max(1, size.th);
 		water.width = size.w;
 		water.height = Math.max(1, size.h);
 		const tctx = trace.getContext("2d");
@@ -196,71 +205,67 @@ export default function Spectrum() {
 	const silentTooLong =
 		startedAt !== undefined && !active && Date.now() - startedAt > SWEEP_SILENT_MS;
 
+	const tickCount = size.w > 0 && size.w < 480 ? 3 : 5;
+
 	return (
-		<main style={{ flexDirection: "column" }}>
-			<div
-				style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}
-			>
-				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
-					SPECTRUM // BAND SWEEP
-				</span>
-				<button
-					className="primary"
-					disabled={!linked || busy}
-					title={
-						linked
-							? active
-								? "Tell the T-Deck to stop sweeping and go back to listening for packets"
-								: "Tell the T-Deck to sweep its band and stream the power it measures"
-							: "Needs a T-Deck on the cable — use the CONNECT button in the header"
-					}
-					onClick={() => void onToggle()}
-				>
-					{active ? "STOP SWEEPING" : "START SWEEPING"}
-				</button>
-				<button
-					disabled={!peak}
-					title="Forget the loudest-seen trace and let it rebuild from the next pass"
-					onClick={() => {
-						// uptoMs stays: the ring rows already seen must not fold back in.
-						peakRef.current = { uptoMs: peakRef.current.uptoMs };
-						setPeakEpoch((v) => v + 1);
-					}}
-				>
-					CLEAR PEAKS
-				</button>
+		<main className="spectrum-main" style={{ flexDirection: "column" }}>
+			<div className="spectrum-toolbar">
+				<span className="spectrum-kicker dim">SPECTRUM // BAND SWEEP</span>
+				<div className="spectrum-actions">
+					<button
+						className="primary"
+						disabled={!linked || busy}
+						title={
+							linked
+								? active
+									? "Tell the T-Deck to stop sweeping and go back to listening for packets"
+									: "Tell the T-Deck to sweep its band and stream the power it measures"
+								: "Needs a T-Deck on the cable — use the CONNECT button in the header"
+						}
+						onClick={() => void onToggle()}
+					>
+						{active ? "STOP SWEEPING" : "START SWEEPING"}
+					</button>
+					<button
+						disabled={!peak}
+						title="Forget the loudest-seen trace and let it rebuild from the next pass"
+						onClick={() => {
+							// uptoMs stays: the ring rows already seen must not fold back in.
+							peakRef.current = { uptoMs: peakRef.current.uptoMs };
+							setPeakEpoch((v) => v + 1);
+						}}
+					>
+						CLEAR PEAKS
+					</button>
+				</div>
 				{!linked && (
-					<span className="dim" style={{ fontSize: 11 }}>
+					<span className="spectrum-note dim">
 						No radio linked — connect a T-Deck over USB and the sweep runs on
 						its radio.
 					</span>
 				)}
 				{linked && active && (
-					<span className="dim" style={{ fontSize: 11 }}>
+					<span className="spectrum-note dim">
 						While it sweeps, the radio measures power instead of decoding
 						packets.
 					</span>
 				)}
-				{note && (
-					<span className="err" style={{ fontSize: 11 }}>
-						{note}
-					</span>
-				)}
+				{note && <span className="spectrum-note err">{note}</span>}
 				{!note && silentTooLong && (
-					<span className="warn" style={{ fontSize: 11 }}>
+					<span className="spectrum-note warn">
 						No sweep data arrived — the firmware on this deck may not have the
 						spectrum link yet.
 					</span>
 				)}
 				<span className="spacer" />
-				<span className="dim" style={{ fontSize: 11 }}>
+				<span className="spectrum-count dim">
 					{latest
 						? `${sweeps.length} PASSES · ${latest.db.length} BINS`
 						: "NO PASSES YET"}
 				</span>
 			</div>
 
-			<div className="panel" style={{ flex: 1, minWidth: 0 }}>
+			<div className="panel spectrum-panel">
 				<div className="panel-title">
 					<span>
 						WATERFALL //{" "}
@@ -277,48 +282,21 @@ export default function Spectrum() {
 						</span>
 					)}
 				</div>
-				<div
-					style={{
-						flex: 1,
-						display: "flex",
-						flexDirection: "column",
-						minHeight: 0,
-						padding: 14,
-						gap: 6,
-					}}
-				>
-					<canvas
-						ref={traceRef}
-						style={{ width: "100%", height: TRACE_HEIGHT, flexShrink: 0 }}
-					/>
-					<div
-						ref={waterBoxRef}
-						style={{ flex: 1, minHeight: 160, position: "relative" }}
-					>
+				<div className="spectrum-stage">
+					<canvas ref={traceRef} className="spectrum-trace" />
+					<div ref={waterBoxRef} className="spectrum-water">
 						{sweeps.length === 0 && (
-							<p className="dim" style={{ position: "absolute", margin: 0 }}>
+							<p className="dim spectrum-empty">
 								{linked
 									? "Press START SWEEPING — each pass across the band paints one row here_"
 									: "The waterfall paints itself while a linked T-Deck sweeps the band_"}
 							</p>
 						)}
-						<canvas
-							ref={waterRef}
-							style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-						/>
+						<canvas ref={waterRef} className="spectrum-water-canvas" />
 					</div>
 					{latest && (
-						<div
-							className="dim"
-							style={{
-								display: "flex",
-								justifyContent: "space-between",
-								fontSize: 10,
-								letterSpacing: 1,
-								flexShrink: 0,
-							}}
-						>
-							{freqTicks(latest.f0Hz, latest.f1Hz).map((tk) => (
+						<div className="spectrum-ticks dim">
+							{freqTicks(latest.f0Hz, latest.f1Hz, tickCount).map((tk) => (
 								<span key={tk.frac}>{fmtMHz(tk.hz)}</span>
 							))}
 						</div>
