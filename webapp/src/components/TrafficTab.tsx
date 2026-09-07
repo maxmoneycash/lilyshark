@@ -965,13 +965,32 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
         )}
 
         {!capture && (
-          <div className="kv">
-            <span className="k">CAPTURE</span>
-            <span className="v dim">
+          <div className="chat-empty traffic-empty">
+            <div className="chat-empty-title">
+              {busy ? 'READING…' : 'NO CAPTURE OPEN'}
+            </div>
+            <div className="dim">
               {busy
-                ? 'reading…'
-                : 'none open. The T-Deck writes .lscap to microSD. Load the bundled sample to inspect 24 synthetic LongFast frames, including one Shelby pointer.'}
-            </span>
+                ? 'Opening the file.'
+                : 'The T-Deck writes .lscap to microSD. Load the bundled sample to inspect 24 synthetic LongFast frames, including one Shelby pointer.'}
+            </div>
+            {!busy && (
+              <div className="traffic-empty-keys">
+                <button type="button" className="primary" onClick={() => void openSample()}>
+                  SAMPLE
+                </button>
+                {link.status !== 'linked' && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.dispatchEvent(new CustomEvent('lilyshark-connect'))
+                    }
+                  >
+                    CONNECT
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 

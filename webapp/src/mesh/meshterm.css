@@ -4008,14 +4008,23 @@ body:has(.meshterm .app.menu-open) {
 		width: auto;
 		height: auto;
 	}
-	.meshterm .sniffer-empty {
+	.meshterm .sniffer-empty,
+	.meshterm .traffic-empty {
 		margin: 12px;
 		padding: 20px 14px;
 		min-height: 14rem;
 	}
-	.meshterm .sniffer-empty button {
+	.meshterm .sniffer-empty button,
+	.meshterm .traffic-empty-keys button {
 		align-self: stretch;
 		min-height: 44px;
+	}
+	.meshterm .traffic-empty-keys {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
+	.meshterm .traffic-empty-keys button:only-child {
+		grid-column: 1 / -1;
 	}
 	.meshterm .sniffer .panel.hot {
 		flex: 1 1 auto !important;
@@ -4078,7 +4087,8 @@ body:has(.meshterm .app.menu-open) {
 	flex-wrap: wrap;
 	flex-shrink: 0;
 }
-.meshterm .sniffer-empty {
+.meshterm .sniffer-empty,
+.meshterm .traffic-empty {
 	margin: 14px;
 	max-width: none;
 	min-height: 12rem;
@@ -4089,6 +4099,11 @@ body:has(.meshterm .app.menu-open) {
 }
 .meshterm .sniffer-empty button {
 	align-self: flex-start;
+}
+.meshterm .traffic-empty-keys {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
 }
 .meshterm .sniffer-table {
 	--sniffer-col-note: 4.5rem;
