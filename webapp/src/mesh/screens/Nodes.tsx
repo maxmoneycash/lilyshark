@@ -165,7 +165,7 @@ function Th(props: {
 	return (
 		<th
 			onClick={() => props.onSort(props.k)}
-			style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
+			style={{ cursor: "pointer", userSelect: "none" }}
 		>
 			{props.label}{" "}
 			<span style={{ fontSize: 9, letterSpacing: 0 }}>
@@ -788,9 +788,9 @@ export default function Nodes({
 
 	return (
 		<main ref={rootRef}>
-			<div className="panel" style={{ flex: 1, minWidth: 0 }}>
+			<div className="panel nodes-roster" style={{ flex: 1, minWidth: 0 }}>
 				<div className="panel-title">
-					<span>
+					<span className="panel-title-label">
 						{t("PANEL // NODES")} · {nodes.length}
 						{q ? t(" OF {0}", all.length) : ""} {t("DETECTED")}
 						{isDemo() ? " · DEMO PALO ALTO" : ""}
@@ -799,7 +799,8 @@ export default function Nodes({
 						value={filter}
 						onChange={(e) => setFilter(e.target.value)}
 						placeholder={t("filter name / id_")}
-						style={{ width: 180, fontSize: 11 }}
+						className="nodes-filter"
+						aria-label={t("Filter nodes by name or id")}
 					/>
 				</div>
 				<div className="scroll-y">
@@ -810,6 +811,7 @@ export default function Nodes({
 							moment the radio answers.
 						</p>
 					)}
+					{(nodes.length > 0 || link.status === "linked") && (
 					<table className="grid">
 						<thead>
 							<tr>
@@ -900,8 +902,9 @@ export default function Nodes({
 							))}
 						</tbody>
 					</table>
+					)}
 					{nodes.length === 0 && (
-						<div className="chat-empty" style={{ margin: 12 }}>
+						<div className="chat-empty nodes-empty">
 							<div className="chat-empty-title">
 								{q
 									? t("NO MATCHES FOR \"{0}\"", filter)

@@ -552,6 +552,7 @@
 	font-size: 10px;
 	letter-spacing: 1px;
 	text-align: left;
+	white-space: nowrap;
 }
 .meshterm table.grid td {
 	padding: 7px 12px;
@@ -612,11 +613,23 @@
 	gap: 10px;
 	max-width: 100%;
 }
+.meshterm .chat-tools .chat-search {
+	width: 190px;
+	font-size: 11px;
+	min-width: 0;
+}
+.meshterm .chat-convo-list {
+	padding: 8px 0;
+}
 @media (max-width: 860px) {
 	.meshterm .chat-tools {
 		width: 100%;
 	}
 	.meshterm .panel-title .chat-tools input {
+		flex: 1 0 100%;
+		width: auto;
+	}
+	.meshterm .chat-known {
 		flex: 1 0 100%;
 	}
 }
@@ -647,6 +660,10 @@
 	color: var(--warn);
 }
 
+.meshterm .chat-line {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
 .meshterm .msg-mine {
 	background: color-mix(in srgb, var(--fg) 8%, transparent);
 	padding: 2px 10px 2px 8px;
@@ -654,6 +671,11 @@
 }
 .meshterm .msg-mine.failed {
 	background: color-mix(in srgb, var(--err) 14%, transparent);
+}
+.meshterm .chat-retry {
+	color: var(--err);
+	border-color: var(--err);
+	animation: meshterm-sheet-err 420ms var(--ease-out);
 }
 
 /* quote/forward button: dim, revealed on hovering the message */
@@ -799,19 +821,39 @@
 .meshterm .chat-send:disabled {
 	opacity: 0.45;
 }
+.meshterm .chat-send.is-shake,
+.meshterm .chat-dock .error {
+	animation: meshterm-sheet-err 420ms var(--ease-out);
+}
+.meshterm .chat-dock {
+	flex-shrink: 0;
+	background: var(--panel);
+	border-top: 1px solid var(--border);
+}
+.meshterm .chat-dock .error {
+	margin: 8px 14px 0;
+}
+.meshterm .chat-dock .reply-bar {
+	border-top: 0;
+}
 .meshterm .chat-input {
 	display: flex;
 	align-items: center;
+	flex-wrap: wrap;
 	gap: 8px;
 	border-top: 1px solid var(--border);
 	padding: 10px 14px;
+}
+.meshterm .chat-dock .chat-input {
+	border-top: 0;
 }
 .meshterm .chat-input .prompt {
 	font-weight: 700;
 	text-shadow: 0 0 6px var(--glow);
 }
 .meshterm .chat-input input {
-	flex: 1;
+	flex: 1 1 12ch;
+	min-width: 0;
 	background: transparent;
 	border: none;
 	font-size: 13px;
@@ -1727,8 +1769,25 @@ body:has(.meshterm .app.menu-open) {
    float at the top with half a panel of nothing between it and the input.
    margin-top on the first child bottom-anchors without breaking scrolling
    once the history outgrows the pane. */
+.meshterm .chat-msgs {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
 .meshterm .chat-msgs > :first-child {
 	margin-top: auto;
+}
+.meshterm .nodes-filter {
+	width: 180px;
+	font-size: 11px;
+	min-width: 0;
+}
+.meshterm .nodes-empty {
+	margin: 14px;
+	max-width: none;
+	min-height: 10rem;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
 }
 
 /* The MESH stat tiles share the row's width instead of each sizing to its
@@ -3049,7 +3108,10 @@ body:has(.meshterm .app.menu-open) {
 	80% { transform: translateX(2px); }
 }
 @media (prefers-reduced-motion: reduce) {
-	.meshterm .overlay-sheet .error {
+	.meshterm .overlay-sheet .error,
+	.meshterm .chat-retry,
+	.meshterm .chat-send.is-shake,
+	.meshterm .chat-dock .error {
 		animation: none;
 	}
 }
@@ -3085,13 +3147,97 @@ body:has(.meshterm .app.menu-open) {
 		white-space: normal;
 	}
 	.meshterm .chat-input {
-		position: sticky;
-		bottom: 0;
-		background: var(--panel);
-		padding-bottom: max(10px, env(safe-area-inset-bottom));
-		z-index: 3;
+		align-items: stretch;
+		padding-bottom: 10px;
+	}
+	.meshterm .chat-remain {
+		display: inline-flex;
+		align-items: center;
 	}
 	.meshterm .chat-send {
-		flex-shrink: 0;
+		flex: 0 0 auto;
+	}
+	.meshterm main:has(.chat-thread) {
+		min-height: calc(100dvh - 52px);
+	}
+	.meshterm main:not(.fill) > .chat-thread {
+		flex: 1 1 auto !important;
+		min-height: 18rem;
+	}
+	.meshterm .chat-thread .chat-msgs {
+		flex: 1 1 auto !important;
+		min-height: 10rem;
+		overflow: visible;
+	}
+	.meshterm .chat-dock {
+		position: sticky;
+		bottom: 0;
+		z-index: 3;
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+	.meshterm .chat-convos .chat-convo-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		padding: 8px 10px 10px;
+	}
+	.meshterm .chat-convos .convo-item {
+		width: auto;
+		flex: 0 1 auto;
+		padding: 8px 12px;
+		border: 1px solid var(--border);
+	}
+	.meshterm .chat-convos .convo-item.dim {
+		flex: 1 1 100%;
+		border: 0;
+	}
+	.meshterm .panel.nodes-roster:has(table) {
+		overflow-x: visible;
+	}
+	.meshterm .nodes-roster .scroll-y {
+		overflow: visible;
+	}
+	.meshterm .nodes-roster table {
+		min-width: 0;
+		width: 100%;
+		table-layout: fixed;
+	}
+	.meshterm .nodes-roster th:nth-child(3),
+	.meshterm .nodes-roster td:nth-child(3),
+	.meshterm .nodes-roster th:nth-child(7),
+	.meshterm .nodes-roster td:nth-child(7) {
+		width: 22%;
+	}
+	.meshterm .nodes-roster th,
+	.meshterm .nodes-roster td {
+		white-space: normal;
+		overflow-wrap: anywhere;
+		vertical-align: middle;
+	}
+	.meshterm .nodes-roster td {
+		padding-top: 12px;
+		padding-bottom: 12px;
+	}
+	.meshterm .nodes-roster tbody tr {
+		min-height: 44px;
+	}
+	/* SHORT / BATTERY / HOPS / POSITION live in the detail pane. */
+	.meshterm .nodes-roster th:nth-child(2),
+	.meshterm .nodes-roster td:nth-child(2),
+	.meshterm .nodes-roster th:nth-child(4),
+	.meshterm .nodes-roster td:nth-child(4),
+	.meshterm .nodes-roster th:nth-child(5),
+	.meshterm .nodes-roster td:nth-child(5),
+	.meshterm .nodes-roster th:nth-child(6),
+	.meshterm .nodes-roster td:nth-child(6) {
+		display: none;
+	}
+	.meshterm .nodes-roster .panel-foot {
+		flex-wrap: wrap;
+		gap: 8px 16px;
+	}
+	.meshterm .nodes-empty {
+		margin: 12px;
+		padding: 20px 14px;
 	}
 }

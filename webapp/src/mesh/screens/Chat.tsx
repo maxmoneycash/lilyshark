@@ -61,6 +61,7 @@ export default function Chat({
   const previousView = useRef("");
   const previousLast = useRef("");
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [sendShake, setSendShake] = useState(false);
 
   useEffect(() => {
     if (focusSearch) searchRef.current?.select();
@@ -144,12 +145,14 @@ export default function Chat({
     const reply = replyTo;
     setDraft("");
     setError("");
+    setSendShake(false);
     const rid = replyTo?.id;
     setReplyTo(undefined);
     try {
       await sendText(text, convo, rid);
     } catch (e) {
       setError(t("TX FAILED: {0}", String(e)));
+      setSendShake(true);
       // A disconnected link can reject before creating a retryable chat row.
       // Keep that draft available without duplicating messages already stored.
       const stored = getSnapshot().messages.some((m) =>
@@ -164,9 +167,9 @@ export default function Chat({
 
   return (
     <main>
-      <div className="panel" style={{ width: 230, flexShrink: 0 }}>
+      <div className="panel chat-convos" style={{ width: 230, flexShrink: 0 }}>
         <div className="panel-title">{t("PANEL // CHANNELS")}</div>
-        <div style={{ padding: "8px 0" }}>
+        <div className="chat-convo-list">
           {channelConvos.map((c) => (
             <button
               type="button"
@@ -185,7 +188,7 @@ export default function Chat({
         <div className="panel-title" style={{ borderTop: "1px solid var(--border)" }}>
           {t("DIRECT MESSAGES")}
         </div>
-        <div style={{ padding: "8px 0" }}>
+        <div className="chat-convo-list">
           {dmConvos.length === 0 && (
             <div className="convo-item dim" style={{ cursor: "default" }}>
               <span>{t("Choose a node to start a direct message.")}</span>
@@ -208,9 +211,9 @@ export default function Chat({
         </div>
       </div>
 
-      <div className="panel" style={{ flex: 1, minWidth: 0 }}>
+      <div className="panel chat-thread" style={{ flex: 1, minWidth: 0 }}>
         <div className="panel-title">
-          <span>
+          <span className="panel-title-label">
             PANEL // CHAT · {convoLabel}
             {convo.startsWith("dm:") &&
               (s.nodes.get(Number(convo.slice(3)))?.publicKey ? (
@@ -239,7 +242,7 @@ export default function Chat({
               placeholder={t("SEARCH THE WHOLE HISTORY_")}
               aria-label={t("Search message history")}
               title={t("CTRL+F · ESC CLEARS")}
-              style={{ width: 190, fontSize: 11 }}
+              className="chat-search"
             />
             <button
 
@@ -289,7 +292,7 @@ export default function Chat({
             >
               {confirmClear ? t("SURE?") : t("CLEAR")}
             </button>
-            <span>{t("{0} KNOWN NODES", s.nodes.size)}</span>
+            <span className="chat-known">{t("{0} KNOWN NODES", s.nodes.size)}</span>
           </span>
         </div>
         <div
@@ -343,7 +346,7 @@ export default function Chat({
             <Fragment key={`${m.id}-${m.ts}`}>
             {sep && <div className="chat-daysep">{dateSep(m.ts)}</div>}
             <div
-              className={m.mine ? `msg-mine ${m.state === "failed" ? "failed" : ""}` : ""}
+              className={`chat-line${m.mine ? ` msg-mine${m.state === "failed" ? " failed" : ""}` : ""}`}
               style={q ? { cursor: "pointer" } : undefined}
               onClick={
                 q
@@ -422,7 +425,8 @@ export default function Chat({
                 <>
                   <span className="err">{t("FAILED")}{m.failureReason ? ` · ${m.failureReason}` : ""}</span>{" "}
                   <button
-
+                    type="button"
+                    className="chat-retry"
                     title={t("RETRY SEND")}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -454,63 +458,66 @@ export default function Chat({
             );
           })}
         </div>
-        {!q && hasNewMessages && (
-          <button
-            type="button"
-            className="chat-latest"
-            onClick={() => {
-              const el = listRef.current;
-              if (el) el.scrollTop = el.scrollHeight;
-              followLatest.current = true;
-              setHasNewMessages(false);
-            }}
-          >
-            {t("New messages · Jump to latest")}
-          </button>
-        )}
-        {error && <p className="error" role="status">{error}</p>}
-        {replyTo && (
-          <div className="reply-bar">
-            <span className="dim">
-              {t("REPLYING TO")} &lt;{nodeShort(replyTo.from)}&gt;:{" "}
-              {replyTo.text.slice(0, 60)}
+        <div className="chat-dock">
+          {!q && hasNewMessages && (
+            <button
+              type="button"
+              className="chat-latest"
+              onClick={() => {
+                const el = listRef.current;
+                if (el) el.scrollTop = el.scrollHeight;
+                followLatest.current = true;
+                setHasNewMessages(false);
+              }}
+            >
+              {t("New messages · Jump to latest")}
+            </button>
+          )}
+          {error && <p className="error" role="status">{error}</p>}
+          {replyTo && (
+            <div className="reply-bar">
+              <span className="dim">
+                {t("REPLYING TO")} &lt;{nodeShort(replyTo.from)}&gt;:{" "}
+                {replyTo.text.slice(0, 60)}
+              </span>
+              <button
+                type="button"
+                aria-label={t("Cancel reply")}
+                onClick={() => setReplyTo(undefined)}
+              >
+                CLOSE
+              </button>
+            </div>
+          )}
+          <div className="chat-input">
+            <span className="prompt">&gt;</span>
+            <input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onSend()}
+              placeholder={t("TYPE A MESSAGE")}
+              aria-label={t("Message")}
+              maxLength={200}
+            />
+            <span
+              className={
+                200 - new TextEncoder().encode(draft).length < 20
+                  ? "chat-remain warn"
+                  : "chat-remain dim"
+              }
+            >
+              {Math.max(0, 200 - new TextEncoder().encode(draft).length)}
             </span>
             <button
-
-              aria-label={t("Cancel reply")}
-              onClick={() => setReplyTo(undefined)}
+              type="button"
+              className={sendShake ? "primary chat-send is-shake" : "primary chat-send"}
+              disabled={!draft.trim()}
+              onClick={() => void onSend()}
             >
-              CLOSE
+              {t("SEND E")}
             </button>
           </div>
-        )}
-        <div className="chat-input">
-          <span className="prompt">&gt;</span>
-          <input
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onSend()}
-            placeholder={t("TYPE A MESSAGE")}
-            aria-label={t("Message")}
-            maxLength={200}
-          />
-          <span
-            className={
-              200 - new TextEncoder().encode(draft).length < 20
-                ? "chat-remain warn"
-                : "chat-remain dim"
-            }
-          >
-            {Math.max(0, 200 - new TextEncoder().encode(draft).length)}
-          </span>
-          <button
-            className="primary chat-send"
-            disabled={!draft.trim()}
-            onClick={() => void onSend()}
-          >
-            {t("SEND E")}
-          </button>
         </div>
       </div>
       {menu &&

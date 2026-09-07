@@ -55,6 +55,7 @@ const terminal = readFileSync(new URL("./TerminalApp.tsx", import.meta.url), "ut
 const shelby = readFileSync(new URL("./screens/Shelby.tsx", import.meta.url), "utf8");
 const telemetry = readFileSync(new URL("./screens/Telemetry.tsx", import.meta.url), "utf8");
 const nodes = readFileSync(new URL("./screens/Nodes.tsx", import.meta.url), "utf8");
+const chat = readFileSync(new URL("./screens/Chat.tsx", import.meta.url), "utf8");
 const mapView = readFileSync(new URL("./screens/MapView.tsx", import.meta.url), "utf8");
 
 assert.match(traffic, /startTrafficDemoInterval\(\s*simulatedLive,/);
@@ -96,6 +97,11 @@ assert.match(netProtocol, /NET_ORIGIN_FLAG = 1 << 3/);
 assert.match(terminal, /setTab\("TELEMETRY"\)/);
 assert.match(telemetry, /ThisDevicePanel/);
 assert.match(nodes, /ThisDeviceRow/);
+assert.match(nodes, /nodes-roster/);
+assert.match(nodes, /nodes-empty/);
+assert.match(chat, /chat-dock/);
+assert.match(chat, /chat-retry/);
+assert.match(chat, /sendShake/);
 assert.match(mapView, /useDeviceLink/);
 assert.match(mapView, /THIS DEVICE/);
 assert.match(traffic, /sim-badge/);
