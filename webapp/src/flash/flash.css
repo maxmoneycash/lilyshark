@@ -773,10 +773,46 @@
   }
   .meshterm main.flash-page > .page {
     max-width: 1240px !important;
+    padding-top: 20px;
+    padding-bottom: 40px;
+  }
+  .meshterm .flash-page .lede h1 {
+    font-size: clamp(28px, 9vw, 40px);
+    margin-top: 10px;
+  }
+  .meshterm .flash-page .sub {
+    font-size: 13px;
+    margin-top: 12px;
   }
   .meshterm .flash-page .device-card {
     padding: 12px 8px;
     gap: 8px;
+    min-height: 72px;
+  }
+  .meshterm .flash-page .hero {
+    min-height: 280px;
+    padding: 28px 12px 36px;
+  }
+  .meshterm .flash-page .tdeck-photo {
+    width: 168px;
+  }
+  .meshterm .flash-page .hero-footnote {
+    font-size: 8px;
+  }
+  .meshterm .flash-page .flash-btn,
+  .meshterm .flash-page .outline-btn {
+    min-height: 44px;
+    width: 100%;
+  }
+  .meshterm .flash-page .cta {
+    display: grid;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .meshterm .flash-page .devices {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
