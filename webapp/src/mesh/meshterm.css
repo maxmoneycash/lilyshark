@@ -1014,15 +1014,7 @@
 
 /* ── pie ── */
 .meshterm footer {
-	display: flex;
-	gap: 24px;
-	font-size: 11px;
-	color: var(--fg-dim);
-	padding: 6px 16px;
-	border-top: 1px solid var(--border);
-	flex-shrink: 0;
-	white-space: nowrap;
-	overflow: hidden;
+	display: none;
 }
 
 .meshterm .error {
@@ -1692,13 +1684,7 @@ body:has(.meshterm .app.menu-open) {
 	}
 }
 
-@media (max-width: 560px) {
-	/* The last log line is diagnostics, not status; clipped mid-word on a
-	   phone it read as a rendering bug. DEBUG still has the full log. */
-	.meshterm footer > span:last-child {
-		display: none;
-	}
-}
+
 
 /* ── Refinement pass ──────────────────────────────────────────────────────
    The medium-severity items from the live audit: layout rhythm rather than
@@ -1909,10 +1895,10 @@ body:has(.meshterm .app.menu-open) {
 	z-index: 70;
 	display: flex;
 	flex-direction: column;
-	justify-content: center;
-	gap: 18px;
-	padding: max(64px, env(safe-area-inset-top) + 52px) clamp(20px, 8vw, 120px)
-		max(30px, env(safe-area-inset-bottom) + 18px);
+	justify-content: safe center;
+	gap: 16px;
+	padding: max(18px, env(safe-area-inset-top) + 10px) clamp(16px, 6vw, 120px)
+		max(24px, env(safe-area-inset-bottom) + 16px);
 	background: color-mix(in srgb, var(--bg) 94%, var(--fg));
 	overflow-y: auto;
 	overscroll-behavior: contain;
@@ -1921,24 +1907,34 @@ body:has(.meshterm .app.menu-open) {
 	border-top: 1px solid var(--border);
 	max-width: 640px;
 }
+.meshterm .sheet-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	width: 100%;
+	max-width: 640px;
+}
 .meshterm .sheet-title {
 	font-size: 13px;
 	letter-spacing: 3px;
 	color: var(--fg);
 }
 .meshterm .sheet-close {
-	position: absolute;
-	top: max(10px, env(safe-area-inset-top));
-	right: 12px;
-	width: 46px;
+	position: static;
+	width: auto;
 	min-height: 42px;
-	font-size: 16px;
+	padding: 0 12px;
+	font-size: 13px;
+	letter-spacing: 1px;
 	background: transparent;
+	flex-shrink: 0;
 }
 .meshterm .sheet-actions {
 	display: flex;
 	gap: 10px;
 	flex-wrap: wrap;
+	max-width: 640px;
 }
 .meshterm .sheet-actions button {
 	min-height: 46px;
@@ -1951,6 +1947,14 @@ body:has(.meshterm .app.menu-open) {
 	line-height: 1.6;
 	margin: 0;
 	color: var(--fg-dim);
+}
+.meshterm .sheet-note-alert {
+	color: var(--ink, var(--fg));
+	max-width: 640px;
+}
+.meshterm .overlay-sheet .error {
+	margin: 0;
+	max-width: 640px;
 }
 
 /* With the sheet open the header rides on top of it, so the wordmark and the
@@ -2028,8 +2032,8 @@ body:has(.meshterm .app.menu-open) {
 	max-width: min(34rem, 38%);
 	align-self: center;
 	justify-self: start;
-	padding: 18px 36px 18px 0;
-	background: linear-gradient(90deg, var(--bg) 62%, transparent);
+	padding: 18px 48px 18px 0;
+	background: linear-gradient(90deg, var(--bg) 72%, transparent);
 }
 .meshterm .intro-head {
 	margin: 0 0 18px;
@@ -2141,7 +2145,7 @@ body:has(.meshterm .app.menu-open) {
 	outline: 2px solid var(--ink, var(--fg));
 	outline-offset: 4px;
 }
-.meshterm .intro-pager {
+.meshterm .app:has(.intro-scroll)::after {
 	display: none;
 }
 
@@ -2929,62 +2933,28 @@ body:has(.meshterm .app.menu-open) {
 	}
 }
 
-/* The mobile pager sits beside the handset, leaving the text and CTA bands
-   unchanged. Its empty middle passes pointer gestures through to the model. */
 @media (max-width: 860px) {
 	.meshterm .intro-rail,
 	.meshterm .intro-hint {
 		display: none;
 	}
-	.meshterm .intro-pager {
-		position: absolute;
-		top: 31%;
-		left: 18px;
-		right: 18px;
-		transform: translateY(-50%);
+	.meshterm .overlay-sheet {
+		justify-content: flex-start;
+		gap: 14px;
+	}
+	.meshterm .overlay-sheet .flow {
+		display: none;
+	}
+	.meshterm .sheet-actions {
 		display: grid;
-		grid-template-columns: auto minmax(0, 1fr) auto;
-		grid-template-rows: auto auto;
-		gap: 4px 0;
-		align-items: center;
-		pointer-events: none;
-	}
-	.meshterm .intro-pager button {
-		grid-row: 1;
-		padding: 0 8px;
-		font-size: 10px;
-		letter-spacing: 0.4px;
-		pointer-events: auto;
-	}
-	.meshterm .intro-pager button:first-child {
-		grid-column: 1;
-	}
-	.meshterm .intro-pager button:last-child {
-		grid-column: 3;
-	}
-	.meshterm .intro-pager span {
-		grid-column: 3;
-		grid-row: 2;
-		justify-self: center;
-		font-size: 10px;
-		color: var(--fg-dim);
+		grid-template-columns: 1fr;
+		width: 100%;
 	}
 	.meshterm .sheet-actions button {
 		min-height: 44px;
 		padding: 8px 12px;
 		font-size: 12px;
-	}
-}
-@media (max-width: 860px) and (max-height: 620px) {
-	.meshterm .intro-pager {
-		top: 19%;
-	}
-}
-@media (min-width: 600px) and (max-width: 860px) and (min-height: 320px) and (max-height: 480px) {
-	.meshterm .intro-pager {
-		top: 12px;
-		left: calc(39% + 6px);
-		transform: none;
+		width: 100%;
 	}
 }
 

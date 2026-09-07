@@ -269,22 +269,11 @@ export function IntroTab({ onOpen }: { onOpen: (tab: string) => void }) {
                   </motion.div>
                 )}
               </div>
-              {idx === 0 && (
-                <div className="intro-hint dim" aria-hidden="true">
-                  SCROLL ▾
-                </div>
-              )}
             </div>
 
             <div className="intro-device">
               <TDeckModel screen={screenSrc} />
             </div>
-
-            <nav className="intro-pager" aria-label="Introduction sections">
-              <button type="button" disabled={idx === 0} onClick={() => jumpToSection(idx - 1)}>PREVIOUS</button>
-              <span>{idx + 1} / {SECTIONS.length}</span>
-              <button type="button" disabled={last} onClick={() => jumpToSection(idx + 1)}>NEXT</button>
-            </nav>
 
             <nav className="intro-rail" aria-label="Introduction sections">
               {SECTIONS.map((sec, i) => (

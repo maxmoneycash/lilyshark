@@ -38,7 +38,7 @@ const Docs = lazy(() => import("./screens/Docs"));
 // they load on first visit like the other heavy screens.
 const Spectrum = lazy(() => import("./screens/Spectrum"));
 const Sniffer = lazy(() => import("./screens/Sniffer"));
-import { fmtFreq, useHourTick } from "./fmt";
+import { useHourTick } from "./fmt";
 import { saveText, stamp } from "./export";
 import { t, useLangTick } from "./i18n";
 import {
@@ -149,40 +149,24 @@ function saveLastMode(mode: Mode): void {
 
 // Grace period before the first reconnect: the node is still booting.
 const RECONNECT_WAIT_MS = 6000;
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
+
+function onApplePhone(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
 }
 
-function hms(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
-}
-
-// Host (this machine) battery via the Battery Status API. Returns null when the
-// browser doesn't expose it (Safari doesn't) — the caller renders nothing.
-function useHostBattery(): { level: number; charging: boolean } | null {
-  const [bat, setBat] = useState<{ level: number; charging: boolean } | null>(null);
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const getBattery = (navigator as any).getBattery?.bind(navigator);
-    if (!getBattery) return;
-    let mgr: { level: number; charging: boolean; removeEventListener: (t: string, f: () => void) => void } | undefined;
-    let cancelled = false;
-    const update = () => mgr && setBat({ level: mgr.level, charging: mgr.charging });
-    getBattery().then((m: typeof mgr & { addEventListener: (t: string, f: () => void) => void }) => {
-      if (cancelled) return;
-      mgr = m;
-      update();
-      m.addEventListener("levelchange", update);
-      m.addEventListener("chargingchange", update);
-    });
-    return () => {
-      cancelled = true;
-      mgr?.removeEventListener("levelchange", update);
-      mgr?.removeEventListener("chargingchange", update);
-    };
-  }, []);
-  return bat;
+function missingTransportError(kind: "usb" | "ble"): string {
+  if (onApplePhone()) {
+    return kind === "ble"
+      ? "Safari on iPhone cannot open Bluetooth. Apple does not give websites that API. Use the Lilyshark iOS app, or Chrome on Android."
+      : "Safari on iPhone has no USB serial. Use the Lilyshark iOS app, or Chrome on a computer.";
+  }
+  return kind === "ble"
+    ? "This browser has no Web Bluetooth. Use Chrome or Edge on a computer, or Chrome on Android."
+    : "USB needs Chrome or Edge on a computer. This browser has no Web Serial.";
 }
 
 function App() {
@@ -190,7 +174,6 @@ function App() {
   // at the root: a clock format or language change repaints every screen
   useHourTick();
   useLangTick();
-  const hostBat = useHostBattery();
   // The intro opens first: the device, its screens, and why it exists —
   // unless a deep link asked for a specific screen.
   const [tab, setTabState] = useState<Tab>(() => tabFromLocation(window.location));
@@ -238,6 +221,7 @@ function App() {
   const [connectOpen, setConnectOpen] = useState(false);
   const hasSerial = typeof navigator !== "undefined" && "serial" in navigator;
   const hasBle = typeof navigator !== "undefined" && "bluetooth" in navigator;
+  const onIos = onApplePhone();
   const [chatConvo, setChatConvo] = useState("ch:0");
   // node to preselect when jumping MAP → NODES with [+INFO]
   const [nodeFocus, setNodeFocus] = useState<number | undefined>();
@@ -248,8 +232,6 @@ function App() {
   const [mode, setMode] = useState<Mode>("serie");
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState("");
-  const [now, setNow] = useState(Date.now());
-  const [connectedAt, setConnectedAt] = useState<number | undefined>();
   const canceledRef = useRef(false);
   // Auto-reconnect: wantRef = the user wants to be connected (false after
   // DISCONNECT/CANCEL). Exponential backoff.
@@ -264,16 +246,6 @@ function App() {
 
   const connected = s.status !== undefined && s.status >= DeviceStatus.Connected;
   const configuring = s.status === DeviceStatus.Configuring;
-
-  // `now` only feeds the footer UPLINK readout, which exists only while the
-  // link is up — outside that the tick would re-render the whole tree once a
-  // second for nothing.
-  useEffect(() => {
-    if (!connected) return;
-    setNow(Date.now());
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [connected]);
 
   // Without a radio attached every screen is an empty panel, which shows
   // nothing about what the instrument does. Seed a demo mesh instead, and drop
@@ -500,7 +472,6 @@ function App() {
       // opens on this click (a user gesture is mandatory for Web Serial/BLE).
       await (m === "serie" ? connectSerial() : connectBle());
       if (canceledRef.current) return;
-      setConnectedAt(Date.now());
       saveLastMode(m);
     } catch (e) {
       wantRef.current = false; // manual connect failed: don't retry behind their back
@@ -529,7 +500,6 @@ function App() {
     try {
       await reconnectLast();
       if (!wantRef.current) return; // the user cancelled while reconnecting
-      setConnectedAt(Date.now());
       setError("");
       attemptRef.current = 0;
       addLog("RECONNECT: connected");
@@ -551,7 +521,6 @@ function App() {
   const stopAndForget = async () => {
     wantRef.current = false;
     clearReconnect();
-    setConnectedAt(undefined);
     await disconnect();
   };
 
@@ -607,8 +576,6 @@ function App() {
 
   let totalUnread = 0;
   for (const n of s.unread.values()) totalUnread += n;
-
-  const ch0 = s.channels.get(0);
 
   return (
     <div className={`app ${menuOpen ? "menu-open" : ""} ${tab === "FLASH" ? "app-flash" : ""}`}>
@@ -721,47 +688,27 @@ function App() {
         </button>
       </header>
 
-      {/* The connect sheet: the same surface as the tab sheet, holding the
-          three steps instead of a transport dropdown squeezed into the header. */}
       {connectOpen && (
         <div className="overlay-sheet" role="dialog" aria-label="Connect a radio">
-          <button
-            className="sheet-close"
-            aria-label="Close"
-            onClick={() => setConnectOpen(false)}
-          >
-            CLOSE
-          </button>
-          <div className="sheet-title">CONNECT A RADIO</div>
-          <div className="flow">
-            <div className="flow-step">
-              <span className="flow-n">01</span>
-              <span className="flow-k">FLASH</span>
-              <span className="flow-v">
-                the radio runs Lilyshark (<a href={tabHref("FLASH")} onClick={(event) => {
-                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                  event.preventDefault(); setConnectOpen(false); setTab("FLASH");
-                }}>install it from the browser</a>) or the MeshCore companion
-                firmware — a T-Deck, Heltec, RAK or any supported LoRa board
-              </span>
-            </div>
-            <div className="flow-step">
-              <span className="flow-n">02</span>
-              <span className="flow-k">LINK</span>
-              <span className="flow-v">
-                pick how this browser reaches it — the device picker opens on
-                the same tap
-              </span>
-            </div>
-            <div className="flow-step">
-              <span className="flow-n">03</span>
-              <span className="flow-k">LISTEN</span>
-              <span className="flow-v">
-                the terminal configures itself and every screen switches from
-                the demo mesh to what your radio hears
-              </span>
-            </div>
+          <div className="sheet-bar">
+            <div className="sheet-title">CONNECT A RADIO</div>
+            <button
+              className="sheet-close"
+              aria-label="Close"
+              onClick={() => {
+                setConnectOpen(false);
+                setError("");
+              }}
+            >
+              CLOSE
+            </button>
           </div>
+          {onIos && (
+            <p className="sheet-note sheet-note-alert">
+              iPhone Safari cannot pair a radio. Apple blocks Bluetooth and USB
+              in every iOS browser. Use the Lilyshark iOS app on this phone.
+            </p>
+          )}
           <div className="sheet-actions">
             {(connected || lilyLinked) && (
               <button
@@ -777,9 +724,12 @@ function App() {
             )}
             <button
               className="primary"
-              disabled={!hasSerial}
               title="For a T-Deck running Lilyshark firmware: live device telemetry on TELEMETRY, your node on NODES, and Shelby pointer hand-off on TRAFFIC"
               onClick={() => {
+                if (!hasSerial) {
+                  setError(missingTransportError("usb"));
+                  return;
+                }
                 landOnLilyRef.current = true;
                 setConnectOpen(false);
                 void connectDeviceLink();
@@ -788,9 +738,12 @@ function App() {
               LILYSHARK T-DECK · USB
             </button>
             <button
-              disabled={!hasBle}
               title="For a T-Deck running Lilyshark firmware: pair over Bluetooth the way the Meshtastic phone app does — no cable, and it works with no internet at all"
               onClick={() => {
+                if (!hasBle) {
+                  setError(missingTransportError("ble"));
+                  return;
+                }
                 setConnectOpen(false);
                 setError("");
                 void connectMeshtasticBle().catch((e) => setError(String(e)));
@@ -799,8 +752,11 @@ function App() {
               LILYSHARK T-DECK · BLUETOOTH
             </button>
             <button
-              disabled={!hasSerial}
               onClick={() => {
+                if (!hasSerial) {
+                  setError(missingTransportError("usb"));
+                  return;
+                }
                 setMode("serie");
                 setConnectOpen(false);
                 void onConnect("serie");
@@ -809,8 +765,11 @@ function App() {
               MESHCORE · USB
             </button>
             <button
-              disabled={!hasBle}
               onClick={() => {
+                if (!hasBle) {
+                  setError(missingTransportError("ble"));
+                  return;
+                }
                 setMode("ble");
                 setConnectOpen(false);
                 void onConnect("ble");
@@ -819,22 +778,22 @@ function App() {
               MESHCORE · BLUETOOTH
             </button>
           </div>
-          <p className="sheet-note">
-            Pick by firmware, not by cable. A T-Deck running Lilyshark links
-            with either LILYSHARK button — USB carries the full analyzer
-            telemetry, Bluetooth carries the mesh conversation the way the
-            phone app does, cable-free and internet-free. The MeshCore buttons speak the
-            companion protocol and will sit at ESTABLISHING LINK forever
-            against a Lilyshark radio.
-          </p>
-          {!hasSerial && !hasBle && (
+          {error && <p className="error">{error}</p>}
+          {!onIos && (
             <p className="sheet-note">
-              This browser exposes neither Web Serial nor Web Bluetooth — open
-              lilyshark.com in Chrome or Edge on a computer, or Chrome on
-              Android, to attach a radio. Everything else works right here.
+              Pick by firmware. Lilyshark USB is the full analyzer. Lilyshark
+              Bluetooth is the mesh conversation. MeshCore buttons speak a
+              different protocol.
             </p>
           )}
-          {!hasSerial && hasBle && (
+          {!onIos && !hasSerial && !hasBle && (
+            <p className="sheet-note">
+              This browser has neither Web Serial nor Web Bluetooth. Open
+              lilyshark.com in Chrome or Edge on a computer, or Chrome on
+              Android.
+            </p>
+          )}
+          {!onIos && !hasSerial && hasBle && (
             <p className="sheet-note">
               USB needs Chrome or Edge on a computer; Bluetooth works here.
             </p>
@@ -951,39 +910,6 @@ function App() {
       )}
       </Suspense>
       </ScreenBoundary>
-
-      <footer>
-        {/* The node counts to the right are invented while no radio is
-            attached: say so before they are read as a measurement. */}
-        {s.deviceInfo?.model && <span>HW {s.deviceInfo.model}</span>}
-        {s.selfInfo && (
-          <span>
-            {t("FREQ")} {fmtFreq(s.selfInfo.radioFreq)} · SF{s.selfInfo.radioSf}
-          </span>
-        )}
-        {ch0 && <span>{t("CHANNEL")} 0 #{ch0.name}</span>}
-        {(() => {
-          const nowS = Date.now() / 1000;
-          const act = [...s.nodes.values()].filter(
-            (n) => nowS - n.lastHeard < 3600,
-          ).length;
-          return <span>{t("{0} NODES · {1} ACTIVE 1H", s.nodes.size, act)}</span>;
-        })()}
-        <span className="spacer" />
-        {/* Uplink duration and host battery moved down from the header: they
-            are session status, which is what this strip is for, and the
-            header stays down to identity, navigation, and the connect act. */}
-        {connected && connectedAt && <span>UPLINK {hms(now - connectedAt)}</span>}
-        {lilyLinked && deviceLink.firmware && (
-          <span>LILYSHARK {deviceLink.firmware}</span>
-        )}
-        {hostBat && !hostBat.charging && (
-          <span className={hostBat.level <= 0.2 ? "err" : "dim"}>
-            BAT {Math.round(hostBat.level * 100)}%
-          </span>
-        )}
-        <span>{s.log.length ? fmtLog(s.log[s.log.length - 1]) : "—"}</span>
-      </footer>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 import { TDeckPhoto } from './TDeckPhoto';
 import type { TDeckViewer } from './tdeck-scene';
@@ -9,11 +9,9 @@ export function TDeckModel({ screen }: { screen: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const viewer = useRef<TDeckViewer>();
   const reduceMotion = usePrefersReducedMotion();
-  const [paused, setPaused] = useState(false);
   const [status, setStatus] = useState<'loading' | 'ready' | 'fallback'>('loading');
-  const instructions = useId();
-  const settings = useRef({ screen, moving: !reduceMotion && !paused });
-  settings.current = { screen, moving: !reduceMotion && !paused };
+  const settings = useRef({ screen, moving: !reduceMotion });
+  settings.current = { screen, moving: !reduceMotion };
 
   useEffect(() => {
     let cancelled = false;
@@ -36,8 +34,8 @@ export function TDeckModel({ screen }: { screen: string }) {
 
   useEffect(() => { viewer.current?.setScreen(screen); }, [screen]);
   useEffect(() => {
-    viewer.current?.setMotion(!reduceMotion && !paused);
-  }, [reduceMotion, paused]);
+    viewer.current?.setMotion(!reduceMotion);
+  }, [reduceMotion]);
 
   return (
     <div className="tdeck-model" data-state={status} data-screen={screen}>
@@ -51,24 +49,9 @@ export function TDeckModel({ screen }: { screen: string }) {
         className="tdeck-model-canvas"
         role="img"
         aria-label="Interactive 3D LILYGO T-Deck Plus running Lilyshark"
-        aria-describedby={instructions}
         tabIndex={status === 'ready' ? 0 : -1}
         aria-hidden={status !== 'ready'}
       />
-      <div className="tdeck-model-controls" hidden={status !== 'ready'}>
-        <span id={instructions} className="tdeck-model-hint">
-          Drag to turn · Scroll to explore
-          <span className="tdeck-model-sr">. Arrow keys turn the radio. Home faces the screen.</span>
-        </span>
-        <div className="tdeck-model-buttons">
-          {!reduceMotion && (
-            <button type="button" onClick={() => setPaused(value => !value)}>
-              {paused ? 'Resume motion' : 'Pause motion'}
-            </button>
-          )}
-          <button type="button" onClick={() => viewer.current?.reset()}>Reset view</button>
-        </div>
-      </div>
     </div>
   );
 }

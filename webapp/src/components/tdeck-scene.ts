@@ -21,15 +21,21 @@ export function mountTDeck(
 ): TDeckViewer {
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: true,
+      powerPreference: 'high-performance',
+      stencil: false,
+    });
   } catch {
     callbacks.onError();
     return { setScreen() {}, setMotion() {}, reset() {}, dispose() {} };
   }
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  renderer.toneMapping = THREE.AgXToneMapping;
+  renderer.toneMappingExposure = 1;
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-.12, .12, .17, -.17, .001, 5);
   camera.position.set(0, .027, 1);
@@ -38,17 +44,21 @@ export function mountTDeck(
   scene.add(rig);
   const environment = new RoomEnvironment();
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const environmentMap = pmrem.fromScene(environment, .04);
+  const environmentMap = pmrem.fromScene(environment, .015, .1, 100, { size: 512 });
   scene.environment = environmentMap.texture;
-  scene.environmentIntensity = .85;
+  scene.environmentIntensity = 1.05;
   environment.dispose();
   pmrem.dispose();
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x5b5060, 1.3));
-  for (const [x, y, z, strength] of [[-.3, .2, .5, 3], [.3, .1, -.3, 2], [.2, -.2, .4, 1]]) {
-    const light = new THREE.DirectionalLight(0xffffff, strength);
-    light.position.set(x, y, z);
-    scene.add(light);
-  }
+  scene.add(new THREE.HemisphereLight(0xfff3ea, 0x2a2428, .28));
+  const key = new THREE.DirectionalLight(0xfff6ee, 2.6);
+  key.position.set(-.45, .6, .85);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xb7c6e4, .38);
+  fill.position.set(.6, .05, .4);
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 1.55);
+  rim.position.set(.15, .45, -.7);
+  scene.add(rim);
 
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
@@ -65,7 +75,16 @@ export function mountTDeck(
   lcdTexture.minFilter = THREE.LinearFilter;
   lcdTexture.magFilter = THREE.NearestFilter;
   lcdTexture.generateMipmaps = false;
-  const lcdMaterial = new THREE.MeshBasicMaterial({ map: lcdTexture, toneMapped: false });
+  const lcdMaterial = new THREE.MeshStandardMaterial({
+    map: lcdTexture,
+    emissiveMap: lcdTexture,
+    emissive: 0xffffff,
+    emissiveIntensity: 1,
+    roughness: 0.32,
+    metalness: 0,
+    toneMapped: false,
+    dithering: true,
+  });
   textures.add(lcdTexture);
   materials.add(lcdMaterial);
 
@@ -114,13 +133,13 @@ export function mountTDeck(
   function resize() {
     const width = Math.max(canvas.clientWidth, 1);
     const height = Math.max(canvas.clientHeight, 1);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, width < 600 ? 1.5 : 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(width, height, false);
     // The radio is the stage. On a wide canvas it sits slightly right so
     // the copy can live in the left margin. The whip can crop off the top.
     const aspect = width / height;
     const halfHeight = Math.max(height < 400 ? .056 : .064, .04 * height / width);
-    const pan = aspect > 1 ? halfHeight * Math.min(aspect * .22, .32) : 0;
+    const pan = aspect > 1 ? halfHeight * aspect * .3 : 0;
     camera.position.y = height < 400 ? -.004 : -.006;
     camera.left = -halfHeight * aspect + pan;
     camera.right = halfHeight * aspect + pan;
@@ -177,15 +196,39 @@ export function mountTDeck(
       trackResources(gltf.scene);
       if (disposed || failed) { disposeModel(); return; }
       let hasScreen = false;
+      const anisotropy = renderer.capabilities.getMaxAnisotropy();
       gltf.scene.traverse(object => {
         if (!(object instanceof THREE.Mesh)) return;
-        const replaceScreen = (material: THREE.Material) => {
-          if (material.name !== 'LCD display') return material;
-          hasScreen = true;
-          // The web export normalizes the LCD's full 0..1 coordinates to UV0.
-          return lcdMaterial;
+        const polish = (material: THREE.Material) => {
+          if (material.name === 'LCD display') {
+            hasScreen = true;
+            if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
+              material.map = lcdTexture;
+              material.emissiveMap = lcdTexture;
+              material.emissive.set(0xffffff);
+              material.emissiveIntensity = Math.max(material.emissiveIntensity, 1);
+              material.toneMapped = false;
+              material.dithering = true;
+              material.needsUpdate = true;
+              return material;
+            }
+            return lcdMaterial;
+          }
+          if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
+            material.envMapIntensity = 1.15;
+            material.dithering = true;
+            for (const map of [material.map, material.normalMap, material.roughnessMap, material.metalnessMap, material.aoMap]) {
+              if (map) {
+                map.anisotropy = anisotropy;
+                map.needsUpdate = true;
+              }
+            }
+            if (material.map) material.map.colorSpace = THREE.SRGBColorSpace;
+            material.needsUpdate = true;
+          }
+          return material;
         };
-        object.material = Array.isArray(object.material) ? object.material.map(replaceScreen) : replaceScreen(object.material);
+        object.material = Array.isArray(object.material) ? object.material.map(polish) : polish(object.material);
       });
       if (!hasScreen || !lcdContext) throw new Error('Model has no usable LCD');
       // Source glTF: front +Y, antenna -Z. Present front +Z and antenna +Y.
