@@ -23,7 +23,12 @@ function Spark({ values }: { values: number[] }) {
 		})
 		.join(" ");
 	return (
-		<svg className="spark" width={w} height={h} aria-hidden="true">
+		<svg
+			className="spark"
+			viewBox={`0 0 ${w} ${h}`}
+			preserveAspectRatio="none"
+			aria-hidden="true"
+		>
 			<polyline
 				fill="none"
 				stroke="currentColor"
@@ -56,7 +61,9 @@ export function ThisDevicePanel() {
 					THIS DEVICE
 					<SimulateBadge on={telem?.sim} />
 				</span>
-				<span>LILYSHARK {link.firmware || "VERSION NOT REPORTED"} OVER USB · {link.node !== undefined ? `!${link.node.toString(16).padStart(8, "0")}` : "NODE ID NOT REPORTED"}</span>
+				<span className="device-id">
+					LILYSHARK {link.firmware || "VERSION NOT REPORTED"} OVER USB · {link.node !== undefined ? `!${link.node.toString(16).padStart(8, "0")}` : "NODE ID NOT REPORTED"}
+				</span>
 			</div>
 			{telem ? (
 				<>

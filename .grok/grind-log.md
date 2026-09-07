@@ -29,8 +29,8 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Sniffer bars wrap as 44px keys; NOTE/TIME freeze; CLOSE is thumb-sized
 - Shelby wire format wraps to the measure; registry freezes OBJECT; hex breaks instead of shoving the page
 - Sniffer hex uses 4-byte rows on a phone; dissection stacks above bytes
+- ThisDevice tiles sit two-up; sparks fill the tile; LIVE AIR / MAP / UNLINK are 44px keys
 
 ## Next (pick one per round)
 
-1. ThisDevice / telemetry tiles on a phone
-2. Debug log wrap and export targets
+1. Debug log wrap and export targets

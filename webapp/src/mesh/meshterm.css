@@ -1983,6 +1983,18 @@ body:has(.meshterm .app.menu-open) {
 .meshterm .spark {
 	color: var(--fg);
 	display: block;
+	width: 100%;
+	height: 18px;
+}
+.meshterm .this-device .device-id {
+	overflow-wrap: anywhere;
+	min-width: 0;
+}
+.meshterm .this-device .stat-tile .label,
+.meshterm .this-device .stat-tile .value {
+	min-width: 0;
+	max-width: 100%;
+	overflow-wrap: anywhere;
 }
 .meshterm .sim-badge {
 	display: inline-block;
@@ -3160,13 +3172,6 @@ body:has(.meshterm .app.menu-open) {
 	.meshterm .kv .k {
 		font-size: 11px;
 	}
-	.meshterm .this-device .device-readout {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-	}
-	.meshterm .this-device .stat-tile {
-		min-width: 0;
-	}
 	.meshterm .device-note {
 		font-size: 12px;
 		line-height: 1.5;
@@ -3417,9 +3422,43 @@ body:has(.meshterm .app.menu-open) {
 		flex-wrap: wrap;
 	}
 	.meshterm .telemetry-stats .stat-tile {
-		flex: 1 1 30%;
+		flex: 1 1 calc(50% - 8px);
 		max-width: none;
 		min-width: 0;
+	}
+	.meshterm .this-device .panel-title {
+		align-items: flex-start;
+	}
+	.meshterm .this-device .device-readout {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 8px;
+	}
+	.meshterm .this-device .stat-tile {
+		min-width: 0;
+		padding: 10px;
+	}
+	.meshterm .this-device .stat-tile .label {
+		letter-spacing: 1px;
+	}
+	.meshterm .this-device .spark {
+		height: 22px;
+	}
+	.meshterm .this-device .device-actions button {
+		flex: 1 1 calc(50% - 8px);
+		min-height: 44px;
+		min-width: 0;
+	}
+	.meshterm .this-device .device-counters {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 8px 12px;
+	}
+	.meshterm .this-device .device-counters span {
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 	.meshterm .telemetry-stats-note,
 	.meshterm .telemetry-aside {
