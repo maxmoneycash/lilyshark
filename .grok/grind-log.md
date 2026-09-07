@@ -24,7 +24,10 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Traffic table freezes # and TIME; filter wraps as a phone row
 - CONNECT morphs CONNECT / CANCEL / LINKED in place
 - Intro T-Deck look baked as TDECK_SCENE; DialKit keeps only framing/breathe; camera faces the LCD
+- Docs/Paper: sticky Docs/Paper tabs, sticky PDF toolbar, phone-width pages, 44px doc nav
 
 ## Next (pick one per round)
 
-1. Docs/Paper: measure, images, sticky section tabs
+1. Mesh screen phone layout
+2. Sniffer / capture tools on a phone
+3. Shelby screen measure and tables

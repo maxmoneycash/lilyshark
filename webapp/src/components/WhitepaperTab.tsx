@@ -24,8 +24,9 @@ export function WhitepaperTab() {
     <main className="fill">
       <div className="pdf-scroll">
         <div className="pdf-toolbar">
-          THE GROWTH TRAP IN PROOF OF PHYSICAL WORK · {PAGES} PP
-          <span style={{ flex: 1 }} />
+          <span className="pdf-toolbar-title">
+            THE GROWTH TRAP IN PROOF OF PHYSICAL WORK · {PAGES} PP
+          </span>
           <a href="/lilyshark-whitepaper.pdf" download="lilyshark-whitepaper.pdf">
             DOWNLOAD PDF
           </a>

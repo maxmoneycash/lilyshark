@@ -1413,6 +1413,11 @@ body {
 	color: var(--fg);
 	text-decoration: underline;
 	text-underline-offset: 3px;
+	flex-shrink: 0;
+}
+.meshterm .pdf-toolbar-title {
+	min-width: 0;
+	flex: 1 1 auto;
 }
 
 /* ── Prose and flow (SHELBY) ──────────────────────────────────────────────
@@ -1530,9 +1535,24 @@ body {
 		padding: 8px 0 32px;
 	}
 	.meshterm .pdf-toolbar {
-		padding: 4px 10px 0;
+		position: sticky;
+		top: 0;
+		z-index: 4;
+		background: var(--bg);
+		width: 100%;
+		padding: 8px 12px;
 		flex-wrap: wrap;
-		row-gap: 2px;
+		row-gap: 6px;
+		justify-content: space-between;
+	}
+	.meshterm .pdf-toolbar a {
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
+	}
+	.meshterm .pdf-page {
+		width: calc(100% - 16px);
+		box-shadow: none;
 	}
 
 	/* The titlebar is a desktop-window affectation; the header is sticky and
@@ -3040,12 +3060,14 @@ body:has(.meshterm .app.menu-open) {
 		grid-template-columns: minmax(0, 1fr);
 		grid-template-rows: auto minmax(0, 1fr);
 		gap: 8px;
+		padding: 0 8px 12px;
 	}
 	.meshterm .docs-nav {
-		max-height: 26vh;
+		max-height: 22vh;
 	}
 	.meshterm .docs-nav button:not(.tab) {
-		padding: 9px 10px;
+		padding: 10px 12px;
+		min-height: 44px;
 	}
 	.meshterm .docs-scroll {
 		padding: 12px 14px 32px;
@@ -3571,10 +3593,23 @@ body:has(.meshterm .app.menu-open) {
 }
 
 @media (max-width: 860px) {
+	.meshterm .section-tabs {
+		position: sticky;
+		top: 0;
+		z-index: 36;
+		background: var(--bg);
+		padding: 8px 10px;
+		gap: 6px;
+	}
+	.meshterm .app:not(:has(main.fill)) .section-tabs {
+		top: calc(env(safe-area-inset-top, 0px) + 52px);
+	}
 	.meshterm .section-tabs a {
 		display: inline-flex;
 		align-items: center;
 		min-height: 44px;
+		flex: 1 1 auto;
+		justify-content: center;
 	}
 }
 
