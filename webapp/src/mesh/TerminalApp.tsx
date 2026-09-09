@@ -195,6 +195,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const debugCursorRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!menuOpen) return;
     const nav = navRef.current;
@@ -206,6 +207,8 @@ function App() {
     const controls = [...links, toggle];
     (links.find(link => link.getAttribute("aria-current") === "page") ?? links[0])?.focus();
     const onKey = (event: KeyboardEvent) => {
+      // A modal dialog owns the keyboard; the hamburger trap must not steal Tab.
+      if (event.target instanceof Element && event.target.closest("dialog")) return;
       if (event.key === "Escape") {
         event.preventDefault(); setMenuOpen(false); toggle.focus();
       } else if (event.key === "Tab") {
@@ -221,13 +224,74 @@ function App() {
   }, [menuOpen]);
   // Offer the transports this browser can use in a compact native dialog.
   const [connectOpen, setConnectOpen] = useState(false);
+  const connectOpenRef = useRef(false);
+  connectOpenRef.current = connectOpen;
   const connectDialog = useRef<HTMLDialogElement>(null);
+  const openConnect = useCallback(() => {
+    setMenuOpen(false);
+    setConnectOpen(true);
+  }, []);
   useEffect(() => {
     const dialog = connectDialog.current;
     if (!connectOpen || !dialog) return;
     const trigger = document.activeElement;
     if (!dialog.open) dialog.showModal();
+    const first =
+      dialog.querySelector<HTMLButtonElement>(".sheet-actions button") ??
+      dialog.querySelector<HTMLButtonElement>(".sheet-close");
+    first?.focus();
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const buttons = Array.from(
+        dialog.querySelectorAll<HTMLButtonElement>(".sheet-close, .sheet-actions button"),
+      );
+      if (buttons.length === 0) return;
+      const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      if (i < 0) return;
+      event.preventDefault();
+      const next = event.key === "ArrowDown"
+        ? (i + 1) % buttons.length
+        : (i - 1 + buttons.length) % buttons.length;
+      buttons[next]?.focus();
+    };
+    dialog.addEventListener("keydown", onKey);
+
+    const vv = window.visualViewport;
+    const syncVv = () => {
+      if (!vv) return;
+      const obscured = window.innerHeight - vv.height - vv.offsetTop;
+      if (obscured < 40) {
+        dialog.style.removeProperty("inset");
+        dialog.style.removeProperty("top");
+        dialog.style.removeProperty("left");
+        dialog.style.removeProperty("right");
+        dialog.style.removeProperty("max-height");
+        dialog.style.removeProperty("margin");
+        return;
+      }
+      const pad = 8;
+      dialog.style.inset = "auto";
+      dialog.style.left = "0";
+      dialog.style.right = "0";
+      dialog.style.margin = "0 auto";
+      dialog.style.maxHeight = `${Math.max(160, vv.height - pad * 2)}px`;
+      dialog.style.top = `${vv.offsetTop + pad}px`;
+    };
+    vv?.addEventListener("resize", syncVv);
+    vv?.addEventListener("scroll", syncVv);
+    syncVv();
+
     return () => {
+      dialog.removeEventListener("keydown", onKey);
+      vv?.removeEventListener("resize", syncVv);
+      vv?.removeEventListener("scroll", syncVv);
+      dialog.style.removeProperty("inset");
+      dialog.style.removeProperty("left");
+      dialog.style.removeProperty("right");
+      dialog.style.removeProperty("top");
+      dialog.style.removeProperty("max-height");
+      dialog.style.removeProperty("margin");
       dialog.close();
       if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
     };
@@ -325,7 +389,9 @@ function App() {
         el?.isContentEditable ||
         tag === "INPUT" ||
         tag === "TEXTAREA" ||
-        tag === "SELECT"
+        tag === "SELECT" ||
+        connectOpenRef.current ||
+        el?.closest("dialog")
       ) {
         return;
       }
@@ -594,6 +660,12 @@ function App() {
 
   let totalUnread = 0;
   for (const n of s.unread.values()) totalUnread += n;
+  const unreadMark = totalUnread > 9 ? "9+" : String(totalUnread);
+
+  useEffect(() => {
+    if (tab !== "DEBUG") return;
+    debugCursorRef.current?.scrollIntoView({ block: "end", inline: "nearest" });
+  }, [tab, s.log.length]);
 
   return (
     <div className={`app ${menuOpen ? "menu-open" : ""} ${tab === "FLASH" ? "app-flash" : ""}`}>
@@ -641,7 +713,7 @@ function App() {
           ref={menuButtonRef}
           type="button"
           className="menu-btn"
-          data-unread={totalUnread > 0 ? "" : undefined}
+          data-unread={totalUnread > 0 ? unreadMark : undefined}
           aria-label={menuOpen ? "Close menu" : totalUnread > 0 ? `Menu, ${totalUnread} unread` : "Menu"}
           aria-controls="main-navigation"
           aria-expanded={menuOpen}
@@ -654,6 +726,7 @@ function App() {
         <span className="spacer" />
         {connected ? (
           <button
+            type="button"
             className="primary"
             title={t("Open this device's telemetry — disconnect from the status pill")}
             onClick={() => {
@@ -664,15 +737,21 @@ function App() {
             }}
           >
             {s.myNodeNum !== undefined
-              ? `!${s.myNodeNum.toString(16).padStart(8, "0")} · ${/t-deck/i.test(s.deviceInfo?.model ?? "") ? "T-DECK" : (s.deviceInfo?.model?.split(" ")[0]?.toUpperCase() ?? "RADIO")}`
+              ? (
+                <>
+                  <span className="conn-id">!{s.myNodeNum.toString(16).padStart(8, "0")} · </span>
+                  {/t-deck/i.test(s.deviceInfo?.model ?? "") ? "T-DECK" : (s.deviceInfo?.model?.split(" ")[0]?.toUpperCase() ?? "RADIO")}
+                </>
+              )
               : t("LINKED")}
           </button>
         ) : lilyLinked ? (
-          <button className="primary" onClick={() => void onLilyDisconnect()}>
+          <button type="button" className="primary" onClick={() => void onLilyDisconnect()}>
             T-DECK LINKED
           </button>
         ) : connecting || lilyConnecting ? (
           <button
+            type="button"
             className="primary"
             onClick={() => {
               if (lilyConnecting) void onLilyDisconnect();
@@ -683,8 +762,11 @@ function App() {
           </button>
         ) : (
           <button
+            type="button"
             className="primary"
-            onClick={() => setConnectOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={connectOpen}
+            onClick={openConnect}
           >
             {t("CONNECT")}
           </button>
@@ -694,7 +776,9 @@ function App() {
           className="conn-pill"
           style={{ cursor: "pointer" }}
           title={t("Connection details")}
-          onClick={() => setConnectOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={connectOpen}
+          onClick={openConnect}
         >
           <span className={`led ${ledClass}`} />
           <span
@@ -708,10 +792,11 @@ function App() {
       </header>
 
       {connectOpen && (
-        <dialog ref={connectDialog} className="overlay-sheet" aria-label="Connect a radio" onCancel={() => { setConnectOpen(false); setError(""); }}>
+        <dialog ref={connectDialog} className="overlay-sheet" aria-labelledby="connect-sheet-title" onCancel={() => { setConnectOpen(false); setError(""); }}>
           <div className="sheet-bar">
-            <div className="sheet-title">CONNECT A RADIO</div>
+            <div className="sheet-title" id="connect-sheet-title">CONNECT A RADIO</div>
             <button
+              type="button"
               className="sheet-close"
               aria-label="Close"
               onClick={() => {
@@ -731,10 +816,11 @@ function App() {
           {(hasSerial || hasBle) && <p className="sheet-note">Choose the firmware running on your radio.</p>}
           <div className="sheet-actions">
             {!hasSerial && !hasBle && !connected && !lilyLinked && (
-              <button className="primary" onClick={() => { setConnectOpen(false); setTab("TRAFFIC"); }}>Explore demo</button>
+              <button type="button" className="primary" onClick={() => { setConnectOpen(false); setTab("TRAFFIC"); }}>Explore demo</button>
             )}
             {(connected || lilyLinked) && (
               <button
+                type="button"
                 className="primary"
                 onClick={() => {
                   setConnectOpen(false);
@@ -746,6 +832,7 @@ function App() {
               </button>
             )}
             {hasSerial && (<button
+              type="button"
               className="primary"
               title="For a T-Deck running Lilyshark firmware: live device telemetry on TELEMETRY, your node on NODES, and Shelby pointer hand-off on TRAFFIC"
               onClick={() => {
@@ -762,6 +849,7 @@ function App() {
             </button>
             )}
             {hasBle && (<button
+              type="button"
               title="For a T-Deck running Lilyshark firmware: pair over Bluetooth the way the Meshtastic phone app does — no cable, and it works with no internet at all"
               onClick={() => {
                 if (!hasBle) {
@@ -777,6 +865,7 @@ function App() {
             </button>
             )}
             {hasSerial && (<button
+              type="button"
               onClick={() => {
                 if (!hasSerial) {
                   setError(missingTransportError("usb"));
@@ -791,6 +880,7 @@ function App() {
             </button>
             )}
             {hasBle && (<button
+              type="button"
               onClick={() => {
                 if (!hasBle) {
                   setError(missingTransportError("ble"));
@@ -851,7 +941,7 @@ function App() {
       {tab === "INTRO" && (
         <IntroTab
           onOpen={(next) => setTab(next as Tab)}
-          onConnect={() => setConnectOpen(true)}
+          onConnect={openConnect}
           connected={connected || lilyLinked}
         />
       )}
@@ -897,15 +987,15 @@ function App() {
       {tab === "SPECTRUM" && <Spectrum />}
       {tab === "SNIFFER" && <Sniffer />}
       {tab === "DEBUG" && (
-        <main>
+        <main className="debug-main">
           {/* no background of its own: hardcoding a near-black left the light
               theme's dark text unreadable */}
           <div className="panel" style={{ flex: 1 }}>
             <div className="panel-title">
               <span>PANEL // DEBUG · SERIAL 115200 8N1</span>
-              <span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span className="debug-tools">
                 <button
-
+                  type="button"
                   title={t("Export the log to a text file")}
                   disabled={s.log.length === 0}
                   onClick={() =>
@@ -919,10 +1009,10 @@ function App() {
                 {t("{0} LINES", s.log.length)}
               </span>
             </div>
-            <pre className="debuglog">
+            <pre className="debuglog" tabIndex={0} aria-label="Serial log">
               {s.log.map(fmtLog).join("\n")}
               {"\n"}
-              <span className="cursor">█</span>
+              <span className="cursor" ref={debugCursorRef}>█</span>
             </pre>
           </div>
         </main>

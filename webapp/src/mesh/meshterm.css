@@ -947,6 +947,13 @@
 }
 
 /* ── debug ── */
+.meshterm .debug-tools {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+	min-width: 0;
+}
 .meshterm .debuglog {
 	flex: 1;
 	overflow-y: auto;
@@ -956,6 +963,10 @@
 	line-height: 1.55;
 	font-family: inherit;
 	white-space: pre-wrap;
+}
+.meshterm .debuglog:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: -2px;
 }
 
 /* ── mapa ── */
@@ -1480,10 +1491,19 @@ body {
 		top: 0;
 		z-index: 40;
 		background: var(--bg);
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		column-gap: 8px;
-		row-gap: 6px;
-		padding: max(5px, env(safe-area-inset-top)) 8px 5px;
+		row-gap: 0;
+		padding: max(5px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 5px max(8px, env(safe-area-inset-left));
+	}
+	.meshterm header .logo {
+		min-width: 0;
+		flex-shrink: 1;
+	}
+	.meshterm header .logo .wordmark {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	/* The spacer that pushes controls right on desktop claims an entire
 	   wrapped row here. */
@@ -1502,6 +1522,9 @@ body {
 	.meshterm header > button.primary {
 		order: 1;
 		margin-left: auto;
+		max-width: min(42vw, 12rem);
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.meshterm .menu-btn {
 		order: 2;
@@ -1575,11 +1598,16 @@ body {
 		z-index: 60;
 		flex-direction: column;
 		align-items: stretch;
-		justify-content: center;
-		gap: 10px;
-		padding: 72px 26px 34px;
-		overflow: hidden auto;
+		justify-content: flex-start;
+		justify-content: safe center;
+		gap: 8px;
+		padding: max(72px, env(safe-area-inset-top) + 56px) max(26px, env(safe-area-inset-right)) max(34px, env(safe-area-inset-bottom) + 20px) max(26px, env(safe-area-inset-left));
+		overflow-x: hidden;
+		overflow-y: auto;
 		overscroll-behavior: contain;
+		-webkit-overflow-scrolling: touch;
+		scroll-padding-top: 8px;
+		scroll-padding-bottom: 8px;
 		background: color-mix(in srgb, var(--bg) 94%, var(--fg));
 		opacity: 0;
 		pointer-events: none;
@@ -1591,6 +1619,10 @@ body {
 	}
 	.meshterm header nav > .tab {
 		width: 100%;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
 		font-size: 17px;
 		letter-spacing: 2px;
 		padding: 13px 16px;
@@ -1618,7 +1650,7 @@ body {
 		/* No margin-left auto here: CONNECT carries the push-right, so the
 		   two sit adjacent — a second auto margin split the free space and
 		   stranded CONNECT in the middle of the header. */
-		position: relative;
+		overflow: visible;
 		z-index: 61;
 		background: transparent;
 	}
@@ -1961,8 +1993,10 @@ body:has(.meshterm .app.menu-open) {
 		right: 0;
 		height: 100vh; /* fallback where dvh misbehaves */
 		height: 100dvh;
-		padding-top: max(72px, env(safe-area-inset-top) + 60px);
+		padding-top: max(72px, env(safe-area-inset-top) + 56px);
+		padding-right: max(26px, env(safe-area-inset-right));
 		padding-bottom: max(34px, env(safe-area-inset-bottom) + 20px);
+		padding-left: max(26px, env(safe-area-inset-left));
 	}
 }
 
@@ -1987,10 +2021,10 @@ body:has(.meshterm .app.menu-open) {
 /* The native Connect dialog keeps its actions and close control together. */
 .meshterm .overlay-sheet {
 	position: fixed;
-	inset: 0;
-	width: min(600px, calc(100% - 32px));
+	inset: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+	width: min(600px, 100%);
 	height: fit-content;
-	max-height: calc(100dvh - 32px);
+	max-height: 100%;
 	margin: auto;
 	z-index: 70;
 	display: flex;
@@ -2017,6 +2051,10 @@ body:has(.meshterm .app.menu-open) {
 	gap: 12px;
 	width: 100%;
 	max-width: 640px;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--bg);
 }
 .meshterm .sheet-title {
 	min-width: 0;
@@ -2075,21 +2113,27 @@ body:has(.meshterm .app.menu-open) {
 		z-index: 62;
 	}
 
-	/* Eleven destinations outgrow a short phone: centered with overflow they
-	   clipped at both ends. Auto margins center when there is room and scroll
-	   honestly when there is not. */
+	/* Destinations outgrow a short phone. `safe center` keeps them in the
+	   middle when they fit; flex-start (the fallback) plus overflow-y lets
+	   every tab scroll into reach when they do not. Auto margins on the
+	   first/last tab were eating the scrollable overflow and clipping both
+	   ends. */
 	.meshterm header nav {
 		justify-content: flex-start;
+		justify-content: safe center;
 	}
-	.meshterm header nav > .tab:first-child {
-		margin-top: auto;
-	}
+	.meshterm header nav > .tab:first-child,
 	.meshterm header nav > .tab:last-child {
-		margin-bottom: auto;
+		margin-top: 0;
+		margin-bottom: 0;
 	}
 	.meshterm header nav > .tab {
 		font-size: 15px;
 		padding: 11px 16px;
+		flex-shrink: 0;
+	}
+	.meshterm header nav > .tab .unread-badge {
+		margin-left: 0;
 		flex-shrink: 0;
 	}
 }
@@ -2291,7 +2335,7 @@ body:has(.meshterm .app.menu-open) {
 		grid-template-columns: minmax(0, 1fr);
 		grid-template-rows: minmax(240px, 1fr) minmax(0, auto) auto;
 		grid-template-areas: "device" "copy" "progress";
-		padding: 0 24px 12px;
+		padding: 0 max(24px, env(safe-area-inset-right)) 12px max(24px, env(safe-area-inset-left));
 		gap: 16px;
 	}
 	.meshterm .intro-copy {
@@ -2313,7 +2357,7 @@ body:has(.meshterm .app.menu-open) {
 
 @media (max-width: 860px) and (max-height: 720px) {
 	.meshterm .intro-stage {
-		padding: 0 20px 10px;
+		padding: 0 max(20px, env(safe-area-inset-right)) 10px max(20px, env(safe-area-inset-left));
 		gap: 12px;
 	}
 	.meshterm .intro-head { font-size: 22px; margin-bottom: 8px; }
@@ -3042,10 +3086,10 @@ body:has(.meshterm .app.menu-open) {
 
 /* Links share the same navigation controls on every page, including /flash/. */
 .meshterm header .logo { text-decoration: none; }
-.meshterm header nav > a.tab { box-sizing: border-box; text-decoration: none; color: var(--fg); border: 1px solid var(--border); font-family: inherit; line-height: 1.45; justify-content: center; }
+.meshterm header nav > a.tab { box-sizing: border-box; display: inline-flex; align-items: center; text-decoration: none; color: var(--fg); border: 1px solid var(--border); font-family: inherit; line-height: 1.45; justify-content: center; }
 .meshterm header nav > a.tab.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .meshterm header nav > a.tab:focus-visible, .meshterm header .logo:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
-.meshterm .section-tabs { display: flex; flex: none; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.meshterm .section-tabs { display: flex; flex: none; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
 .meshterm .section-tabs a { color: var(--fg); font-size: 11px; padding: 8px 12px; border: 1px solid var(--border); text-decoration: none; }
 .meshterm .section-tabs a[aria-current="page"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
 .meshterm .section-tabs a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
@@ -3056,17 +3100,35 @@ body:has(.meshterm .app.menu-open) {
 /* Keep the navigation legible on smaller laptops; controls get their own row. */
 @media (min-width: 861px) and (max-width: 1280px) {
   .meshterm header { flex-wrap: wrap; gap: 8px; }
-  .meshterm header nav { order: 3; flex: 1 0 100%; justify-content: space-between; gap: 2px; }
-  .meshterm header nav > a.tab { flex: 0 0 auto; font-size: 10px; letter-spacing: 0; height: 30px; padding: 0 4px; }
+  .meshterm header nav { order: 3; flex: 1 0 100%; flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
+  .meshterm header nav > a.tab { flex: 0 1 auto; font-size: 10px; letter-spacing: 0; height: 30px; padding: 0 6px; }
   .meshterm header > .primary { margin-left: auto; font-size: 10px; height: 30px; }
   .meshterm header > .conn-pill { display: none; }
 }
 
 @media (max-width: 860px) {
+	.meshterm .section-tabs {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+		padding: 8px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+	}
 	.meshterm .section-tabs a {
 		display: inline-flex;
 		align-items: center;
+		flex: 0 0 auto;
 		min-height: 44px;
+	}
+	.meshterm .debug-main {
+		padding-bottom: max(12px, env(safe-area-inset-bottom));
+	}
+	.meshterm .debuglog {
+		min-height: min(60dvh, 28rem);
+	}
+}
+@media (max-width: 430px) {
+	.meshterm header > button.primary .conn-id {
+		display: none;
 	}
 }
 
@@ -3094,16 +3156,26 @@ body:has(.meshterm .app.menu-open) {
 }
 
 .meshterm .menu-btn[data-unread]::after {
-	content: "";
+	content: attr(data-unread);
 	position: absolute;
-	top: 7px;
-	right: 7px;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
+	top: 2px;
+	right: 2px;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	border-radius: 8px;
 	background: var(--warn);
+	color: var(--bg);
 	box-shadow: 0 0 0 2px var(--bg);
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 16px;
+	letter-spacing: 0;
+	text-align: center;
 	pointer-events: none;
+}
+.meshterm .app.menu-open .menu-btn[data-unread]::after {
+	box-shadow: 0 0 0 2px var(--fg);
 }
 
 @media (max-width: 860px) {
