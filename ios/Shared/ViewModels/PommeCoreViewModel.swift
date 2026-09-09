@@ -228,6 +228,9 @@ final class PommeCoreViewModel: ObservableObject {
         channelStore.persistChannelMessages = { [weak self] key in self?.messageStoreManager.persistMessages(for: key) }
         
         // MessageStoreManager dependencies
+        messageStoreManager.canSendMessagesProvider = { [weak self] in
+            self?.connectionManager.connectionState == .ready
+        }
         messageStoreManager.sendCommand = { [weak self] data, label in self?.connectionManager.sendCommand(data, label: label) }
         #if canImport(MeshtasticKit)
         messageStoreManager.sendToRadio = { [weak self] data, label in

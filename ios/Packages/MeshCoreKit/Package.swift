@@ -23,7 +23,8 @@ let package = Package(
         ),
         .testTarget(
             name: "MeshCoreKitTests",
-            dependencies: ["MeshCoreKit"]
+            dependencies: ["MeshCoreKit"],
+            resources: [.copy("Fixtures")]
         )
     ]
 )

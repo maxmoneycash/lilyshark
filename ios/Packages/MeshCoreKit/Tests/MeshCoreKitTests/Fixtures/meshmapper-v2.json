@@ -1,0 +1,15 @@
+{
+  "success": true, "schema_version": 2, "region": "TEST", "region_name": "Synthetic test region",
+  "generated_at": 1710547200, "data_age_seconds": null, "point_count": 15,
+  "grid_squares": [
+    {"grid_id":"test-1","bounds":{"south":0,"west":0,"north":0.0027,"east":0.00384},"coverage_type":"BIDIR","fill_color":"#1e7e34","border_color":"#14522d","snr":8.5,"timestamp":1710547200,"count":14,"snr_min":-2.1,"snr_max":11.3,"status_mask":37,"first_seen":1710201600,"noise":17.4,"effective":2.43},
+    {"grid_id":"test-2","bounds":{"south":0.0027,"west":0,"north":0.0054,"east":0.00384},"coverage_type":"RX","fill_color":"#6f42c1","border_color":"#6f42c1","snr":null,"timestamp":null},
+    {"grid_id":"test-future","bounds":{"south":0,"west":0.00384,"north":0.0027,"east":0.00768},"coverage_type":"FUTURE","fill_color":"#888888","border_color":"#888888","snr":0,"timestamp":1710547100,"future_field":true},
+    {"grid_id":"test-invalid","bounds":{"south":91,"west":0,"north":92,"east":0.00384},"coverage_type":"DROP","fill_color":"#bd2130","border_color":"#bd2130","snr":null,"timestamp":null}
+  ],
+  "repeaters": [
+    {"hex":"AB","name":"Test zero coordinate","lat":0,"lon":0,"last_heard":null,"enabled":2,"advert_bytes":null},
+    {"hex":"AB","name":"Test collision","lat":1,"lon":1,"last_heard":1710547000,"enabled":2,"advert_bytes":1},
+    {"hex":"CD","name":null,"lat":null,"lon":null,"last_heard":null,"enabled":1,"advert_bytes":null}
+  ]
+}

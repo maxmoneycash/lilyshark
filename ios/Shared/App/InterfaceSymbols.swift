@@ -1,4 +1,5 @@
 import Foundation
+import MeshCoreKit
 
 /// The saved values remain compatible with existing groups. Only their visual
 /// presentation changes: system symbols replace the old emoji picker and badges.
@@ -96,5 +97,24 @@ enum MessageReaction: String, CaseIterable, Identifiable {
 
     static func symbolName(for savedValue: String) -> String {
         reaction(for: savedValue)?.symbolName ?? "bubble.left"
+    }
+}
+
+
+extension Message {
+    /// Display protocol-generated reaction commands as words. Ordinary message
+    /// text and the interoperable payload remain unchanged.
+    var interfaceText: String {
+        let parts = text.split(separator: "\n", omittingEmptySubsequences: false)
+        let alphabet = Set("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
+        guard parts.count == 2, parts[1].count == 8,
+              parts[1].allSatisfy({ alphabet.contains($0) }) else { return text }
+        for reaction in MessageReaction.allCases where parts[0].hasPrefix(reaction.rawValue) {
+            let recipient = parts[0].dropFirst(reaction.rawValue.count)
+            if recipient.isEmpty || (recipient.hasPrefix("@[") && recipient.hasSuffix("]")) {
+                return "Reaction: \(reaction.label)"
+            }
+        }
+        return text
     }
 }

@@ -43,7 +43,7 @@ struct MessageBubble: View {
     private var bubbleAccessibilityLabel: String {
         var parts: [String] = []
         if let quoted = quotedText { parts.append("Quoted: \(quoted)") }
-        parts.append(quotedText != nil ? replyText : message.text)
+        parts.append(quotedText != nil ? replyText : message.interfaceText)
         let fmt = DateFormatter(); fmt.timeStyle = .short; fmt.dateStyle = .none
         parts.append(fmt.string(from: message.timestamp))
         switch message.status {
@@ -106,7 +106,7 @@ struct MessageBubble: View {
                             .accessibilityLabel("Quoted: \(quoted)")
                         }
                         // Message text
-                        linkifyMeshcoreURLs(quotedText != nil ? replyText : message.text)
+                        linkifyMeshcoreURLs(quotedText != nil ? replyText : message.interfaceText)
                             .textSelection(.enabled)
 
                         // Link preview
@@ -115,7 +115,7 @@ struct MessageBubble: View {
                         }
 
                         // Shared coordinates render as a tappable map card
-                        if let coord = detectCoordinate(in: quotedText != nil ? replyText : message.text) {
+                        if let coord = detectCoordinate(in: quotedText != nil ? replyText : message.interfaceText) {
                             MessageMapCard(coordinate: coord)
                         }
                     }
@@ -228,6 +228,7 @@ struct MessageBubble: View {
                 } label: {
                     Label("React", systemImage: "face.smiling")
                 }
+                .disabled(!messageStoreManager.canSendMessages)
                 Button {
                     copyToClipboard(message.text)
                 } label: {
@@ -244,6 +245,7 @@ struct MessageBubble: View {
                     } label: {
                         Label("Retry Send", systemImage: "arrow.clockwise")
                     }
+                    .disabled(!messageStoreManager.canSendMessages)
                 }
                 Divider()
                 Button(role: .destructive) {
@@ -350,7 +352,7 @@ struct ChannelMessageBubble: View {
         if message.text.contains("meshcore://") {
             return linkifyMeshcoreURLs(message.text)
         }
-        return highlightMentions(in: message.text, myName: deviceConfig.deviceName)
+        return highlightMentions(in: message.interfaceText, myName: deviceConfig.deviceName)
     }
 
     var body: some View {
@@ -485,9 +487,9 @@ struct ChannelMessageBubble: View {
                             Button {
                                 let hash = messageStoreManager.reactionHash(for: message)
                                 let reactionText = "\(reaction.rawValue)@[\(sender)]\n\(hash)"
-                                if let chIdx = message.channelIndex {
-                                    messageStoreManager.sendChannelMessage(reactionText, channelIndex: chIdx)
-                                }
+                                guard let chIdx = message.channelIndex,
+                                      messageStoreManager.sendChannelMessage(reactionText, channelIndex: chIdx),
+                                      messageStoreManager.lastSendError == nil else { return }
                                 messageStoreManager.addReactionLocal(reaction.rawValue, to: message)
                             } label: {
                                 Label(reaction.label, systemImage: reaction.symbolName)
@@ -496,6 +498,7 @@ struct ChannelMessageBubble: View {
                     } label: {
                         Label("React", systemImage: "face.smiling")
                     }
+                    .disabled(!messageStoreManager.canSendMessages)
                     Button {
                         NotificationCenter.default.post(name: .insertMention, object: sender)
                     } label: {
@@ -738,7 +741,8 @@ struct ChannelDetailSheet: View {
                         Text("Mentions").tag("mentions")
                         Text("Muted").tag("muted")
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
+                    .frame(minHeight: Design.minimumTouchTarget)
                     .onChange(of: notifyMode) { _, mode in
                         if let notifyMode = ChannelStore.ChannelNotifyMode(rawValue: mode) {
                             channelStore.setChannelNotifyMode(notifyMode, for: channelName)
@@ -797,7 +801,14 @@ struct ForwardContactPicker: View {
 
     var body: some View {
         NavigationStack {
-            List(filteredContacts) { contact in
+            List {
+                Section {
+                    Text("Choose a contact, then review the forwarded text before sending. Existing draft text is kept.")
+                        .font(.footnote)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(filteredContacts) { contact in
                 Button {
                     onSelect(contact)
                 } label: {
@@ -810,6 +821,12 @@ struct ForwardContactPicker: View {
                     }
                 }
                 .listRowBackground(MeshTheme.surface)
+                }
+            }
+            .overlay {
+                if filteredContacts.isEmpty {
+                    ContentUnavailableView.search(text: search)
+                }
             }
             .meshTheme()
             .searchable(text: $search, prompt: "Search contacts")

@@ -97,6 +97,16 @@
 		8EF971496F064F1AD761B796 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21606E2B959E6496D3B0230D /* ContactListView.swift */; };
 		9144822AD9EB38340AF2317E /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFFE2BF3488F0C0647632CD /* ChatView.swift */; };
 		96059FF0363E830C376C23ED /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		2C9BEDC90EF743B5A696A78A /* WelcomeHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4560E316527A4470963AD0DA /* WelcomeHomeView.swift */; };
+		A4168C2761904C4B907349B0 /* RadioVisibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */; };
+		A1E0C58B1DDF4B29AC9D731B /* NativeCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */; };
+		340DC0A5453D45658C564CDC /* CoverageMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018D4CFC4D7043F7BC584A8D /* CoverageMapView.swift */; };
+		80E3F5B7FBFE40DFB4BAFF4A /* CommunityCoverageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7438FA3FF4D9470C95E12FC4 /* CommunityCoverageStore.swift */; };
+		0E4F08520D534CEB80EB2995 /* TDeckExperienceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C9A6B779E489F8822F094 /* TDeckExperienceView.swift */; };
+		B03BBBF92BB84A02B880727B /* TDeckSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057AB21A96724481909407CA /* TDeckSceneView.swift */; };
+		529C43A1085445B2A567F4ED /* TDeckScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7544B2F6AD450190C5C986 /* TDeckScreens.swift */; };
+		FADF490BE5F34B5CA5D2D541 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062840715E604736BCAEE0E9 /* HelpView.swift */; };
+		78DD2A11F9C84578875B7A6C /* MessageComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD0266C60FF4C66AC08EFDD /* MessageComposer.swift */; };
 		D74B8A331B684581BE4D34CD /* ChatFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */; };
 		26AF0F49A5DB4256BE07C12D /* MeshValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */; };
 		CFA39D0BA5C242D0858D74AC /* InterfaceSymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */; };
@@ -109,6 +119,16 @@
 		A3B4C5D6E7F8A9B0C1D2E3F4 /* NavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */; };
 		A3C4EC30F51CEF0E73260DD5 /* RadioPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E616344CEDCD1ADC41548B7 /* RadioPreset.swift */; };
 		A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		5C4C97B438CE45579A36724C /* WelcomeHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4560E316527A4470963AD0DA /* WelcomeHomeView.swift */; };
+		D1E49AB3112343728A988FFA /* RadioVisibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */; };
+		E6A1D52B79F944758F60364C /* NativeCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */; };
+		EB7D28C2C37847558E4FD3B5 /* CoverageMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018D4CFC4D7043F7BC584A8D /* CoverageMapView.swift */; };
+		150B94E05FE24F59B3464734 /* CommunityCoverageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7438FA3FF4D9470C95E12FC4 /* CommunityCoverageStore.swift */; };
+		D55CFE82E9054EEE997BC445 /* TDeckExperienceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C9A6B779E489F8822F094 /* TDeckExperienceView.swift */; };
+		77AE7D5B15EB463DBD3B08C6 /* TDeckSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057AB21A96724481909407CA /* TDeckSceneView.swift */; };
+		4DE6ADA394CA481092B68595 /* TDeckScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7544B2F6AD450190C5C986 /* TDeckScreens.swift */; };
+		7B3D82EA88A24D32992D475B /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062840715E604736BCAEE0E9 /* HelpView.swift */; };
+		22A4947D223A4011970360F2 /* MessageComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD0266C60FF4C66AC08EFDD /* MessageComposer.swift */; };
 		2C2599DCC68F4E8FA32D509D /* ChatFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */; };
 		783CDF1A172745ADAE7545F8 /* MeshValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */; };
 		B8D3DA1A033A491882AC6121 /* InterfaceSymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */; };
@@ -154,7 +174,19 @@
 		F686EC73BF362831969DC6D5 /* NodeSetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86334BBA19C5E5E981032313 /* NodeSetupWizardView.swift */; };
 		F70142BB0E4E485FAA189AD7 /* alert.caf in Resources */ = {isa = PBXBuildFile; fileRef = 38CA824A6E6A4B7D9DD6A055 /* alert.caf */; };
 		F90000EB8EC8EB28EA724AC8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 43931BD12312D05F62A9E3B3 /* Assets.xcassets */; };
+		TDKBLD0000000000000001 /* TDeck in Resources */ = {isa = PBXBuildFile; fileRef = TDKREF0000000000000001 /* TDeck */; };
+		TDKBLD0000000000000002 /* TDeck in Resources */ = {isa = PBXBuildFile; fileRef = TDKREF0000000000000001 /* TDeck */; };
 		FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		3EBF818CD89546A59D213D09 /* WelcomeHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4560E316527A4470963AD0DA /* WelcomeHomeView.swift */; };
+		683A2B142E9943AFBB68ACB3 /* RadioVisibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */; };
+		E2D1AA19715E4451AF93565B /* NativeCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */; };
+		2321B8B043594EF58385852A /* CoverageMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018D4CFC4D7043F7BC584A8D /* CoverageMapView.swift */; };
+		3CB34C6098DF4E3B9BF769FA /* CommunityCoverageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7438FA3FF4D9470C95E12FC4 /* CommunityCoverageStore.swift */; };
+		D664467C43CC4891A7C766A5 /* TDeckExperienceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C9A6B779E489F8822F094 /* TDeckExperienceView.swift */; };
+		6C818ACBEBF746219714B613 /* TDeckSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057AB21A96724481909407CA /* TDeckSceneView.swift */; };
+		0B9ADBD6A2E0407590C2976F /* TDeckScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7544B2F6AD450190C5C986 /* TDeckScreens.swift */; };
+		CCFDE97023A84B7C8A63E98B /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062840715E604736BCAEE0E9 /* HelpView.swift */; };
+		ED2779A7294043588DB25DED /* MessageComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD0266C60FF4C66AC08EFDD /* MessageComposer.swift */; };
 		61B06DCE452F4A6599FC1D47 /* ChatFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */; };
 		4BD73EF6CBC14A47AB9A3192 /* MeshValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */; };
 		9AA63F674DF346429C6975E6 /* InterfaceSymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */; };
@@ -328,6 +360,7 @@
 		NOT10000000000000000000 /* NOTICE */ = {isa = PBXFileReference; lastKnownFileType = text; path = NOTICE; sourceTree = SOURCE_ROOT; };
 		38CA824A6E6A4B7D9DD6A055 /* alert.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = alert.caf; sourceTree = "<group>"; };
 		43931BD12312D05F62A9E3B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		TDKREF0000000000000001 /* TDeck */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TDeck; path = Resources/TDeck; sourceTree = SOURCE_ROOT; };
 		5D859AE9C98610F71C2FBAAF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		5E616344CEDCD1ADC41548B7 /* RadioPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioPreset.swift; sourceTree = "<group>"; };
 		635B414AA8FC75B37367C7F5 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = iOS/PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
@@ -356,6 +389,16 @@
 		E09A1F63605E4CA4ACDE7634 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStore.swift; sourceTree = "<group>"; };
 		F6BA0593D517B1467DBC1C42 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		4560E316527A4470963AD0DA /* WelcomeHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/WelcomeHomeView.swift"; sourceTree = SOURCE_ROOT; };
+		6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/RadioVisibilityView.swift"; sourceTree = SOURCE_ROOT; };
+		CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/NativeCoverageView.swift"; sourceTree = SOURCE_ROOT; };
+		018D4CFC4D7043F7BC584A8D /* CoverageMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/CoverageMapView.swift"; sourceTree = SOURCE_ROOT; };
+		7438FA3FF4D9470C95E12FC4 /* CommunityCoverageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Stores/CommunityCoverageStore.swift"; sourceTree = SOURCE_ROOT; };
+		413C9A6B779E489F8822F094 /* TDeckExperienceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/TDeckExperienceView.swift"; sourceTree = SOURCE_ROOT; };
+		057AB21A96724481909407CA /* TDeckSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/TDeckSceneView.swift"; sourceTree = SOURCE_ROOT; };
+		3A7544B2F6AD450190C5C986 /* TDeckScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/App/TDeckScreens.swift"; sourceTree = SOURCE_ROOT; };
+		062840715E604736BCAEE0E9 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/HelpView.swift"; sourceTree = SOURCE_ROOT; };
+		5CD0266C60FF4C66AC08EFDD /* MessageComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MessageComposer.swift"; sourceTree = SOURCE_ROOT; };
 		30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/App/ChatFixtureHost.swift"; sourceTree = SOURCE_ROOT; };
 		B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MeshValueRow.swift"; sourceTree = SOURCE_ROOT; };
 		CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/App/InterfaceSymbols.swift"; sourceTree = SOURCE_ROOT; };
@@ -489,6 +532,7 @@
 		05CB0C5EB82027D64527E896 = {
 			isa = PBXGroup;
 			children = (
+				TDKREF0000000000000001 /* TDeck */,
 				6DEB2AE5149CF01089457535 /* Packages */,
 				E0B34F245C5063D4BCB4E068 /* Shared */,
 				37FFAEFD4E59AD6A0C20CC49 /* Views */,
@@ -686,6 +730,16 @@
 			children = (
 				A259126AAB80661010C6A336 /* PommeCoreApp.swift */,
 				F6BA0593D517B1467DBC1C42 /* Theme.swift */,
+				4560E316527A4470963AD0DA /* WelcomeHomeView.swift */,
+				6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */,
+				CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */,
+				018D4CFC4D7043F7BC584A8D /* CoverageMapView.swift */,
+				7438FA3FF4D9470C95E12FC4 /* CommunityCoverageStore.swift */,
+				413C9A6B779E489F8822F094 /* TDeckExperienceView.swift */,
+				057AB21A96724481909407CA /* TDeckSceneView.swift */,
+				3A7544B2F6AD450190C5C986 /* TDeckScreens.swift */,
+				062840715E604736BCAEE0E9 /* HelpView.swift */,
+				5CD0266C60FF4C66AC08EFDD /* MessageComposer.swift */,
 				30C10DE59B3B4F58A8E3D741 /* ChatFixtureHost.swift */,
 				B4DCE59240394B0894DEFC64 /* MeshValueRow.swift */,
 				CD4AB5E7672345A99D557477 /* InterfaceSymbols.swift */,
@@ -922,6 +976,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				TDKBLD0000000000000002 /* TDeck in Resources */,
 				F90000EB8EC8EB28EA724AC8 /* Assets.xcassets in Resources */,
 				B5EE485BAA6AEBB5F4E8FF23 /* PrivacyInfo.xcprivacy in Resources */,
 				0F05C0E42F9F004400818F68 /* Localizable.xcstrings in Resources */,
@@ -935,6 +990,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				TDKBLD0000000000000001 /* TDeck in Resources */,
 				EE31FC870779BB9B07A11EEE /* Assets.xcassets in Resources */,
 				895D4D4DB59133B2391177FB /* PrivacyInfo.xcprivacy in Resources */,
 				0F05C0E62F9F004400818F68 /* Localizable.xcstrings in Resources */,
@@ -970,6 +1026,16 @@
 			files = (
 				894905739E99B7E425A27485 /* PommeCoreApp.swift in Sources */,
 				A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */,
+				5C4C97B438CE45579A36724C /* WelcomeHomeView.swift in Sources */,
+				D1E49AB3112343728A988FFA /* RadioVisibilityView.swift in Sources */,
+				E6A1D52B79F944758F60364C /* NativeCoverageView.swift in Sources */,
+				EB7D28C2C37847558E4FD3B5 /* CoverageMapView.swift in Sources */,
+				150B94E05FE24F59B3464734 /* CommunityCoverageStore.swift in Sources */,
+				D55CFE82E9054EEE997BC445 /* TDeckExperienceView.swift in Sources */,
+				77AE7D5B15EB463DBD3B08C6 /* TDeckSceneView.swift in Sources */,
+				4DE6ADA394CA481092B68595 /* TDeckScreens.swift in Sources */,
+				7B3D82EA88A24D32992D475B /* HelpView.swift in Sources */,
+				22A4947D223A4011970360F2 /* MessageComposer.swift in Sources */,
 				2C2599DCC68F4E8FA32D509D /* ChatFixtureHost.swift in Sources */,
 				783CDF1A172745ADAE7545F8 /* MeshValueRow.swift in Sources */,
 				B8D3DA1A033A491882AC6121 /* InterfaceSymbols.swift in Sources */,
@@ -1018,6 +1084,16 @@
 				SVT10000000100000000002 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000002 /* SettingsView+Editors.swift in Sources */,
 				96059FF0363E830C376C23ED /* Theme.swift in Sources */,
+				2C9BEDC90EF743B5A696A78A /* WelcomeHomeView.swift in Sources */,
+				A4168C2761904C4B907349B0 /* RadioVisibilityView.swift in Sources */,
+				A1E0C58B1DDF4B29AC9D731B /* NativeCoverageView.swift in Sources */,
+				340DC0A5453D45658C564CDC /* CoverageMapView.swift in Sources */,
+				80E3F5B7FBFE40DFB4BAFF4A /* CommunityCoverageStore.swift in Sources */,
+				0E4F08520D534CEB80EB2995 /* TDeckExperienceView.swift in Sources */,
+				B03BBBF92BB84A02B880727B /* TDeckSceneView.swift in Sources */,
+				529C43A1085445B2A567F4ED /* TDeckScreens.swift in Sources */,
+				FADF490BE5F34B5CA5D2D541 /* HelpView.swift in Sources */,
+				78DD2A11F9C84578875B7A6C /* MessageComposer.swift in Sources */,
 				D74B8A331B684581BE4D34CD /* ChatFixtureHost.swift in Sources */,
 				26AF0F49A5DB4256BE07C12D /* MeshValueRow.swift in Sources */,
 				CFA39D0BA5C242D0858D74AC /* InterfaceSymbols.swift in Sources */,
@@ -1116,6 +1192,16 @@
 				SVT10000000100000000003 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000003 /* SettingsView+Editors.swift in Sources */,
 				FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */,
+				3EBF818CD89546A59D213D09 /* WelcomeHomeView.swift in Sources */,
+				683A2B142E9943AFBB68ACB3 /* RadioVisibilityView.swift in Sources */,
+				E2D1AA19715E4451AF93565B /* NativeCoverageView.swift in Sources */,
+				2321B8B043594EF58385852A /* CoverageMapView.swift in Sources */,
+				3CB34C6098DF4E3B9BF769FA /* CommunityCoverageStore.swift in Sources */,
+				D664467C43CC4891A7C766A5 /* TDeckExperienceView.swift in Sources */,
+				6C818ACBEBF746219714B613 /* TDeckSceneView.swift in Sources */,
+				0B9ADBD6A2E0407590C2976F /* TDeckScreens.swift in Sources */,
+				CCFDE97023A84B7C8A63E98B /* HelpView.swift in Sources */,
+				ED2779A7294043588DB25DED /* MessageComposer.swift in Sources */,
 				61B06DCE452F4A6599FC1D47 /* ChatFixtureHost.swift in Sources */,
 				4BD73EF6CBC14A47AB9A3192 /* MeshValueRow.swift in Sources */,
 				9AA63F674DF346429C6975E6 /* InterfaceSymbols.swift in Sources */,

@@ -520,6 +520,7 @@ extension PommeCoreViewModel {
         // never been asked, so a random non-zero one cannot be mistaken for it.
         let nonce = UInt32.random(in: 1...UInt32.max)
         meshtasticConfigNonce = nonce
+        connectionManager.reportedMeshtasticLoRa = nil
         deviceConfig.isLoading = true
         deviceConfig.loadedSections = []
         connectionManager.sendToRadio(
@@ -551,6 +552,21 @@ extension PommeCoreViewModel {
             deviceConfig.semanticVersion = firmware
             deviceConfig.loadedSections.insert("deviceInfo")
             DebugLogger.shared.log("MT: firmware '\(firmware)'", level: .rx)
+
+        case .loraConfig(let report):
+            connectionManager.reportedMeshtasticLoRa = report
+            deviceConfig.loadedSections.insert("meshtasticLoRa")
+            // Populate legacy consumers only from explicit values. In particular,
+            // a modem preset never becomes an invented center frequency.
+            if let frequency = report.frequencyMHz, let value = UInt32(exactly: (frequency * 1000).rounded()) {
+                deviceConfig.radioFrequency = value
+            }
+            if let bandwidth = report.bandwidthKHz, let value = UInt32(exactly: (bandwidth * 1000).rounded()) {
+                deviceConfig.radioBandwidth = value
+            }
+            if let factor = report.spreadingFactor { deviceConfig.radioSpreadingFactor = UInt8(clamping: factor) }
+            if let rate = report.codingRate { deviceConfig.radioCodingRate = UInt8(clamping: rate) }
+            if let power = report.txPower, power > 0 { deviceConfig.radioTXPower = UInt8(clamping: power) }
 
         case .nodeInfo(let info):
             upsertMeshtasticNode(
@@ -673,9 +689,8 @@ extension PommeCoreViewModel {
             return
         }
         meshtasticConfigNonce = 0
-        // A deck reports no battery and no radio parameters, so the MeshCore
-        // loading gate — selfInfo plus deviceInfo plus battAndStorage — can
-        // never close on its own and every settings screen would spin forever.
+        // Optional config and health reports vary across firmware. The echoed
+        // nonce closes the dump without waiting on MeshCore-specific sections.
         deviceConfig.isLoading = false
         channelStore.seedPrimaryChannelForDeck()
         let nodeCount = contactStore.contacts.count

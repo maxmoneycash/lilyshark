@@ -142,6 +142,8 @@ final class ConnectionManager {
     var discoveredMeshtasticDevices: [DiscoveredMeshtasticDevice] = []
 
     private(set) var meshtasticState: MeshtasticBLEConnectionState = .disconnected
+    /// Exact fields reported by this link, kept separate from DeviceConfig defaults.
+    var reportedMeshtasticLoRa: MeshtasticProto.LoRaConfig?
     #endif
     #if os(macOS) || targetEnvironment(macCatalyst)
     let usbManager = USBSerialManager()
@@ -1189,6 +1191,7 @@ final class ConnectionManager {
                 guard let self else { return }
                 let wasActive = self.isMeshtasticLinkActive
                 self.meshtasticState = state
+                if state == .connecting || state == .disconnected { self.reportedMeshtasticLoRa = nil }
                 self.isMeshtasticReady = (state == .ready)
                 // .scanning is a shared idle state — both centrals scan at the
                 // same time — so it is not evidence that a deck owns the link.

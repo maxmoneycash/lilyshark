@@ -42,7 +42,7 @@ struct ContactRowView: View {
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
                 if let latestMessage {
-                    Text(latestMessage.isOutgoing ? "You: \(latestMessage.text)" : latestMessage.text)
+                    Text(latestMessage.isOutgoing ? "You: \(latestMessage.interfaceText)" : latestMessage.interfaceText)
                         .font(.subheadline)
                         .foregroundStyle(MeshTheme.textSecondary)
                         .lineLimit(2)

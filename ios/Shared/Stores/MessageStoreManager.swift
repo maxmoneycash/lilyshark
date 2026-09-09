@@ -42,6 +42,28 @@ final class MessageStoreManager {
 
     // MARK: - Dependencies (set by coordinator)
 
+    /// Wired by the coordinator after the radio has finished connecting.
+    var canSendMessagesProvider: (() -> Bool)?
+    var canSendMessages: Bool { canSendMessagesProvider?() ?? false }
+    var lastSendError: String?
+    var messageByteLimit: Int {
+        meshtasticNodeNum == 0 ? MessageTextBudget.meshCoreLimit : MessageTextBudget.meshtasticLimit
+    }
+
+    private func acceptsMessage(_ text: String) -> Bool {
+        let budget = MessageTextBudget(text, limit: messageByteLimit)
+        guard budget.canSend else {
+            lastSendError = budget.text.isEmpty ? "Write a message first." : "The message is too long. Shorten it by \(max(0, -budget.remaining)) bytes."
+            return false
+        }
+        guard canSendMessages else {
+            lastSendError = "Connect a deck before sending. Your message has not been sent."
+            return false
+        }
+        lastSendError = nil
+        return true
+    }
+
     /// Closure to send a command frame to the device.
     var sendCommand: ((Data, String) -> Void)?
 
@@ -88,7 +110,13 @@ final class MessageStoreManager {
     var onUnreadChanged: (() -> Void)?
 
     /// Pending pre-send path check: holds message frame until advert path response arrives.
-    private var pendingPathCheck: (contact: Contact, frame: Data)?
+    private struct PendingPathCheck {
+        let contact: Contact
+        let frame: Data
+        let messageID: UUID
+        let radioPrefix: String?
+    }
+    private var pendingPathCheck: PendingPathCheck?
     private var pathCheckTimeoutTask: Task<Void, Never>?
 
     /// Whether the app is currently in the background.
@@ -118,6 +146,13 @@ final class MessageStoreManager {
 
     /// Maps expected ACK code -> message tracking info.
     private var pendingACKs: [UInt32: (contactKeyHash: Data, messageID: UUID)] = [:]
+
+    /// MeshCore text frames that have gone to the radio and still need RESP_SENT.
+    ///
+    /// RESP_SENT is one global reply for every send-text command. Matching the
+    /// first `.sending` bubble would attach another message's ACK — including a
+    /// path-check message that has not been transmitted yet.
+    private var awaitingSentResponse: [(contactKeyHash: Data, messageID: UUID)] = []
 
     /// Meshtastic packet ids the deck still owes a Routing result for.
     ///
@@ -150,6 +185,7 @@ final class MessageStoreManager {
     func activateForRadio(_ prefix: String) {
         #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
         guard radioPrefix12 != prefix else { return }
+        clearInFlightTracking()
         radioPrefix12 = prefix
         messagesByContact.removeAll()
         unreadCounts.removeAll()
@@ -161,6 +197,7 @@ final class MessageStoreManager {
             mergeMessagesForCurrentRadio()
             return
         }
+        clearInFlightTracking()
         radioPrefix12 = prefix
         persistenceStore = MessageStore(radioPrefix: prefix)
         MessageStore.migrateToPerRadioStorage(radioPrefix: prefix)
@@ -175,11 +212,29 @@ final class MessageStoreManager {
 
     /// Deactivate message storage on disconnect. Clears in-memory messages so the UI shows empty state.
     func deactivate() {
+        pathCheckTimeoutTask?.cancel()
+        pendingPathCheck = nil
+        clearInFlightTracking()
         flushDirtyMessages()
         messagesByContact.removeAll()
         unreadCounts.removeAll()
         radioPrefix12 = nil
         updateAppBadge()
+    }
+
+    private func clearInFlightTracking() {
+        awaitingSentResponse.removeAll()
+        pendingACKs.removeAll()
+        pendingChannelEcho = nil
+        #if canImport(MeshtasticKit)
+        pendingMeshtasticPackets.removeAll()
+        #endif
+    }
+
+    /// Put a MeshCore text frame on the wire and remember which bubble owns the next RESP_SENT.
+    private func transmitMeshCoreText(_ frame: Data, id: UUID, contactKey: Data, label: String) {
+        sendCommand?(frame, label)
+        awaitingSentResponse.append((contactKeyHash: contactKey, messageID: id))
     }
 
     // MARK: - Message Access
@@ -362,9 +417,10 @@ final class MessageStoreManager {
 
     // MARK: - Send Messages
 
-    func sendTextMessage(_ text: String, to contact: Contact, signed: Bool = false) {
+    @discardableResult
+    func sendTextMessage(_ text: String, to contact: Contact, signed: Bool = false) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard acceptsMessage(trimmed) else { return false }
 
         #if canImport(MeshtasticKit)
         if meshtasticNodeNum != 0 {
@@ -373,10 +429,11 @@ final class MessageStoreManager {
                 // node number, so there is no address on this mesh to send to.
                 Self.logger.warning("MT SEND: \(contact.name) is not a Meshtastic node — refusing")
                 DebugLogger.shared.log("MT SEND blocked: '\(contact.name)' has no node number", level: .error)
-                return
+                lastSendError = "This contact has no address on the connected mesh."
+                return false
             }
             sendMeshtasticText(trimmed, to: node, channelIndex: nil, conversationKey: contact.publicKeyPrefix)
-            return
+            return true
         }
         #endif
 
@@ -403,8 +460,10 @@ final class MessageStoreManager {
         // If the contact's advert arrived directly (path_len=0), reset the outbound
         // route so the firmware discovers the direct path instead of routing through
         // a repeater. This is a local firmware query — no airtime cost.
-        if contact.outPathLen > 0 {
-            pendingPathCheck = (contact: contact, frame: frame)
+        let alreadyCheckingPath = pendingPathCheck != nil
+        if alreadyCheckingPath { flushPendingPathCheck(reason: "next message") }
+        if contact.outPathLen > 0 && !alreadyCheckingPath {
+            pendingPathCheck = PendingPathCheck(contact: contact, frame: frame, messageID: outgoing.id, radioPrefix: radioPrefix12)
             let query = MeshCoreProtocol.buildGetAdvertPath(publicKey: contact.publicKey)
             sendCommand?(query, "PRE_SEND_PATH_CHECK")
             pathCheckTimeoutTask?.cancel()
@@ -414,8 +473,9 @@ final class MessageStoreManager {
                 self.flushPendingPathCheck(reason: "timeout")
             }
         } else {
-            sendCommand?(frame, "SEND_TXT")
+            transmitMeshCoreText(frame, id: outgoing.id, contactKey: contact.publicKeyPrefix, label: "SEND_TXT")
         }
+        return true
     }
 
     /// Handle advert path response for a pending pre-send path check.
@@ -423,6 +483,7 @@ final class MessageStoreManager {
         guard let pending = pendingPathCheck else { return }
         pathCheckTimeoutTask?.cancel()
         pendingPathCheck = nil
+        guard isCurrentPathCheck(pending) else { return }
 
         if info.pathLen == 0 {
             // Last advert from this contact arrived directly — they're in range.
@@ -431,13 +492,23 @@ final class MessageStoreManager {
             DebugLogger.shared.log("PATH REFRESH: \(pending.contact.name) direct advert detected, resetting route", level: .info)
             resetPathForContact?(pending.contact)
             Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                self?.sendCommand?(pending.frame, "SEND_TXT(path_refreshed)")
+                do { try await Task.sleep(nanoseconds: 500_000_000) }
+                catch { return }
+                guard let self, self.isCurrentPathCheck(pending) else { return }
+                self.transmitMeshCoreText(
+                    pending.frame, id: pending.messageID,
+                    contactKey: pending.contact.publicKeyPrefix,
+                    label: "SEND_TXT(path_refreshed)"
+                )
             }
         } else {
             // Contact still reached via repeater(s) — send on the cached routed path.
             Self.logger.info("PRE-SEND PATH CHECK: \(pending.contact.name) still routed (\(info.pathLen) hops)")
-            sendCommand?(pending.frame, "SEND_TXT")
+            transmitMeshCoreText(
+                pending.frame, id: pending.messageID,
+                contactKey: pending.contact.publicKeyPrefix,
+                label: "SEND_TXT"
+            )
         }
     }
 
@@ -445,13 +516,26 @@ final class MessageStoreManager {
         guard let pending = pendingPathCheck else { return }
         pendingPathCheck = nil
         pathCheckTimeoutTask?.cancel()
+        guard isCurrentPathCheck(pending) else { return }
         Self.logger.info("PRE-SEND PATH CHECK: flushing (\(reason)) — sending on cached path for \(pending.contact.name)")
-        sendCommand?(pending.frame, "SEND_TXT")
+        transmitMeshCoreText(
+            pending.frame, id: pending.messageID,
+            contactKey: pending.contact.publicKeyPrefix,
+            label: "SEND_TXT"
+        )
     }
 
-    func sendChannelMessage(_ text: String, channelIndex: UInt8 = 0, signed: Bool = false) {
+    private func isCurrentPathCheck(_ pending: PendingPathCheck) -> Bool {
+        canSendMessages && meshtasticNodeNum == 0 && radioPrefix12 == pending.radioPrefix
+            && messagesByContact[pending.contact.publicKeyPrefix]?.contains(where: {
+                $0.id == pending.messageID && $0.status == .sending
+            }) == true
+    }
+
+    @discardableResult
+    func sendChannelMessage(_ text: String, channelIndex: UInt8 = 0, signed: Bool = false) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard acceptsMessage(trimmed) else { return false }
 
         #if canImport(MeshtasticKit)
         if meshtasticNodeNum != 0 {
@@ -461,7 +545,7 @@ final class MessageStoreManager {
                 channelIndex: channelIndex,
                 conversationKey: Data([channelIndex])
             )
-            return
+            return true
         }
         #endif
 
@@ -488,14 +572,16 @@ final class MessageStoreManager {
         messagesByContact[channelKey, default: []].append(outgoing)
         persistMessages(for: channelKey)
 
-        sendCommand?(frame, "SEND_CHANNEL_TXT")
+        transmitMeshCoreText(frame, id: outgoing.id, contactKey: channelKey, label: "SEND_CHANNEL_TXT")
         pendingChannelEcho = (id: outgoing.id, channelKey: channelKey, sent: Date())
         DebugLogger.shared.log("ECHO: armed pending echo for ch=\(channelIndex)", level: .info)
+        return true
     }
 
-    func sendRoomMessage(_ text: String, to contact: Contact) {
+    @discardableResult
+    func sendRoomMessage(_ text: String, to contact: Contact) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard acceptsMessage(trimmed) else { return false }
 
         let outgoing = Message(
             contactKeyHash: contact.publicKeyPrefix,
@@ -512,7 +598,8 @@ final class MessageStoreManager {
             recipientKeyHash: contact.publicKeyPrefix,
             txtType: 0
         )
-        sendCommand?(frame, "SEND_ROOM_TXT")
+        transmitMeshCoreText(frame, id: outgoing.id, contactKey: contact.publicKeyPrefix, label: "SEND_ROOM_TXT")
+        return true
     }
 
     #if canImport(MeshtasticKit)
@@ -569,6 +656,7 @@ final class MessageStoreManager {
 
         pendingMeshtasticPackets[packetID] = (conversationKey: conversationKey, messageID: outgoing.id)
         guard sendToRadio?(payload, label) == true else {
+            lastSendError = "The message could not reach the deck. Reconnect and retry."
             pendingMeshtasticPackets.removeValue(forKey: packetID)
             markMeshtasticMessage(outgoing.id, in: conversationKey, as: .failed,
                                   reason: "The message could not reach the deck. Reconnect and retry.")
@@ -661,38 +749,47 @@ final class MessageStoreManager {
     // MARK: - ACK Handling
 
     func handleSentResponse(expectedACK: UInt32, suggestedTimeoutMs: UInt32) {
-        var matched = false
-        for (contactKey, messages) in messagesByContact {
-            if let idx = messages.firstIndex(where: { $0.isOutgoing && ($0.status == .sending || $0.status == .retrying || $0.status == .flooding) }) {
-                // Don't downgrade a flooding message back to sent — keep .flooding visible until ACK or timeout
-                let keepFlooding = messages[idx].status == .flooding
-                Self.logger.info("DM RESP_SENT: matched message \(messages[idx].id) → \(keepFlooding ? ".flooding (kept)" : ".sent"), ack=\(expectedACK)")
-                if !keepFlooding {
-                    messagesByContact[contactKey]?[idx].status = .sent
-                }
-                messagesByContact[contactKey]?[idx].expectedACK = expectedACK
-                messagesByContact[contactKey]?[idx].suggestedTimeoutMs = suggestedTimeoutMs
-                pendingACKs[expectedACK] = (contactKeyHash: contactKey, messageID: messages[idx].id)
-                persistMessages(for: contactKey)
-                matched = true
-
-                // Direct/retry phase: cap at 15s (covers SF12/BW125/CR4-8 worst-case ~12s round trip).
-                // Flood phase uses firmware's full suggested timeout — mesh propagation needs more time.
-                let rawSec = UInt64(suggestedTimeoutMs / 1000)
-                let timeoutSec = keepFlooding ? max(rawSec, 6) : min(max(rawSec, 6), 15)
-                Task { @MainActor [weak self] in
-                    try? await Task.sleep(nanoseconds: timeoutSec * 1_000_000_000)
-                    guard let self else { return }
-                    if self.pendingACKs[expectedACK] != nil {
-                        self.handleACKTimeout(ackCode: expectedACK)
-                    }
-                }
-                break
-            }
-        }
-        if !matched {
+        guard !awaitingSentResponse.isEmpty else {
             // Expected for CLI commands, login, status requests — not just DMs.
             Self.logger.debug("DM RESP_SENT: no pending message for ack=\(expectedACK) (likely non-DM command)")
+            return
+        }
+        let next = awaitingSentResponse.removeFirst()
+        guard var messages = messagesByContact[next.contactKeyHash],
+              let idx = messages.firstIndex(where: { $0.id == next.messageID && $0.isOutgoing }) else {
+            Self.logger.debug("DM RESP_SENT: transmitted message \(next.messageID) is gone, ack=\(expectedACK)")
+            return
+        }
+
+        let status = messages[idx].status
+        guard status == .sending || status == .retrying || status == .flooding else {
+            // Channel sends are stored as .sent before the radio replies. Consume
+            // this RESP_SENT so it cannot attach to another conversation.
+            Self.logger.debug("DM RESP_SENT: consumed ack=\(expectedACK) for \(next.messageID) in \(status.rawValue)")
+            return
+        }
+
+        let keepFlooding = status == .flooding
+        Self.logger.info("DM RESP_SENT: matched message \(messages[idx].id) → \(keepFlooding ? ".flooding (kept)" : ".sent"), ack=\(expectedACK)")
+        if !keepFlooding {
+            messages[idx].status = .sent
+        }
+        messages[idx].expectedACK = expectedACK
+        messages[idx].suggestedTimeoutMs = suggestedTimeoutMs
+        messagesByContact[next.contactKeyHash] = messages
+        pendingACKs[expectedACK] = (contactKeyHash: next.contactKeyHash, messageID: messages[idx].id)
+        persistMessages(for: next.contactKeyHash)
+
+        // Direct/retry phase: cap at 15s (covers SF12/BW125/CR4-8 worst-case ~12s round trip).
+        // Flood phase uses firmware's full suggested timeout — mesh propagation needs more time.
+        let rawSec = UInt64(suggestedTimeoutMs / 1000)
+        let timeoutSec = keepFlooding ? max(rawSec, 6) : min(max(rawSec, 6), 15)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: timeoutSec * 1_000_000_000)
+            guard let self else { return }
+            if self.pendingACKs[expectedACK] != nil {
+                self.handleACKTimeout(ackCode: expectedACK)
+            }
         }
     }
 
@@ -739,10 +836,10 @@ final class MessageStoreManager {
 
                 if let channelIdx = message.channelIndex {
                     let frame = MeshCoreProtocol.buildSendChannelMessage(text: message.text, channelIndex: channelIdx)
-                    sendCommand?(frame, "AUTO_RETRY_CHANNEL(\(attempt))")
+                    transmitMeshCoreText(frame, id: message.id, contactKey: contactKey, label: "AUTO_RETRY_CHANNEL(\(attempt))")
                 } else {
                     let frame = MeshCoreProtocol.buildSendTextMessage(text: message.text, recipientKeyHash: contactKey, attempt: attempt)
-                    sendCommand?(frame, "AUTO_RETRY_TXT(\(attempt))")
+                    transmitMeshCoreText(frame, id: message.id, contactKey: contactKey, label: "AUTO_RETRY_TXT(\(attempt))")
                 }
                 return
             }
@@ -778,7 +875,7 @@ final class MessageStoreManager {
                 persistMessages(for: contactKey)
 
                 let frame = MeshCoreProtocol.buildSendTextMessage(text: message.text, recipientKeyHash: contactKey, attempt: attempt)
-                sendCommand?(frame, "FLOOD_RETRY_TXT(\(attempt))")
+                transmitMeshCoreText(frame, id: message.id, contactKey: contactKey, label: "FLOOD_RETRY_TXT(\(attempt))")
                 return
             }
         }
@@ -794,12 +891,31 @@ final class MessageStoreManager {
     /// Called when firmware returns RESP_ERR — no RESP_SENT will arrive, so no expectedACK
     /// is registered and no timeout task is scheduled. Without this, the message hangs forever.
     func failPendingSendingMessage() {
-        for (contactKey, messages) in messagesByContact {
-            if let idx = messages.firstIndex(where: { $0.isOutgoing && $0.status == .sending }) {
+        while !awaitingSentResponse.isEmpty {
+            let next = awaitingSentResponse.removeFirst()
+            if var messages = messagesByContact[next.contactKeyHash],
+               let idx = messages.firstIndex(where: {
+                   $0.id == next.messageID && $0.isOutgoing && $0.status == .sending
+               }) {
                 Self.logger.warning("RESP_ERR received with message \(messages[idx].id) stuck in .sending — marking failed")
-                messagesByContact[contactKey]?[idx].status = .failed
-                persistMessages(for: contactKey)
-                break
+                messages[idx].status = .failed
+                messagesByContact[next.contactKeyHash] = messages
+                persistMessages(for: next.contactKeyHash)
+                return
+            }
+        }
+        if let pending = pendingPathCheck {
+            pendingPathCheck = nil
+            pathCheckTimeoutTask?.cancel()
+            if isCurrentPathCheck(pending),
+               var messages = messagesByContact[pending.contact.publicKeyPrefix],
+               let idx = messages.firstIndex(where: {
+                   $0.id == pending.messageID && $0.isOutgoing && $0.status == .sending
+               }) {
+                Self.logger.warning("RESP_ERR received while path-checking message \(pending.messageID) — marking failed")
+                messages[idx].status = .failed
+                messagesByContact[pending.contact.publicKeyPrefix] = messages
+                persistMessages(for: pending.contact.publicKeyPrefix)
             }
         }
     }
@@ -870,21 +986,18 @@ final class MessageStoreManager {
 
     func addReaction(_ emoji: String, to message: Message) {
         let contactKey = message.contactKeyHash
-        guard var messages = messagesByContact[contactKey],
-              let idx = messages.firstIndex(where: { $0.id == message.id }) else { return }
-        if messages[idx].reactions.contains(emoji) {
-            messages[idx].reactions.removeAll { $0 == emoji }
+        guard let current = messagesByContact[contactKey]?.first(where: { $0.id == message.id }) else { return }
+        if current.reactions.contains(emoji) {
+            guard let index = messagesByContact[contactKey]?.firstIndex(where: { $0.id == message.id }) else { return }
+            messagesByContact[contactKey]?[index].reactions.removeAll { $0 == emoji }
+            persistMessages(for: contactKey)
         } else {
-            messages[idx].reactions.append(emoji)
-            // Send reaction over the mesh (MeshCore One compatible format)
-            let hash = reactionHash(for: message)
-            let reactionText = "\(emoji)\n\(hash)"
-            if let contact = contactProvider?(contactKey) {
-                sendTextMessage(reactionText, to: contact)
-            }
+            let reactionText = "\(emoji)\n\(reactionHash(for: message))"
+            guard let contact = contactProvider?(contactKey), sendTextMessage(reactionText, to: contact), lastSendError == nil else { return }
+            // Read the current array after sending; a pre-send copy would
+            // discard the outgoing record and its delivery tracking.
+            addReactionLocal(emoji, to: message)
         }
-        messagesByContact[contactKey] = messages
-        persistMessages(for: contactKey)
     }
 
     /// Add a reaction locally without sending over mesh (for channel reactions sent separately).
@@ -968,6 +1081,9 @@ final class MessageStoreManager {
     }
 
     func deleteMessage(_ message: Message, in contactKey: Data) {
+        awaitingSentResponse.removeAll { $0.messageID == message.id }
+        pendingACKs = pendingACKs.filter { $0.value.messageID != message.id }
+        if pendingChannelEcho?.id == message.id { pendingChannelEcho = nil }
         if var messages = messagesByContact[contactKey],
            let idx = messages.firstIndex(where: { $0.id == message.id }) {
             messages.remove(at: idx)
@@ -997,6 +1113,13 @@ final class MessageStoreManager {
     func retryMessage(_ message: Message) {
         guard message.isOutgoing, message.status == .failed else { return }
         let contactKey = message.contactKeyHash
+        guard acceptsMessage(message.text) else {
+            if let index = messagesByContact[contactKey]?.firstIndex(where: { $0.id == message.id }) {
+                messagesByContact[contactKey]?[index].failureReason = lastSendError
+                persistMessages(for: contactKey)
+            }
+            return
+        }
         guard messagesByContact[contactKey]?.first(where: { $0.id == message.id })?.status == .failed else { return }
 
         #if canImport(MeshtasticKit)
@@ -1040,7 +1163,7 @@ final class MessageStoreManager {
                 messages[idx].attempt = 0
                 messagesByContact[contactKey] = messages
                 let frame = MeshCoreProtocol.buildSendChannelMessage(text: message.text, channelIndex: channelIndex)
-                sendCommand?(frame, "MANUAL_RETRY_CHANNEL")
+                transmitMeshCoreText(frame, id: message.id, contactKey: contactKey, label: "MANUAL_RETRY_CHANNEL")
             }
             persistMessages(for: contactKey)
         }
@@ -1054,12 +1177,12 @@ final class MessageStoreManager {
         Task { @MainActor [weak self] in
             do { try await Task.sleep(nanoseconds: 500_000_000) }
             catch { return }
-            guard let self,
+            guard let self, self.canSendMessages,
                   self.radioPrefix12 == retryRadioPrefix,
                   self.meshtasticNodeNum == 0,
                   self.messagesByContact[contactKey]?.first(where: { $0.id == message.id })?.status == expectedStatus else { return }
             let frame = MeshCoreProtocol.buildSendTextMessage(text: message.text, recipientKeyHash: contactKey, attempt: attempt)
-            self.sendCommand?(frame, label)
+            self.transmitMeshCoreText(frame, id: message.id, contactKey: contactKey, label: label)
         }
     }
 
@@ -1079,6 +1202,7 @@ final class MessageStoreManager {
             }
         }
         pendingACKs.removeAll()
+        awaitingSentResponse.removeAll()
     }
 
     // MARK: - iCloud Message Sync
@@ -1338,6 +1462,7 @@ final class MessageStoreManager {
     func reset() {
         isSyncingMessages = false
         pendingACKs.removeAll()
+        awaitingSentResponse.removeAll()
         pendingChannelEcho = nil
         meshtasticNodeNum = 0
         #if canImport(MeshtasticKit)

@@ -2,11 +2,21 @@ import SwiftUI
 
 /// A short introduction with scrollable content and a persistent action bar.
 struct OnboardingView: View {
+    enum Mode {
+        case firstRun
+        case replay
+    }
+
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var hasCompletedOnboarding: Bool
     var navigateToSettings: (() -> Void)? = nil
+    var mode: Mode = .firstRun
     @State private var currentPage = 0
+    #if os(iOS) || os(macOS)
+    @State private var showDeck = false
+    #endif
     private let lastPage = 3
 
     var body: some View {
@@ -29,10 +39,10 @@ struct OnboardingView: View {
                 Spacer()
                 if currentPage < lastPage {
                     Button { complete() } label: {
-                        Text("Skip").touchable()
+                        Text(mode == .replay ? "Close" : "Skip").touchable()
                     }
                     .buttonStyle(.meshSecondary)
-                    .accessibilityLabel("Skip introduction")
+                    .accessibilityLabel(mode == .replay ? "Close welcome guide" : "Skip introduction")
                 }
             }
             .padding(.horizontal, Design.Space.loose)
@@ -46,12 +56,27 @@ struct OnboardingView: View {
         }
         .tint(MeshTheme.interactiveGreen)
         .meshAnimation(Design.Motion.quick, value: currentPage)
+        #if os(iOS) || os(macOS)
+        .sheet(isPresented: $showDeck) {
+            NavigationStack {
+                TDeckExperienceView()
+                    .lilysharkSheet { showDeck = false }
+            }
+            .meshTheme()
+        }
+        #endif
     }
 
     @ViewBuilder
     private var pageContent: some View {
         switch currentPage {
         case 0:
+            #if os(iOS) || os(macOS)
+            TDeckHeroView()
+                .frame(height: dynamicTypeSize.isAccessibilitySize ? 200 : 260)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: Design.Radius.control, style: .continuous))
+            #else
             ZStack {
                 MeshAnimationBackdrop()
                 Image(systemName: "antenna.radiowaves.left.and.right")
@@ -60,10 +85,21 @@ struct OnboardingView: View {
             }
             .frame(height: dynamicTypeSize.isAccessibilitySize ? 100 : 160)
             .accessibilityHidden(true)
+            #endif
             pageTitle("Welcome to Lilyshark")
             paragraph("Message nearby people through your deck or radio, even without internet or cell service.")
             feature("Messages", symbol: "bubble.left.and.bubble.right", detail: "Direct conversations and shared channels.")
             feature("Map", symbol: "map", detail: "Positions shared by nodes on your mesh.")
+            #if os(iOS) || os(macOS)
+            Button {
+                showDeck = true
+            } label: {
+                Text("Look around the deck")
+                    .frame(maxWidth: .infinity)
+                    .touchable()
+            }
+            .buttonStyle(.meshSecondary)
+            #endif
         case 1:
             pageTitle("Connect your radio")
             paragraph("Use a Lilyshark deck or a MeshCore radio with Bluetooth enabled.")
@@ -155,17 +191,21 @@ struct OnboardingView: View {
                 complete()
             }
         } label: {
-            Text(currentPage < lastPage ? "Continue" : "Get Started")
+            Text(currentPage < lastPage ? "Continue" : (mode == .replay ? "Done" : "Get Started"))
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .touchable()
         }
         .buttonStyle(.meshPrimary)
         .foregroundStyle(MeshTheme.textOnAccent)
-        .accessibilityLabel(currentPage < lastPage ? "Next introduction page" : "Get started with Lilyshark")
+        .accessibilityLabel(currentPage < lastPage ? "Next introduction page" : (mode == .replay ? "Close welcome guide" : "Get started with Lilyshark"))
     }
 
     private func complete() {
+        if mode == .replay {
+            dismiss()
+            return
+        }
         withMeshAnimation(reduceMotion: reduceMotion) { hasCompletedOnboarding = true }
     }
 }

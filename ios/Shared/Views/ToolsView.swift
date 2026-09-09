@@ -20,9 +20,27 @@ struct ToolsView: View {
     @State private var showAirtime = false
     @State private var showSensitivity = false
     @State private var showFreqScanner = false
+    @State private var showDeck = false
+    @State private var connectAfterDismiss = false
     var body: some View {
         List {
+            if connectionManager.connectionState != .ready {
+                Section {
+                    Button("Connect a deck", systemImage: "antenna.radiowaves.left.and.right") {
+                        connectionManager.requestShowScanner = true
+                    }
+                    .buttonStyle(.meshSecondary)
+                }
+            }
             Section {
+                toolButton(
+                    icon: "rotate.3d",
+                    title: "The Deck",
+                    subtitle: "Turn the T-Deck and walk through every firmware screen"
+                ) {
+                    showDeck = true
+                }
+
                 toolButton(
                     icon: "eye.trianglebadge.exclamationmark",
                     title: "Line of Sight",
@@ -84,7 +102,17 @@ struct ToolsView: View {
             }
         }
         .meshTheme()
-        .navigationTitle("Tools")
+        .navigationTitle("Radio")
+        .sheet(isPresented: $showDeck) {
+            NavigationStack {
+                TDeckExperienceView()
+                    .lilysharkSheet { showDeck = false }
+            }
+            .meshTheme()
+            #if os(macOS) || targetEnvironment(macCatalyst)
+            .frame(minWidth: 520, minHeight: 720)
+            #endif
+        }
         .sheet(isPresented: $showLineOfSight) {
             LineOfSightView()
             #if os(macOS) || targetEnvironment(macCatalyst)
@@ -121,7 +149,7 @@ struct ToolsView: View {
             .frame(minWidth: 500, idealWidth: 600, minHeight: 600, idealHeight: 700)
             #endif
         }
-        .sheet(isPresented: $showFreqScanner) {
+        .sheet(isPresented: $showFreqScanner, onDismiss: openScannerIfRequested) {
             NavigationStack {
                 Group {
                     if supportsMonitoring {
@@ -137,7 +165,7 @@ struct ToolsView: View {
             .frame(minWidth: 400, minHeight: 500)
             #endif
         }
-        .sheet(isPresented: $showNoiseFloor) {
+        .sheet(isPresented: $showNoiseFloor, onDismiss: openScannerIfRequested) {
             NavigationStack {
                 ScrollView {
                     if supportsMonitoring {
@@ -163,11 +191,26 @@ struct ToolsView: View {
     }
 
     private var monitoringUnavailable: some View {
-        ContentUnavailableView(
-            "Connect a MeshCore radio",
-            systemImage: "antenna.radiowaves.left.and.right.slash",
-            description: Text("These tools use MeshCore radio reports and controls. For a Lilyshark deck, open the web app and connect over USB to monitor radio traffic.")
-        )
+        ContentUnavailableView {
+            Label("MeshCore radio required", systemImage: "antenna.radiowaves.left.and.right.slash")
+        } description: {
+            Text("These tools use MeshCore radio reports and controls. For a Lilyshark deck, open the web app and connect over USB to monitor radio traffic.")
+        } actions: {
+            if !connectionManager.isActivelyConnected {
+                Button("Choose a radio") {
+                    connectAfterDismiss = true
+                    showFreqScanner = false
+                    showNoiseFloor = false
+                }
+                .buttonStyle(.meshPrimary)
+            }
+        }
+    }
+
+    private func openScannerIfRequested() {
+        guard connectAfterDismiss else { return }
+        connectAfterDismiss = false
+        connectionManager.requestShowScanner = true
     }
 
     private func toolButton(icon: String, title: LocalizedStringKey, subtitle: LocalizedStringKey, action: @escaping () -> Void) -> some View {

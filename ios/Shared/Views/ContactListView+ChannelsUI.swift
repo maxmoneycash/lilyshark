@@ -227,6 +227,7 @@ extension ContactListView {
     var channelsSection: some View {
         Section(isExpanded: $channelsExpanded) {
             // Public channel is always the first item
+            if matchesChannel(index: 0, name: "Public Channel") {
             #if os(watchOS)
             NavigationLink {
                 ChannelChatView(channelIndex: 0, channelName: "Public Channel")
@@ -244,8 +245,9 @@ extension ContactListView {
                     : MeshTheme.surface
             )
             #endif
+            }
 
-            ForEach(channelStore.channels.filter { $0.index != 0 }) { channel in
+            ForEach(channelStore.channels.filter { $0.index != 0 && matchesChannel(index: $0.index, name: $0.name) }) { channel in
                 #if os(watchOS)
                 NavigationLink {
                     ChannelChatView(channelIndex: channel.index, channelName: channel.name)

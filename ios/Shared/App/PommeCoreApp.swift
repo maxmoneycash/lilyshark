@@ -247,6 +247,9 @@ struct ContentView: View {
     @State private var hasRequestedAutoScan = false
     /// Bridged from OnboardingView's "Open Settings Now" button.
     @AppStorage("openSettingsAfterOnboarding") private var openSettingsAfterOnboarding = false
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     var body: some View {
         #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
@@ -443,7 +446,7 @@ struct ContentView: View {
         @Bindable var navigation = navigationStore
         TabView(selection: $navigation.section) {
             Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: AppSection.messages) {
-                messagesNavigation
+                messagesRoot
             }
             Tab("Map", systemImage: "map", value: AppSection.map) {
                 NavigationStack { MeshMapView() }
@@ -456,9 +459,51 @@ struct ContentView: View {
             }
         }
         #else
+        messagesRoot
+        #endif
+    }
+
+    /// Phone portrait lands on the guided welcome instead of an empty list.
+    @ViewBuilder
+    private var messagesRoot: some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if showsDisconnectedWelcome {
+            NavigationStack {
+                WelcomeHomeView(showScanner: $showScanner)
+                    .lilysharkNavigationTitle()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            NavigationLink {
+                                ContactListView(
+                                    showScanner: $showScanner,
+                                    showDiscover: $showDiscover,
+                                    showSettings: $showSettings,
+                                    showRemoteManagement: $showRemoteManagement,
+                                    showAdvertSent: $showAdvertSent
+                                )
+                            } label: {
+                                Image(systemName: "bubble.left.and.bubble.right")
+                            }
+                            .accessibilityLabel("Conversations")
+                            .accessibilityHint("Open the contact list without connecting")
+                        }
+                    }
+            }
+        } else {
+            messagesNavigation
+        }
+        #else
         messagesNavigation
         #endif
     }
+
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    private var showsDisconnectedWelcome: Bool {
+        horizontalSizeClass == .compact
+            && connectionManager.connectionState == .disconnected
+            && navigationStore.sidebarSelection == nil
+    }
+    #endif
 
     private var messagesNavigation: some View {
         NavigationSplitView {
@@ -539,23 +584,7 @@ struct ContentView: View {
             #endif
             case nil:
                 if connectionManager.connectionState == .disconnected {
-                    VStack(spacing: 16) {
-                        ContentUnavailableView(
-                            "Connect a deck or radio",
-                            systemImage: "antenna.radiowaves.left.and.right.slash",
-                            description: Text("Power on a Lilyshark deck or MeshCore radio, then scan for nearby devices.")
-                        )
-                        Button {
-                            showScanner = true
-                        } label: {
-                            Label("Scan for Devices", systemImage: "magnifyingglass")
-                                .touchable()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(MeshTheme.interactiveGreen)
-                        .foregroundStyle(.black)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    WelcomeHomeView(showScanner: $showScanner)
                 } else {
                     VStack(spacing: 16) {
                         Image(systemName: "bubble.left.and.bubble.right")
@@ -594,7 +623,8 @@ struct ContentView: View {
             return
         }
 
-        showScanner = true
+        // Scan in the background so Connect opens onto a populated list.
+        // Do not present the scanner: the welcome is the first screen.
         connectionManager.requestAutoScan()
     }
 

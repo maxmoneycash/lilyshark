@@ -28,15 +28,15 @@ struct SendDirectMessageIntent: AppIntent {
         guard isConnected else {
             throw IntentError.notConnected
         }
-        let sent = await MainActor.run { () -> Bool in
+        try await MainActor.run {
             guard let contact = bridge.contactStore?.contacts.first(where: { $0.publicKeyPrefix.hexCompact == recipient.id }) else {
-                return false
+                throw IntentError.contactNotFound
             }
-            bridge.messageStoreManager?.sendTextMessage(message, to: contact)
-            return true
+            guard let store = bridge.messageStoreManager, store.sendTextMessage(message, to: contact), store.lastSendError == nil else {
+                throw IntentError.sendRejected(bridge.messageStoreManager?.lastSendError ?? "Open Lilyshark and connect a deck to send.")
+            }
         }
-        guard sent else { throw IntentError.contactNotFound }
-        return .result(dialog: "Message sent to \(recipient.name).")
+        return .result(dialog: "Message queued for \(recipient.name). Delivery is not confirmed.")
     }
 }
 
@@ -56,15 +56,15 @@ struct SendChannelMessageIntent: AppIntent {
         guard isConnected else {
             throw IntentError.notConnected
         }
-        let sent = await MainActor.run { () -> Bool in
+        try await MainActor.run {
             guard let ch = bridge.channelStore?.channels.first(where: { String($0.index) == channel.id }) else {
-                return false
+                throw IntentError.channelNotFound
             }
-            bridge.messageStoreManager?.sendChannelMessage(message, channelIndex: ch.index)
-            return true
+            guard let store = bridge.messageStoreManager, store.sendChannelMessage(message, channelIndex: ch.index), store.lastSendError == nil else {
+                throw IntentError.sendRejected(bridge.messageStoreManager?.lastSendError ?? "Open Lilyshark and connect a deck to send.")
+            }
         }
-        guard sent else { throw IntentError.channelNotFound }
-        return .result(dialog: "Message sent to \(channel.name).")
+        return .result(dialog: "Message queued for \(channel.name). Delivery is not confirmed.")
     }
 }
 
@@ -92,12 +92,14 @@ private enum IntentError: Error, LocalizedError {
     case notConnected
     case contactNotFound
     case channelNotFound
+    case sendRejected(String)
 
     var errorDescription: String? {
         switch self {
         case .notConnected: return "Radio is not connected."
         case .contactNotFound: return "Contact not found."
         case .channelNotFound: return "Channel not found."
+        case .sendRejected(let reason): return reason
         }
     }
 }

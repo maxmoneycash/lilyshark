@@ -23,6 +23,7 @@ struct MessageSendFailure: View {
                     .touchable()
             }
             .buttonStyle(.meshSecondary)
+            .disabled(!messageStoreManager.canSendMessages)
             .accessibilityHint("Sends this message again through the connected deck")
         }
         .padding(12)

@@ -13,6 +13,10 @@ import StoreKit
 import LocalAuthentication
 import CloudKit
 import MeshCoreKit
+#if os(iOS)
+import UserNotifications
+import UIKit
+#endif
 #if !os(watchOS)
 import CoreLocation
 #endif
@@ -27,9 +31,20 @@ extension SettingsView {
 
 struct NotificationsSection: View {
     @ObservedObject private var prefs = NotificationPreferences.shared
+    #if os(iOS)
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
+    @State private var authorizationStatus: UNAuthorizationStatus?
+    @State private var alertsEnabled = false
+    @State private var isRequestingAccess = false
+    @State private var accessError: String?
+    #endif
 
     var body: some View {
         Section {
+            #if os(iOS)
+            notificationAccess
+            #endif
             Toggle(isOn: $prefs.notifyDirect) {
                 Label("Direct Messages", systemImage: "bubble.left.fill")
                     .foregroundStyle(MeshTheme.accent)
@@ -80,7 +95,98 @@ struct NotificationsSection: View {
         } header: {
             SectionInfoHeader(title: "Notifications", info: "Choose which events trigger notifications. In-App Banners shows alerts even when the app is open.")
         }
+        #if os(iOS)
+        .task { await refreshNotificationAccess() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await refreshNotificationAccess() }
+            }
+        }
+        #endif
     }
+
+    #if os(iOS)
+    private var notificationAccess: some View {
+        VStack(alignment: .leading, spacing: Design.Space.tight) {
+            Label(notificationAccessTitle, systemImage: "bell.badge")
+                .font(.headline)
+            Text(notificationAccessDetail)
+                .font(.footnote)
+                .foregroundStyle(MeshTheme.textSecondary)
+            if authorizationStatus == .notDetermined {
+                Button {
+                    Task { await requestNotificationAccess() }
+                } label: {
+                    Text(isRequestingAccess ? "Requesting Access…" : "Allow Notifications")
+                        .frame(maxWidth: .infinity)
+                        .touchable()
+                }
+                .buttonStyle(.meshSecondary)
+                .disabled(isRequestingAccess)
+            } else if authorizationStatus != nil {
+                Button {
+                    guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+                    openURL(url)
+                } label: {
+                    Label("Open Notification Settings", systemImage: "arrow.up.right.square")
+                        .frame(maxWidth: .infinity)
+                        .touchable()
+                }
+                .buttonStyle(.meshSecondary)
+            }
+            if let accessError {
+                Text(accessError)
+                    .font(.footnote)
+                    .foregroundStyle(MeshTheme.disconnected)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowBackground(MeshTheme.surface)
+    }
+
+    private var notificationAccessTitle: String {
+        guard let authorizationStatus else { return "Checking Notification Access…" }
+        switch authorizationStatus {
+        case .notDetermined: return "Notification Access Not Requested"
+        case .denied: return "Notifications Turned Off in iOS"
+        case .authorized: return alertsEnabled ? "Notifications Allowed" : "Notification Alerts Turned Off"
+        case .provisional: return "Quiet Notifications Allowed"
+        case .ephemeral: return "Notifications Allowed Temporarily"
+        @unknown default: return "Notification Access Unavailable"
+        }
+    }
+
+    private var notificationAccessDetail: String {
+        guard let authorizationStatus else { return "Waiting for the current iOS notification settings." }
+        switch authorizationStatus {
+        case .notDetermined: return "Allow notifications to receive mesh alerts, then choose the events below."
+        case .denied: return "Your choices below are saved. Turn on Allow Notifications in iOS Settings to receive alerts."
+        case .authorized where !alertsEnabled: return "iOS allows notifications, but visual alerts are off. Review banner, sound, and badge settings in iOS."
+        case .authorized: return "Choose the events below. Focus and other iOS settings may silence or delay alerts."
+        case .provisional: return "iOS delivers these quietly. Change notification settings if you want banners or sounds."
+        case .ephemeral: return "iOS has granted temporary access. Review notification settings for this app."
+        @unknown default: return "Review this app’s notification access in iOS Settings."
+        }
+    }
+
+    private func refreshNotificationAccess() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        authorizationStatus = settings.authorizationStatus
+        alertsEnabled = settings.alertSetting == .enabled
+    }
+
+    private func requestNotificationAccess() async {
+        isRequestingAccess = true
+        accessError = nil
+        defer { isRequestingAccess = false }
+        do {
+            _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+        } catch {
+            accessError = "Could not request notification access: \(error.localizedDescription)"
+        }
+        await refreshNotificationAccess()
+    }
+    #endif
 }
 
 // MARK: - Message Settings

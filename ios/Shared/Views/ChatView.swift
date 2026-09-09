@@ -33,6 +33,8 @@ struct ChatView: View {
     let contact: Contact
     @Environment(ContactStore.self) private var contactStore
     @Environment(MessageStoreManager.self) private var messageStoreManager
+    @Environment(ConnectionManager.self) private var connectionManager
+    @State private var showSendError = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var messageText = ""
     @State private var showNotes = false
@@ -47,6 +49,7 @@ struct ChatView: View {
     @State private var signNextMessage = false
     @State private var forwardMessage: Message?
     @State private var showForwardPicker = false
+    @State private var forwardDestination: Data?
     @State private var chatExportItems: [Any] = []
     @State private var showChatExport = false
     @State private var showLocationUnavailableAlert = false
@@ -61,7 +64,6 @@ struct ChatView: View {
     @State private var refreshTick = Date()
     private let refreshTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
-    private let maxMessageLength = 160
 
     private var messages: [Message] {
         messageStoreManager.messages(for: contact)
@@ -242,11 +244,10 @@ struct ChatView: View {
                         Button { sendLocationAsDM() } label: {
                             Label("Send Location", systemImage: "location.fill")
                         }
-                        #if os(macOS)
+                        .disabled(!messageStoreManager.canSendMessages)
                         Button { exportChatHistory() } label: {
                             Label("Export Chat", systemImage: "square.and.arrow.up")
                         }
-                        #endif
                         #endif
                         Button { showNotes = true } label: {
                             Label("Notes", systemImage: "note.text")
@@ -259,6 +260,11 @@ struct ChatView: View {
                     .accessibilityLabel("Conversation actions")
                 }
             }
+        }
+        .alert("Message not sent", isPresented: $showSendError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(messageStoreManager.lastSendError ?? "Your draft is still here. Try again when the deck is ready.")
         }
         .sheet(isPresented: $showNotes) {
             ContactNotesSheet(contact: contact)
@@ -319,11 +325,24 @@ struct ChatView: View {
                 .padding(24)
             }
         }
-        .sheet(isPresented: $showForwardPicker) {
+        .sheet(isPresented: $showForwardPicker, onDismiss: {
+            if let key = forwardDestination {
+                forwardDestination = nil
+                navigationStore.sidebarSelection = .contact(key)
+            }
+        }) {
             ForwardContactPicker { targetContact in
                 if let msg = forwardMessage {
-                    let fwdText = "Fwd from \(contactStore.displayName(for: contact)): \(msg.text)"
-                    messageStoreManager.sendTextMessage(String(fwdText.prefix(160)), to: targetContact)
+                    let text = "Fwd from \(contactStore.displayName(for: contact)): \(msg.interfaceText)"
+                    let isCurrentChat = targetContact.publicKeyPrefix == contact.publicKeyPrefix
+                    let existing = isCurrentChat ? messageText : messageStoreManager.loadDraft(for: targetContact.publicKeyPrefix)
+                    let draft = existing.isEmpty ? text : existing + "\n\n" + text
+                    if isCurrentChat {
+                        messageText = draft
+                    } else {
+                        messageStoreManager.saveDraft(draft, for: targetContact.publicKeyPrefix)
+                        forwardDestination = targetContact.publicKeyPrefix
+                    }
                 }
                 forwardMessage = nil
                 showForwardPicker = false
@@ -514,98 +533,40 @@ struct ChatView: View {
                     Button { quotedMessage = nil } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(MeshTheme.textSecondary)
+                            .touchable()
                     }
                     .buttonStyle(.meshPlain)
+                    .accessibilityLabel("Remove quoted message")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(MeshTheme.surfaceLight)
             }
-            // The composer.
-            //
-            // Sized from Design rather than by hand: the message field is the
-            // control this app exists for, and it was set at 15pt in a 40pt
-            // row -- the size of a search box in a settings screen. The send
-            // button was a 28pt glyph with no padding, well under the 44pt
-            // minimum, on the edge of the screen where the thumb lands.
-            //
-            // The button also now says something when it is disabled. It used
-            // to go grey and stay the same size, which reads as "broken"
-            // rather than "type something first".
-            HStack(spacing: Design.Space.snug) {
-                TextField("Type a message...", text: $messageText, axis: .vertical)
-                    // Up to five lines before it scrolls. A long message
-                    // typed into a one-line field is written blind.
-                    .lineLimit(1...5)
-                    .font(Design.Text.message)
-                    .padding(.horizontal, Design.Space.regular)
-                    .padding(.vertical, Design.Space.snug)
-                    .background(MeshTheme.surfaceLight)
-                    .clipShape(RoundedRectangle(cornerRadius: Design.Radius.bubble, style: .continuous))
-                    .foregroundStyle(MeshTheme.textPrimary)
-                    .onChange(of: messageText) { _, newValue in
-                        if newValue.count > maxMessageLength {
-                            messageText = String(newValue.prefix(maxMessageLength))
-                        }
-                    }
-                    #if !os(watchOS)
-                    .onSubmit { send() }
-                    #endif
-
-                Button(action: send) {
-                    Image(systemName: "arrow.up")
-                        .font(Design.Text.controlGlyph)
-                        .foregroundStyle(canSend ? Color.white : MeshTheme.textSecondary)
-                        .frame(width: Design.sendButton, height: Design.sendButton)
-                        .background(
-                            Circle().fill(canSend ? MeshTheme.accent : MeshTheme.surfaceLight)
-                        )
-                        // Grows into its filled state as the first character
-                        // is typed, so the control tells you it is ready
-                        // before you reach for it.
-                        .scaleEffect(canSend ? 1 : 0.88)
-                }
-                .buttonStyle(.pressable)
-                .meshAnimation(Design.Motion.quick, value: canSend)
-                .disabled(!canSend)
-                .accessibilityLabel("Send message")
-            }
-            .padding(.horizontal, Design.Space.snug)
-
-            if !messageText.isEmpty {
-                HStack {
-                    Spacer()
-                    Text("\(messageText.count)/\(maxMessageLength)")
-                        .font(.caption2)
-                        .foregroundStyle(
-                            messageText.count > maxMessageLength - 10
-                                ? Color.orange
-                                : MeshTheme.textSecondary
-                        )
-                }
-                .padding(.horizontal, 16)
-            }
+            MessageComposer(
+                text: $messageText,
+                budget: MessageTextBudget(outgoingText, limit: messageStoreManager.messageByteLimit),
+                isConnected: messageStoreManager.canSendMessages,
+                connect: { connectionManager.requestShowScanner = true },
+                send: send
+            )
         }
-        .padding(.vertical, 8)
         .background(MeshTheme.surface)
     }
 
-    /// Whether there is anything to send. Named because the composer asks
-    /// three times and an inline trim in each is three chances to disagree.
-    private var canSend: Bool {
-        !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private var outgoingText: String {
+        guard let quoted = quotedMessage else { return messageText }
+        let senderName = quoted.isOutgoing ? "Me" : contactStore.displayName(for: contact)
+        let preview = String(quoted.text.prefix(10))
+        let suffix = quoted.text.count > 10 ? ".." : ""
+        return "@[\(senderName)]\n>\(preview)\(suffix)\n\(messageText)"
     }
 
     private func send() {
-        var text = messageText
-        if let quoted = quotedMessage {
-            // MeshCore One compatible quote format: @[senderName]\n>preview..\nreply
-            let senderName = quoted.isOutgoing ? "Me" : contactStore.displayName(for: contact)
-            let preview = String(quoted.text.prefix(10))
-            let suffix = quoted.text.count > 10 ? ".." : ""
-            text = "@[\(senderName)]\n>\(preview)\(suffix)\n\(text)"
+        guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard messageStoreManager.sendTextMessage(outgoingText, to: contact, signed: signNextMessage) else {
+            showSendError = true
+            return
         }
-        messageStoreManager.sendTextMessage(text, to: contact, signed: signNextMessage)
         messageStoreManager.playHapticFeedback()
         signNextMessage = false
         messageText = ""
@@ -621,7 +582,7 @@ struct ChatView: View {
         for msg in msgs {
             let time = msg.timestamp.formatted(date: .numeric, time: .shortened)
             let sender = msg.isOutgoing ? "Me" : name
-            lines.append("[\(time)] \(sender): \(msg.text)")
+            lines.append("[\(time)] \(sender): \(msg.interfaceText)")
         }
         let text = lines.joined(separator: "\n")
         #if os(iOS)
@@ -644,7 +605,10 @@ struct ChatView: View {
         let lon = location.coordinate.longitude
         let (fLat, fLon) = PommeCoreViewModel.fudgeLocation(lat: lat, lon: lon)
         let text = "Location: \(formatCoordinate(fLat)), \(formatCoordinate(fLon))"
-        messageStoreManager.sendTextMessage(text, to: contact)
+        guard messageStoreManager.sendTextMessage(text, to: contact) else {
+            showSendError = true
+            return
+        }
         messageStoreManager.playHapticFeedback()
         DebugLogger.shared.log("LOCATION: sent to \(contact.name)", level: .tx)
     }

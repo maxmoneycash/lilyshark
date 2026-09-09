@@ -14,6 +14,11 @@ import MeshCoreKit
 struct AntennaSettingsView: View {
     @Environment(LineOfSightStore.self) private var store
     @Environment(DeviceConfig.self) private var deviceConfig
+    @Environment(ConnectionManager.self) private var connection
+
+    private var reportedFrequency: Double? {
+        store.reportedFrequencyMHz(config: deviceConfig, connection: connection)
+    }
 
     var body: some View {
         @Bindable var store = store
@@ -55,10 +60,10 @@ struct AntennaSettingsView: View {
                     .foregroundStyle(MeshTheme.accent)
                     .frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Frequency")
+                    Text("Frequency (MHz)")
                         .font(.caption)
                         .foregroundStyle(MeshTheme.accent)
-                    if store.manualFrequencyOverride {
+                    if store.manualFrequencyOverride || reportedFrequency == nil {
                         TextField("MHz", value: $store.frequencyMHz, format: .number)
                             .foregroundStyle(MeshTheme.textPrimary)
                             #if !os(watchOS)
@@ -76,11 +81,17 @@ struct AntennaSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(MeshTheme.accent)
                 .listRowBackground(MeshTheme.surface)
+                .disabled(reportedFrequency == nil)
                 .onChange(of: store.manualFrequencyOverride) { _, manual in
                     if !manual {
-                        store.loadFromDeviceConfig(deviceConfig)
+                        store.loadFromDeviceConfig(deviceConfig, connection: connection)
                     }
                 }
+            if reportedFrequency == nil {
+                Text("No radio frequency has been reported. Enter the frequency to use for this analysis.")
+                    .font(.caption).foregroundStyle(MeshTheme.textSecondary)
+                    .listRowBackground(MeshTheme.surface)
+            }
         } header: {
             Text("Antenna & RF Settings")
         }

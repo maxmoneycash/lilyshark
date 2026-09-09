@@ -15,6 +15,9 @@ import CoreSpotlight
 import UniformTypeIdentifiers
 #endif
 import MeshCoreKit
+#if canImport(MeshtasticKit)
+import MeshtasticKit
+#endif
 
 /// Observable store for contacts, nicknames, notes, groups, and activity status.
 /// Extracted from PommeCoreViewModel to enable fine-grained view observation.
@@ -96,6 +99,8 @@ final class ContactStore {
     private let iCloudStore = NSUbiquitousKeyValueStore.default
     private var nicknames: [String: String] = [:]
     private var contactNotes: [String: String] = [:]
+    private var meshtasticFavouriteRadioPrefix: String?
+    private var meshtasticFavouriteKeys: Set<String> = []
 
     // Contact sync state
     var incomingContacts: [Contact] = []
@@ -603,7 +608,57 @@ final class ContactStore {
 
     // MARK: - Favourites
 
+    private func loadMeshtasticFavourites() {
+        let radioKey = radioPublicKeyHexProvider?() ?? ""
+        let prefix = radioKey.isEmpty ? nil : String(radioKey.prefix(12))
+        guard meshtasticFavouriteRadioPrefix != prefix else { return }
+        meshtasticFavouriteRadioPrefix = prefix
+        #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        meshtasticFavouriteKeys = []
+        #else
+        meshtasticFavouriteKeys = prefix.map {
+            Set(UserDefaults.standard.stringArray(forKey: "meshtasticFavourites.\($0)") ?? [])
+        } ?? []
+        #endif
+    }
+
+    private func withLocalMeshtasticFavourite(_ contact: Contact) -> Contact {
+        #if canImport(MeshtasticKit)
+        if MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) != nil {
+            loadMeshtasticFavourites()
+            let flags = meshtasticFavouriteKeys.contains(contact.publicKey.hexCompact)
+                ? contact.flags | 0x01 : contact.flags & ~0x01
+            return contact.withFlags(flags)
+        }
+        #endif
+        return contact
+    }
+
+    private func saveMeshtasticFavourites() {
+        #if !(DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS))
+        if let prefix = meshtasticFavouriteRadioPrefix {
+            UserDefaults.standard.set(Array(meshtasticFavouriteKeys), forKey: "meshtasticFavourites.\(prefix)")
+        }
+        #endif
+    }
+
     func toggleFavourite(for contact: Contact) {
+        #if canImport(MeshtasticKit)
+        if MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) != nil {
+            loadMeshtasticFavourites()
+            let key = contact.publicKey.hexCompact
+            if meshtasticFavouriteKeys.contains(key) {
+                meshtasticFavouriteKeys.remove(key)
+            } else {
+                meshtasticFavouriteKeys.insert(key)
+            }
+            saveMeshtasticFavourites()
+            if let index = contacts.firstIndex(where: { $0.publicKeyPrefix == contact.publicKeyPrefix }) {
+                contacts[index] = withLocalMeshtasticFavourite(contacts[index])
+            }
+            return
+        }
+        #endif
         var newFlags = contact.flags
         if contact.isFavourite {
             newFlags &= ~0x01
@@ -653,8 +708,19 @@ final class ContactStore {
     func removeContact(_ contact: Contact) {
         nodeObservations.removeValue(forKey: contact.publicKeyPrefix)
         nodePositions.removeValue(forKey: contact.publicKeyPrefix)
-        let frame = MeshCoreProtocol.buildRemoveContact(publicKey: contact.publicKey)
-        sendCommand?(frame, "REMOVE_CONTACT")
+        #if canImport(MeshtasticKit)
+        let isMeshtastic = MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) != nil
+        #else
+        let isMeshtastic = false
+        #endif
+        if isMeshtastic {
+            loadMeshtasticFavourites()
+            meshtasticFavouriteKeys.remove(contact.publicKey.hexCompact)
+            saveMeshtasticFavourites()
+        } else {
+            let frame = MeshCoreProtocol.buildRemoveContact(publicKey: contact.publicKey)
+            sendCommand?(frame, "REMOVE_CONTACT")
+        }
         contacts.removeAll { $0.publicKeyPrefix == contact.publicKeyPrefix }
         // Clean up all local data for this contact
         setNickname("", for: contact)
@@ -827,13 +893,13 @@ final class ContactStore {
                 DebugLogger.shared.log("ADVERT: timestamp updated for \(contacts[idx].name)", level: .rx)
             } else {
                 // Full contact advert — replace with new data
-                let c = isLiveAdvert ? contactWithTimestamp(contact) : contact
+                let c = withLocalMeshtasticFavourite(isLiveAdvert ? contactWithTimestamp(contact) : contact)
                 contacts[idx] = c
                 DebugLogger.shared.log("ADVERT: updated \(c.name) lastAdvert=\(c.lastAdvert)", level: .rx)
             }
         } else if !contact.name.isEmpty {
             // Only add new contacts if we have real data (not pubkey-only)
-            let c = isLiveAdvert ? contactWithTimestamp(contact) : contact
+            let c = withLocalMeshtasticFavourite(isLiveAdvert ? contactWithTimestamp(contact) : contact)
             contacts.append(c)
             DebugLogger.shared.log("ADVERT: new contact \(c.name) lastAdvert=\(c.lastAdvert)", level: .rx)
         } else {
@@ -954,5 +1020,7 @@ final class ContactStore {
         nodePositions = [:]
         nicknames = [:]
         contactNotes = [:]
+        meshtasticFavouriteRadioPrefix = nil
+        meshtasticFavouriteKeys = []
     }
 }

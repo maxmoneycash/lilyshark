@@ -22,25 +22,16 @@ import CoreLocation
 extension SettingsView {
     var troubleshootingSection: some View {
         Section {
-            Button {
-                showConnectionHelp = true
+            NavigationLink {
+                HelpView()
             } label: {
-                HStack {
-                    Label("Can't Connect to Radio?", systemImage: "questionmark.circle")
-                        .foregroundStyle(MeshTheme.accent)
-                    Spacer()
-                }
-                .touchable()
+                Label("Help & Diagnostics", systemImage: "questionmark.circle")
+                    .foregroundStyle(MeshTheme.accent)
+                    .touchable()
             }
-            .buttonStyle(.meshPlain)
             .listRowBackground(MeshTheme.surface)
         } header: {
-            sectionInfoHeader("Troubleshooting", info: "Tools to help diagnose connection problems between your phone and radio.")
-        }
-        .alert("Connection Troubleshooting", isPresented: $showConnectionHelp) {
-            Button("OK") {}
-        } message: {
-            Text("If your radio won't appear in the scanner:\n\n1. Go to Settings \u{2192} Bluetooth\n2. Find your MeshCore device and tap \u{24D8}\n3. Tap \u{2018}Forget This Device\u{2019}\n4. Power off the radio for 30 seconds\n5. Power it back on and scan again\n\nForce-quitting the app can leave the radio\u{2019}s Bluetooth in a stuck state. A full power cycle clears it.")
+            Text("Help")
         }
     }
 }
@@ -80,7 +71,7 @@ extension SettingsView {
             .listRowBackground(MeshTheme.surface)
 
             Button {
-                UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+                showWelcomeGuide = true
             } label: {
                 HStack {
                     Text("Show Welcome Guide")

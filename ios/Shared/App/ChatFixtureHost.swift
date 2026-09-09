@@ -34,6 +34,9 @@ private struct ChatFixtureHost: View {
                         .accessibilityIdentifier("chat-fixture-reset")
                 }
                 .buttonStyle(.meshSecondary)
+                Toggle("Simulated connection", isOn: $fixture.isConnected)
+                    .font(.caption)
+                    .accessibilityIdentifier("chat-fixture-connection")
                 Text("A: \(fixture.messageStore.unreadCount(for: fixture.contacts[0])) unread · B: \(fixture.messageStore.unreadCount(for: fixture.contacts[1])) unread")
                     .font(.caption.monospacedDigit())
                     .accessibilityIdentifier("chat-fixture-unread-counts")
@@ -77,6 +80,7 @@ private final class ChatFixtureState {
     let deviceConfig = DeviceConfig()
     let lineOfSightStore = LineOfSightStore()
     let contacts: [Contact]
+    var isConnected = true
     private var arrivals = [0, 0]
     var retryCheckStatus = "Retry checks pending"
 
@@ -85,6 +89,10 @@ private final class ChatFixtureState {
             Self.contact(node: 0x00F17A01, name: "Fixture A"),
             Self.contact(node: 0x00F17A02, name: "Fixture B"),
         ]
+        messageStore.canSendMessagesProvider = { [weak self] in self?.isConnected ?? false }
+        messageStore.sendCommand = { _, label in
+            DebugLogger.shared.log("Fixture accepted \(label); no transport is attached.")
+        }
         let store = contactStore
         messageStore.contactProvider = { key in
             store.contacts.first { $0.publicKeyPrefix == key }
@@ -93,7 +101,7 @@ private final class ChatFixtureState {
             store.contacts.first { $0.publicKeyPrefix == key }?.name ?? "Fixture"
         }
         remoteSessionManager.contactsProvider = { store.contacts }
-        // All send closures stay nil. Neither Bluetooth central is activated.
+        // Send commands end at the recorder. Neither Bluetooth central is activated.
         messageStore.isInBackground = true // Avoid 160 seed-message haptics.
         let historyEnd = Date().addingTimeInterval(-60)
         for contact in contacts {
@@ -130,28 +138,40 @@ private final class ChatFixtureState {
 
     func checkRetryCancellation() async {
         retryCheckStatus = "Checking retry cancellation…"
-        var failures: [String] = []
+        var failures = checkMessageValidation()
+        for mode in ["retry", "path refresh"] {
         for scenario in ["normal", "disconnect", "delete", "switch radio"] {
             guard !Task.isCancelled else { return }
             let manager = MessageStoreManager()
             manager.isInBackground = true
+            manager.canSendMessagesProvider = { true }
             manager.activateForRadio("f17a00000001")
-            let contact = contacts[0]
+            let contact = Self.contact(node: 0x00F17A01, name: "Fixture A", outPathLen: mode == "path refresh" ? 1 : -1)
             manager.contactProvider = { _ in contact }
             var commands = 0
             let requestedAt = Date()
             manager.sendCommand = { _, label in
-                if label == "MANUAL_RETRY_FLOOD" {
+                let expectedLabel = mode == "retry" ? "MANUAL_RETRY_FLOOD" : "SEND_TXT(path_refreshed)"
+                if label == expectedLabel {
                     commands += 1
                     DebugLogger.shared.log("Fixture retry \(scenario): command after \(Date().timeIntervalSince(requestedAt))s")
                 }
             }
-            let message = Message(
-                contactKeyHash: contact.publicKeyPrefix, text: "Fixture retry \(scenario)",
-                timestamp: Date(), isOutgoing: true, status: .failed
-            )
-            _ = manager.handleIncomingMessage(message)
-            manager.retryMessage(message)
+            let message: Message
+            if mode == "retry" {
+                message = Message(contactKeyHash: contact.publicKeyPrefix, text: "Fixture retry \(scenario)",
+                                  timestamp: Date(), isOutgoing: true, status: .failed)
+                _ = manager.handleIncomingMessage(message)
+                manager.retryMessage(message)
+            } else {
+                guard manager.sendTextMessage("Fixture path check \(scenario)", to: contact),
+                      let sent = manager.messages(for: contact).last else {
+                    failures.append("Path check was not accepted")
+                    continue
+                }
+                message = sent
+                manager.handleAdvertPathForPendingSend(AdvertPathInfo(recvTimestamp: 0, pathLen: 0, pathHashes: []))
+            }
             // The retry's 500ms delay starts when its child task runs, not
             // when retryMessage returns. Yield before observing cancellation.
             await Task.yield()
@@ -170,20 +190,99 @@ private final class ChatFixtureState {
                 }
             } catch { manager.deactivate(); return }
             let expected = scenario == "normal" ? 1 : 0
-            if commands != expected { failures.append("\(scenario): \(commands), expected \(expected)") }
+            if commands != expected { failures.append("\(mode) \(scenario): \(commands), expected \(expected)") }
             let status = manager.messages(for: contact).first?.status.rawValue ?? "absent"
             DebugLogger.shared.log("Fixture retry \(scenario): \(commands) commands, state=\(status), protocol node=\(manager.meshtasticNodeNum), radio=\(manager.radioPrefix12 ?? "none")")
             manager.deactivate()
         }
-        retryCheckStatus = failures.isEmpty ? "Retry checks passed: 4 of 4" : "Retry check failed: \(failures.joined(separator: "; "))"
+        }
+        retryCheckStatus = failures.isEmpty ? "Send checks passed" : "Send check failed: \(failures.joined(separator: "; "))"
         DebugLogger.shared.log(retryCheckStatus, level: failures.isEmpty ? .info : .error)
     }
 
-    private static func contact(node: UInt32, name: String) -> Contact {
+    private func checkMessageValidation() -> [String] {
+        let manager = MessageStoreManager()
+        manager.activateForRadio("f17a00000001")
+        var ready = false
+        var frames: [Data] = []
+        manager.canSendMessagesProvider = { ready }
+        manager.sendCommand = { frame, _ in frames.append(frame) }
+        let contact = contacts[0]
+        var failures: [String] = []
+        if manager.sendTextMessage("Offline draft", to: contact) || !frames.isEmpty || !manager.messages(for: contact).isEmpty {
+            failures.append("Disconnected text was accepted")
+        }
+        ready = true
+        let tooLong = String(repeating: "é", count: 81)
+        if manager.sendTextMessage(tooLong, to: contact) || !frames.isEmpty || !manager.messages(for: contact).isEmpty {
+            failures.append("Over-budget direct text was accepted")
+        }
+        if manager.sendChannelMessage(tooLong) || manager.sendRoomMessage(tooLong, to: contact) || !frames.isEmpty {
+            failures.append("Over-budget channel or room text was accepted")
+        }
+        let exact = String(repeating: "é", count: 80)
+        if !manager.sendTextMessage(exact, to: contact) || frames.count != 1
+            || String(data: frames.last?.dropFirst(13) ?? Data(), encoding: .utf8) != exact
+            || manager.messages(for: contact).last?.text != exact {
+            failures.append("Encoded text did not survive sending unchanged")
+        }
+        manager.deactivate()
+        failures += checkSentResponseMatching()
+        return failures
+    }
+
+    private func checkSentResponseMatching() -> [String] {
+        let manager = MessageStoreManager()
+        manager.activateForRadio("f17a00000001")
+        manager.canSendMessagesProvider = { true }
+        manager.sendCommand = { _, _ in }
+        let routed = Self.contact(node: 0x00F17A01, name: "Fixture A", outPathLen: 1)
+        let direct = Self.contact(node: 0x00F17A02, name: "Fixture B", outPathLen: -1)
+        var failures: [String] = []
+
+        guard manager.sendTextMessage("on the wire", to: direct),
+              manager.sendTextMessage("waiting for path", to: routed),
+              let wired = manager.messages(for: direct).last,
+              let waiting = manager.messages(for: routed).last else {
+            manager.deactivate()
+            return ["Path-check pairing was not accepted"]
+        }
+        manager.handleSentResponse(expectedACK: 42, suggestedTimeoutMs: 8000)
+        let wiredAfter = manager.messages(for: direct).last
+        let waitingAfter = manager.messages(for: routed).last
+        if wiredAfter?.id != wired.id || wiredAfter?.status != .sent || wiredAfter?.expectedACK != 42 {
+            failures.append("RESP_SENT attached to the path-check message instead of the transmitted one")
+        }
+        if waitingAfter?.id != waiting.id || waitingAfter?.status != .sending || waitingAfter?.expectedACK != nil {
+            failures.append("Unsent path-check message was marked sent")
+        }
+
+        manager.handleAdvertPathForPendingSend(AdvertPathInfo(recvTimestamp: 0, pathLen: 0, pathHashes: []))
+        let third = Self.contact(node: 0x00F17A03, name: "Fixture C", outPathLen: -1)
+        guard manager.sendTextMessage("after refresh", to: third),
+              let later = manager.messages(for: third).last else {
+            manager.deactivate()
+            failures.append("Follow-up send after path refresh was not accepted")
+            return failures
+        }
+        manager.handleSentResponse(expectedACK: 99, suggestedTimeoutMs: 8000)
+        if manager.messages(for: third).last?.id != later.id
+            || manager.messages(for: third).last?.expectedACK != 99 {
+            failures.append("Follow-up RESP_SENT did not stay with the later transmitted message")
+        }
+        if manager.messages(for: routed).last?.expectedACK != nil {
+            failures.append("Delayed path-refresh message consumed a later RESP_SENT")
+        }
+
+        manager.deactivate()
+        return failures
+    }
+
+    private static func contact(node: UInt32, name: String, outPathLen: Int8 = -1) -> Contact {
         Contact(
             publicKey: MeshtasticIdentity.syntheticKey(forNodeNum: node),
             name: name, type: .chat, flags: 0,
-            outPathLen: -1, outPath: Data(), lastAdvert: 0,
+            outPathLen: outPathLen, outPath: Data(), lastAdvert: 0,
             latitude: 0, longitude: 0, lastmod: 0
         )
     }

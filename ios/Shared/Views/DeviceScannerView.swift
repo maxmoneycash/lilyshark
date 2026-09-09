@@ -106,7 +106,7 @@ struct DeviceScannerView: View {
                                     Text("\(saved.host):\(saved.port)")
                                         .font(.caption)
                                         .foregroundStyle(MeshTheme.textSecondary)
-                                    Text(saved.lastConnected, style: .relative)
+                                    Text("Last tried \(saved.lastConnected, style: .relative) ago")
                                         .font(.caption2)
                                         .foregroundStyle(MeshTheme.textSecondary)
                                 }
@@ -163,7 +163,7 @@ struct DeviceScannerView: View {
                 Text("WiFi")
                     .foregroundStyle(MeshTheme.textSecondary)
             } footer: {
-                Text("Connect to a companion radio with WiFi enabled (TCP, default port 5000).")
+                Text("Connect to a MeshCore companion radio with Wi-Fi enabled on the same network (TCP, default port 5000).")
                     .font(.caption2)
             }
 
@@ -244,6 +244,16 @@ struct DeviceScannerView: View {
                 connectionManager.usbManager.scanPorts()
             }
             #endif
+
+            Section {
+                NavigationLink {
+                    HelpView()
+                } label: {
+                    Label("Connection Help", systemImage: "questionmark.circle")
+                        .touchable()
+                }
+                .listRowBackground(MeshTheme.surface)
+            }
         }
         .meshListStyle()
         .meshAnimation(Design.Motion.quick, value: hasBluetoothResults)

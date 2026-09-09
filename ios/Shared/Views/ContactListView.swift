@@ -12,6 +12,14 @@ import SwiftUI
 import MeshCoreKit
 
 struct ContactListView: View {
+    enum ConversationFilter: String, CaseIterable, Identifiable {
+        case all = "All conversations"
+        case unread = "Unread"
+        case favourites = "Favourites"
+
+        var id: Self { self }
+    }
+
     @Environment(ContactStore.self) var contactStore
     @Environment(ChannelStore.self) var channelStore
     @Environment(MessageStoreManager.self) var messageStoreManager
@@ -74,6 +82,8 @@ struct ContactListView: View {
     let refreshTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     @State var contactsExpanded = true
     @State var channelsExpanded = true
+    @State var conversationSearch = ""
+    @State var conversationFilter: ConversationFilter = .all
     @AppStorage("contactSortByLastSeen") var sortByLastSeen = true
     @AppStorage("channelsFirst") var channelsFirst = false
     #if os(iOS)
@@ -95,6 +105,23 @@ struct ContactListView: View {
     #endif
 
     var body: some View {
+        contactListWithNicknameSheet
+        .onChange(of: messageStoreManager.lastExportedURL) { _, url in
+            if isExporting, let url, !url.isEmpty {
+                copyToClipboard(url)
+                messageStoreManager.lastExportedURL = nil
+                isExporting = false
+                showExportCopied = true
+            }
+        }
+        .alert("Link Copied", isPresented: $showExportCopied) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The contact's meshcore:// link has been copied to the clipboard.")
+        }
+    }
+
+    private var contactListNavigation: some View {
         mainListWithGroupSheets
         // The wordmark rather than the word. The web app's header and the
         // deck's splash both draw this same SVG, so a system-font "Lilyshark"
@@ -105,6 +132,9 @@ struct ContactListView: View {
         // must still hear "Lilyshark" and not silence -- the image is the
         // brand, the text is the meaning, and both have to be present.
         .lilysharkNavigationTitle()
+        .searchable(text: $conversationSearch, prompt: "Contacts, channels, or node ID")
+        .onChange(of: conversationSearch) { _, _ in revealFilteredConversations() }
+        .onChange(of: conversationFilter) { _, _ in revealFilteredConversations() }
         // navigationDestination is only needed on iOS (not macOS/Catalyst) because on
         // macOS the NavigationSplitView's detail: block drives the detail column exclusively.
         // Leaving navigationDestination active on macOS creates a conflicting navigation
@@ -221,6 +251,10 @@ struct ContactListView: View {
             }
         }
         #endif
+    }
+
+    private var contactListWithContactSheets: some View {
+        contactListNavigation
         .overlay { deleteAlertsOverlay }
         .alert("Contact Shared", isPresented: $showShareConfirmation) {
             Button("OK", role: .cancel) {}
@@ -253,6 +287,10 @@ struct ContactListView: View {
         .sheet(item: $pathEditorContact) { contact in
             ManualPathEditor(contact: contact)
         }
+    }
+
+    private var contactListWithChannelSheets: some View {
+        contactListWithContactSheets
         .sheet(item: $channelSheetAction) { action in
             NavigationStack {
                 ChannelManagementView(action: action)
@@ -317,6 +355,10 @@ struct ContactListView: View {
             #endif
         }
         #endif
+    }
+
+    private var contactListWithNicknameSheet: some View {
+        contactListWithChannelSheets
         .sheet(isPresented: $showNicknameSheet) {
             NavigationStack {
                 Form {
@@ -388,19 +430,6 @@ struct ContactListView: View {
             .frame(minWidth: 360, minHeight: 300)
             #endif
         }
-        .onChange(of: messageStoreManager.lastExportedURL) { _, url in
-            if isExporting, let url, !url.isEmpty {
-                copyToClipboard(url)
-                messageStoreManager.lastExportedURL = nil
-                isExporting = false
-                showExportCopied = true
-            }
-        }
-        .alert("Link Copied", isPresented: $showExportCopied) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("The contact's meshcore:// link has been copied to the clipboard.")
-        }
     }
 
     // MARK: - Settings Navigation
@@ -452,22 +481,42 @@ private extension ContactListView {
             }
     }
 
+    @ViewBuilder
+    var conversationSections: some View {
+        connectionSection
+        Section {
+            Picker("Show", selection: $conversationFilter) {
+                ForEach(ConversationFilter.allCases) { filter in
+                    Text(filter.rawValue).tag(filter)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityIdentifier("conversation-filter")
+            .listRowBackground(MeshTheme.surface)
+        }
+        if isFilteringConversations && matchingContacts.isEmpty && !hasMatchingChannels {
+            conversationSearchEmptyState
+        }
+        if channelsFirst && (!isFilteringConversations || hasMatchingChannels) {
+            channelsSection
+        }
+        if !isFilteringConversations && !contactStore.pendingNewContacts.isEmpty {
+            pendingContactsSection
+        }
+        if !isFilteringConversations && !contactStore.contactGroups.isEmpty {
+            groupsSection
+        }
+        if !isFilteringConversations || !matchingContacts.isEmpty {
+            contactsSection
+        }
+        if !channelsFirst && (!isFilteringConversations || hasMatchingChannels) {
+            channelsSection
+        }
+    }
+
     var mainList: some View {
         List(selection: $localSelection) {
-            connectionSection
-            if channelsFirst {
-                channelsSection
-            }
-            if !contactStore.pendingNewContacts.isEmpty {
-                pendingContactsSection
-            }
-            if !contactStore.contactGroups.isEmpty {
-                groupsSection
-            }
-            contactsSection
-            if !channelsFirst {
-                channelsSection
-            }
+            conversationSections
             #if os(macOS) || targetEnvironment(macCatalyst)
             if isUSBCLIConnected {
                 Section {
@@ -576,11 +625,15 @@ private extension ContactListView {
                 }
             } message: {
                 if let contact = contactToDelete {
-                    Text("Are you sure you want to remove \(contactStore.displayName(for: contact))? This will delete all messages with this contact.")
+                    if isMeshtasticContact(contact) {
+                        Text("Remove \(contactStore.displayName(for: contact)) and its messages from this app? The contact can reappear when the deck reports it again.")
+                    } else {
+                        Text("Are you sure you want to remove \(contactStore.displayName(for: contact))? This will delete all messages with this contact.")
+                    }
                 }
             }
-            .confirmationDialog("Delete \(selectedContacts.count) Contact\(selectedContacts.count == 1 ? "" : "s")?", isPresented: $showBulkDeleteConfirm) {
-                Button("Delete", role: .destructive) {
+            .confirmationDialog(selectedContactsAreLocal ? "Remove \(selectedContacts.count) Local Contacts?" : "Delete \(selectedContacts.count) Contact\(selectedContacts.count == 1 ? "" : "s")?", isPresented: $showBulkDeleteConfirm) {
+                Button(selectedContactsAreLocal ? "Remove" : "Delete", role: .destructive) {
                     for key in selectedContacts {
                         if let contact = contactStore.contacts.first(where: { $0.publicKeyPrefix == key }) {
                             contactStore.removeContact(contact)
@@ -591,7 +644,11 @@ private extension ContactListView {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will remove the selected contacts from the device. This cannot be undone.")
+                if selectedContactsAreLocal {
+                    Text("This removes the selected contacts and their messages from this app. Contacts can reappear when the deck reports them again.")
+                } else {
+                    Text("This will remove the selected contacts from the device. This cannot be undone.")
+                }
             }
     }
 }

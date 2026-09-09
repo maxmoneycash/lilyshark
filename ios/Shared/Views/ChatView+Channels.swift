@@ -30,6 +30,8 @@ struct ChannelChatView: View {
     @Environment(ContactStore.self) private var contactStore
     @Environment(ChannelStore.self) private var channelStore
     @Environment(MessageStoreManager.self) private var messageStoreManager
+    @Environment(ConnectionManager.self) private var connectionManager
+    @State private var showSendError = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var messageText = ""
     @State private var unreadDividerIndex: Int?
@@ -38,7 +40,6 @@ struct ChannelChatView: View {
     @State private var showChannelDetail = false
     @State private var showLocationUnavailableAlert = false
 
-    private let maxMessageLength = 160
 
     private var channelKey: Data { Data([channelIndex]) }
 
@@ -54,6 +55,11 @@ struct ChannelChatView: View {
             messageInput
         }
         .background(MeshTheme.background)
+        .alert("Message not sent", isPresented: $showSendError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(messageStoreManager.lastSendError ?? "Your draft is still here. Try again when the deck is ready.")
+        }
         .navigationTitle(channelName)
         #if !os(watchOS)
         .sheet(isPresented: $showChannelDetail) {
@@ -73,36 +79,37 @@ struct ChannelChatView: View {
             }
             #endif
             ToolbarItem(placement: .automatic) {
-                HStack(spacing: 12) {
-                    Button {
-                        sendLocationToChannel()
-                    } label: {
-                        Image(systemName: "location.fill")
-                            .foregroundStyle(MeshTheme.accent)
-                            .touchable()
-                    }
-                    .accessibilityLabel("Send location to channel")
-                    Button {
-                        // Cycle notification mode: all → mentions → muted → all
-                        let next: String
-                        switch notifyMode {
-                        case "all": next = "mentions"
-                        case "mentions": next = "muted"
-                        default: next = "all"
-                        }
-                        notifyMode = next
-                        if let mode = ChannelStore.ChannelNotifyMode(rawValue: next) {
-                            channelStore.setChannelNotifyMode(mode, for: channelName)
-                        }
-                    } label: {
-                        Image(systemName: notifyMode == "muted" ? "bell.slash" : notifyMode == "mentions" ? "at" : "bell.fill")
-                            .foregroundStyle(MeshTheme.accent)
-                            .touchable()
-                    }
-                    .accessibilityLabel("Channel notifications")
-                    .accessibilityValue(notifyMode == "muted" ? "Muted" : notifyMode == "mentions" ? "Mentions only" : "All messages")
-                    .accessibilityHint("Changes the notification setting for this channel")
+                Button {
+                    sendLocationToChannel()
+                } label: {
+                    Image(systemName: "location.fill")
+                        .foregroundStyle(MeshTheme.accent)
+                        .touchable()
                 }
+                .accessibilityLabel("Send location to channel")
+                .disabled(!messageStoreManager.canSendMessages)
+            }
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    // Cycle notification mode: all → mentions → muted → all
+                    let next: String
+                    switch notifyMode {
+                    case "all": next = "mentions"
+                    case "mentions": next = "muted"
+                    default: next = "all"
+                    }
+                    notifyMode = next
+                    if let mode = ChannelStore.ChannelNotifyMode(rawValue: next) {
+                        channelStore.setChannelNotifyMode(mode, for: channelName)
+                    }
+                } label: {
+                    Image(systemName: notifyMode == "muted" ? "bell.slash" : notifyMode == "mentions" ? "at" : "bell.fill")
+                        .foregroundStyle(MeshTheme.accent)
+                        .touchable()
+                }
+                .accessibilityLabel("Channel notifications")
+                .accessibilityValue(notifyMode == "muted" ? "Muted" : notifyMode == "mentions" ? "Mentions only" : "All messages")
+                .accessibilityHint("Changes the notification setting for this channel")
             }
         }
         #endif
@@ -293,55 +300,15 @@ struct ChannelChatView: View {
                 .background(MeshTheme.surface)
             }
 
-            VStack(spacing: 4) {
-                HStack(spacing: 10) {
-                    TextField("Type a message...", text: $messageText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(MeshTheme.surfaceLight)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .foregroundStyle(MeshTheme.textPrimary)
-                        .onChange(of: messageText) { _, newValue in
-                            if newValue.count > maxMessageLength {
-                                messageText = String(newValue.prefix(maxMessageLength))
-                            }
-                            mentionQuery = detectMentionQuery(in: newValue)
-                        }
-                        #if !os(watchOS)
-                        .onSubmit { send() }
-                        #endif
-
-                    Button(action: send) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(
-                                messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                    ? MeshTheme.textSecondary
-                                    : MeshTheme.accent
-                            )
-                    }
-                    .buttonStyle(.meshPlain)
-                    .accessibilityLabel("Send to \(channelName)")
-                    .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                .padding(.horizontal, 12)
-
-                if !messageText.isEmpty {
-                    HStack {
-                        Spacer()
-                        Text("\(messageText.count)/\(maxMessageLength)")
-                            .font(.caption2)
-                            .foregroundStyle(
-                                messageText.count > maxMessageLength - 10
-                                    ? Color.orange
-                                    : MeshTheme.textSecondary
-                            )
-                    }
-                    .padding(.horizontal, 16)
-                }
-            }
-            .padding(.vertical, 8)
-            .background(MeshTheme.surface)
+            MessageComposer(
+                text: $messageText,
+                budget: MessageTextBudget(messageText, limit: messageStoreManager.messageByteLimit),
+                isConnected: messageStoreManager.canSendMessages,
+                sendLabel: "Send to \(channelName)",
+                connect: { connectionManager.requestShowScanner = true },
+                send: send
+            )
+            .onChange(of: messageText) { _, text in mentionQuery = detectMentionQuery(in: text) }
         }
     }
 
@@ -363,7 +330,10 @@ struct ChannelChatView: View {
     }
 
     private func send() {
-        messageStoreManager.sendChannelMessage(messageText, channelIndex: channelIndex)
+        guard messageStoreManager.sendChannelMessage(messageText, channelIndex: channelIndex) else {
+            showSendError = true
+            return
+        }
         messageStoreManager.playHapticFeedback()
         messageText = ""
         mentionQuery = nil
@@ -377,7 +347,10 @@ struct ChannelChatView: View {
         }
         let (fLat, fLon) = PommeCoreViewModel.fudgeLocation(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
         let text = "Location: \(formatCoordinate(fLat)), \(formatCoordinate(fLon))"
-        messageStoreManager.sendChannelMessage(text, channelIndex: channelIndex)
+        guard messageStoreManager.sendChannelMessage(text, channelIndex: channelIndex) else {
+            showSendError = true
+            return
+        }
         messageStoreManager.playHapticFeedback()
         DebugLogger.shared.log("LOCATION: sent to channel \(channelIndex)", level: .tx)
     }
@@ -397,6 +370,8 @@ struct RoomChatView: View {
     @Environment(ContactStore.self) private var contactStore
     @Environment(RemoteSessionManager.self) private var remoteSessionManager
     @Environment(MessageStoreManager.self) private var messageStoreManager
+    @Environment(ConnectionManager.self) private var connectionManager
+    @State private var showSendError = false
     @ObservedObject var session: RemoteDeviceSession
     @State private var messageText = ""
     @State private var password = ""
@@ -404,7 +379,6 @@ struct RoomChatView: View {
     @State private var showManagement = false
     @State private var showContactDetail = false
 
-    private let maxMessageLength = 160
 
     /// Accent for remote management icon.
     private var remoteAccent: Color { MeshTheme.remoteRoom }
@@ -471,6 +445,11 @@ struct RoomChatView: View {
             }
         }
         .background(MeshTheme.background)
+        .alert("Message not sent", isPresented: $showSendError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(messageStoreManager.lastSendError ?? "Your draft is still here. Try again when the deck is ready.")
+        }
         .navigationTitle(contactStore.displayName(for: contact))
         .toolbar {
             #if !os(watchOS)
@@ -622,54 +601,14 @@ struct RoomChatView: View {
     }
 
     private var roomMessageInput: some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 10) {
-                TextField("Type a message...", text: $messageText)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(MeshTheme.surfaceLight)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .foregroundStyle(MeshTheme.textPrimary)
-                    .onChange(of: messageText) { _, newValue in
-                        if newValue.count > maxMessageLength {
-                            messageText = String(newValue.prefix(maxMessageLength))
-                        }
-                    }
-                    #if !os(watchOS)
-                    .onSubmit { sendRoomMessage() }
-                    #endif
-
-                Button(action: sendRoomMessage) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(
-                            messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                ? MeshTheme.textSecondary
-                                : MeshTheme.accent
-                        )
-                }
-                .buttonStyle(.meshPlain)
-                .accessibilityLabel("Send message to room")
-                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .padding(.horizontal, 12)
-
-            if !messageText.isEmpty {
-                HStack {
-                    Spacer()
-                    Text("\(messageText.count)/\(maxMessageLength)")
-                        .font(.caption2)
-                        .foregroundStyle(
-                            messageText.count > maxMessageLength - 10
-                                ? Color.orange
-                                : MeshTheme.textSecondary
-                        )
-                }
-                .padding(.horizontal, 16)
-            }
-        }
-        .padding(.vertical, 8)
-        .background(MeshTheme.surface)
+        MessageComposer(
+            text: $messageText,
+            budget: MessageTextBudget(messageText),
+            isConnected: messageStoreManager.canSendMessages,
+            sendLabel: "Send message to room",
+            connect: { connectionManager.requestShowScanner = true },
+            send: sendRoomMessage
+        )
     }
 
     private var readOnlyInputBar: some View {
@@ -837,7 +776,10 @@ struct RoomChatView: View {
     }
 
     private func sendRoomMessage() {
-        messageStoreManager.sendRoomMessage(messageText, to: contact)
+        guard messageStoreManager.sendRoomMessage(messageText, to: contact) else {
+            showSendError = true
+            return
+        }
         messageStoreManager.playHapticFeedback()
         messageText = ""
     }
@@ -853,7 +795,7 @@ struct RoomMessageBubble: View {
     /// Room servers often prefix messages with "SenderName: actual message"
     private var senderAndText: (sender: String?, text: String) {
         if !message.isOutgoing {
-            let text = message.text
+            let text = message.interfaceText
             // Look for "Name: message" pattern (common room server format)
             if let colonRange = text.range(of: ": ") {
                 let potentialName = String(text[text.startIndex..<colonRange.lowerBound])
@@ -869,7 +811,7 @@ struct RoomMessageBubble: View {
                 return (name, text)
             }
         }
-        return (nil, message.text)
+        return (nil, message.interfaceText)
     }
 
     var body: some View {

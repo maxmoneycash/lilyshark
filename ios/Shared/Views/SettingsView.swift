@@ -41,7 +41,8 @@ struct SettingsView: View {
     @State var showDeleteRadioConfirm = false
     @State var radioToMigrate: String?
     @State var showMigrateSheet = false
-    @State var showConnectionHelp = false
+    @State private var showScanner = false
+    @State var showWelcomeGuide = false
     @State var showPurgeOptions = false
     @State var showDebugLog = false
     @State var showSupportersSheet = false
@@ -71,6 +72,19 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        .sheet(isPresented: $showScanner) {
+            NavigationStack {
+                DeviceScannerView()
+                    .lilysharkSheet { showScanner = false }
+            }
+            .meshTheme()
+        }
+        .sheet(isPresented: $showWelcomeGuide) {
+            // Replay is local to Settings: it must not remove the app's main
+            // view or trigger the first-run scanner by changing completion.
+            OnboardingView(hasCompletedOnboarding: .constant(true), mode: .replay)
+                .meshTheme()
+        }
         .alert("Join the Supporters Wall?", isPresented: $tipJar.showSupporterNamePrompt) {
             TextField("Display name", text: $supporterName)
             Button("Add My Name") {
@@ -104,17 +118,28 @@ struct SettingsView: View {
     private var disconnectedView: some View {
         List {
             appearanceSection
-            iCloudSection
-            radioDataSection
-
             Section {
                 ContentUnavailableView {
                     Label("Connect a Radio", systemImage: "antenna.radiowaves.left.and.right.slash")
                 } description: {
                     Text("Your app preferences are available here. Connect a MeshCore radio to view and change its device settings.")
+                } actions: {
+                    Button("Connect a Radio") { showScanner = true }
+                        .buttonStyle(.meshPrimary)
                 }
             }
 
+            notificationsSection
+            #if os(iOS)
+            watchCompanionSection
+            #endif
+            meshResponderSection
+            privacySection
+            iCloudSection
+            storageSection
+            radioDataSection
+
+            troubleshootingSection
             tipJarSection
             aboutSection
         }
@@ -200,10 +225,10 @@ struct SettingsView: View {
                     }
                     statsSection
                 }
-                troubleshootingSection
             } header: {
                 sectionInfoHeader("Advanced", info: "Developer and diagnostic tools. Most users won\u{2019}t need these.")
             }
+            troubleshootingSection
 
             // 10. Danger Zone
             if supportsMeshCoreSettings {
@@ -393,15 +418,16 @@ private extension SettingsView {
 
             if iCloudSyncEnabled {
                 let usage = iCloudKVSUsage()
-                HStack {
-                    Text("iCloud Storage")
-                        .foregroundStyle(MeshTheme.accent)
-                    Spacer()
-                    Text("\(usage.keys) keys, \(ByteCountFormatter.string(fromByteCount: Int64(usage.bytes), countStyle: .memory))")
-                        .font(.caption)
-                        .foregroundStyle(usage.bytes > 900_000 ? .red : usage.bytes > 700_000 ? .orange : .green)
-                }
+                MeshValueRow(
+                    label: "Local Sync Cache",
+                    value: "\(usage.keys) keys, about \(ByteCountFormatter.string(fromByteCount: Int64(usage.bytes), countStyle: .memory))",
+                    valueColor: usage.bytes > 900_000 ? .red : MeshTheme.textSecondary
+                )
                 .listRowBackground(MeshTheme.surface)
+                Text("This estimate describes data cached on this device. It does not confirm that iCloud has uploaded it.")
+                    .font(.footnote)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                    .listRowBackground(MeshTheme.surface)
                 if usage.bytes > 900_000 {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")

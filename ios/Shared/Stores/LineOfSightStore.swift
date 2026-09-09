@@ -96,9 +96,27 @@ final class LineOfSightStore {
 
     // MARK: - Public Methods
 
-    func loadFromDeviceConfig(_ config: DeviceConfig) {
+    func reportedFrequencyMHz(config: DeviceConfig, connection: ConnectionManager) -> Double? {
+        guard connection.isActivelyConnected else { return nil }
+        if connection.isMeshtasticLinkActive {
+            #if canImport(MeshtasticKit)
+            return connection.reportedMeshtasticLoRa?.frequencyMHz
+            #else
+            return nil
+            #endif
+        }
+        return config.loadedSections.contains("selfInfo") ? config.frequencyMHz : nil
+    }
+
+    func loadFromDeviceConfig(_ config: DeviceConfig, connection: ConnectionManager) {
         guard !manualFrequencyOverride else { return }
-        frequencyMHz = config.frequencyMHz
+        guard let frequency = reportedFrequencyMHz(config: config, connection: connection) else {
+            // Keep the analysis parameter editable without calling a placeholder
+            // or a previous connection's settings a report from this radio.
+            manualFrequencyOverride = true
+            return
+        }
+        frequencyMHz = frequency
     }
 
     /// Pre-configure for analyzing path to a specific contact.

@@ -18,6 +18,7 @@ extension ContactListView {
 
     /// Contacts not assigned to any group — shown in the main Contacts section.
     var ungroupedContacts: [Contact] {
+        if isFilteringConversations { return matchingContacts }
         let grouped = Set(contactStore.contactGroups.flatMap(\.memberPubkeys))
         return contactStore.sortedContacts(byLastSeen: sortByLastSeen).filter {
             !grouped.contains($0.publicKey.hexCompact)
@@ -98,6 +99,7 @@ extension ContactListView {
                             NavigationLink(value: SidebarSelection.contact(contact.publicKeyPrefix)) {
                                 contactRow(contact)
                             }
+                            .contextMenu { contactContextMenu(for: contact) }
                             .listRowBackground(MeshTheme.surface)
                             #endif
                         }
@@ -321,8 +323,9 @@ extension ContactListView {
                                 showDeleteConfirm = true
                             }
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Label(isMeshtasticContact(contact) ? "Remove" : "Delete", systemImage: "trash")
                         }
+                        .disabled(!canChangeContact(contact))
                     }
                     .swipeActions(edge: .leading) {
                         Button {
@@ -334,6 +337,7 @@ extension ContactListView {
                             )
                         }
                         .tint(.yellow)
+                        .disabled(!canChangeContact(contact))
                     }
                     .listRowBackground(
                         navigationStore.selectedContactKey == contact.publicKeyPrefix
@@ -359,6 +363,7 @@ extension ContactListView {
                     .font(.caption)
                     Spacer()
                     if !selectedContacts.isEmpty {
+                        if !selectedContactsAreLocal {
                         Button {
                             for key in selectedContacts {
                                 if let contact = contactStore.contacts.first(where: { $0.publicKeyPrefix == key }) {
@@ -369,12 +374,15 @@ extension ContactListView {
                             Text("Export (\(selectedContacts.count))")
                                 .font(.caption.weight(.medium))
                         }
+                        .disabled(connectionManager.connectionState != .ready || connectionManager.isMeshtasticLinkActive)
+                        }
                         Button(role: .destructive) {
                             showBulkDeleteConfirm = true
                         } label: {
-                            Text("Delete (\(selectedContacts.count))")
+                            Text(selectedContactsAreLocal ? "Remove (\(selectedContacts.count))" : "Delete (\(selectedContacts.count))")
                                 .font(.caption.weight(.medium))
                         }
+                        .disabled(!selectedContactsAreLocal && (connectionManager.connectionState != .ready || connectionManager.isMeshtasticLinkActive))
                     }
                 }
                 .listRowBackground(MeshTheme.surface)

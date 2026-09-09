@@ -13,6 +13,9 @@ import SwiftUI
 import MapKit
 @preconcurrency import CoreLocation
 import MeshCoreKit
+#if canImport(MeshtasticKit)
+import MeshtasticKit
+#endif
 
 // MARK: - InternetMapNode
 
@@ -81,6 +84,7 @@ final class MeshMapService {
     private static let nodesURL  = URL(string: "https://map.meshcore.dev/api/v1/nodes?binary=0&short=0")!
 
     private(set) var nodes: [InternetMapNode] = []
+    private(set) var lastFetchError: String?
     private var lastFetch: Date = .distantPast
     private let fetchInterval: TimeInterval = 300  // 5 minutes
 
@@ -160,20 +164,28 @@ final class MeshMapService {
     /// Force-refresh the internet node list from map.meshcore.dev.
     func fetch() async {
         do {
-            let (data, _) = try await URLSession.shared.data(from: Self.nodesURL)
-            let decoded = Self.decodeJSONNodes(from: data)
+            var request = URLRequest(url: Self.nodesURL)
+            request.timeoutInterval = 15
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            let decoded = try Self.decodeJSONNodes(from: data)
             nodes = decoded
             lastFetch = Date()
+            lastFetchError = nil
             DebugLogger.shared.log("MAP FETCH: \(decoded.count) internet nodes", level: .info)
         } catch {
+            guard !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
+            lastFetchError = "Internet nodes could not be refreshed."
             DebugLogger.shared.log("MAP FETCH: \(error.localizedDescription)", level: .error)
         }
     }
 
     /// Decode JSON array of node objects from the map API.
-    private static func decodeJSONNodes(from data: Data) -> [InternetMapNode] {
+    private static func decodeJSONNodes(from data: Data) throws -> [InternetMapNode] {
         guard let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            return []
+            throw URLError(.cannotParseResponse)
         }
         return array.compactMap { dict -> InternetMapNode? in
             guard let lat = dict["adv_lat"] as? Double,
@@ -439,7 +451,11 @@ enum MeshMapMessagePackDecoder {
 // MARK: - MeshMapView
 
 @available(iOS 17.0, macOS 14.0, *)
-struct MeshMapView: View {
+struct RadioMapView: View {
+    var topControlsInset: CGFloat = 0
+    @Namespace private var mapScope
+    @Environment(ConnectionManager.self) private var connection
+    @Environment(DeviceConfig.self) private var deviceConfig
     @Environment(ContactStore.self) private var contactStore
     @Environment(NavigationStore.self) private var navigationStore
     @Environment(RFMonitorStore.self) private var rfStore
@@ -449,7 +465,7 @@ struct MeshMapView: View {
     /// Mirrors the camera's current region. Set explicitly when we move the camera
     /// programmatically so nodes appear without waiting for onMapCameraChange to fire.
     @State private var visibleRegion: MKCoordinateRegion? = nil
-    /// True once we've applied the initial 500-mile camera jump; avoids re-jumping on pans.
+    /// Once positioned, live updates never interrupt a user panning the map.
     @State private var hasSetInitialCamera = false
     /// The selected cluster for the detail sheet/popover.
     @State private var selectedCluster: NodeCluster? = nil
@@ -460,17 +476,59 @@ struct MeshMapView: View {
     /// Internet map nodes fetched from map.meshcore.dev.
     @State private var internetMapNodes: [InternetMapNode] = []
     @State private var isLoadingInternetNodes = false
+    @State private var internetMapError: String?
+    @State private var internetRefreshTask: Task<Void, Never>?
 
-    // ~500 miles as degrees of latitude (1° ≈ 69 mi → 500 mi ÷ 69 ≈ 7.25°)
-    private static let initialSpanDegrees = 7.25
+    private static let initialSpanDegrees = 0.35
 
     /// Grid cell size in degrees for clustering. Adapts to zoom level.
     /// At wide zoom (large span) cells are big → heavy clustering.
     /// At close zoom (small span) cells are small → individual nodes.
     private static let clusterThreshold: Double = 0.15
 
+    private var radioCoordinate: CLLocationCoordinate2D? {
+        RadioMapPosition.reportedCoordinate(connection: connection, config: deviceConfig, contacts: contactStore)
+    }
+
+    private func centerOnAvailablePosition() {
+        let center = radioCoordinate ?? locationManager.currentLocation?.coordinate ?? mappableContacts.first.flatMap(reportedCoordinate) ?? CLLocationCoordinate2D(latitude: 37.8044, longitude: -122.2712)
+        let region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: Self.initialSpanDegrees, longitudeDelta: Self.initialSpanDegrees))
+        cameraPosition = .region(region)
+        visibleRegion = region
+    }
+
     private var mappableContacts: [Contact] {
-        contactStore.contacts.filter { $0.latitude != 0 || $0.longitude != 0 }
+        contactStore.contacts.filter {
+            guard !contactStore.isBlocked($0), reportedCoordinate(for: $0) != nil else { return false }
+            guard radioCoordinate != nil else { return true }
+            #if canImport(MeshtasticKit)
+            if connection.isMeshtasticLinkActive,
+               let num = MeshtasticIdentity.nodeNum(forSyntheticKey: $0.publicKey) {
+                return num != UInt32(deviceConfig.publicKeyHex, radix: 16)
+            }
+            #endif
+            return $0.publicKey.hexCompact.lowercased() != deviceConfig.publicKeyHex.lowercased()
+        }
+    }
+
+    private func reportedCoordinate(for contact: Contact) -> CLLocationCoordinate2D? {
+        let latitude: Double
+        let longitude: Double
+        if let position = contactStore.nodePositions[contact.publicKeyPrefix] {
+            latitude = position.latitude
+            longitude = position.longitude
+        } else {
+            #if canImport(MeshtasticKit)
+            // Meshtastic has explicit field presence, including a real 0,0.
+            guard MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) == nil else { return nil }
+            #endif
+            // MeshCore uses 0,0 for an absent position.
+            guard contact.latitude != 0 || contact.longitude != 0 else { return nil }
+            latitude = contact.latitude
+            longitude = contact.longitude
+        }
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
     }
 
     private var linkQualityEntries: [(contact: Contact, snr: Int8)] {
@@ -485,7 +543,7 @@ struct MeshMapView: View {
     }
 
     private func snrColor(_ snr: Int8) -> Color {
-        let db = Int(snr)
+        let db = Double(snr) / 4 // Message SNR is stored in quarter-decibels.
         if db > 0 { return .green }
         if db > -10 { return .orange }
         return .red
@@ -539,7 +597,17 @@ struct MeshMapView: View {
 
     var body: some View {
         ZStack {
-            Map(position: $cameraPosition) {
+            Map(position: $cameraPosition, scope: mapScope) {
+                if let radioCoordinate {
+                    Annotation("My radio · reported position", coordinate: radioCoordinate) {
+                        Label(deviceConfig.deviceName.isEmpty ? "My radio" : deviceConfig.deviceName, systemImage: "antenna.radiowaves.left.and.right")
+                            .font(.caption.weight(.bold))
+                            .padding(Design.Space.tight)
+                            .background(MeshTheme.accent, in: Capsule())
+                            .foregroundStyle(.white)
+                            .accessibilityLabel("My radio, reported position")
+                    }
+                }
                 // Position history trails
                 ForEach(mappableContacts) { contact in
                     let trail = contactStore.positionTrail(for: contact)
@@ -551,80 +619,9 @@ struct MeshMapView: View {
                     }
                 }
 
-                // Local mesh contacts — custom annotations with tap-to-navigate
-                ForEach(mappableContacts) { contact in
-                    Annotation(contactStore.displayName(for: contact),
-                               coordinate: CLLocationCoordinate2D(
-                                   latitude: contact.latitude,
-                                   longitude: contact.longitude
-                               )) {
-                        Button {
-                            navigationStore.sidebarSelection = .contact(contact.publicKeyPrefix)
-                        } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: contactTypeIcon(contact))
-                                    .foregroundStyle(contactTypeColor(contact))
-                                    .font(.title2)
-                                    .padding(6)
-                                    .background(Circle().fill(.background))
-                                    .shadow(radius: 2)
-                                Text(contactStore.displayName(for: contact))
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.textPrimary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .buttonStyle(.meshPlain)
-                    }
-                }
+                localAnnotations
 
-                // Internet map nodes — clustered annotations
-                ForEach(clusteredNodes) { cluster in
-                    Annotation("", coordinate: cluster.coordinate) {
-                        if cluster.isSingle {
-                            // Single node — show individual marker
-                            Button {
-                                selectedCluster = cluster
-                            } label: {
-                                VStack(spacing: 2) {
-                                    Image(systemName: Self.internetNodeIcon(type: cluster.nodes[0].type))
-                                        .foregroundStyle(.white)
-                                        .font(.caption)
-                                        .frame(width: 28, height: 28)
-                                        .background(Circle().fill(Color.teal))
-                                        .shadow(radius: 2)
-                                    Text(cluster.nodes[0].name)
-                                        .font(.caption2)
-                                        .foregroundStyle(MeshTheme.textSecondary)
-                                        .lineLimit(1)
-                                        .frame(maxWidth: 80)
-                                }
-                            }
-                            .buttonStyle(.meshPlain)
-                        } else {
-                            // Cluster — show count bubble
-                            Button {
-                                selectedCluster = cluster
-                            } label: {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.teal.opacity(0.85))
-                                        .frame(width: clusterSize(cluster.count),
-                                               height: clusterSize(cluster.count))
-                                        .overlay(
-                                            Circle()
-                                                .strokeBorder(Color.white, lineWidth: 2)
-                                        )
-                                        .shadow(radius: 3)
-                                    Text(clusterLabel(cluster.count))
-                                        .font(.caption.weight(.bold))
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                            .buttonStyle(.meshPlain)
-                        }
-                    }
-                }
+                internetAnnotations
 
                 // Coverage heat map — GPS-tagged RSSI points from RF monitor
                 if mapOverlay == .coverage {
@@ -639,13 +636,15 @@ struct MeshMapView: View {
                 }
 
                 // Link quality lines — SNR-colored from device to each contact with message history
-                if mapOverlay == .linkQuality, let deviceCoord = locationManager.currentLocation?.coordinate {
+                if mapOverlay == .linkQuality, let deviceCoord = radioCoordinate {
                     ForEach(linkQualityEntries, id: \.contact.id) { entry in
+                        if let coordinate = reportedCoordinate(for: entry.contact) {
                         MapPolyline(coordinates: [
                             deviceCoord,
-                            CLLocationCoordinate2D(latitude: entry.contact.latitude, longitude: entry.contact.longitude)
+                            coordinate
                         ])
                         .stroke(snrColor(entry.snr).opacity(0.8), lineWidth: 3)
+                        }
                     }
                 }
 
@@ -654,12 +653,18 @@ struct MeshMapView: View {
             .onMapCameraChange(frequency: .onEnd) { context in
                 DispatchQueue.main.async {
                     visibleRegion = context.region
+                    if cameraPosition.positionedByUser { hasSetInitialCamera = true }
                 }
             }
-            .mapControls {
-                MapUserLocationButton()
-                MapCompass()
-                MapScaleView()
+            .mapControls { MapScaleView() }
+            .ignoresSafeArea(.container, edges: .top)
+            .overlay(alignment: .bottomTrailing) {
+                VStack(spacing: Design.Space.tight) {
+                    MapCompass(scope: mapScope)
+                    MapUserLocationButton(scope: mapScope).tint(MeshTheme.textPrimary)
+                }
+                .padding(.trailing, Design.Space.snug)
+                .padding(.bottom, Design.minimumTouchTarget + Design.Space.loose)
             }
 
             // Overlays
@@ -731,7 +736,7 @@ struct MeshMapView: View {
                                     .foregroundStyle(MeshTheme.textSecondary)
                             }
                             HStack(spacing: 4) {
-                                Circle().fill(Color.teal.opacity(0.85)).frame(width: 8, height: 8)
+                                Circle().fill(MeshTheme.accent).frame(width: 8, height: 8)
                                 Text("Internet map (\(internetMapNodes.count))")
                                     .font(.caption2)
                                     .foregroundStyle(MeshTheme.textSecondary)
@@ -746,9 +751,31 @@ struct MeshMapView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 8)
-                .padding(.top, 8)
+                .padding(.top, Design.Space.tight + topControlsInset)
 
                 Spacer()
+
+                if let internetMapError {
+                    VStack(alignment: .leading, spacing: Design.Space.tight) {
+                        Label(internetMapError, systemImage: "wifi.exclamationmark")
+                            .font(.subheadline)
+                        Text(internetMapNodes.isEmpty
+                             ? "Contacts with reported positions are still shown."
+                             : "Showing previously loaded internet nodes and local contacts.")
+                            .font(.caption)
+                            .foregroundStyle(MeshTheme.textSecondary)
+                        Button("Retry internet map") {
+                            internetRefreshTask?.cancel()
+                            internetRefreshTask = Task { await fetchInternetMapNodes(force: true) }
+                        }
+                        .buttonStyle(.meshSecondary)
+                        .disabled(isLoadingInternetNodes)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: Design.Radius.control))
+                    .padding(.horizontal)
+                }
 
                 if locationManager.authorizationStatus == .denied ||
                    locationManager.authorizationStatus == .restricted {
@@ -760,7 +787,7 @@ struct MeshMapView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .padding()
                 }
-                if mappableContacts.isEmpty && internetMapNodes.isEmpty && !isLoadingInternetNodes {
+                if mappableContacts.isEmpty && internetMapNodes.isEmpty && !isLoadingInternetNodes && internetMapError == nil {
                     ContentUnavailableView(
                         "No shared positions to show",
                         systemImage: "mappin.slash",
@@ -772,79 +799,104 @@ struct MeshMapView: View {
                     .padding(.bottom)
                 }
 
-                // Cycling overlay button — bottom-trailing, clear of MapKit's top-right controls
                 HStack {
+                    Button("Center on my mesh", systemImage: "scope") { centerOnAvailablePosition() }
+                        .labelStyle(.iconOnly)
+                        .frame(minWidth: Design.minimumTouchTarget, minHeight: Design.minimumTouchTarget)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: Design.Radius.control))
                     Spacer()
-                    Button {
-                        switch mapOverlay {
-                        case .none:
-                            mapOverlay = .linkQuality
-                        case .linkQuality:
-                            if rfStore.coveragePoints.isEmpty {
-                                showCoverageInfo = true
-                            } else {
-                                mapOverlay = .coverage
-                            }
-                        case .coverage:
-                            mapOverlay = .none
-                        }
+                    Menu {
+                        Button("No signal overlay") { mapOverlay = .none }
+                        Button("Received message SNR") { mapOverlay = .linkQuality }
+                        Button("Local reception samples") { mapOverlay = .coverage }
                     } label: {
-                        Image(systemName: overlayButtonIcon)
+                        Label(mapOverlay == .coverage ? "Local reception" : mapOverlay == .linkQuality ? "Message SNR" : "Layers", systemImage: overlayButtonIcon)
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(mapOverlay == .none ? MeshTheme.textSecondary : MeshTheme.accent)
-                            .frame(width: 32, height: 32)
-                            .background(.thinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .touchable()
-                    }
-                    .buttonStyle(.meshPlain)
-                    .alert("Coverage Heat Map", isPresented: $showCoverageInfo) {
-                        Button("Got It", role: .cancel) {}
-                    } message: {
-                        Text("Signal strength data is collected automatically while the RF Monitor is open and you're moving. Every received packet is GPS-tagged and plotted here as a colour-coded heat map.\n\nOpen the RF Monitor tab and move around with your radio to start building coverage data.")
+                            .padding(.horizontal, Design.Space.snug)
+                            .frame(minHeight: Design.minimumTouchTarget)
+                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: Design.Radius.control))
                     }
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
+                if mapOverlay != .none {
+                    Text(mapOverlay == .coverage
+                         ? "Local receive samples from RF Monitor. No return path is verified."
+                         : "Lines join reported positions. They are not packet routes; SNR describes the last received hop.")
+                        .font(.caption)
+                        .padding(Design.Space.tight)
+                        .background(.thinMaterial)
+                }
             }
         }
         .navigationTitle("Map")
         .task {
             // Defer past the current view-update pass to avoid
             // "Publishing changes from within view updates" warnings.
-            try? await Task.sleep(nanoseconds: 1)
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            centerOnAvailablePosition()
             locationManager.requestPermission()
             await fetchInternetMapNodes()
         }
-        .onChange(of: locationManager.currentLocation) { _, location in
-            guard let location, !hasSetInitialCamera else { return }
-            hasSetInitialCamera = true
-            let region = MKCoordinateRegion(
-                center: location.coordinate,
-                span: MKCoordinateSpan(
-                    latitudeDelta: Self.initialSpanDegrees,
-                    longitudeDelta: Self.initialSpanDegrees
-                )
-            )
-            DispatchQueue.main.async {
-                cameraPosition = .region(region)
-                visibleRegion = region
-            }
+        .onDisappear { internetRefreshTask?.cancel() }
+        .onChange(of: radioCoordinate?.latitude) {
+            guard !hasSetInitialCamera, radioCoordinate != nil else { return }
+            centerOnAvailablePosition()
         }
-        .onChange(of: internetMapNodes.count) {
-            guard !internetMapNodes.isEmpty, visibleRegion == nil,
-                  let loc = locationManager.currentLocation else { return }
-            let region = MKCoordinateRegion(
-                center: loc.coordinate,
-                span: MKCoordinateSpan(
-                    latitudeDelta: Self.initialSpanDegrees,
-                    longitudeDelta: Self.initialSpanDegrees
-                )
-            )
-            visibleRegion = region
+        .onChange(of: radioCoordinate?.longitude) {
+            guard !hasSetInitialCamera, radioCoordinate != nil else { return }
+            centerOnAvailablePosition()
+        }
+        .onChange(of: locationManager.currentLocation) { _, location in
+            guard location != nil, !hasSetInitialCamera else { return }
+            hasSetInitialCamera = true
+            centerOnAvailablePosition()
         }
         .sheet(item: $selectedCluster) { cluster in
             ClusterDetailView(cluster: cluster)
+        }
+    }
+
+    @MapContentBuilder
+    private var localAnnotations: some MapContent {
+                // Local mesh contacts — custom annotations with tap-to-navigate
+                ForEach(mappableContacts) { contact in
+                    if let coordinate = reportedCoordinate(for: contact) {
+                    Annotation(contactStore.displayName(for: contact),
+                               coordinate: coordinate) {
+                        Button {
+                            navigationStore.sidebarSelection = .contact(contact.publicKeyPrefix)
+                        } label: {
+                            Image(systemName: contactTypeIcon(contact))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(MeshTheme.accent)
+                                .frame(width: 24, height: 24)
+                                .background(MeshTheme.surface, in: Circle())
+                                .overlay(Circle().strokeBorder(MeshTheme.accent, lineWidth: 1.5))
+                                .frame(minWidth: Design.minimumTouchTarget, minHeight: Design.minimumTouchTarget)
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.meshPlain)
+                        .accessibilityLabel("Open \(contactStore.displayName(for: contact))")
+                        .accessibilityHint("Opens this contact in Messages")
+                    }
+                    }
+                }
+
+    }
+
+    @MapContentBuilder
+    private var internetAnnotations: some MapContent {
+        ForEach(clusteredNodes) { cluster in
+            Annotation("", coordinate: cluster.coordinate) {
+                Button { selectedCluster = cluster } label: {
+                    CoverageRepeaterMarker(count: cluster.count, ambiguous: false, selected: selectedCluster?.id == cluster.id)
+                }
+                .buttonStyle(.meshPlain)
+                .accessibilityLabel(cluster.isSingle ? "Internet node \(cluster.nodes[0].name)" : "\(cluster.count) internet nodes")
+                .accessibilityHint("Shows details from the internet map")
+            }.annotationTitles(.hidden)
         }
     }
 
@@ -922,12 +974,18 @@ struct MeshMapView: View {
 
     // MARK: - Internet Map
 
-    private func fetchInternetMapNodes() async {
+    private func fetchInternetMapNodes(force: Bool = false) async {
         guard !isLoadingInternetNodes else { return }
         isLoadingInternetNodes = true
-        await MeshMapService.shared.fetchIfNeeded()
+        defer { isLoadingInternetNodes = false }
+        if force {
+            await MeshMapService.shared.fetch()
+        } else {
+            await MeshMapService.shared.fetchIfNeeded()
+        }
+        guard !Task.isCancelled else { return }
         internetMapNodes = MeshMapService.shared.nodes
-        isLoadingInternetNodes = false
+        internetMapError = MeshMapService.shared.lastFetchError
     }
 }
 
@@ -1016,7 +1074,7 @@ struct ClusterDetailView: View {
             #endif
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: MeshMapView.internetNodeIcon(type: node.type))
+                Image(systemName: RadioMapView.internetNodeIcon(type: node.type))
                     .foregroundStyle(.teal)
                     .frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {

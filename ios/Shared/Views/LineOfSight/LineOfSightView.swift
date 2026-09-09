@@ -16,6 +16,7 @@ import MeshCoreKit
 struct LineOfSightView: View {
     @Environment(LineOfSightStore.self) private var store
     @Environment(DeviceConfig.self) private var deviceConfig
+    @Environment(ConnectionManager.self) private var connection
     @Environment(\.dismiss) private var dismiss
     @State private var shareItems: [Any] = []
     @State private var showShareSheet = false
@@ -128,7 +129,7 @@ struct LineOfSightView: View {
                 }
             }
             .onAppear {
-                store.loadFromDeviceConfig(deviceConfig)
+                store.loadFromDeviceConfig(deviceConfig, connection: connection)
             }
             #if os(iOS)
             .sheet(isPresented: $showShareSheet) {
