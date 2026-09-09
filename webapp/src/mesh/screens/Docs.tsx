@@ -79,6 +79,25 @@ function WideContent({
 	);
 }
 
+function RetryButton({
+	onClick,
+	label,
+}: {
+	onClick: () => void;
+	label: string;
+}) {
+	return (
+		<button
+			type="button"
+			className="docs-retry"
+			onClick={onClick}
+			aria-label={label}
+		>
+			Retry
+		</button>
+	);
+}
+
 /** Repository docs published by scripts/sync_docs_to_webapp.py. */
 export default function Docs() {
 	const [docs, setDocs] = useState<DocEntry[]>([]);
@@ -101,6 +120,9 @@ export default function Docs() {
 		if (docs.length) setDocAttempt((attempt) => attempt + 1);
 		else setListAttempt((attempt) => attempt + 1);
 	};
+	const retryLabel = docs.length
+		? "Retry loading this document"
+		: "Retry loading documents";
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const navRef = useRef<HTMLElement>(null);
 	const docsRef = useRef(docs);
@@ -286,9 +308,7 @@ export default function Docs() {
 						<label htmlFor="docs-mobile-select">Document</label>
 					)}
 					{!docs.length && message ? (
-						<button type="button" className="docs-retry" onClick={retry}>
-							Retry
-						</button>
+						<RetryButton onClick={retry} label={retryLabel} />
 					) : (
 						<select
 							id="docs-mobile-select"
@@ -321,13 +341,7 @@ export default function Docs() {
 									: "Loading documents…"}
 							</p>
 							{message && (
-								<button
-									type="button"
-									className="docs-retry"
-									onClick={retry}
-								>
-									Retry
-								</button>
+								<RetryButton onClick={retry} label={retryLabel} />
 							)}
 						</div>
 					)}
@@ -375,13 +389,7 @@ export default function Docs() {
 								<p className="err" role="alert">
 									{message}
 								</p>
-								<button
-									type="button"
-									className="docs-retry"
-									onClick={retry}
-								>
-									Retry
-								</button>
+								<RetryButton onClick={retry} label={retryLabel} />
 							</div>
 						)}
 						{!message && text == null && (

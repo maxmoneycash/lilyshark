@@ -76,6 +76,10 @@
 	width: max-content;
 	max-width: 100%;
 }
+.meshterm .docs-grid .docs-retry:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: 2px;
+}
 .meshterm .docs-grid .docs-nav .docs-retry {
 	text-align: center;
 	white-space: nowrap;
