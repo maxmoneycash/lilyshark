@@ -150,6 +150,9 @@
 	.meshterm .sniffer-screen .sniffer-table {
 		max-height: min(46dvh, 420px) !important;
 	}
+	.meshterm .sniffer-screen .sniffer-detail {
+		scroll-margin-top: calc(54px + env(safe-area-inset-top, 0px));
+	}
 	.meshterm .telemetry-panels {
 		grid-template-columns: minmax(0, 1fr);
 	}
