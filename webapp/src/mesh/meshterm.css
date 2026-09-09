@@ -936,16 +936,21 @@
 	font-size: 10px;
 	letter-spacing: 2px;
 	color: var(--fg-dim);
+	overflow-wrap: anywhere;
+	text-wrap: balance;
 }
 .meshterm .stat-tile .value {
 	font-size: 22px;
 	font-weight: 700;
 	text-shadow: 0 0 8px var(--glow);
+	min-width: 0;
+	overflow-wrap: anywhere;
 }
 .meshterm .stat-tile .value small {
 	font-size: 12px;
 	font-weight: 400;
 	color: var(--fg-dim);
+	overflow-wrap: anywhere;
 }
 
 /* ── debug ── */
@@ -1844,12 +1849,14 @@ body:has(.meshterm .app.menu-open) {
 	padding: 12px 16px;
 	border-bottom: 1px solid var(--border);
 	font-size: 12.5px;
+	min-width: 0;
 }
 .meshterm .stat-strip .stat {
 	display: inline-flex;
 	align-items: baseline;
 	gap: 9px;
 	white-space: nowrap;
+	min-width: 0;
 }
 .meshterm .stat-strip .k {
 	color: var(--fg-dim);
@@ -1891,30 +1898,169 @@ body:has(.meshterm .app.menu-open) {
 .meshterm .stat-tile {
 	flex: 1 1 110px;
 	max-width: 200px;
+	min-width: 0;
+}
+
+/* MESH graph: fit the pane so names stay 12px and on-canvas; wrap the
+   legend instead of shoving SOLID/DASHED off the phone; never let the
+   1100px topology canvas widen the page. */
+.meshterm main.mesh-screen {
+	min-width: 0;
+	max-width: 100%;
+}
+.meshterm main.mesh-screen .mesh-topology {
+	min-width: 0;
+	max-width: 100%;
+}
+.meshterm main.mesh-screen .mesh-topology-toolbar {
+	flex-wrap: wrap;
+	gap: 8px 10px;
+	align-items: center;
+}
+.meshterm main.mesh-screen .mesh-toolbar-cluster {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 10px;
+	min-width: 0;
+	max-width: 100%;
+}
+.meshterm main.mesh-screen .mesh-count {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.meshterm main.mesh-screen .mesh-graph-layout {
+	flex: 1;
+	display: flex;
+	flex-wrap: wrap;
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+}
+.meshterm main.mesh-screen .mesh-graph-viewport {
+	flex: 999 1 320px;
+	min-width: 0;
+	max-width: 100%;
+	min-height: 260px;
+	height: 100%;
+	overflow: hidden;
+}
+.meshterm main.mesh-screen .mesh-graph-viewport svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	max-width: 100%;
+}
+.meshterm main.mesh-screen .mesh-legend {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 14px;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.meshterm main.mesh-screen .mesh-legend > span {
+	flex: 0 1 auto;
+	min-width: 0;
+}
+.meshterm main.mesh-screen .mesh-node-detail {
+	flex: 1 1 260px;
+	min-width: 0;
+	max-width: 100%;
+}
+.meshterm main.mesh-screen .mesh-empty {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-height: 10rem;
+	max-width: 58ch;
+	padding: 20px 16px;
+}
+.meshterm main.mesh-screen .mesh-empty h2 {
+	margin: 0 0 10px;
+	font-size: 15px;
+	line-height: 1.35;
+	letter-spacing: 0;
+	font-weight: 700;
+	color: var(--fg);
+}
+.meshterm main.mesh-screen .mesh-empty p {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--ink, var(--fg));
+}
+@media (max-width: 860px) {
+	.meshterm main.mesh-screen .mesh-graph-layout.scroll-y {
+		overflow: hidden;
+		max-width: 100%;
+	}
+	.meshterm main.mesh-screen .mesh-graph-layout .mesh-graph-viewport {
+		height: min(60dvh, 480px) !important;
+		max-width: 100%;
+		min-width: 0;
+		overflow: hidden !important;
+	}
+	.meshterm main.mesh-screen .mesh-graph-viewport svg {
+		width: 100% !important;
+		height: 100% !important;
+		max-width: 100%;
+	}
+	.meshterm main.mesh-screen .mesh-node-detail {
+		min-width: 0 !important;
+	}
+	.meshterm main.mesh-screen .mesh-legend {
+		gap: 4px 12px;
+	}
 }
 
 .meshterm .this-device {
 	flex-shrink: 0;
+	min-width: 0;
+}
+.meshterm .this-device .panel-title > span {
+	min-width: 0;
+	overflow-wrap: anywhere;
 }
 .meshterm .this-device .device-readout {
-	display: flex;
-	flex-wrap: wrap;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
 	gap: 8px;
 	padding: 10px 12px 12px;
+	min-width: 0;
 }
 .meshterm .this-device .stat-tile {
 	flex: 1 1 140px;
 	max-width: none;
-	min-width: 120px;
+	min-width: 0;
 	padding: 8px 10px;
 	border: 1px solid var(--border);
+}
+.meshterm .this-device .stat-tile .label {
+	letter-spacing: 1px;
+	line-height: 1.3;
 }
 .meshterm .this-device .stat-tile .value {
 	font-size: 16px;
 	display: flex;
 	flex-direction: column;
-	align-items: flex-start;
+	align-items: stretch;
 	gap: 4px;
+	width: 100%;
+}
+.meshterm .this-device .stat-tile .value small {
+	text-wrap: pretty;
+}
+.meshterm .this-device .spark {
+	width: 100%;
+	height: 24px;
+	color: var(--fg);
+	display: block;
+	flex-shrink: 0;
+}
+.meshterm .this-device .spark-empty {
+	color: var(--fg-dim);
 }
 .meshterm .device-actions {
 	display: flex;
@@ -3032,11 +3178,23 @@ body:has(.meshterm .app.menu-open) {
 		font-size: 11px;
 	}
 	.meshterm .this-device .device-readout {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 	.meshterm .this-device .stat-tile {
 		min-width: 0;
+		padding: 8px;
+	}
+	.meshterm .this-device .stat-tile .label {
+		font-size: 9px;
+		letter-spacing: 0.5px;
+		min-height: 2.4em;
+	}
+	.meshterm .this-device .stat-tile .value {
+		font-size: 15px;
+	}
+	.meshterm .this-device .stat-tile .value small {
+		font-size: 11px;
+		line-height: 1.35;
 	}
 	.meshterm .device-note {
 		font-size: 12px;
@@ -3231,6 +3389,9 @@ body:has(.meshterm .app.menu-open) {
 	}
 	.meshterm .stat-strip .v {
 		overflow-wrap: anywhere;
+	}
+	.meshterm .this-device .device-readout {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 	.meshterm .chat-input {
 		align-items: stretch;

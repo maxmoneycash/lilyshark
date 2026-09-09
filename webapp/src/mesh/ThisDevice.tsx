@@ -9,25 +9,53 @@ export function SimulateBadge({ on }: { on?: boolean }) {
 }
 
 function Spark({ values }: { values: number[] }) {
-	if (values.length < 2) return null;
+	const w = 120;
+	const h = 24;
+	if (values.length < 2) {
+		return (
+			<svg
+				className="spark spark-empty"
+				viewBox={`0 0 ${w} ${h}`}
+				preserveAspectRatio="none"
+				aria-hidden="true"
+			>
+				<line
+					x1="0"
+					y1={h / 2}
+					x2={w}
+					y2={h / 2}
+					stroke="currentColor"
+					strokeWidth="1.5"
+					strokeDasharray="4 3"
+					vectorEffect="nonScalingStroke"
+				/>
+			</svg>
+		);
+	}
 	const min = Math.min(...values);
 	const max = Math.max(...values);
-	const span = max - min || 1;
-	const w = 72;
-	const h = 16;
+	const flat = max === min;
 	const pts = values
 		.map((v, i) => {
 			const x = (i / (values.length - 1)) * w;
-			const y = h - ((v - min) / span) * (h - 2) - 1;
+			const y = flat ? h / 2 : h - ((v - min) / (max - min)) * (h - 2) - 1;
 			return `${x.toFixed(1)},${y.toFixed(1)}`;
 		})
 		.join(" ");
 	return (
-		<svg className="spark" width={w} height={h} aria-hidden="true">
+		<svg
+			className="spark"
+			viewBox={`0 0 ${w} ${h}`}
+			preserveAspectRatio="none"
+			aria-hidden="true"
+		>
 			<polyline
 				fill="none"
 				stroke="currentColor"
-				strokeWidth="1.2"
+				strokeWidth="2"
+				strokeLinejoin="round"
+				strokeLinecap="round"
+				vectorEffect="nonScalingStroke"
 				points={pts}
 			/>
 		</svg>
@@ -44,11 +72,22 @@ export function ThisDevicePanel() {
 		.filter((n): n is number => n !== undefined);
 	const rssiSeries = hist.map((h) => telemetrySignal(h, "rssi")).filter((n): n is number => n !== undefined);
 	const snrSeries = hist.map((h) => telemetrySignal(h, "snr")).filter((n): n is number => n !== undefined);
-	const rssi = telem && telemetrySignal(telem, "rssi");
-	const snr = telem && telemetrySignal(telem, "snr");
-	const voltage = telem && telemetryVoltage(telem);
-	const dropped = telem && unattributedFrames(telem);
+	const rssi = telem ? telemetrySignal(telem, "rssi") : undefined;
+	const snr = telem ? telemetrySignal(telem, "snr") : undefined;
+	const voltage = telem ? telemetryVoltage(telem) : undefined;
+	const dropped = telem ? unattributedFrames(telem) : undefined;
 	const count = (n: number | undefined) => telemetryCount(n)?.toLocaleString() ?? "Not reported";
+	const batLabel = telem ? reportedLabel(telem.bat) : "Not reported";
+	const gpsLabel = telem ? reportedLabel(telem.gps) : "Not reported";
+	const gpsSearching = telem ? /search/i.test(telem.gps) : false;
+	const rxNote = (measured: number | undefined) =>
+		telem?.direction === 2
+			? "Transmitted frame · no receive signal"
+			: measured === undefined
+				? "No receive measurement."
+				: undefined;
+	const rssiNote = rxNote(rssi);
+	const snrNote = rxNote(snr);
 	return (
 		<div className="panel this-device">
 			<div className="panel-title">
@@ -64,9 +103,12 @@ export function ThisDevicePanel() {
 						<div className="stat-tile">
 							<div className="label">BATTERY</div>
 							<div className="value">
-								{reportedLabel(telem.bat)}
+								{batLabel}
 								{voltage !== undefined && (
 									<small>{voltage.toFixed(2)} V</small>
+								)}
+								{voltage === undefined && batLabel === "Not reported" && (
+									<small>The deck has not reported a battery reading.</small>
 								)}
 								<Spark values={batSeries} />
 							</div>
@@ -74,16 +116,18 @@ export function ThisDevicePanel() {
 						<div className="stat-tile">
 							<div className="label">GPS</div>
 							<div className="value">
-								{reportedLabel(telem.gps)}
+								{gpsLabel}
 								{telem.sat !== undefined && <small>{telem.sat} SAT</small>}
 								{telem.lat !== undefined && telem.lon !== undefined ? (
 									<small>
 										{fmtHemisphere(telem.lat, telem.lon, 5, 5)}
 									</small>
-								) : telem.gps.includes("SEARCH") ? (
-									<small>Waiting for a GPS fix.</small>
 								) : (
-									<small>Position not reported</small>
+									<small>
+										{gpsSearching
+											? "Waiting for a GPS fix."
+											: "The deck has not reported a position."}
+									</small>
 								)}
 							</div>
 						</div>
@@ -111,7 +155,7 @@ export function ThisDevicePanel() {
 							<div className="label">LATEST FRAME RSSI</div>
 							<div className="value">
 								{rssi === undefined ? "Not reported" : `${rssi.toFixed(1)} DBM`}
-								{telem.direction === 2 && <small>Transmitted frame · no receive signal</small>}
+								{rssiNote && <small>{rssiNote}</small>}
 								<Spark values={rssiSeries} />
 							</div>
 						</div>
@@ -119,7 +163,7 @@ export function ThisDevicePanel() {
 							<div className="label">LATEST FRAME SNR</div>
 							<div className="value">
 								{snr === undefined ? "Not reported" : `${snr.toFixed(1)} DB`}
-								{telem.direction === 2 && <small>Transmitted frame · no receive signal</small>}
+								{snrNote && <small>{snrNote}</small>}
 								<Spark values={snrSeries} />
 							</div>
 						</div>

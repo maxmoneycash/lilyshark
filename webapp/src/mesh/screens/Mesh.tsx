@@ -47,6 +47,7 @@ function layout(
 		);
 	const arr = ids.map((id) => pos.get(id)!);
 	const n = arr.length;
+	if (n === 0) return pos;
 	const k = Math.sqrt((w * h) / Math.max(1, n)); // ideal distance between nodes
 	const ITERS = 400;
 	let temp = w / 8; // max displacement per iteration, cools down to 0
@@ -107,13 +108,20 @@ function layout(
 		if (p.y < minY) minY = p.y;
 		if (p.y > maxY) maxY = p.y;
 	}
-	const pad = 60; // room for the labels, which sit to the right of the node
+	// Labels sit to the right of each node. Extra right pad keeps short names
+	// inside the pane once the cluster is scaled to fit; equal padding clipped
+	// the last column of names against overflow:hidden.
+	const padL = Math.min(40, Math.max(22, Math.round(w * 0.06)));
+	const padR = Math.min(88, Math.max(52, Math.round(w * 0.14)));
+	const padY = Math.min(52, Math.max(28, Math.round(h * 0.1)));
 	const sc = Math.min(
-		(w - pad * 2) / Math.max(1, maxX - minX),
-		(h - pad * 2) / Math.max(1, maxY - minY),
+		(w - padL - padR) / Math.max(1, maxX - minX),
+		(h - padY * 2) / Math.max(1, maxY - minY),
 	);
-	const offX = (w - (maxX - minX) * sc) / 2 - minX * sc;
-	const offY = (h - (maxY - minY) * sc) / 2 - minY * sc;
+	const usedW = (maxX - minX) * sc;
+	const usedH = (maxY - minY) * sc;
+	const offX = padL + (w - padL - padR - usedW) / 2 - minX * sc;
+	const offY = padY + (h - padY * 2 - usedH) / 2 - minY * sc;
 	for (const p of arr) {
 		p.x = p.x * sc + offX;
 		p.y = p.y * sc + offY;
@@ -155,6 +163,7 @@ export default function Mesh() {
 		{ node: number; hourBucket: number; n: number }[]
 	>([]);
 	const [actHours, setActHours] = useState(48);
+	const [graphSize, setGraphSize] = useState({ w: W, h: H });
 
 	useEffect(() => {
 		if (view !== "activity") return;
@@ -181,35 +190,36 @@ export default function Mesh() {
 
 	const ids = useMemo(() => {
 		const set = new Set<number>();
+		// NodeInfo arrives before NeighborInfo. Drawing only the linked pair
+		// left a blank graph under a summary that already counted the mesh.
+		for (const [id] of s.nodes) set.add(id);
+		if (s.myNodeNum !== undefined) set.add(s.myNodeNum);
 		for (const e of edges) {
 			set.add(e.a);
 			set.add(e.b);
 		}
-		return [...set];
-	}, [edges]);
+		return [...set].sort((a, b) => a - b);
+	}, [edges, s.nodes.size, s.myNodeNum]);
 
-	const pos = useMemo(() => layout(ids, edges, W, H), [ids, edges]);
+	const pos = useMemo(
+		() => layout(ids, edges, graphSize.w, graphSize.h),
+		[ids, edges, graphSize],
+	);
 
 	useEffect(() => {
+		if (view !== "graph" || ids.length === 0) return;
 		const viewport = graphViewport.current;
-		if (!viewport || view !== "graph") return;
-		const center = () => {
-			if (!window.matchMedia("(max-width: 860px)").matches) return;
-			const svg = viewport.querySelector("svg");
-			if (!svg) return;
-			const point = (s.myNodeNum === undefined
-				? undefined
-				: pos.get(s.myNodeNum)) ?? { x: W / 2, y: H / 2 };
-			viewport.scrollLeft =
-				(point.x * svg.clientWidth) / W - viewport.clientWidth / 2;
-			viewport.scrollTop =
-				(point.y * svg.clientHeight) / H - viewport.clientHeight / 2;
+		if (!viewport || typeof ResizeObserver === "undefined") return;
+		const measure = () => {
+			const w = Math.max(240, Math.round(viewport.clientWidth));
+			const h = Math.max(220, Math.round(viewport.clientHeight));
+			setGraphSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
 		};
-		center();
-		const observer = new ResizeObserver(center);
+		measure();
+		const observer = new ResizeObserver(measure);
 		observer.observe(viewport);
 		return () => observer.disconnect();
-	}, [pos, s.myNodeNum, view]);
+	}, [view, ids.length]);
 
 	const short = (num: number) =>
 		s.nodes.get(num)?.shortName ?? num.toString(16).slice(-4);
@@ -345,7 +355,7 @@ export default function Mesh() {
 
 			<div className="panel mesh-topology" style={{ flex: 1, minWidth: 0 }}>
 				<div className="panel-title mesh-topology-toolbar">
-					<span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+					<span className="mesh-toolbar-cluster">
 						<button
 							className={view === "graph" ? "tab active" : "tab"}
 							aria-pressed={view === "graph"}
@@ -360,11 +370,13 @@ export default function Mesh() {
 						>
 							{t("ACTIVITY")}
 						</button>
-						{view === "graph"
-							? `${t("{0} NODES", ids.length)} · ${t("{0} LINKS", edges.length)}`
-							: t("{0} NODES HEARD", grid.rows.length)}
+						<span className="mesh-count">
+							{view === "graph"
+								? `${t("{0} NODES", ids.length)} · ${t("{0} LINKS", edges.length)}`
+								: t("{0} NODES HEARD", grid.rows.length)}
+						</span>
 					</span>
-					<span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+					<span className="mesh-toolbar-cluster">
 						{view === "activity" &&
 							[24, 48, 168].map((h) => (
 								<button
@@ -458,39 +470,21 @@ export default function Mesh() {
 						<h2>{t("No links recorded.")}</h2>
 						<p>
 							{t(
-								"Enable Neighbor Info in Config, or run a traceroute from Nodes. Solid lines are neighbors; dashed lines are traceroutes.",
+								"Connect a T-Deck to hear neighbors. Neighbor Info draws the solid links; a traceroute from Nodes fills the dashed hops.",
 							)}
 						</p>
 					</div>
 				) : (
-					<div
-						className="scroll-y mesh-graph-layout"
-						style={{ display: "flex", flexWrap: "wrap" }}
-					>
+					<div className="scroll-y mesh-graph-layout">
 						<div
 							ref={graphViewport}
 							className="mesh-graph-viewport"
 							role="region"
-							aria-label={t(
-								"Radio mesh topology. Scroll to explore the graph.",
-							)}
+							aria-label={t("Radio mesh topology")}
 							tabIndex={0}
-							style={{
-								flex: "999 1 320px",
-								minWidth: 0,
-								minHeight: 260,
-								// Definite height on desktop so the svg's height:100% resolves
-								// and the viewBox scales to FIT the pane — without it the svg
-								// falls back to its intrinsic 3:2 aspect, renders taller than
-								// the pane, and the graph is half below a scrollbar. On the
-								// phone the pane is auto-height and the % is simply ignored.
-								height: "100%",
-								overflow: "hidden",
-							}}
 						>
 							<svg
-								viewBox={`0 0 ${W} ${H}`}
-								style={{ width: "100%", height: "100%" }}
+								viewBox={`0 0 ${graphSize.w} ${graphSize.h}`}
 								role="group"
 								aria-label={t("Radio nodes and links")}
 							>
@@ -582,7 +576,7 @@ export default function Mesh() {
 							<div
 								ref={nodeDetail}
 								className="panel hot mesh-node-detail"
-								style={{ flex: "1 1 260px", minWidth: 240, fontSize: 12 }}
+								style={{ fontSize: 12 }}
 							>
 								<div className="panel-title">
 									<span>{short(sel)}</span>
@@ -645,16 +639,17 @@ export default function Mesh() {
 					</div>
 				)}
 
-				<div className="panel-foot">
+				<div className="panel-foot mesh-legend">
 					{view === "graph" ? (
 						<>
-							<span className="mesh-pan-hint">{t("SCROLL TO EXPLORE")} · </span>
-							<span>{t("SOLID = NEIGHBOR")}</span>
-							<span className="spacer" />
-							{ids.length > 45 && (
-								<span className="dim">{t("TAP A NODE FOR NAMES")} · </span>
+							{ids.length > 0 && edges.length === 0 && (
+								<span>{t("NO LINKS YET")}</span>
 							)}
+							<span>{t("SOLID = NEIGHBOR")}</span>
 							<span>{t("DASHED = TRACEROUTE")}</span>
+							{ids.length > 45 && (
+								<span className="dim">{t("TAP A NODE FOR NAMES")}</span>
+							)}
 						</>
 					) : (
 						<span>{t("ONE CELL = ONE HOUR")}</span>
