@@ -746,8 +746,21 @@
 .meshterm .flash-page .art {
   display: block;
 }
+.meshterm .flash-page .art:has(.tdeck-photo) {
+  --lcd-x: 0.0619;
+  --lcd-y: 0.3656;
+  --lcd-w: 0.8704;
+  --lcd-h: 0.2921;
+  width: 64px;
+  height: calc(64px * var(--lcd-h) / var(--lcd-w) * 1116 / 517);
+  overflow: hidden;
+  position: relative;
+}
 .meshterm .flash-page .art .tdeck-photo {
-  width: 25px;
+  position: absolute;
+  width: calc(100% / var(--lcd-w));
+  left: calc(-100% * var(--lcd-x) / var(--lcd-w));
+  top: calc(-100% * var(--lcd-y) / var(--lcd-h));
   margin: 0;
   filter: none;
 }
@@ -863,6 +876,9 @@
   }
   .meshterm .flash-page .product {
     order: -1;
+  }
+  .meshterm .flash-page .install-layout:not([data-kind="firmware"]) .hero {
+    display: none;
   }
   .meshterm .flash-page .install-layout[data-kind="firmware"] {
     display: grid;
