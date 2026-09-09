@@ -307,6 +307,27 @@ export function IoGraphPanel({
 
   const brushed = brush !== null;
 
+  useEffect(() => {
+    if (!brushed) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      onBrushRef.current(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [brushed]);
+
   return (
     <>
       <div className="panel-title">
@@ -338,6 +359,8 @@ export function IoGraphPanel({
       {/* A div uPlot owns outright: no React children, ever. */}
       <div
         ref={boxRef}
+        className="traffic-io-plot"
+        aria-label="Capture IO graph, frames over time"
         style={{ width: '100%', height: PLOT_HEIGHT, padding: '4px 0 0' }}
       />
 
@@ -380,8 +403,8 @@ export function IoGraphPanel({
             {brushed ? (
               <span className="ok">
                 BRUSHED {brushLabel(brush)} · {shownFrames} OF {filteredFrames} FILTERED
-                FRAME(S) IN RANGE — click a bar, drag across bars, or press WHOLE
-                CAPTURE
+                FRAME(S) IN RANGE — click a bar, drag across bars, press Escape, or press
+                WHOLE CAPTURE
               </span>
             ) : (
               <span className="dim">

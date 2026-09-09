@@ -70,6 +70,7 @@ import { crcClass, fmtFreq } from './trafficFormat';
 import { AnimatedNumber } from './AnimatedNumber';
 import { dissectRNode } from '../lib/dissect/rnode';
 import { reportedLabel, telemetrySignal } from '../mesh/deviceTelemetry';
+import './traffic.css';
 
 
 /**
@@ -687,7 +688,6 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
     () => frames.reduce((n, fr) => n + (fr.truncated ? 1 : 0), 0),
     [frames],
   );
-  const anyTruncated = useMemo(() => frames.some((fr) => fr.truncated), [frames]);
 
   // ── the open captures ─────────────────────────────────────────────────
   // What each tab is allowed to say about its capture, from facts this tab
@@ -734,8 +734,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
       : (slots.slots.find((s) => s.id === diffBId) ?? null);
 
   return (
-    <main>
-      <div className="panel" style={{ flex: 1 }}>
+    <main className="traffic-screen">
+      <div className="panel traffic-list" style={{ flex: 1 }}>
         <div className="panel-title traffic-toolbar">
           <span className="panel-title-label">PANEL // TRAFFIC{name ? ` · ${name}` : ''}</span>
           <span className="spacer" />
@@ -809,7 +809,6 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               aria-label="Shelby blob name"
               placeholder="Shelby blob name"
               value={blob}
-              style={{ width: 160 }}
               onChange={(e) => setBlob(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && void fetchBlob()}
             />
@@ -819,7 +818,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
           </span>
         </div>
 
-        {error && <div className="panel-foot err">{error}</div>}
+        {error && (capture || !openError) && <div className="panel-foot err">{error}</div>}
 
         {/* Which captures are open, and which of them this panel is showing. */}
         <CaptureSlotBar
@@ -968,13 +967,26 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
         )}
 
         {!capture && (
-          <div className="kv">
-            <span className="k">CAPTURE</span>
-            <span className="v dim">
-              {busy
-                ? 'reading…'
-                : 'none open. The T-Deck writes .lscap to microSD. Load the bundled sample to inspect 24 synthetic LongFast frames, including one Shelby pointer.'}
-            </span>
+          <div className="traffic-empty" role="status">
+            {busy ? (
+              <>
+                <h2>Reading capture…</h2>
+                <p>Opening the file into this analyzer.</p>
+              </>
+            ) : openError ? (
+              <>
+                <h2>Could not open that capture.</h2>
+                <p className="err">{openError}</p>
+              </>
+            ) : (
+              <>
+                <h2>No capture open.</h2>
+                <p>
+                  The T-Deck writes .lscap to microSD. Load the bundled sample to inspect 24
+                  synthetic LongFast frames, including one Shelby pointer.
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -1029,19 +1041,16 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             {/* The display filter. A conversation is one expression in this
                 same box, so following one and typing one are the same act —
                 and CLEAR is the single way back to the whole capture. */}
-            <div
-              className="panel-foot"
-              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}
-            >
+            <div className="panel-foot traffic-filter">
               <span className="k">FILTER</span>
               <input
+                aria-label="Display filter"
+                aria-invalid={filter.ok ? undefined : true}
                 value={filterText}
                 spellCheck={false}
                 placeholder="proto == meshtastic && snr > -5_"
                 title={`Fields: ${FILTER_FIELDS.join(', ')}. Comparisons == != < <= > >= with k/M/G suffixes on numbers; combine with && || ! (or the words and / or / not).`}
                 style={{
-                  flex: '1 1 260px',
-                  minWidth: 160,
                   color: filter.ok ? undefined : 'var(--err, #ff6b6b)',
                 }}
                 onChange={(e) => setFilterText(e.target.value)}
@@ -1050,18 +1059,18 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 {following ? 'SHOW ALL FRAMES' : 'CLEAR'}
               </button>
               {!filter.ok ? (
-                <span className="err">
+                <span className="err traffic-filter-note">
                   {filter.error.message} · column {filter.error.start + 1}
                 </span>
               ) : following ? (
-                <span className="ok">
+                <span className="ok traffic-filter-note">
                   FOLLOWING {conversationLabel(following)} · {filtered.length} OF{' '}
                   {frames.length} FRAMES
                 </span>
               ) : filter.empty ? (
-                <span className="dim">no filter — every frame in the capture</span>
+                <span className="dim traffic-filter-note">no filter — every frame in the capture</span>
               ) : (
-                <span>
+                <span className="traffic-filter-note">
                   {filtered.length} OF {frames.length} FRAMES MATCH
                 </span>
               )}
@@ -1069,7 +1078,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                   the expression leaves, the graph's line counts what the
                   brush leaves of that. */}
               {brush && (
-                <span className="dim">
+                <span className="dim traffic-filter-note">
                   · a time range is also brushed on the IO graph
                 </span>
               )}
@@ -1124,14 +1133,13 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               {truncatedCount > 0 && (
                 <span className="dim">* = FRAME TRUNCATED AT CAPTURE</span>
               )}
-              {anyTruncated && <span className="dim">* = FRAME TRUNCATED AT CAPTURE</span>}
             </div>
           </>
         )}
       </div>
 
       {f && (
-        <div className="panel" style={{ width: 360, flexShrink: 0 }}>
+        <div className="panel traffic-detail">
           <div className="panel-title">
             FRAME {Number(f.sequence)}
             <span className="spacer" />

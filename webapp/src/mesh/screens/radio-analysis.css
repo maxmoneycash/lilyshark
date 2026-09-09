@@ -9,6 +9,39 @@
 	overflow: auto;
 	overscroll-behavior: contain;
 }
+.meshterm .sniffer-screen .sniffer-empty {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-height: 10rem;
+	max-width: 58ch;
+	padding: 20px 16px;
+}
+.meshterm .sniffer-screen .sniffer-empty h2 {
+	margin: 0 0 10px;
+	font-size: 15px;
+	line-height: 1.35;
+	letter-spacing: 0;
+	font-weight: 700;
+	color: var(--fg);
+}
+.meshterm .sniffer-screen .sniffer-empty p {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--ink, var(--fg));
+}
+.meshterm .sniffer-screen .sniffer-table tbody tr:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: -2px;
+}
+.meshterm .sniffer-screen .sniffer-trail {
+	display: block;
+	max-height: none;
+	overflow-wrap: anywhere;
+	line-height: 1.5;
+}
 .meshterm .sniffer-panels > .panel {
 	min-height: 0;
 	overflow: visible;
@@ -62,9 +95,23 @@
 	min-height: 300px;
 }
 .meshterm .telemetry-chart-body .telemetry-empty {
-	margin: 0 0 12px;
+	margin: 0;
+	padding: 8px 0 4px;
+	max-width: 52ch;
+}
+.meshterm .telemetry-empty h2 {
+	margin: 0 0 8px;
+	font-size: 15px;
+	line-height: 1.35;
+	letter-spacing: 0;
+	font-weight: 700;
+	color: var(--fg);
+}
+.meshterm .telemetry-empty p {
+	margin: 0;
 	font-size: 12px;
-	line-height: 1.5;
+	line-height: 1.55;
+	color: var(--ink, var(--fg));
 }
 .meshterm .telemetry-chart-body:has(.telemetry-empty) .telemetry-plot {
 	flex: none;
@@ -112,6 +159,10 @@
 	.meshterm .telemetry-chart-body .telemetry-plot {
 		flex: none;
 		height: 300px;
+	}
+	.meshterm .telemetry-chart-body:has(.telemetry-empty) .telemetry-plot {
+		height: 0;
+		min-height: 0;
 	}
 	.meshterm .telemetry-stats {
 		grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -245,5 +296,16 @@
 	}
 	.meshterm .mesh-pan-hint {
 		display: inline;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.meshterm .sniffer-screen button,
+	.meshterm .telemetry-screen button {
+		transition: none;
+	}
+	.meshterm .sniffer-screen .sniffer-table tbody tr:last-child,
+	.meshterm .telemetry-screen .uplot {
+		animation: none;
 	}
 }

@@ -195,6 +195,7 @@ function DeckTrend() {
 					T-DECK // LIVE
 				</span>
 				<select
+					className="telemetry-metric-select"
 					aria-label="Deck telemetry metric"
 					value={metric.id}
 					onChange={(e) => setMetricId(e.target.value)}
@@ -215,13 +216,20 @@ function DeckTrend() {
 					<div className="panel-title">CHART // T-DECK · {metric.label}</div>
 					<div className="telemetry-chart-body">
 						{rows.length === 0 && (
-							<p className="dim telemetry-empty">
-								{link.history.length === 0
-									? "Waiting for telemetry from the linked deck."
-									: metric.id === "rssi" || metric.id === "snr"
-										? "No received frame with a reported signal measurement is available."
-										: "This measurement has not been reported by the deck."}
-							</p>
+							<div className="telemetry-empty" role="status">
+								<h2>
+									{link.history.length === 0
+										? "Waiting for telemetry from the linked deck."
+										: "This measurement is not in the live history."}
+								</h2>
+								<p>
+									{link.history.length === 0
+										? "Samples arrive about every two seconds once the T-Deck is talking."
+										: metric.id === "rssi" || metric.id === "snr"
+											? "No received frame with a reported signal measurement is available."
+											: "The deck has not reported this reading yet."}
+								</p>
+							</div>
 						)}
 						<div ref={plotDiv} className="telemetry-plot" />
 					</div>
@@ -308,9 +316,9 @@ const seriesColors = (): string[] => [
 // uPlot wants pixels, so the box has to be measured. One helper for both the
 // first build and every later resize, so the two can never disagree and fight
 // each other through the ResizeObserver.
-const plotSize = (box: HTMLElement) => ({
+const plotSize = (box: HTMLElement, legend = false) => ({
 	width: Math.max(100, box.clientWidth),
-	height: Math.max(220, box.clientHeight - 80),
+	height: Math.max(160, Math.max(0, box.clientHeight - (legend ? 36 : 0))),
 });
 
 export default function Telemetry() {
@@ -334,6 +342,7 @@ export default function Telemetry() {
 	} | null>(null);
 	const plotDiv = useRef<HTMLDivElement>(null);
 	const plotRef = useRef<uPlot | null>(null);
+	const legendRef = useRef(false);
 	const [withData, setWithData] = useState<Set<number>>(new Set());
 	// ponytail: periodic refresh instead of reacting to s.version — the mesh
 	// mutates dozens of times/s and rebuilding the chart each time hangs the webview
@@ -452,7 +461,7 @@ export default function Telemetry() {
 			}
 			plotRef.current = new uPlot(
 				{
-					...plotSize(plotDiv.current),
+					...plotSize(plotDiv.current, dual || compare.length > 0),
 					series: [
 						{},
 						{
@@ -518,7 +527,7 @@ export default function Telemetry() {
 		const box = plotDiv.current;
 		if (!box || typeof ResizeObserver === "undefined") return;
 		const ro = new ResizeObserver(() => {
-			plotRef.current?.setSize(plotSize(box));
+			plotRef.current?.setSize(plotSize(box, legendRef.current));
 		});
 		ro.observe(box);
 		return () => ro.disconnect();
@@ -567,6 +576,8 @@ export default function Telemetry() {
 			? (s.nodes.get(effectiveNode)?.shortName ?? effectiveNode)
 			: "—";
 	const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2));
+	const showLegend = metric === CHANNEL || compare.length > 0;
+	legendRef.current = showLegend;
 
 	if (link.status === "linked") {
 		return (
@@ -703,11 +714,18 @@ export default function Telemetry() {
 					</div>
 					<div className="telemetry-chart-body">
 						{!stats && (
-							<p className="dim telemetry-empty">
-								{t(
-									"No measurements in this range. Telemetry is saved as the connected radio reports it.",
-								)}
-							</p>
+							<div className="telemetry-empty" role="status">
+								<h2>
+									{nodes.length === 0
+										? "No telemetry stored yet."
+										: "No measurements in this range."}
+								</h2>
+								<p>
+									{t(
+										"Telemetry is saved as the connected radio reports it.",
+									)}
+								</p>
+							</div>
 						)}
 						{/* Keep the host's height independent of the canvas and legend. */}
 						<div ref={plotDiv} className="telemetry-plot" />

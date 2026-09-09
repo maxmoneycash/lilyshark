@@ -1,0 +1,138 @@
+/* TRAFFIC analyzer chrome. Lives next to the screen so meshterm.css can stay
+   the shared shell; these rules only apply while this tab is mounted. */
+
+.meshterm .traffic-toolbar {
+	flex-wrap: wrap;
+	align-items: center;
+	row-gap: 8px;
+}
+.meshterm .traffic-toolbar .panel-title-label {
+	flex: 1 1 12rem;
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.meshterm .traffic-fetch {
+	min-width: 0;
+	flex: 1 1 12rem;
+}
+.meshterm .traffic-fetch input {
+	min-width: 0;
+	width: 100%;
+	max-width: 16rem;
+}
+
+.meshterm .traffic-empty {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-height: 10rem;
+	max-width: 58ch;
+	padding: 20px 16px;
+}
+.meshterm .traffic-empty h2 {
+	margin: 0 0 10px;
+	font-size: 15px;
+	line-height: 1.35;
+	letter-spacing: 0;
+	font-weight: 700;
+	color: var(--fg);
+}
+.meshterm .traffic-empty p {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--ink, var(--fg));
+}
+.meshterm .traffic-empty .err {
+	color: var(--err);
+}
+
+.meshterm .traffic-filter {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	align-items: center;
+}
+.meshterm .traffic-filter input {
+	flex: 1 1 260px;
+	min-width: 0;
+}
+.meshterm .traffic-filter .traffic-filter-note {
+	flex: 1 1 12rem;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.meshterm .traffic-slots {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	align-items: center;
+}
+.meshterm .traffic-slot {
+	display: inline-flex;
+	gap: 2px;
+	align-items: center;
+	min-width: 0;
+	max-width: 100%;
+}
+.meshterm .traffic-slot button {
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.meshterm .traffic-detail,
+.meshterm .traffic-diff {
+	min-width: 0;
+}
+.meshterm .traffic-detail {
+	flex: 0 1 360px;
+	width: 360px;
+}
+.meshterm .traffic-diff {
+	flex: 0 1 420px;
+	width: 420px;
+}
+
+.meshterm .traffic-frames[data-empty='true'] {
+	flex: 0 0 auto;
+}
+.meshterm .traffic-frames tbody tr:focus-visible,
+.meshterm .traffic-diff tbody tr:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: -2px;
+}
+
+.meshterm .traffic-io-plot {
+	min-width: 0;
+	overflow: hidden;
+}
+
+@media (max-width: 860px) {
+	.meshterm .traffic-toolbar .panel-title-label {
+		flex: 1 1 100%;
+	}
+	.meshterm .traffic-detail,
+	.meshterm .traffic-diff {
+		width: 100%;
+		flex-basis: auto;
+	}
+	.meshterm .traffic-slot {
+		flex: 1 1 100%;
+	}
+	.meshterm .traffic-slot button:first-child {
+		flex: 1 1 auto;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.meshterm .traffic-screen button {
+		transition: none;
+	}
+}

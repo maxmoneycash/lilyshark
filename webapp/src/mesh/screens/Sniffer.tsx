@@ -56,7 +56,7 @@ import {
 	SPACER_ROW_STYLE,
 	useRowWindow,
 } from "../../lib/useRowWindow";
-import { rowWindowPositions } from "../../lib/virtualRows";
+import { rowWindowPositions, tableKeyNav } from "../../lib/virtualRows";
 import { deleteFrameNote, loadFrameNotes, saveFrameNote } from "../db";
 import { stamp } from "../export";
 import { hhmm, snrClass } from "../fmt";
@@ -339,14 +339,52 @@ interface FrameTableProps {
  */
 function FrameTable({ frames, sel, onPick, notes }: FrameTableProps) {
 	const rows = useRowWindow(frames.length);
-	const win = rows.win;
+	const { pageRows, win, scrollToRow } = rows;
 	const newest = frames.length - 1;
+	const selectedPosition = useMemo(() => {
+		if (!sel) return -1;
+		const index = frames.indexOf(sel);
+		return index < 0 ? -1 : newest - index;
+	}, [frames, sel, newest]);
+	const rowNodes = useRef(new Map<number, HTMLTableRowElement>());
+	const wantFocus = useRef(false);
+
+	useEffect(() => {
+		if (selectedPosition >= 0) scrollToRow(selectedPosition);
+		// Position shifts as new frames arrive; only a new pick should move the
+		// list, or a live session would yank the operator back to the selection.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [sel, scrollToRow]);
+
+	const onKeyDown = (event: ReactKeyboardEvent<HTMLTableSectionElement>) => {
+		const from = selectedPosition >= 0 ? selectedPosition : win.start;
+		const nav = tableKeyNav(from, frames.length, event.key, pageRows);
+		if (!nav) return;
+		event.preventDefault();
+		wantFocus.current = true;
+		scrollToRow(nav.position);
+		const frame = frames[newest - nav.position];
+		if (nav.activate && frame === sel) onPick(undefined);
+		else onPick(frame);
+	};
+
+	useEffect(() => {
+		if (!wantFocus.current || selectedPosition < 0) return;
+		const node = rowNodes.current.get(selectedPosition);
+		if (!node) return;
+		wantFocus.current = false;
+		node.focus({ preventScroll: true });
+	}, [selectedPosition, win.start, win.end]);
+
+	const roving =
+		selectedPosition >= win.start && selectedPosition < win.end
+			? selectedPosition
+			: win.start;
 
 	return (
 		<div
 			className="scroll-y sniffer-table"
 			ref={rows.scrollRef}
-			tabIndex={0}
 			role="region"
 			aria-label="Captured frames"
 		>
@@ -367,7 +405,7 @@ function FrameTable({ frames, sel, onPick, notes }: FrameTableProps) {
 						<th>BYTES</th>
 					</tr>
 				</thead>
-				<tbody>
+				<tbody onKeyDown={onKeyDown}>
 					{win.topPadPx > 0 && (
 						<tr aria-hidden="true" style={SPACER_ROW_STYLE}>
 							<td
@@ -381,8 +419,13 @@ function FrameTable({ frames, sel, onPick, notes }: FrameTableProps) {
 						return (
 							<tr
 								key={`${f.atMs}:${f.src}:${position}`}
-								ref={position === win.start ? rows.rowRef : undefined}
+								ref={(el) => {
+									if (el) rowNodes.current.set(position, el);
+									else rowNodes.current.delete(position);
+									if (position === win.start) rows.rowRef(el);
+								}}
 								className={f === sel ? "sel" : ""}
+								tabIndex={position === roving ? 0 : -1}
 								onClick={() => onPick(f === sel ? undefined : f)}
 							>
 								<NoteCell
@@ -1144,13 +1187,20 @@ export default function Sniffer() {
 						{frames.length > 0 && <span>SELECT A FRAME TO INSPECT</span>}
 					</div>
 					{frames.length === 0 ? (
-						<p className="dim" style={{ padding: 16, fontSize: 12 }}>
-							{linked
-								? "Listening for the next radio frame."
-								: "serial" in navigator
-									? "Connect a T-Deck over USB to inspect live packets and raw bytes."
-									: "Open this page in desktop Chrome or Edge, then connect a T-Deck over USB to inspect live packets and raw bytes."}
-						</p>
+						<div className="sniffer-empty" role="status">
+							<h2>
+								{linked
+									? "Listening for the next radio frame."
+									: "No live frames yet."}
+							</h2>
+							<p>
+								{linked
+									? "The radio is on the cable. The first decoded packet lands in this table."
+									: "serial" in navigator
+										? "Connect a T-Deck over USB to inspect live packets and raw bytes."
+										: "Open this page in desktop Chrome or Edge, then connect a T-Deck over USB to inspect live packets and raw bytes."}
+							</p>
+						</div>
 					) : (
 						<FrameTable
 							frames={frames}
@@ -1384,10 +1434,7 @@ export default function Sniffer() {
 							)}
 						</div>
 						{sel.raw && dissection && (
-							<div
-								className="panel-foot"
-								style={{ display: "block", maxHeight: 66, overflowY: "auto" }}
-							>
+							<div className="panel-foot sniffer-trail">
 								{activeRow ? (
 									<>
 										<span style={{ color: "var(--fg)" }}>

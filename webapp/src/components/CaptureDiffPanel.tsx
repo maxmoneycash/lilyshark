@@ -138,7 +138,7 @@ export function CaptureDiffPanel({
     );
 
   return (
-    <div className="panel" style={{ width: 420, flexShrink: 0 }}>
+    <div className="panel traffic-diff">
       <div className="panel-title">
         DIFF // A vs B
         <span className="spacer" />

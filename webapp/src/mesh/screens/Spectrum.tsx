@@ -200,7 +200,7 @@ export default function Spectrum() {
 		startedAt !== undefined && !active && Date.now() - startedAt > SWEEP_SILENT_MS;
 
 	return (
-		<main style={{ flexDirection: "column" }}>
+		<main className="spectrum-screen" style={{ flexDirection: "column" }}>
 			<div className="spectrum-toolbar">
 				<span className="dim spectrum-toolbar-title">
 					SPECTRUM // BAND SWEEP
@@ -208,6 +208,8 @@ export default function Spectrum() {
 				<button
 					className="primary"
 					disabled={!linked || busy}
+					aria-pressed={active}
+					aria-busy={busy || undefined}
 					title={
 						linked
 							? active
@@ -230,28 +232,23 @@ export default function Spectrum() {
 				>
 					CLEAR PEAKS
 				</button>}
-				{linked && active && (
-					<span className="dim" style={{ fontSize: 11 }}>
-						While it sweeps, the radio measures power instead of decoding
-						packets.
-					</span>
-				)}
-				{note && (
-					<span className="err" style={{ fontSize: 11 }}>
-						{note}
-					</span>
-				)}
-				{!note && silentTooLong && (
-					<span className="warn" style={{ fontSize: 11 }}>
-						No sweep data arrived — the firmware on this deck may not have the
-						spectrum link yet.
-					</span>
-				)}
 				<span className="spacer" />
-				{latest && <span className="dim" style={{ fontSize: 11 }}>
+				{latest && <span className="dim spectrum-passes">
 					{sweeps.length} PASSES · {latest.db.length} BINS
 				</span>}
 			</div>
+			{(note || silentTooLong || (linked && active)) && (
+				<p
+					className={`spectrum-status${note ? " err" : silentTooLong ? " warn" : " dim"}`}
+					role={note ? "alert" : "status"}
+				>
+					{note
+						? note
+						: silentTooLong
+							? "No sweep data arrived — the firmware on this deck may not have the spectrum link yet."
+							: "While it sweeps, the radio measures power instead of decoding packets."}
+				</p>
+			)}
 
 			<div className="panel spectrum-panel" data-empty={!latest} style={{ flex: 1, minWidth: 0 }}>
 				<div className="panel-title">
@@ -270,11 +267,13 @@ export default function Spectrum() {
 						</span>
 					)}
 				</div>
-				{!latest && <div className="spectrum-empty">
-					<h2>{startedAt ? "Waiting for the first sweep…" : "See where the band is busy."}</h2>
-					<p>{linked
-						? "Start a sweep to see received power across the band. The radio pauses packet reception while scanning; each pass adds a row to the waterfall."
-						: "Connect a T-Deck over USB, then start a sweep. Follow radio activity across a spectrum trace and waterfall, with peak hold to catch brief signals."}</p>
+				{!latest && <div className="spectrum-empty" role="status">
+					<h2>{startedAt ? "Waiting for the first sweep…" : linked ? "See where the band is busy." : "No T-Deck on the cable."}</h2>
+					<p>{startedAt
+						? "The deck was told to sweep. The first pass should land here within a few seconds."
+						: linked
+							? "Start a sweep to see received power across the band. The radio pauses packet reception while scanning; each pass adds a row to the waterfall."
+							: "Connect a T-Deck over USB, then start a sweep. Follow radio activity across a spectrum trace and waterfall, with peak hold to catch brief signals."}</p>
 				</div>}
 				<div className="spectrum-charts" aria-hidden={!latest}>
 					<canvas
@@ -296,15 +295,8 @@ export default function Spectrum() {
 					</div>
 					{latest && (
 						<div
-							className="dim"
+							className="dim spectrum-freq-ticks"
 							aria-label="Frequency in megahertz"
-							style={{
-								display: "flex",
-								justifyContent: "space-between",
-								fontSize: 10,
-								fontVariantNumeric: "tabular-nums",
-								flexShrink: 0,
-							}}
 						>
 							{freqTicks(latest.f0Hz, latest.f1Hz).map((tk) => (
 								<span key={tk.frac}>{fmtMHz(tk.hz).replace(/ MHz$/, "")}</span>

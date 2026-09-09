@@ -34,16 +34,13 @@ const shortName = (name: string) =>
 export function CaptureSlotBar({ tabs, activeId, onActivate, onClose }: CaptureSlotBarProps) {
   if (tabs.length === 0) return null;
   return (
-    <div
-      className="panel-foot"
-      style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}
-    >
+    <div className="panel-foot traffic-slots">
       <span className="k">CAPTURES</span>
       {tabs.map((tab) => {
         const badges = slotBadges(tab.facts);
         const title = slotTitle(tab.name, tab.facts);
         return (
-          <span key={tab.id} style={{ display: 'inline-flex', gap: 2, alignItems: 'center' }}>
+          <span key={tab.id} className="traffic-slot">
             <button
               className={tab.id === activeId ? 'primary' : ''}
               title={title}
@@ -55,6 +52,7 @@ export function CaptureSlotBar({ tabs, activeId, onActivate, onClose }: CaptureS
             </button>
             <button
               title={`Close ${tab.name} — it is not saved anywhere unless you downloaded or published it`}
+              aria-label={`Close ${tab.name}`}
               onClick={() => onClose(tab.id)}
             >
               CLOSE

@@ -140,7 +140,13 @@ export function TrafficFrameTable({
       : win.start;
 
   return (
-    <div className="scroll-y" ref={rows.scrollRef}>
+    <div
+      className="scroll-y traffic-frames"
+      ref={rows.scrollRef}
+      data-empty={shown.length === 0}
+      role="region"
+      aria-label="Captured frames"
+    >
       <div className="scroll-x">
         <table className="grid">
           <thead ref={rows.headRef}>
@@ -202,7 +208,11 @@ export function TrafficFrameTable({
                     {hasField(fr, RF_FIELD.frequency) ? fmtFreq(fr.centerFrequencyHz) : '—'}
                   </td>
                   <td>
-                    {fr.spreadingFactor}/{fr.codingRateDenominator}
+                    {hasField(fr, RF_FIELD.spreadingFactor) || hasField(fr, RF_FIELD.codingRate)
+                      ? `${hasField(fr, RF_FIELD.spreadingFactor) ? fr.spreadingFactor : '—'} / ${
+                          hasField(fr, RF_FIELD.codingRate) ? fr.codingRateDenominator : '—'
+                        }`
+                      : '—'}
                   </td>
                   <td>{hasField(fr, RF_FIELD.rssi) ? fr.rssiDbm.toFixed(1) : '—'}</td>
                   <td>{hasField(fr, RF_FIELD.snr) ? fr.snrDb.toFixed(1) : '—'}</td>
