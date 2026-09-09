@@ -334,10 +334,11 @@ const PLATFORMS = [
     chip: "ESP32-S3 · SX1262 · GPS",
     gps: true,
     heroLabel: "01 / Handheld analyzer",
-    caption: `running ${FIRMWARE.version}`,
+    caption: "Home screen · GPS on",
     heading: "Lilyshark for T-Deck Plus.",
     tagline:
       "Inspect LoRa packets, scan the band, and map nearby nodes with the built-in GPS.",
+    screen: "/flash/deck-screen-plus.png",
   },
   {
     id: "tdeck",
@@ -346,10 +347,11 @@ const PLATFORMS = [
     chip: "ESP32-S3 · SX1262",
     gps: false,
     heroLabel: "02 / Handheld analyzer",
-    caption: `running ${FIRMWARE.version}`,
+    caption: "Capabilities screen · no GPS",
     heading: "Lilyshark for T-Deck.",
     tagline:
       "The full packet analyzer on the original T-Deck. Same radio tools and capture formats, without built-in GPS.",
+    screen: "/flash/deck-screen-base.png",
   },
   {
     id: "browser",
@@ -379,6 +381,7 @@ const PLATFORMS = [
 
 type PlatformId = (typeof PLATFORMS)[number]["id"];
 type PlatformKind = (typeof PLATFORMS)[number]["kind"];
+type Platform = (typeof PLATFORMS)[number];
 
 const CHECKLISTS: Record<PlatformKind, string[]> = {
   firmware: [
@@ -487,13 +490,13 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
     onOpen(tab);
   };
 
-  const art = (id: PlatformId, gps: boolean) =>
-    id === "browser" ? (
+  const art = (p: Platform) =>
+    p.id === "browser" ? (
       <BrowserIcon />
-    ) : id === "source" ? (
+    ) : p.id === "source" ? (
       <SourceIcon />
     ) : (
-      <TDeckPhoto alt={gps ? "T-Deck Plus" : "T-Deck family"} />
+      <TDeckPhoto screen={p.screen} alt={p.name} />
     );
 
   return (
@@ -531,7 +534,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
           {PLATFORMS.map((p) => (
             <RadioGroup.Item key={p.id} value={p.id} className="device-card">
               <span className="art" aria-hidden="true">
-                {art(p.id, p.gps)}
+                {art(p)}
               </span>
               <span className="device-copy">
                 <span className="device-name">{p.name}</span>
@@ -543,12 +546,15 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
         </RadioGroup.Root>
 
         <div className="install-layout" data-kind={kind}>
-          <div className="hero">
+          <div className="hero" data-board={selected.id}>
             <span className="hero-label">{selected.heroLabel}</span>
             <div className="preview-content" key={selected.id}>
-              {kind === "firmware" ? (
-                <TDeckPhoto alt="Front view of a LILYGO T-Deck Plus displaying the Lilyshark firmware Home screen" />
-              ) : kind === "browser" ? (
+              {selected.kind === "firmware" ? (
+                <TDeckPhoto
+                  screen={selected.screen}
+                  alt={`Front view of a LILYGO ${selected.name} displaying the Lilyshark ${selected.caption}`}
+                />
+              ) : selected.kind === "browser" ? (
                 <BrowserPreview />
               ) : (
                 <SourceMock />
@@ -556,14 +562,11 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
               <div className="hero-caption">
                 <span>
                   <b>
-                    {kind === "firmware"
-                      ? "T-Deck Plus pictured"
+                    {selected.kind === "firmware"
+                      ? `${selected.name} pictured`
                       : selected.name}
                   </b>{" "}
-                  ·{" "}
-                  {kind === "firmware"
-                    ? "Firmware Home screen"
-                    : selected.caption}
+                  · {selected.caption}
                 </span>
               </div>
             </div>
