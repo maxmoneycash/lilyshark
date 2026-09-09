@@ -25,6 +25,21 @@ extension ContactListView {
         }
     }
 
+    private var emptyContactsTitle: String {
+        if !contactStore.contacts.isEmpty { return "Contacts are in groups" }
+        return connectionManager.isActivelyConnected ? "No contacts yet" : "Waiting for contacts"
+    }
+
+    private var emptyContactsDescription: String {
+        if !contactStore.contacts.isEmpty {
+            return "Open a group above to see its contacts. Ungrouped contacts will appear here."
+        }
+        if connectionManager.isActivelyConnected {
+            return "They appear when this deck hears someone on the mesh."
+        }
+        return "Connect a deck. Contacts appear as it hears the mesh."
+    }
+
     @ViewBuilder
     var pendingContactsSection: some View {
         Section {
@@ -279,13 +294,16 @@ extension ContactListView {
     var contactsSection: some View {
         Section(isExpanded: $contactsExpanded) {
             if ungroupedContacts.isEmpty {
-                ContentUnavailableView {
-                    Label(contactStore.contacts.isEmpty ? "Waiting for contacts" : "Contacts are in groups", systemImage: "person.2")
-                } description: {
-                    Text(contactStore.contacts.isEmpty
-                         ? "Connect to a deck. Contacts appear when it shares saved nodes or reports someone heard on the mesh."
-                         : "Open a group above to see its contacts. Ungrouped contacts will appear here.")
+                Label {
+                    Text(emptyContactsDescription)
+                        .font(.subheadline)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "person.2")
+                        .foregroundStyle(MeshTheme.textSecondary)
                 }
+                .accessibilityLabel("\(emptyContactsTitle). \(emptyContactsDescription)")
                 .listRowBackground(MeshTheme.surface)
             } else {
                 ForEach(ungroupedContacts) { contact in

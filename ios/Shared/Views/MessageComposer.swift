@@ -19,6 +19,7 @@ struct MessageComposer: View {
                 TextField("Type a message…", text: $text, axis: .vertical)
                     .lineLimit(1...5)
                     .font(Design.Text.message)
+                    .submitLabel(.send)
                     .padding(.horizontal, Design.Space.regular)
                     .padding(.vertical, Design.Space.snug)
                     .background(MeshTheme.surfaceLight)
@@ -58,6 +59,6 @@ struct MessageComposer: View {
         }
         .padding(.horizontal, Design.Space.snug)
         .padding(.vertical, Design.Space.tight)
-        .background(MeshTheme.surface)
+        .background(.bar)
     }
 }

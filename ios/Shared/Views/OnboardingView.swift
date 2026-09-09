@@ -20,39 +20,56 @@ struct OnboardingView: View {
     private let lastPage = 3
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Design.Space.loose) {
-                pageContent
+        GeometryReader { geo in
+            ScrollView {
+                VStack(alignment: .leading, spacing: Design.Space.loose) {
+                    pageContent(containerHeight: geo.size.height)
+                }
+                .frame(maxWidth: 560, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .padding(Design.Space.loose)
+                .padding(.bottom, Design.Space.section)
+                .transition(.opacity)
             }
-            .frame(maxWidth: 560, alignment: .leading)
-            .frame(maxWidth: .infinity)
-            .padding(Design.Space.loose)
-            .transition(.opacity)
+            .id(currentPage)
+            .scrollClipDisabled()
         }
-        .id(currentPage)
         .background(MeshTheme.background)
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack {
-                Text("Step \(currentPage + 1) of \(lastPage + 1)")
-                    .font(.subheadline)
-                    .foregroundStyle(MeshTheme.textSecondary)
+                progressDots
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Step \(currentPage + 1) of \(lastPage + 1)")
                 Spacer()
                 if currentPage < lastPage {
                     Button { complete() } label: {
-                        Text(mode == .replay ? "Close" : "Skip").touchable()
+                        Text(mode == .replay ? "Close" : "Skip")
+                            .font(.body.weight(.semibold))
+                            .touchable()
                     }
-                    .buttonStyle(.meshSecondary)
+                    .buttonStyle(.meshPlain)
+                    .foregroundStyle(MeshTheme.textSecondary)
                     .accessibilityLabel(mode == .replay ? "Close welcome guide" : "Skip introduction")
                 }
             }
             .padding(.horizontal, Design.Space.loose)
-            .padding(.vertical, Design.Space.tight)
+            .padding(.vertical, Design.Space.snug)
             .background(MeshTheme.background)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             navigationControls
-                .padding(Design.Space.regular)
-                .background(MeshTheme.surface)
+                .padding(.horizontal, Design.Space.loose)
+                .padding(.top, Design.Space.regular)
+                .padding(.bottom, Design.Space.snug)
+                .background {
+                    LinearGradient(
+                        colors: [MeshTheme.background.opacity(0), MeshTheme.background],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .padding(.top, -Design.Space.snug)
+                    .allowsHitTesting(false)
+                }
         }
         .tint(MeshTheme.interactiveGreen)
         .meshAnimation(Design.Motion.quick, value: currentPage)
@@ -68,14 +85,33 @@ struct OnboardingView: View {
     }
 
     @ViewBuilder
-    private var pageContent: some View {
+    private func pageContent(containerHeight: CGFloat) -> some View {
         switch currentPage {
         case 0:
             #if os(iOS) || os(macOS)
             TDeckHeroView()
-                .frame(height: dynamicTypeSize.isAccessibilitySize ? 200 : 260)
+                .frame(height: TDeckStage.height(
+                    in: containerHeight,
+                    accessibility: dynamicTypeSize.isAccessibilitySize,
+                    fraction: 0.56
+                ))
                 .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: Design.Radius.control, style: .continuous))
+                .padding(.horizontal, -Design.Space.loose)
+            Text("Drag sideways to turn the deck")
+                .font(Design.Text.label)
+                .foregroundStyle(MeshTheme.textSecondary.opacity(0.85))
+                .frame(maxWidth: .infinity)
+                .accessibilityHidden(true)
+            Button {
+                showDeck = true
+            } label: {
+                Text("Look around the deck")
+                    .font(.body.weight(.semibold))
+                    .touchable()
+            }
+            .buttonStyle(.meshPlain)
+            .foregroundStyle(MeshTheme.accent)
+            .frame(maxWidth: .infinity)
             #else
             ZStack {
                 MeshAnimationBackdrop()
@@ -88,18 +124,6 @@ struct OnboardingView: View {
             #endif
             pageTitle("Welcome to Lilyshark")
             paragraph("Message nearby people through your deck or radio, even without internet or cell service.")
-            feature("Messages", symbol: "bubble.left.and.bubble.right", detail: "Direct conversations and shared channels.")
-            feature("Map", symbol: "map", detail: "Positions shared by nodes on your mesh.")
-            #if os(iOS) || os(macOS)
-            Button {
-                showDeck = true
-            } label: {
-                Text("Look around the deck")
-                    .frame(maxWidth: .infinity)
-                    .touchable()
-            }
-            .buttonStyle(.meshSecondary)
-            #endif
         case 1:
             pageTitle("Connect your radio")
             paragraph("Use a Lilyshark deck or a MeshCore radio with Bluetooth enabled.")
@@ -133,9 +157,21 @@ struct OnboardingView: View {
         }
     }
 
+    private var progressDots: some View {
+        HStack(spacing: Design.Space.tight) {
+            ForEach(0...lastPage, id: \.self) { index in
+                Capsule()
+                    .fill(index == currentPage ? MeshTheme.accent : MeshTheme.textSecondary.opacity(0.28))
+                    .frame(width: index == currentPage ? 22 : 8, height: 8)
+            }
+        }
+        .meshAnimation(Design.Motion.quick, value: currentPage)
+        .accessibilityHidden(true)
+    }
+
     private func pageTitle(_ title: LocalizedStringKey) -> some View {
         Text(title)
-            .font(.title.bold())
+            .font(.title2.weight(.semibold))
             .foregroundStyle(MeshTheme.textPrimary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
@@ -143,7 +179,7 @@ struct OnboardingView: View {
 
     private func paragraph(_ text: LocalizedStringKey) -> some View {
         Text(text)
-            .font(.body)
+            .font(.subheadline)
             .foregroundStyle(MeshTheme.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }

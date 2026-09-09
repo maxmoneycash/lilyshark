@@ -13,44 +13,62 @@ struct WelcomeHomeView: View {
     @State private var routingDemo = MeshRoutingDemoView.Mode.flood
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Design.Space.section) {
-                header
-                hero
-                connectSteps
-                capabilitiesSection
-                meshTutorial
+        GeometryReader { geo in
+            ScrollView {
+                VStack(alignment: .leading, spacing: Design.Space.loose) {
+                    hero(stageHeight: TDeckStage.height(
+                        in: geo.size.height,
+                        accessibility: dynamicTypeSize.isAccessibilitySize,
+                        fraction: 0.52
+                    ))
+                    header
+                        .padding(.horizontal, Design.Space.loose)
+                    connectSteps
+                        .padding(.horizontal, Design.Space.loose)
+                    capabilitiesSection
+                        .padding(.horizontal, Design.Space.loose)
+                    meshTutorial
+                        .padding(.horizontal, Design.Space.loose)
+                }
+                .padding(.bottom, Design.Space.section)
+                .frame(maxWidth: 640, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, Design.Space.loose)
-            .padding(.top, Design.Space.regular)
-            .padding(.bottom, Design.Space.section)
-            .frame(maxWidth: 640, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
+            .contentMargins(.bottom, Design.Space.regular, for: .scrollContent)
         }
-        .scrollIndicators(.hidden)
         .background(MeshTheme.background)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             connectAction
                 .padding(.horizontal, Design.Space.loose)
-                .padding(.top, Design.Space.tight)
+                .padding(.top, Design.Space.regular)
                 .padding(.bottom, Design.Space.snug)
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity)
-                .background(MeshTheme.background)
+                .background {
+                    LinearGradient(
+                        colors: [MeshTheme.background.opacity(0), MeshTheme.background],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .padding(.top, -Design.Space.snug)
+                    .allowsHitTesting(false)
+                }
         }
     }
 
     // MARK: - Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: Design.Space.tight) {
+        VStack(alignment: .leading, spacing: Design.Space.snug) {
             Text("Welcome to Lilyshark")
-                .font(.title.bold())
+                .font(.title2.weight(.semibold))
                 .foregroundStyle(MeshTheme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             Text("Off-grid messages, maps, and radio analysis. Pair a deck to begin — or explore it here first.")
-                .font(.body)
+                .font(.subheadline)
                 .foregroundStyle(MeshTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -60,27 +78,26 @@ struct WelcomeHomeView: View {
 
     // MARK: - Interactive deck hero
 
-    private var hero: some View {
-        VStack(spacing: Design.Space.tight) {
+    private func hero(stageHeight: CGFloat) -> some View {
+        VStack(spacing: Design.Space.snug) {
             TDeckSceneView(
                 screenFileName: Self.capabilities[capabilityIndex].screenFileName,
                 pageOnVerticalDrag: false
             )
-            .frame(height: dynamicTypeSize.isAccessibilitySize ? 180 : 240)
+            .frame(height: stageHeight)
             .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: Design.Radius.card, style: .continuous))
-            .background(
-                MeshTheme.surface,
-                in: RoundedRectangle(cornerRadius: Design.Radius.card, style: .continuous)
-            )
+            .padding(.top, -Design.Space.tight)
             .task(id: reduceMotion) {
                 await autoAdvanceCapabilities()
             }
             Text("Drag sideways to turn the deck")
                 .font(Design.Text.label)
-                .foregroundStyle(MeshTheme.textSecondary)
+                .foregroundStyle(MeshTheme.textSecondary.opacity(0.85))
                 .frame(maxWidth: .infinity)
+                .padding(.horizontal, Design.Space.loose)
+                .accessibilityHidden(true)
         }
+        .accessibilityElement(children: .contain)
     }
 
     private func advanceCapability(by delta: Int) {
@@ -114,6 +131,7 @@ struct WelcomeHomeView: View {
         }
         .buttonStyle(.meshPrimary)
         .foregroundStyle(MeshTheme.textOnAccent)
+        .sensoryFeedback(.impact(weight: .light), trigger: showScanner)
         .accessibilityHint("Scans for nearby decks and radios")
         .frame(maxWidth: 640)
         .frame(maxWidth: .infinity)
@@ -158,7 +176,7 @@ struct WelcomeHomeView: View {
                 Circle()
                     .fill(MeshTheme.accent.opacity(0.15))
                 Text(verbatim: "\(step.number)")
-                    .font(Design.Text.label.weight(.bold))
+                    .font(Design.Text.label.weight(.semibold))
                     .foregroundStyle(MeshTheme.accent)
             }
             .frame(width: 28, height: 28)
@@ -219,6 +237,7 @@ struct WelcomeHomeView: View {
                 .padding(Design.Space.hairline)
             }
             .scrollIndicators(.hidden)
+            .sensoryFeedback(.selection, trigger: capabilityIndex)
         }
     }
 
@@ -230,6 +249,7 @@ struct WelcomeHomeView: View {
             VStack(alignment: .leading, spacing: Design.Space.tight) {
                 Image(systemName: capability.symbol)
                     .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(selected ? MeshTheme.accent : MeshTheme.textSecondary)
                     .accessibilityHidden(true)
                 Text(capability.title)
@@ -241,14 +261,15 @@ struct WelcomeHomeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(Design.Space.regular)
+            .padding(.bottom, Design.Space.tight)
             .frame(width: 200, alignment: .topLeading)
             .background(
-                MeshTheme.surface,
+                selected ? MeshTheme.accent.opacity(0.14) : MeshTheme.surface,
                 in: RoundedRectangle(cornerRadius: Design.Radius.card, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: Design.Radius.card, style: .continuous)
-                    .strokeBorder(selected ? MeshTheme.accent : .clear, lineWidth: 2)
+                    .strokeBorder(selected ? MeshTheme.accent.opacity(0.35) : Color.clear, lineWidth: 1)
             }
             .touchable()
         }
@@ -297,6 +318,7 @@ struct WelcomeHomeView: View {
     private var demoBadge: some View {
         Text("ILLUSTRATIVE DEMO")
             .font(Design.Text.label.weight(.semibold))
+            .tracking(1.2)
             .foregroundStyle(MeshTheme.textSecondary)
             .padding(.horizontal, Design.Space.tight)
             .padding(.vertical, Design.Space.hairline)
@@ -305,7 +327,7 @@ struct WelcomeHomeView: View {
 
     private func sectionHeader(_ title: LocalizedStringKey) -> some View {
         Text(title)
-            .font(.title3.bold())
+            .font(.title3.weight(.semibold))
             .foregroundStyle(MeshTheme.textPrimary)
             .accessibilityAddTraits(.isHeader)
     }

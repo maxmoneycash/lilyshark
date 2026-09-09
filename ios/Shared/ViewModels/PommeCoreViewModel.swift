@@ -529,6 +529,20 @@ final class PommeCoreViewModel: ObservableObject {
         }
         channelStore.hasCompletedInitialChannelSync = false
 
+        #if targetEnvironment(simulator)
+        if connectionManager.isSimulatorDeckPreview {
+            deviceConfig.deviceName = "Lilyshark"
+            deviceConfig.manufacturer = "LILYGO T-Deck Plus"
+            deviceConfig.blePIN = 123456
+            deviceConfig.isLoading = false
+            channelStore.seedPrimaryChannelForDeck()
+            #if os(iOS)
+            syncWidget()
+            #endif
+            return
+        }
+        #endif
+
         #if canImport(MeshtasticKit)
         // A deck answers exactly one question. Everything below this point is
         // MeshCore: twelve settings commands, a contact sync and a message sync,

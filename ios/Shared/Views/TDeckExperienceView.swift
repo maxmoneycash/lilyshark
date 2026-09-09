@@ -17,14 +17,22 @@ struct TDeckExperienceView: View {
                 }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(MeshTheme.background)
+            .background(Color.clear)
 
             caption
                 .padding(.horizontal, Design.Space.regular)
                 .padding(.vertical, Design.Space.snug)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
-                .background(MeshTheme.surface)
+                .background {
+                    LinearGradient(
+                        colors: [MeshTheme.background.opacity(0), MeshTheme.background],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .padding(.top, -Design.Space.section)
+                    .allowsHitTesting(false)
+                }
         }
         .background(MeshTheme.background)
         .navigationTitle("The Deck")
@@ -47,30 +55,34 @@ struct TDeckExperienceView: View {
                 .foregroundStyle(MeshTheme.textPrimary)
                 .accessibilityAddTraits(.isHeader)
             Text(screen.detail)
-                .font(.body)
+                .font(.subheadline)
                 .foregroundStyle(MeshTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text("\(index + 1) of \(TDeckScreen.all.count)")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(MeshTheme.textSecondary)
+                .contentTransition(.numericText(value: Double(index + 1)))
+                .meshAnimation(Design.Motion.value, value: index)
             HStack(spacing: Design.Space.regular) {
                 Button {
                     move(by: -1)
                 } label: {
-                    Text("Previous screen")
+                    Text("Previous")
                         .frame(maxWidth: .infinity)
                         .touchable()
                 }
                 .buttonStyle(.meshSecondary)
                 .disabled(index == 0)
+                .accessibilityLabel("Previous screen")
                 Button {
                     move(by: 1)
                 } label: {
-                    Text(index == TDeckScreen.all.count - 1 ? "First screen" : "Next screen")
+                    Text(index == TDeckScreen.all.count - 1 ? "First" : "Next")
                         .frame(maxWidth: .infinity)
                         .touchable()
                 }
                 .buttonStyle(.meshPrimary)
+                .accessibilityLabel(index == TDeckScreen.all.count - 1 ? "First screen" : "Next screen")
             }
         }
     }

@@ -48,13 +48,18 @@ struct ChannelChatView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            messageList
-            Divider()
-                .overlay(MeshTheme.surfaceLight)
-            messageInput
-        }
-        .background(MeshTheme.background)
+        messageList
+            .background(MeshTheme.background)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+                        .overlay(MeshTheme.surfaceLight)
+                    messageInput
+                }
+            }
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        .toolbar(.hidden, for: .tabBar)
+        #endif
         .alert("Message not sent", isPresented: $showSendError) {
             Button("OK", role: .cancel) { }
         } message: {

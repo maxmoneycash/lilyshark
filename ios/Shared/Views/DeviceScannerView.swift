@@ -23,6 +23,9 @@ struct DeviceScannerView: View {
     @State private var wifiHost = ""
     @State private var wifiPort = "5000"
     @AppStorage("savedWiFiConnections") private var savedWiFiData: Data = Data()
+    #if targetEnvironment(simulator)
+    @State private var pairingDeck: ConnectionManager.SimulatorNearbyDeck?
+    #endif
     #if os(macOS) || targetEnvironment(macCatalyst)
     @State private var manualSerialPort = ""
     #endif
@@ -36,9 +39,31 @@ struct DeviceScannerView: View {
             } header: {
                 Text("Bluetooth")
             } footer: {
+                #if targetEnvironment(simulator)
+                Text("Tap the T-Deck, then enter the PIN on its screen.")
+                    .font(.footnote)
+                #else
                 Text("Lilyshark decks use Meshtastic to share the nodes they hear and the messages they carry. MeshCore radios also offer radio settings and management tools.")
                     .font(.footnote)
+                #endif
             }
+
+            #if targetEnvironment(simulator)
+            if !connectionManager.simulatorNearbyDecks.isEmpty {
+                Section("Lilyshark Decks · Meshtastic") {
+                    ForEach(connectionManager.simulatorNearbyDecks) { deck in
+                        Button {
+                            pairingDeck = deck
+                        } label: {
+                            discoveredRadioRow(name: deck.name, protocolName: "Meshtastic", rssi: deck.rssi)
+                        }
+                        .buttonStyle(.meshPlain)
+                        .accessibilityHint("Shows the Bluetooth pairing flow a phone uses with this deck")
+                        .listRowBackground(MeshTheme.surface)
+                    }
+                }
+            }
+            #endif
 
             #if canImport(MeshtasticKit)
             // Each result stays with the central that discovered it.
@@ -284,6 +309,24 @@ struct DeviceScannerView: View {
             scanCycleTask = nil
             connectionManager.stopScanning()
         }
+        #if targetEnvironment(simulator)
+        .sheet(item: $pairingDeck) { deck in
+            SimulatorBluetoothPairingView(deck: deck) {
+                connectionManager.completeSimulatorDeckPreview(named: deck.name)
+            }
+            .meshTheme()
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(MeshTheme.background)
+        }
+        .onChange(of: connectionManager.connectionState) { _, state in
+            if state == .ready || state == .connected {
+                pairingDeck = nil
+                dismiss()
+            }
+        }
+        .meshAnimation(Design.Motion.quick, value: connectionManager.simulatorNearbyDecks.count)
+        #endif
     }
 
     /// Runs a 15-second scan cycle. When the timer fires, tells the ConnectionManager
@@ -302,16 +345,22 @@ struct DeviceScannerView: View {
     }
 
     private var hasBluetoothResults: Bool {
+        #if targetEnvironment(simulator)
+        if !connectionManager.simulatorNearbyDecks.isEmpty { return true }
+        #endif
         #if canImport(MeshtasticKit)
-        !connectionManager.discoveredPeripherals.isEmpty || !connectionManager.discoveredMeshtasticDevices.isEmpty
+        return !connectionManager.discoveredPeripherals.isEmpty || !connectionManager.discoveredMeshtasticDevices.isEmpty
         #else
-        !connectionManager.discoveredPeripherals.isEmpty
+        return !connectionManager.discoveredPeripherals.isEmpty
         #endif
     }
 
     @ViewBuilder
     private var bluetoothScanStatus: some View {
         if !connectionManager.bleManager.isPoweredOn {
+            #if targetEnvironment(simulator)
+            simulatorBluetoothStatus
+            #else
             ContentUnavailableView {
                 Label {
                     Text("Bluetooth unavailable")
@@ -323,6 +372,7 @@ struct DeviceScannerView: View {
             } description: {
                 Text(connectionManager.bleStatusMessage ?? "Waiting for Bluetooth. Turn it on and allow Lilyshark to find nearby radios.")
             }
+            #endif
         } else if connectionManager.isScanning {
             HStack(alignment: .center, spacing: Design.Space.snug) {
                 ProgressView()
@@ -365,6 +415,45 @@ struct DeviceScannerView: View {
                 .foregroundStyle(MeshTheme.textSecondary)
         }
     }
+
+    #if targetEnvironment(simulator)
+    @ViewBuilder
+    private var simulatorBluetoothStatus: some View {
+        if connectionManager.isScanning && !hasBluetoothResults {
+            HStack(alignment: .center, spacing: Design.Space.snug) {
+                ProgressView()
+                    .tint(MeshTheme.accent)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Design.Space.hairline) {
+                    Text("Looking for nearby radios")
+                        .font(.headline)
+                    Text("Keep the deck powered on and close.")
+                        .font(.subheadline)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+        } else if hasBluetoothResults {
+            Label("Choose a radio", systemImage: "radio")
+                .foregroundStyle(MeshTheme.textSecondary)
+        } else {
+            ContentUnavailableView {
+                Label("No radios found", systemImage: "antenna.radiowaves.left.and.right.slash")
+            } description: {
+                Text("Keep the T-Deck powered on, then scan again.")
+            } actions: {
+                Button {
+                    connectionManager.startScanning()
+                    startScanCycle()
+                } label: {
+                    Label("Scan Again", systemImage: "arrow.clockwise")
+                        .touchable()
+                }
+                .buttonStyle(.meshPrimary)
+            }
+        }
+    }
+    #endif
 
     private func discoveredRadioRow(name: String, protocolName: String, rssi: Int) -> some View {
         VStack(alignment: .leading, spacing: Design.Space.tight) {
@@ -452,3 +541,190 @@ struct SavedWiFiConnection: Codable, Identifiable {
     let port: UInt16
     let lastConnected: Date
 }
+
+#if targetEnvironment(simulator)
+/// The iOS Bluetooth pairing sheet a phone shows when a T-Deck asks to pair.
+private struct SimulatorBluetoothPairingView: View {
+    let deck: ConnectionManager.SimulatorNearbyDeck
+    var onPair: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var enteredPIN = ""
+    @State private var pinError = false
+    @State private var pairing = false
+    @State private var shake = 0
+    @FocusState private var pinFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: Design.Space.loose) {
+                    TDeckSceneView(
+                        screenFileName: "pairing",
+                        interactive: false,
+                        pageOnVerticalDrag: false
+                    )
+                    .frame(height: 232)
+                    .frame(maxWidth: .infinity)
+                    .allowsHitTesting(false)
+                    .accessibilityElement()
+                    .accessibilityLabel("Deck showing pairing PIN \(deck.passkey)")
+
+                    Text("“\(deck.name)” wants to pair with your iPhone. Enter the code on its screen.")
+                        .font(.subheadline)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, Design.Space.loose)
+                .padding(.top, Design.Space.regular)
+                .padding(.bottom, Design.Space.snug)
+                .frame(maxWidth: 480)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+            .background(MeshTheme.background)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                pinEntry
+            }
+            .navigationTitle("Bluetooth Pairing")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .disabled(pairing)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if pairing {
+                        ProgressView()
+                            .accessibilityLabel("Pairing")
+                    } else {
+                        Button("Pair") { pair() }
+                            .fontWeight(.semibold)
+                            .disabled(enteredPIN.count != 6)
+                    }
+                }
+            }
+            .interactiveDismissDisabled(pairing)
+            .task {
+                try? await Task.sleep(for: .milliseconds(reduceMotion ? 250 : 700))
+                pinFocused = true
+            }
+            .sensoryFeedback(.error, trigger: pinError) { _, error in error }
+            .sensoryFeedback(.success, trigger: pairing) { _, isPairing in isPairing }
+            .sensoryFeedback(.selection, trigger: enteredPIN.count)
+        }
+    }
+
+    private var pinEntry: some View {
+        VStack(alignment: .leading, spacing: Design.Space.tight) {
+            Text("Pairing code")
+                .font(Design.Text.label)
+                .foregroundStyle(MeshTheme.textSecondary)
+            pinSlots
+                .offset(x: reduceMotion ? 0 : shakeOffset)
+                .meshAnimation(Design.Motion.quick, value: shake)
+            if pinError {
+                Text("That code does not match the PIN on the deck.")
+                    .font(Design.Text.detail)
+                    .foregroundStyle(MeshTheme.disconnected)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, Design.Space.loose)
+        .padding(.top, Design.Space.snug)
+        .padding(.bottom, Design.Space.tight)
+        .frame(maxWidth: 480)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
+    }
+
+    private var shakeOffset: CGFloat {
+        guard pinError, shake > 0 else { return 0 }
+        return shake.isMultiple(of: 2) ? 8 : -8
+    }
+
+    private var pinSlots: some View {
+        let digits = Array(enteredPIN)
+        return HStack(spacing: Design.Space.tight) {
+            ForEach(0..<6, id: \.self) { index in
+                let filled = index < digits.count
+                let active = pinFocused && index == digits.count && !pairing
+                Text(filled ? String(digits[index]) : " ")
+                    .font(.title3.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(MeshTheme.textPrimary)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: Design.minimumTouchTarget)
+                    .background(
+                        MeshTheme.surface,
+                        in: RoundedRectangle(cornerRadius: Design.Radius.control, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Design.Radius.control, style: .continuous)
+                            .strokeBorder(
+                                pinError
+                                    ? MeshTheme.disconnected
+                                    : (active ? MeshTheme.accent : Color.clear),
+                                lineWidth: active || pinError ? 2 : 1
+                            )
+                    }
+                    .contentTransition(.numericText())
+                    .accessibilityHidden(true)
+            }
+        }
+        .meshAnimation(Design.Motion.quick, value: enteredPIN)
+        .meshAnimation(Design.Motion.quick, value: pinError)
+        .overlay {
+            TextField("", text: $enteredPIN)
+                .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
+                .submitLabel(.go)
+                .focused($pinFocused)
+                .opacity(0.02)
+                .accessibilityLabel("6-digit pairing code")
+                .accessibilityValue(enteredPIN.isEmpty ? "None entered" : enteredPIN)
+                .onChange(of: enteredPIN) { oldValue, value in
+                    let clipped = String(value.filter(\.isNumber).prefix(6))
+                    if clipped != value {
+                        enteredPIN = clipped
+                        return
+                    }
+                    if pinError, clipped != oldValue {
+                        pinError = false
+                    }
+                    if clipped.count == 6, oldValue.count < 6 {
+                        pair()
+                    }
+                }
+                .onSubmit { pair() }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { pinFocused = true }
+    }
+
+    private func pair() {
+        guard !pairing else { return }
+        guard enteredPIN.count == 6 else { return }
+        guard enteredPIN == deck.passkey else {
+            pinError = true
+            enteredPIN = ""
+            shake += 1
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(45))
+                shake += 1
+                try? await Task.sleep(for: .milliseconds(45))
+                shake += 1
+                try? await Task.sleep(for: .milliseconds(45))
+                shake += 1
+            }
+            return
+        }
+        pairing = true
+        onPair()
+    }
+}
+#endif

@@ -203,7 +203,7 @@ extension ContactListView {
                 .foregroundStyle(MeshTheme.textSecondary)
                 .lineLimit(1)
         } else {
-            Text("Mesh broadcast channel")
+            Text("No messages yet")
                 .font(.caption)
                 .foregroundStyle(MeshTheme.textSecondary)
         }

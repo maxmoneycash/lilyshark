@@ -150,16 +150,23 @@ struct ChatView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if isSearching {
-                searchBar.transition(.opacity)
+        messageList
+            .background(MeshTheme.background)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if isSearching {
+                    searchBar.transition(.opacity)
+                }
             }
-            messageList
-            Divider()
-                .overlay(MeshTheme.surfaceLight)
-            messageInput
-        }
-        .background(MeshTheme.background)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+                        .overlay(MeshTheme.surfaceLight)
+                    messageInput
+                }
+            }
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        .toolbar(.hidden, for: .tabBar)
+        #endif
         .onReceive(refreshTimer) { refreshTick = $0 }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

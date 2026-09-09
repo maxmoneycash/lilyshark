@@ -3,6 +3,16 @@ import ModelIO
 import SceneKit
 import SwiftUI
 
+/// Vertical room for a floating T-Deck that is not boxed in a card.
+enum TDeckStage {
+    static func height(in containerHeight: CGFloat, accessibility: Bool, fraction: CGFloat = 0.58) -> CGFloat {
+        let minH: CGFloat = accessibility ? 260 : 420
+        let maxH: CGFloat = accessibility ? 400 : 720
+        let used = accessibility ? min(fraction, 0.40) : fraction
+        return min(max(containerHeight * used, minH), maxH)
+    }
+}
+
 /// Interactive reconstruction of the T-Deck Plus. Drag horizontally to turn it;
 /// a vertical flick pages firmware screens unless `pageOnVerticalDrag` is false,
 /// so a parent ScrollView can take vertical pans. Idle motion floats the handset.
@@ -22,6 +32,7 @@ struct TDeckSceneView: View {
             reduceMotion: reduceMotion,
             onVerticalPage: onVerticalPage
         )
+        .background(Color.clear)
         .accessibilityElement()
         .accessibilityLabel("Lilyshark T-Deck")
         .accessibilityValue(screenFileName.replacingOccurrences(of: "-", with: " "))
@@ -95,6 +106,24 @@ private struct TDeckSceneKitRepresentable: NSViewRepresentable {
 }
 #endif
 
+#if os(iOS)
+private final class TDeckSCNView: SCNView {
+    var onLayout: ((CGSize) -> Void)?
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        onLayout?(bounds.size)
+    }
+}
+#else
+private final class TDeckSCNView: SCNView {
+    var onLayout: ((CGSize) -> Void)?
+    override func layout() {
+        super.layout()
+        onLayout?(bounds.size)
+    }
+}
+#endif
+
 @MainActor
 final class TDeckSceneCoordinator: NSObject {
     private let restYaw: Float = -0.06
@@ -113,12 +142,18 @@ final class TDeckSceneCoordinator: NSObject {
     private var reduceMotion = false
     private var onVerticalPage: ((Int) -> Void)?
     private var rig: SCNNode?
+    private var centerNode: SCNNode?
+    private var camera: SCNCamera?
+    private var cameraNode: SCNNode?
+    private var framedWidth: Double = 0
+    private var framedBodyH: Double = 0
+    private var lastViewSize: CGSize = .zero
     private var lcdNodes: [SCNNode] = []
     private var timer: Timer?
     private weak var view: SCNView?
 
     func makeView() -> SCNView {
-        let view = SCNView()
+        let view = TDeckSCNView()
         self.view = view
         view.backgroundColor = .clear
         view.antialiasingMode = .multisampling4X
@@ -127,7 +162,12 @@ final class TDeckSceneCoordinator: NSObject {
         view.isPlaying = true
         #if os(iOS)
         view.isOpaque = false
+        view.clipsToBounds = false
+        view.layer.isOpaque = false
         #endif
+        view.onLayout = { [weak self] size in
+            self?.frameIfNeeded(size: size)
+        }
         loadScene(into: view)
         addPan(to: view)
         startTimer()
@@ -141,6 +181,9 @@ final class TDeckSceneCoordinator: NSObject {
         self.onVerticalPage = onVerticalPage
         applyScreen(screenFileName)
         view?.isPlaying = !reduceMotion || dragging
+        if let size = view?.bounds.size {
+            frameIfNeeded(size: size)
+        }
     }
 
     func stop() {
@@ -151,19 +194,21 @@ final class TDeckSceneCoordinator: NSObject {
 
     private func loadScene(into view: SCNView) {
         let scene = SCNScene()
-        scene.background.contents = nil
+        scene.background.contents = MeshTheme.scnClear
         let hasEnvironment = Self.installBlenderEnvironment(in: scene)
 
         let cameraNode = SCNNode()
         let camera = SCNCamera()
         camera.usesOrthographicProjection = true
-        camera.orthographicScale = 0.072
+        camera.orthographicScale = 0.082
         camera.zNear = 0.001
         camera.zFar = 8
         cameraNode.camera = camera
-        cameraNode.position = vec(0, 0.02, 1.2)
-        cameraNode.look(at: vec(0, 0.018, 0))
+        cameraNode.position = vec(0, 0.015, 1.2)
+        cameraNode.look(at: vec(0, 0.015, 0))
         scene.rootNode.addChildNode(cameraNode)
+        self.camera = camera
+        self.cameraNode = cameraNode
 
         if !hasEnvironment {
             let ambient = SCNNode()
@@ -196,6 +241,11 @@ final class TDeckSceneCoordinator: NSObject {
         self.rig = rig
         scene.rootNode.addChildNode(rig)
 
+        let center = SCNNode()
+        center.name = "TDeckCenter"
+        self.centerNode = center
+        rig.addChildNode(center)
+
         let content = SCNNode()
         content.name = "TDeckContent"
         if let url = TDeckScreen.modelURL {
@@ -220,11 +270,12 @@ final class TDeckSceneCoordinator: NSObject {
         // +Z. Pitch it forward so the screen faces the camera and the antenna
         // points up, matching the website.
         content.eulerAngles = vec(-Float.pi / 2, 0, 0)
-        rig.addChildNode(content)
+        center.addChildNode(content)
         lcdNodes = Self.findLCDNodes(in: content)
         applyScreen(currentScreen.isEmpty ? "home" : currentScreen)
-        frameModel(content, camera: camera, cameraNode: cameraNode)
         view.scene = scene
+        prepareFraming()
+        applyCameraFraming(viewSize: view.bounds.size)
         applyPose()
     }
 
@@ -243,24 +294,84 @@ final class TDeckSceneCoordinator: NSObject {
         return true
     }
 
-    private func frameModel(_ rig: SCNNode, camera: SCNCamera, cameraNode: SCNNode) {
-        let box = rig.boundingBox
-        let lo = box.min
-        let hi = box.max
-        let sx = hi.x - lo.x
-        let sy = hi.y - lo.y
-        let sz = hi.z - lo.z
-        guard sx > 0 || sy > 0 || sz > 0 else { return }
-        let cx = (lo.x + hi.x) / 2
-        let cy = (lo.y + hi.y) / 2
-        let cz = (lo.z + hi.z) / 2
-        rig.position = vec(Float(-cx), Float(-cy), Float(-cz))
-        // Crop the whip so the handset fills the stage, matching the website.
-        let handset = Swift.min(Double(sy), 0.13)
-        camera.orthographicScale = CGFloat(Swift.max(handset * 0.62, 0.04))
-        let lookY = Float(-sy * 0.22)
-        cameraNode.position = vec(0, lookY, 1.2)
-        cameraNode.look(at: vec(0, lookY, 0))
+    /// `SCNNode.boundingBox` ignores the node's own eulerAngles. Convert the
+    /// eight local corners through the pitched content node so framing uses
+    /// the handset as it actually appears on screen.
+    private func aabb(of node: SCNNode, in target: SCNNode) -> (min: (Float, Float, Float), max: (Float, Float, Float)) {
+        let box = node.boundingBox
+        let xs = [components(box.min).0, components(box.max).0]
+        let ys = [components(box.min).1, components(box.max).1]
+        let zs = [components(box.min).2, components(box.max).2]
+        var lo: (Float, Float, Float) = (.greatestFiniteMagnitude, .greatestFiniteMagnitude, .greatestFiniteMagnitude)
+        var hi: (Float, Float, Float) = (-.greatestFiniteMagnitude, -.greatestFiniteMagnitude, -.greatestFiniteMagnitude)
+        for x in xs {
+            for y in ys {
+                for z in zs {
+                    let p = components(node.convertPosition(vec(x, y, z), to: target))
+                    lo = (min(lo.0, p.0), min(lo.1, p.1), min(lo.2, p.2))
+                    hi = (max(hi.0, p.0), max(hi.1, p.1), max(hi.2, p.2))
+                }
+            }
+        }
+        return (lo, hi)
+    }
+
+    private func components(_ v: SCNVector3) -> (Float, Float, Float) {
+        #if os(macOS)
+        (Float(v.x), Float(v.y), Float(v.z))
+        #else
+        (v.x, v.y, v.z)
+        #endif
+    }
+
+    private func prepareFraming() {
+        guard let center = centerNode, let content = center.childNode(withName: "TDeckContent", recursively: false) else {
+            return
+        }
+        center.position = vec(0, 0, 0)
+        let box = aabb(of: content, in: center)
+        let sx = Double(box.max.0 - box.min.0)
+        let sy = Double(box.max.1 - box.min.1)
+        guard sx > 0.001 || sy > 0.001 else { return }
+        let width = max(sx, 0.04)
+        let totalH = max(sy, 0.04)
+        // Chassis plus SMA and a stump of the whip. Idle rotation stays on
+        // the handset; the rest of the antenna can leave the top of the stage.
+        let bodyH = min(totalH, max(width * 2.2, 0.10))
+        let cx = (box.min.0 + box.max.0) / 2
+        let bodyCenterY = box.min.1 + Float(bodyH / 2)
+        let cz = (box.min.2 + box.max.2) / 2
+        center.position = vec(-cx, -bodyCenterY, -cz)
+        framedWidth = width
+        framedBodyH = bodyH
+    }
+
+    func frameIfNeeded(size: CGSize) {
+        guard size.width > 8, size.height > 8 else { return }
+        if abs(size.width - lastViewSize.width) < 0.5, abs(size.height - lastViewSize.height) < 0.5 {
+            return
+        }
+        lastViewSize = size
+        applyCameraFraming(viewSize: size)
+    }
+
+    private func applyCameraFraming(viewSize: CGSize) {
+        guard let camera, let cameraNode, framedWidth > 0, framedBodyH > 0 else { return }
+        let aspect: Double
+        if viewSize.height > 8, viewSize.width > 8 {
+            aspect = Double(viewSize.width / viewSize.height)
+        } else {
+            aspect = 0.72
+        }
+        let halfFromWidth = (framedWidth * 1.18 / 2) / max(aspect, 0.28)
+        let halfFromBody = framedBodyH * 1.10 / 2
+        let halfH = max(halfFromWidth, halfFromBody, 0.05)
+        // Origin is the chassis center. Spare vertical room goes to the whip.
+        let extra = halfH - (framedBodyH / 2)
+        let lookY = max(extra, 0) * 0.22
+        camera.orthographicScale = CGFloat(halfH)
+        cameraNode.position = vec(0, Float(lookY), 1.2)
+        cameraNode.look(at: vec(0, Float(lookY), 0))
     }
 
     private static func findLCDNodes(in root: SCNNode) -> [SCNNode] {
@@ -443,6 +554,14 @@ extension TDeckSceneCoordinator: UIGestureRecognizerDelegate {
 #endif
 
 private extension MeshTheme {
+    static var scnClear: Any {
+        #if os(iOS)
+        UIColor.clear
+        #else
+        NSColor.clear
+        #endif
+    }
+
     static var scnWhite: Any {
         #if os(iOS)
         UIColor.white

@@ -86,6 +86,12 @@ struct ContactListView: View {
     @State var conversationFilter: ConversationFilter = .all
     @AppStorage("contactSortByLastSeen") var sortByLastSeen = true
     @AppStorage("channelsFirst") var channelsFirst = false
+
+    /// A freshly paired deck has a public channel and no contacts. Put that
+    /// conversation on screen instead of burying it under an empty-contacts block.
+    var showsChannelsFirst: Bool {
+        channelsFirst || contactStore.contacts.isEmpty
+    }
     #if os(iOS)
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State var navigateToMap = false
@@ -484,20 +490,22 @@ private extension ContactListView {
     @ViewBuilder
     var conversationSections: some View {
         connectionSection
-        Section {
-            Picker("Show", selection: $conversationFilter) {
-                ForEach(ConversationFilter.allCases) { filter in
-                    Text(filter.rawValue).tag(filter)
+        if !contactStore.contacts.isEmpty || isFilteringConversations {
+            Section {
+                Picker("Show", selection: $conversationFilter) {
+                    ForEach(ConversationFilter.allCases) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
                 }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("conversation-filter")
+                .listRowBackground(MeshTheme.surface)
             }
-            .pickerStyle(.menu)
-            .accessibilityIdentifier("conversation-filter")
-            .listRowBackground(MeshTheme.surface)
         }
         if isFilteringConversations && matchingContacts.isEmpty && !hasMatchingChannels {
             conversationSearchEmptyState
         }
-        if channelsFirst && (!isFilteringConversations || hasMatchingChannels) {
+        if showsChannelsFirst && (!isFilteringConversations || hasMatchingChannels) {
             channelsSection
         }
         if !isFilteringConversations && !contactStore.pendingNewContacts.isEmpty {
@@ -506,10 +514,12 @@ private extension ContactListView {
         if !isFilteringConversations && !contactStore.contactGroups.isEmpty {
             groupsSection
         }
-        if !isFilteringConversations || !matchingContacts.isEmpty {
+        if isFilteringConversations {
+            if !matchingContacts.isEmpty { contactsSection }
+        } else if !contactStore.contacts.isEmpty {
             contactsSection
         }
-        if !channelsFirst && (!isFilteringConversations || hasMatchingChannels) {
+        if !showsChannelsFirst && (!isFilteringConversations || hasMatchingChannels) {
             channelsSection
         }
     }

@@ -22,87 +22,73 @@ struct ToolsView: View {
     @State private var showFreqScanner = false
     @State private var showDeck = false
     @State private var connectAfterDismiss = false
+
     var body: some View {
         List {
-            if connectionManager.connectionState != .ready {
-                Section {
-                    Button("Connect a deck", systemImage: "antenna.radiowaves.left.and.right") {
-                        connectionManager.requestShowScanner = true
-                    }
-                    .buttonStyle(.meshSecondary)
-                }
-            }
             Section {
-                toolButton(
+                connectionRow
+            }
+
+            Section {
+                toolRow(
                     icon: "rotate.3d",
                     title: "The Deck",
-                    subtitle: "Turn the T-Deck and walk through every firmware screen"
-                ) {
-                    showDeck = true
-                }
+                    detail: "Turn the handset. Walk the firmware.",
+                    featured: true
+                ) { showDeck = true }
+            }
 
-                toolButton(
+            Section("Planning") {
+                toolRow(
                     icon: "eye.trianglebadge.exclamationmark",
                     title: "Line of Sight",
-                    subtitle: "Terrain analysis with Fresnel zone for RF path planning"
-                ) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showLineOfSight = true }
-                }
-
-                toolButton(
+                    detail: "Terrain and Fresnel zone"
+                ) { showLineOfSight = true }
+                toolRow(
                     icon: "function",
                     title: "Radio Calculator",
-                    subtitle: "Link budget, path loss, wavelength, and range estimation"
-                ) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showRadioCalc = true }
-                }
-
-                toolButton(
+                    detail: "Link budget and range"
+                ) { showRadioCalc = true }
+                toolRow(
                     icon: "timer",
-                    title: "Airtime Calculator",
-                    subtitle: "LoRa time-on-air, duty cycle, and packets per hour"
-                ) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showAirtime = true }
-                }
-
-                toolButton(
+                    title: "Airtime",
+                    detail: "Time-on-air and duty cycle"
+                ) { showAirtime = true }
+                toolRow(
                     icon: "chart.bar",
-                    title: "SF/BW Reference",
-                    subtitle: "Sensitivity, bit rate, and range by spreading factor"
-                ) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showSensitivity = true }
-                }
-            } header: {
-                Text("Planning")
-            } footer: {
-                Text("These tools don't require a radio connection.")
+                    title: "SF/BW",
+                    detail: "Sensitivity by spreading factor"
+                ) { showSensitivity = true }
             }
 
             Section {
-                toolButton(
+                toolRow(
                     icon: "waveform.badge.magnifyingglass",
                     title: "RF Monitor",
-                    subtitle: "Live SNR and RSSI chart from received LoRa packets"
-                ) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showNoiseFloor = true }
-                }
-
-                toolButton(
-                    icon: "antenna.radiowaves.left.and.right.slash",
+                    detail: "Live SNR and RSSI",
+                    available: supportsMonitoring
+                ) { showNoiseFloor = true }
+                toolRow(
+                    icon: "dot.radiowaves.left.and.right",
                     title: "Frequency Scanner",
-                    subtitle: "Request regional presets and watch for contact updates"
-                ) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showFreqScanner = true }
-                }
-
+                    detail: "Regional presets",
+                    available: supportsMonitoring
+                ) { showFreqScanner = true }
             } header: {
                 Text("Monitoring")
             } footer: {
-                Text("Monitoring requires a connected MeshCore radio. Lilyshark deck monitoring is available in the web app over USB.")
+                if !supportsMonitoring {
+                    Text("Needs a MeshCore radio. Deck traffic is in the web app over USB.")
+                }
             }
         }
+        .meshListStyle()
         .meshTheme()
         .navigationTitle("Radio")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.large)
+        .contentMargins(.bottom, Design.Space.section, for: .scrollContent)
+        #endif
         .sheet(isPresented: $showDeck) {
             NavigationStack {
                 TDeckExperienceView()
@@ -197,7 +183,7 @@ struct ToolsView: View {
             Text("These tools use MeshCore radio reports and controls. For a Lilyshark deck, open the web app and connect over USB to monitor radio traffic.")
         } actions: {
             if !connectionManager.isActivelyConnected {
-                Button("Choose a radio") {
+                Button("Connect a Deck") {
                     connectAfterDismiss = true
                     showFreqScanner = false
                     showNoiseFloor = false
@@ -213,32 +199,120 @@ struct ToolsView: View {
         connectionManager.requestShowScanner = true
     }
 
-    private func toolButton(icon: String, title: LocalizedStringKey, subtitle: LocalizedStringKey, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(MeshTheme.accent.opacity(0.15))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: icon)
-                        .foregroundStyle(MeshTheme.accent)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
+    @ViewBuilder
+    private var connectionRow: some View {
+        switch connectionManager.connectionState {
+        case .ready:
+            HStack(spacing: Design.Space.snug) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(MeshTheme.connected)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Design.Space.hairline) {
+                    Text("Ready")
+                        .font(.headline)
                         .foregroundStyle(MeshTheme.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let name = connectionManager.connectedDeviceName, !name.isEmpty {
+                        Text(name)
+                            .font(Design.Text.detail)
+                            .foregroundStyle(MeshTheme.textSecondary)
+                            .lineLimit(1)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .touchable()
+            .accessibilityElement(children: .combine)
+            .listRowBackground(MeshTheme.surface)
+        case .connecting, .connected:
+            HStack(spacing: Design.Space.snug) {
+                ProgressView()
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                Text("Connecting")
+                    .font(.headline)
+                    .foregroundStyle(MeshTheme.textPrimary)
+            }
+            .listRowBackground(MeshTheme.surface)
+        default:
+            Button {
+                connectionManager.requestShowScanner = true
+            } label: {
+                rowLabel(
+                    icon: "antenna.radiowaves.left.and.right",
+                    title: "Connect a Deck",
+                    detail: "Scan for a nearby T-Deck or radio",
+                    iconStyle: MeshTheme.accent,
+                    titleFont: .headline,
+                    showsChevron: true
+                )
+            }
+            .buttonStyle(.meshPlain)
+            .listRowBackground(MeshTheme.surface)
+            .accessibilityHint("Scans for nearby decks and radios")
+        }
+    }
+
+    private func toolRow(
+        icon: String,
+        title: LocalizedStringKey,
+        detail: LocalizedStringKey,
+        featured: Bool = false,
+        available: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            rowLabel(
+                icon: icon,
+                title: title,
+                detail: detail,
+                iconStyle: available ? MeshTheme.textPrimary : MeshTheme.textSecondary,
+                titleFont: featured ? .headline : .body,
+                showsChevron: true
+            )
+            .padding(.vertical, featured ? Design.Space.tight : 0)
+            .opacity(available ? 1 : 0.55)
         }
         .buttonStyle(.meshPlain)
         .listRowBackground(MeshTheme.surface)
+        .accessibilityHint(available ? "Opens this tool" : "Needs a MeshCore radio")
+    }
+
+    private func rowLabel(
+        icon: String,
+        title: LocalizedStringKey,
+        detail: LocalizedStringKey,
+        iconStyle: Color,
+        titleFont: Font,
+        showsChevron: Bool
+    ) -> some View {
+        HStack(spacing: Design.Space.snug) {
+            Image(systemName: icon)
+                .font(.title3)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(iconStyle)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Design.Space.hairline) {
+                Text(title)
+                    .font(titleFont)
+                    .foregroundStyle(MeshTheme.textPrimary)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(Design.Text.detail)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .touchable()
     }
 }
 #endif

@@ -145,6 +145,23 @@ final class ConnectionManager {
     /// Exact fields reported by this link, kept separate from DeviceConfig defaults.
     var reportedMeshtasticLoRa: MeshtasticProto.LoRaConfig?
     #endif
+
+    #if targetEnvironment(simulator)
+    /// The simulator has no Bluetooth radio. This is the nearby-deck row a
+    /// phone would show when a powered T-Deck is advertising Meshtastic.
+    struct SimulatorNearbyDeck: Identifiable, Equatable {
+        let id: UUID
+        let name: String
+        let rssi: Int
+        /// Passkey the deck would put on its own screen during pairing.
+        let passkey: String
+    }
+
+    var simulatorNearbyDecks: [SimulatorNearbyDeck] = []
+    /// True while the operator is walking the phone pairing flow with no live GATT link.
+    private(set) var isSimulatorDeckPreview = false
+    private var simulatorScanTask: Task<Void, Never>?
+    #endif
     #if os(macOS) || targetEnvironment(macCatalyst)
     let usbManager = USBSerialManager()
     /// USB serial ports — bridged from USBSerialManager @Published for @Observable tracking.
@@ -673,6 +690,13 @@ final class ConnectionManager {
     // MARK: - Scanning & Connection
 
     func requestAutoScan() {
+        #if targetEnvironment(simulator)
+        if connectionState == .disconnected {
+            scanRetryCount = maxScanRetries
+            startScanning()
+        }
+        return
+        #endif
         if bleManager.isPoweredOn {
             if connectionState == .disconnected {
                 scanRetryCount = maxScanRetries
@@ -685,6 +709,11 @@ final class ConnectionManager {
     }
 
     func startScanning() {
+        #if targetEnvironment(simulator)
+        scanRetryTask?.cancel()
+        startSimulatorDeckPreviewScan()
+        return
+        #endif
         guard bleManager.isPoweredOn else {
             Self.logger.warning("Cannot scan — BLE not powered on, queuing for later")
             pendingAutoScan = true
@@ -709,12 +738,73 @@ final class ConnectionManager {
         #if canImport(MeshtasticKit)
         meshtasticManager.stopScanning()
         #endif
+        #if targetEnvironment(simulator)
+        simulatorScanTask?.cancel()
+        simulatorScanTask = nil
+        #endif
     }
+
+    #if targetEnvironment(simulator)
+    /// Fade a T-Deck into the scanner the way a phone does when the radio is on.
+    func startSimulatorDeckPreviewScan() {
+        simulatorScanTask?.cancel()
+        isScanning = true
+        bleStatusMessage = nil
+        // Keep a deck already on the list so Connect opens onto it instead of
+        // wiping the row and waiting another second.
+        guard simulatorNearbyDecks.isEmpty else { return }
+        simulatorScanTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_100_000_000)
+            guard let self, !Task.isCancelled, self.connectionState == .disconnected else { return }
+            self.simulatorNearbyDecks = [
+                SimulatorNearbyDeck(
+                    id: UUID(),
+                    name: "Lilyshark T-Deck Plus",
+                    rssi: -51,
+                    passkey: "123456"
+                )
+            ]
+        }
+    }
+
+    /// After the passkey is accepted, the app looks like a phone that has the deck.
+    func completeSimulatorDeckPreview(named name: String) {
+        stopScanning()
+        isSimulatorDeckPreview = true
+        isMeshtasticLinkActive = true
+        connectionState = .connecting
+        connectedDeviceName = name
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            guard let self, self.isSimulatorDeckPreview else { return }
+            self.connectionState = .ready
+            self.isMeshtasticReady = true
+            self.onDeviceReady?()
+        }
+    }
+
+    func endSimulatorDeckPreview() {
+        guard isSimulatorDeckPreview else { return }
+        let previous = connectionState
+        isSimulatorDeckPreview = false
+        isMeshtasticReady = false
+        isMeshtasticLinkActive = false
+        simulatorNearbyDecks = []
+        connectionState = .disconnected
+        connectedDeviceName = nil
+        if previous != .disconnected {
+            onDisconnected?(previous)
+        }
+    }
+    #endif
 
     /// Whether either central has anything to show. A scan that found a deck but
     /// no MeshCore radio must not count as an empty scan, or the retry loop
     /// restarts a scan whose results are already on screen.
     private var foundNoDevices: Bool {
+        #if targetEnvironment(simulator)
+        if !simulatorNearbyDecks.isEmpty { return false }
+        #endif
         #if canImport(MeshtasticKit)
         return discoveredPeripherals.isEmpty && discoveredMeshtasticDevices.isEmpty
         #else
@@ -911,6 +1001,13 @@ final class ConnectionManager {
     #endif
 
     func disconnect() {
+        #if targetEnvironment(simulator)
+        if isSimulatorDeckPreview {
+            endSimulatorDeckPreview()
+            scheduleRescanAfterDisconnect()
+            return
+        }
+        #endif
         // Route to the correct transport disconnect
         #if canImport(MeshtasticKit)
         if isMeshtasticLinkActive {
@@ -1003,6 +1100,12 @@ final class ConnectionManager {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
                 guard let self else { return }
+                #if targetEnvironment(simulator)
+                // The simulator has no radio. MeshCore's idle .disconnected would
+                // otherwise pop the scanner over the welcome, and would also
+                // clobber the pairing-preview connection.
+                return
+                #endif
                 // Don't let BLE state changes override an active WiFi connection
                 guard !self.wifiManager.isConnected else { return }
                 // The MeshCore central keeps scanning while a deck is connected,
