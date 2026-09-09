@@ -5,9 +5,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ReactMarkdown from "react-markdown";
 import {
 	docHash,
+	docsHref,
+	headingSection,
+	isDocsHash,
 	readDocLocation,
 	remarkDocHeadings,
 	resolveDocLink,
+	resolveDocLocation,
 } from "./docNavigation";
 
 const pointer = {
@@ -34,6 +38,29 @@ test("document and section routes survive reloads and browser history", () => {
 		id: "a & b",
 		section: "signal-μv",
 	});
+	assert.equal(
+		docsHref("pointer", "encoding-rules"),
+		"/#docs?doc=pointer&section=encoding-rules",
+	);
+	assert.deepEqual(resolveDocLocation("#docs", entries), {
+		id: "pointer",
+		section: "",
+	});
+	assert.deepEqual(resolveDocLocation(docHash("missing", "layout"), entries), {
+		id: "pointer",
+		section: "",
+	});
+	assert.deepEqual(resolveDocLocation(docHash("analysis", "signal"), entries), {
+		id: "analysis",
+		section: "signal",
+	});
+	assert.equal(headingSection("docs-encoding-rules"), "encoding-rules");
+	assert.equal(headingSection("docs-signal-μv"), "signal-μv");
+	assert.equal(headingSection(undefined), "");
+	assert.equal(isDocsHash("#docs"), true);
+	assert.equal(isDocsHash(docHash("pointer", "layout")), true);
+	assert.equal(isDocsHash("#traffic"), false);
+	assert.equal(isDocsHash("#paper"), false);
 });
 
 test("same-document anchors stay in the docs viewer", () => {

@@ -21,6 +21,29 @@ export function docHash(id: string, section = ""): string {
 	return `#docs?${query}`;
 }
 
+export function docsHref(id: string, section = ""): string {
+	return `/${docHash(id, section)}`;
+}
+
+export function isDocsHash(hash: string): boolean {
+	return hash.split("?")[0].toLowerCase() === "#docs";
+}
+
+/** Empty or unknown `?doc=` hashes fall back to the first published document. */
+export function resolveDocLocation(
+	hash: string,
+	docs: DocEntry[],
+): DocLocation {
+	const location = readDocLocation(hash);
+	if (!docs.length || docs.some((doc) => doc.id === location.id))
+		return location;
+	return { id: docs[0].id, section: "" };
+}
+
+export function headingSection(id: string | undefined): string {
+	return id?.startsWith("docs-") ? id.slice(5) : "";
+}
+
 /** Resolve links against their repository location, not the published folder. */
 export function resolveDocLink(
 	href: string,

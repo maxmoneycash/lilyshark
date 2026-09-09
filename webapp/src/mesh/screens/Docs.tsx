@@ -11,9 +11,13 @@ import remarkGfm from "remark-gfm";
 import {
 	type DocEntry,
 	docHash,
+	docsHref,
+	headingSection,
+	isDocsHash,
 	readDocLocation,
 	remarkDocHeadings,
 	resolveDocLink,
+	resolveDocLocation,
 } from "./docNavigation";
 import "./docs.css";
 
@@ -93,13 +97,36 @@ export default function Docs() {
 		error && (!error.id || error.id === current?.id) ? error.message : null;
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const navRef = useRef<HTMLElement>(null);
+	const docsRef = useRef(docs);
+	docsRef.current = docs;
 	useScrollEdges(scrollRef);
 	useScrollEdges(navRef);
 
 	useEffect(() => {
-		const onHash = () => setLocation(readDocLocation(window.location.hash));
+		const onHash = () => {
+			if (!isDocsHash(window.location.hash)) return;
+			const list = docsRef.current;
+			const resolved = list.length
+				? resolveDocLocation(window.location.hash, list)
+				: readDocLocation(window.location.hash);
+			if (list.length) {
+				const hash = docHash(resolved.id, resolved.section);
+				if (window.location.hash !== hash) {
+					window.history.replaceState(
+						null,
+						"",
+						docsHref(resolved.id, resolved.section),
+					);
+				}
+			}
+			setLocation(resolved);
+		};
 		window.addEventListener("hashchange", onHash);
-		return () => window.removeEventListener("hashchange", onHash);
+		window.addEventListener("popstate", onHash);
+		return () => {
+			window.removeEventListener("hashchange", onHash);
+			window.removeEventListener("popstate", onHash);
+		};
 	}, []);
 
 	useEffect(() => {
@@ -122,6 +149,24 @@ export default function Docs() {
 			});
 		return () => request.abort();
 	}, []);
+
+	useEffect(() => {
+		if (!docs.length || !isDocsHash(window.location.hash)) return;
+		const resolved = resolveDocLocation(window.location.hash, docs);
+		const hash = docHash(resolved.id, resolved.section);
+		if (window.location.hash !== hash) {
+			window.history.replaceState(
+				null,
+				"",
+				docsHref(resolved.id, resolved.section),
+			);
+		}
+		setLocation((prev) =>
+			prev.id === resolved.id && prev.section === resolved.section
+				? prev
+				: resolved,
+		);
+	}, [docs]);
 
 	useEffect(() => {
 		if (!current) return;
@@ -164,10 +209,54 @@ export default function Docs() {
 		}
 	}, [location, text]);
 
-	const open = (doc: DocEntry, section = "") => {
-		setLocation({ id: doc.id, section });
-		window.location.hash = docHash(doc.id, section);
+	const open = (doc: DocEntry, section = "", replace = false) => {
+		const next = { id: doc.id, section };
+		setLocation(next);
+		const hash = docHash(doc.id, section);
+		if (window.location.hash === hash) return;
+		const url = docsHref(doc.id, section);
+		if (replace) window.history.replaceState(null, "", url);
+		else window.history.pushState(null, "", url);
 	};
+
+	const heading =
+		(Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6") =>
+		({
+			children,
+			id,
+		}: {
+			children?: ReactNode;
+			id?: string;
+			node?: unknown;
+		}) => {
+			const section = headingSection(id);
+			return (
+				<Tag id={id} tabIndex={-1}>
+					{current && section ? (
+						<a
+							className="docs-heading-link"
+							href={docsHref(current.id, section)}
+							onClick={(event) => {
+								if (
+									event.button ||
+									event.metaKey ||
+									event.ctrlKey ||
+									event.shiftKey ||
+									event.altKey
+								)
+									return;
+								event.preventDefault();
+								open(current, section);
+							}}
+						>
+							{children}
+						</a>
+					) : (
+						children
+					)}
+				</Tag>
+			);
+		};
 
 	return (
 		<main className="fill docs-grid">
@@ -175,9 +264,20 @@ export default function Docs() {
 				<div className="panel-title">
 					<span>DOCUMENTATION</span>
 				</div>
-				<label className="docs-mobile-picker">
-					<span>Document</span>
+				<div className="docs-mobile-picker">
+					{location.section && current ? (
+						<button
+							type="button"
+							className="docs-back"
+							onClick={() => open(current, "", true)}
+						>
+							Back
+						</button>
+					) : (
+						<label htmlFor="docs-mobile-select">Document</label>
+					)}
 					<select
+						id="docs-mobile-select"
 						value={current?.id ?? ""}
 						disabled={!docs.length}
 						onChange={(event) => {
@@ -196,12 +296,12 @@ export default function Docs() {
 							</option>
 						))}
 					</select>
-				</label>
+				</div>
 				<nav className="docs-nav" ref={navRef} aria-label="Documents">
 					{docs.map((doc) => (
 						<a
 							key={doc.id}
-							href={`/${docHash(doc.id)}`}
+							href={docsHref(doc.id)}
 							onClick={(event) => {
 								if (
 									event.button ||
@@ -251,6 +351,12 @@ export default function Docs() {
 							<ReactMarkdown
 								remarkPlugins={[remarkGfm, remarkDocHeadings]}
 								components={{
+									h1: heading("h1"),
+									h2: heading("h2"),
+									h3: heading("h3"),
+									h4: heading("h4"),
+									h5: heading("h5"),
+									h6: heading("h6"),
 									a: ({ href, children }) => {
 										const { doc, section, url } = resolveDocLink(
 											href ?? "",
