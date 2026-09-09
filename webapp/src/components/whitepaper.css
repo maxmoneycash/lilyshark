@@ -1,0 +1,29 @@
+.meshterm main.paper-tab .pdf-toolbar {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	justify-content: space-between;
+	width: 100%;
+	max-width: min(100%, 860px);
+	padding: 8px 12px;
+	background: var(--bg);
+	border-bottom: 1px solid var(--border);
+}
+
+.meshterm main.paper-tab .pdf-toolbar a {
+	flex: none;
+	margin-left: auto;
+}
+
+@media (max-width: 860px) {
+	.meshterm main.paper-tab .pdf-scroll {
+		gap: 0;
+		padding: 0 0 24px;
+	}
+
+	.meshterm main.paper-tab .pdf-page {
+		width: 100%;
+		box-shadow: none;
+		border-bottom: 1px solid var(--border);
+	}
+}

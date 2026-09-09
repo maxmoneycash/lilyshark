@@ -15,17 +15,18 @@
  * tells the truth from the first frame.
  */
 
+import "./whitepaper.css";
+
 const PAGES = 63;
 const PAGE_RATIO = 1812 / 1400; // height / width of the pre-rendered pages
-const src = (n: number) => `/paper/page-${String(n).padStart(3, '0')}.webp`;
+const src = (n: number) => `/paper/page-${String(n).padStart(3, "0")}.webp`;
 
 export function WhitepaperTab() {
   return (
-    <main className="fill">
+    <main className="fill paper-tab">
       <div className="pdf-scroll">
         <div className="pdf-toolbar">
-          THE GROWTH TRAP IN PROOF OF PHYSICAL WORK · {PAGES} PP
-          <span style={{ flex: 1 }} />
+          <span>WHITEPAPER · {PAGES} PP</span>
           <a href="/lilyshark-whitepaper.pdf" download="lilyshark-whitepaper.pdf">
             DOWNLOAD PDF
           </a>
@@ -38,7 +39,7 @@ export function WhitepaperTab() {
             alt={`Page ${i + 1} of ${PAGES}`}
             width={1400}
             height={1812}
-            loading={i < 2 ? 'eager' : 'lazy'}
+            loading={i < 2 ? "eager" : "lazy"}
             decoding="async"
             style={{ aspectRatio: `1400 / ${Math.round(1400 * PAGE_RATIO)}` }}
           />
