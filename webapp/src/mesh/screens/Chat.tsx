@@ -263,29 +263,36 @@ export default function Chat({
         <div className="panel-title chat-titlebar">
           <div className="chat-heading">
             <span className="chat-heading-label">CHAT · {convoLabel}</span>
-            <select
-              className="chat-conversation-picker"
-              aria-label={t("Conversation")}
-              value={convo}
-              onChange={(e) => setConvo(e.target.value)}
-            >
-              <optgroup label={t("Channels")}>
-                {channelConvos.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}{(s.unread.get(c.key) ?? 0) > 0 ? ` · ${s.unread.get(c.key)} unread` : ""}
-                  </option>
-                ))}
-              </optgroup>
-              {dmConvos.length > 0 && (
-                <optgroup label={t("Direct messages")}>
-                  {dmConvos.map((c) => (
+            <label className="chat-conversation-picker-wrap">
+              <span className="chat-conversation-picker-k">{t("CHAT")}</span>
+              <select
+                className="chat-conversation-picker"
+                aria-label={t("Conversation")}
+                value={convo}
+                onChange={(e) => setConvo(e.target.value)}
+              >
+                <optgroup label={t("Channels")}>
+                  {channelConvos.map((c) => (
                     <option key={c.key} value={c.key}>
                       {c.label}{(s.unread.get(c.key) ?? 0) > 0 ? ` · ${s.unread.get(c.key)} unread` : ""}
                     </option>
                   ))}
                 </optgroup>
-              )}
-            </select>
+                <optgroup label={t("Direct messages")}>
+                  {dmConvos.length === 0 ? (
+                    <option value="" disabled>
+                      {t("No direct messages yet")}
+                    </option>
+                  ) : (
+                    dmConvos.map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.label}{(s.unread.get(c.key) ?? 0) > 0 ? ` · ${s.unread.get(c.key)} unread` : ""}
+                      </option>
+                    ))
+                  )}
+                </optgroup>
+              </select>
+            </label>
             {convo.startsWith("dm:") &&
               (s.nodes.get(Number(convo.slice(3)))?.publicKey ? (
                 <span className="chat-encryption" title={t("END-TO-END ENCRYPTED (PKI)")}>PKI</span>
@@ -294,10 +301,14 @@ export default function Chat({
                   className="chat-encryption warn"
                   title={t("NO PUBLIC KEY: ENCRYPTED WITH THE CHANNEL PSK ONLY")}
                 >
-                  {" "}
                   {t("NO PKI")}
                 </span>
               ))}
+            {dmConvos.length === 0 && (
+              <span className="chat-dm-empty-hint dim">
+                {t("Open a node to start a direct message.")}
+              </span>
+            )}
           </div>
           <span className="chat-tools">
             <input
@@ -464,6 +475,8 @@ export default function Chat({
                 className={`nodelink chat-sender ${m.mine ? "" : "warn"}`}
                 style={m.mine ? { fontWeight: 700 } : undefined}
                 title={t("NODE ACTIONS")}
+                aria-haspopup="menu"
+                aria-expanded={menu?.num === m.from}
                 onClick={(e) => {
                   e.stopPropagation();
                   const bounds = e.currentTarget.getBoundingClientRect();
@@ -474,7 +487,7 @@ export default function Chat({
                 &lt;{m.mine ? t("ME") : nodeShort(m.from)}&gt;
               </button>{" "}
               {!m.mine &&
-                (m.hops !== undefined || m.snr !== undefined) &&
+                (m.hops !== undefined || m.rssi !== undefined || m.snr !== undefined) &&
                 (() => {
                   const parts = [
                     m.hops === 0
@@ -484,13 +497,13 @@ export default function Chat({
                         : m.hops !== undefined
                           ? t("{0} HOPS", m.hops)
                           : null,
-                    m.snr !== undefined ? `${m.snr.toFixed(1)} dB` : null,
+                    m.rssi !== undefined ? `${m.rssi.toFixed(0)} DBM` : null,
+                    m.snr !== undefined ? `${m.snr.toFixed(1)} DB` : null,
                   ].filter(Boolean);
                   return (
                     <span
                       className="dim chat-link-quality"
-                      title={t("HOPS TO REACH US (HOPSTART − HOPLIMIT) · SNR OF THE LAST HOP",
-                      )}
+                      title={t("HOPS TO REACH US (HOPSTART − HOPLIMIT) · RSSI AND SNR OF THE LAST HOP")}
                     >
                       [{parts.join(" · ")}]{" "}
                     </span>
@@ -623,6 +636,7 @@ export default function Chat({
                 <div className="node-menu-title">{nodeShort(menu.num)}</div>
                 {menu.num !== s.myNodeNum && (
                   <button
+                    type="button"
                     role="menuitem"
                     onClick={() => {
                       setConvo(`dm:${menu.num}`);
@@ -634,6 +648,7 @@ export default function Chat({
                   </button>
                 )}
                 <button
+                  type="button"
                   role="menuitem"
                   onClick={() => {
                     onViewNode(menu.num);
@@ -644,6 +659,7 @@ export default function Chat({
                 </button>
                 {hasPos && (
                   <button
+                    type="button"
                     role="menuitem"
                     onClick={() => {
                       onViewOnMap(menu.num);

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { type Forecast, forecastBattery, forecastText } from "../battery";
 import { loadHopChanges, loadTelemetry, loadTraceroutes } from "../db";
 import {
@@ -227,13 +227,20 @@ function Detail(props: {
 	useLayoutEffect(() => {
 		const panel = panelRef.current;
 		if (panel && window.matchMedia("(max-width: 860px)").matches) {
-			const header = panel.closest(".app")?.querySelector("header");
-			panel.style.setProperty("--nodes-header-height", `${header?.getBoundingClientRect().height ?? 0}px`);
 			panel.scrollIntoView({ block: "start", behavior: "instant" });
 		}
 		// Focus without another scroll so the title stays below the sticky header.
 		headingRef.current?.focus({ preventScroll: true });
 	}, [n.num]);
+	useEffect(() => {
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key !== "Escape") return;
+			event.preventDefault();
+			props.onClose();
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, [props.onClose]);
 	const [tracing, setTracing] = useState(false);
 	const [traceErr, setTraceErr] = useState("");
 	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -380,9 +387,13 @@ function Detail(props: {
 				] as [string, React.ReactNode][])
 			: []),
 		[
+			"RSSI",
+			n.rssi !== undefined ? `${n.rssi.toFixed(0)} DBM` : "—",
+		],
+		[
 			"SNR",
 			<span className={n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}>
-				{n.snr !== undefined ? `${n.snr.toFixed(2)} DB` : n.viaNet ? "VIA NET" : "—"}
+				{n.snr !== undefined ? `${n.snr.toFixed(1)} DB` : n.viaNet ? "VIA NET" : "—"}
 			</span>,
 		],
 		[
@@ -467,8 +478,9 @@ function Detail(props: {
 					{t("DETAIL // NODE")} {n.shortName}
 				</span>
 				<button
+					type="button"
+					aria-label={t("Close node detail")}
 					onClick={props.onClose}
-
 				>
 					CLOSE
 				</button>
@@ -766,6 +778,9 @@ export default function Nodes({
 	const link = useDeviceLink();
 	const [selected, setSelected] = useState<number | undefined>(initialSelected);
 	const rootRef = useRef<HTMLElement>(null);
+	const openerRef = useRef<HTMLButtonElement | null>(null);
+	const selectedRef = useRef(selected);
+	selectedRef.current = selected;
 
 	// When arriving from the map with a preselected node, scroll its row into
 	// view. Scoped to this screen's own table — a document-wide query would find
@@ -804,10 +819,48 @@ export default function Nodes({
 		selected !== undefined ? s.nodes.get(selected) : undefined;
 	const short = (num: number) =>
 		s.nodes.get(num)?.shortName ?? `!${num.toString(16)}`;
-	const closeDetail = () => {
+	const closeDetail = useCallback(() => {
+		const current = selectedRef.current;
+		const opener =
+			openerRef.current ??
+			rootRef.current?.querySelector<HTMLButtonElement>(`button[data-node-id="${current}"]`);
+		openerRef.current = opener ?? null;
 		setSelected(undefined);
-		rootRef.current?.querySelector<HTMLButtonElement>(`button[data-node-id="${selected}"]`)?.focus();
+	}, []);
+	const selectNode = (num: number, opener?: HTMLButtonElement | null) => {
+		if (selected === num) {
+			closeDetail();
+			return;
+		}
+		openerRef.current =
+			opener ??
+			rootRef.current?.querySelector<HTMLButtonElement>(`button[data-node-id="${num}"]`) ??
+			null;
+		setSelected(num);
 	};
+
+	useLayoutEffect(() => {
+		const root = rootRef.current;
+		if (!root) return;
+		const header = root.closest(".app")?.querySelector("header");
+		const apply = () => {
+			root.style.setProperty(
+				"--nodes-header-height",
+				`${header?.getBoundingClientRect().height ?? 0}px`,
+			);
+		};
+		apply();
+		window.addEventListener("resize", apply);
+		return () => window.removeEventListener("resize", apply);
+	}, []);
+
+	useLayoutEffect(() => {
+		if (selected !== undefined) return;
+		const opener = openerRef.current;
+		if (!opener?.isConnected) return;
+		opener.focus({ preventScroll: true });
+		opener.scrollIntoView({ block: "nearest", behavior: "instant" });
+	}, [selected]);
 
 	return (
 		<main ref={rootRef} className="nodes-screen">
@@ -867,9 +920,7 @@ export default function Nodes({
 								<tr
 									key={n.num}
 									className={selected === n.num ? "sel" : ""}
-									onClick={() =>
-										setSelected(selected === n.num ? undefined : n.num)
-									}
+									onClick={() => selectNode(n.num)}
 								>
 									{/* ignored: struck through as well as dimmed. Opacity alone
 									    was both unreadable on the light theme and the only thing
@@ -889,7 +940,7 @@ export default function Nodes({
 											aria-controls={selected === n.num ? "nodes-detail" : undefined}
 											onClick={(event) => {
 												event.stopPropagation();
-												setSelected(selected === n.num ? undefined : n.num);
+												selectNode(n.num, event.currentTarget);
 											}}
 										>
 											<span className="nodes-name">{n.longName || n.shortName || `!${n.num.toString(16)}`}</span>
@@ -904,8 +955,25 @@ export default function Nodes({
 										</button>
 									</td>
 									<td style={{ fontWeight: 700 }}>{n.shortName}</td>
-									<td className={`nodes-snr ${n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}`}>
-										{n.snr !== undefined ? n.snr.toFixed(2) : n.viaNet ? "NET" : "—"}
+									<td
+										className={`nodes-snr ${n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}`}
+										title={[
+											n.snr !== undefined ? `${n.snr.toFixed(1)} DB` : n.viaNet ? "VIA NET" : null,
+											n.rssi !== undefined ? `${n.rssi.toFixed(0)} DBM` : null,
+										].filter(Boolean).join(" · ") || undefined}
+									>
+										{n.snr === undefined && n.rssi === undefined ? (
+											n.viaNet ? "NET" : "—"
+										) : (
+											<span className="nodes-snr-stack">
+												<span className="nodes-snr-value">
+													{n.snr !== undefined ? n.snr.toFixed(1) : "—"}
+												</span>
+												{n.rssi !== undefined && (
+													<span className="nodes-rssi">{n.rssi.toFixed(0)} DBM</span>
+												)}
+											</span>
+										)}
 									</td>
 									<td
 										className={

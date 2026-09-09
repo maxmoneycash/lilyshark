@@ -3,9 +3,18 @@
 	align-items: center;
 	gap: 8px;
 	min-width: 0;
+	flex: 1;
 }
 
-.meshterm .chat-screen .chat-conversation-picker {
+.meshterm .chat-screen .chat-heading-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.meshterm .chat-screen .chat-conversation-picker-wrap,
+.meshterm .chat-screen .chat-dm-empty-hint {
 	display: none;
 }
 
@@ -16,12 +25,8 @@
 }
 
 .meshterm .chat-screen .chat-tools {
+	flex: 0 1 auto;
 	gap: 8px;
-}
-
-.meshterm main.chat-screen > .node-menu {
-	width: max-content !important;
-	max-width: calc(100vw - 24px) !important;
 }
 
 .meshterm .chat-screen .chat-sender {
@@ -100,16 +105,16 @@
 
 .meshterm .chat-screen .chat-empty {
 	border: 0;
-	padding: 12px 0;
+	padding: 12px 0 16px;
 	line-height: 1.55;
+	overflow-wrap: anywhere;
 }
 
 .meshterm .chat-screen .chat-empty-title {
 	letter-spacing: 0;
 }
 
-.meshterm .chat-screen .chat-msgs[data-searching="true"] > :first-child,
-.meshterm .chat-screen .chat-msgs > .chat-empty:first-child {
+.meshterm .chat-screen .chat-msgs[data-searching="true"] > :first-child {
 	margin-top: 0;
 }
 
@@ -129,17 +134,54 @@
 		padding: 12px;
 	}
 
+	.meshterm .chat-screen .chat-heading {
+		display: grid;
+		grid-template-columns: minmax(12ch, 1fr) auto;
+		align-items: start;
+		width: 100%;
+	}
+
 	.meshterm .chat-screen .chat-heading-label {
 		display: none;
 	}
 
+	.meshterm .chat-screen .chat-conversation-picker-wrap {
+		display: grid;
+		grid-template-columns: auto minmax(12ch, 1fr);
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+
+	.meshterm .chat-screen .chat-conversation-picker-k {
+		font-size: 10px;
+		letter-spacing: 0.12em;
+		color: var(--fg-dim);
+		white-space: nowrap;
+	}
+
 	.meshterm .chat-screen .chat-conversation-picker {
 		display: block;
-		flex: 1;
+		box-sizing: border-box;
 		width: 100%;
-		min-width: 0;
+		max-width: 100%;
+		min-width: 12ch;
 		min-height: 44px;
 		font-size: 16px;
+	}
+
+	.meshterm .chat-screen .chat-encryption {
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.meshterm .chat-screen .chat-dm-empty-hint {
+		display: block;
+		grid-column: 1 / -1;
+		font-size: 11px;
+		line-height: 1.4;
+		overflow-wrap: anywhere;
 	}
 
 	.meshterm .chat-screen .chat-tools {
@@ -155,8 +197,9 @@
 	}
 
 	.meshterm .chat-screen .chat-tools button {
-		min-width: 0;
-		padding-inline: 8px;
+		flex: 0 0 auto;
+		min-width: max-content;
+		padding-inline: 10px;
 		font-size: 11px;
 		letter-spacing: 0.04em;
 	}
@@ -168,4 +211,34 @@
 	.meshterm .chat-screen .chat-sender {
 		min-height: 44px;
 	}
+}
+
+.meshterm main.chat-screen > .node-menu {
+	box-sizing: border-box;
+	width: max-content !important;
+	max-width: min(18rem, calc(100vw - 24px)) !important;
+}
+
+.meshterm main.chat-screen > .node-menu .node-menu-title {
+	overflow-wrap: anywhere;
+}
+
+.meshterm main.chat-screen > .node-menu button {
+	width: 100%;
+	min-width: 0;
+	min-height: 44px;
+	justify-content: flex-start;
+	box-shadow: none;
+	background: transparent;
+	transform: none;
+	letter-spacing: 0.04em;
+}
+
+.meshterm main.chat-screen > .node-menu button:hover,
+.meshterm main.chat-screen > .node-menu button:active {
+	background: color-mix(in srgb, var(--fg) 15%, transparent);
+	color: inherit;
+	border-color: transparent;
+	box-shadow: none;
+	transform: none;
 }
