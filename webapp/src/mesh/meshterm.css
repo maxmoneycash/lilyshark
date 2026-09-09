@@ -1907,6 +1907,11 @@ body:has(.meshterm .app.menu-open) {
 	font-size: 11px;
 	min-width: 0;
 }
+@media (max-width: 860px) {
+	.meshterm .nodes-filter {
+		font-size: 16px;
+	}
+}
 .meshterm .nodes-empty {
 	margin: 14px;
 	max-width: none;
@@ -2703,6 +2708,15 @@ body:has(.meshterm .app.menu-open) {
 	scroll-snap-align: start;
 	scroll-snap-stop: always;
 	pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.meshterm .intro-scroll {
+		scroll-snap-type: none;
+	}
+	.meshterm .intro-snap {
+		scroll-snap-align: none;
+		scroll-snap-stop: normal;
+	}
 }
 
 /* ── Resolution trace ─────────────────────────────────────────────────────
