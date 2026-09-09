@@ -166,6 +166,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const [live, setLive] = useState(() => demoActive && isDemo());
   const liveSeq = useRef(1000);
   const fileRef = useRef<HTMLInputElement>(null);
+  const screenRef = useRef<HTMLElement>(null);
+  const inspectorRef = useRef<HTMLDivElement>(null);
   const demoActiveRef = useRef(demoActive);
   demoActiveRef.current = demoActive;
   const simulatedLive = live && demoActive;
@@ -173,6 +175,36 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const setSelected = useCallback((index: number) => {
     dispatchSlots({ type: 'patch', view: { selected: index } });
   }, []);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  // Phone row taps have to bring the stacked inspector (and DIFF) into the
+  // document; without this, selection only pans more of the capture table.
+  const pendingReveal = useRef(false);
+  const revealDetail = useCallback(() => {
+    if (!window.matchMedia('(max-width: 860px)').matches) return;
+    const target =
+      inspectorRef.current ??
+      screenRef.current?.querySelector<HTMLElement>('.traffic-diff');
+    target?.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }, []);
+  const onSelectFrame = useCallback(
+    (index: number) => {
+      if (index === selectedRef.current) {
+        if (pendingReveal.current) {
+          pendingReveal.current = false;
+          revealDetail();
+        }
+        return;
+      }
+      setSelected(index);
+    },
+    [revealDetail, setSelected],
+  );
+  useEffect(() => {
+    if (!pendingReveal.current) return;
+    pendingReveal.current = false;
+    revealDetail();
+  }, [selected, revealDetail]);
   const setFilterText = useCallback((text: string) => {
     dispatchSlots({ type: 'patch', view: { filterText: text } });
   }, []);
@@ -734,8 +766,20 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
       : (slots.slots.find((s) => s.id === diffBId) ?? null);
 
   return (
-    <main className="traffic-screen">
-      <div className="panel traffic-list" style={{ flex: 1 }}>
+    <main className="traffic-screen" ref={screenRef}>
+      <div
+        className="panel traffic-list"
+        style={{ flex: 1 }}
+        onClickCapture={(e) => {
+          const hit = e.target;
+          if (
+            hit instanceof Element &&
+            hit.closest('.traffic-frames tbody tr[tabindex]')
+          ) {
+            pendingReveal.current = true;
+          }
+        }}
+      >
         <div className="panel-title traffic-toolbar">
           <span className="panel-title-label">PANEL // TRAFFIC{name ? ` · ${name}` : ''}</span>
           <span className="spacer" />
@@ -1097,7 +1141,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               pointers={pointers}
               t0Us={t0}
               selected={selected}
-              onSelect={setSelected}
+              onSelect={onSelectFrame}
               /* Only the capture the demo stream is actually feeding gets
                  pulled to its newest row. */
               follow={simulatedLive && slot !== null && slot.id === demoSlotId}
@@ -1139,7 +1183,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
       </div>
 
       {f && (
-        <div className="panel traffic-detail">
+        <div className="panel traffic-detail" ref={inspectorRef}>
           <div className="panel-title">
             FRAME {Number(f.sequence)}
             <span className="spacer" />

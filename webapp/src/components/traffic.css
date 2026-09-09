@@ -100,6 +100,10 @@
 	width: 420px;
 }
 
+.meshterm .traffic-screen .traffic-frames {
+	overflow: auto;
+	overscroll-behavior: contain;
+}
 .meshterm .traffic-frames[data-empty='true'] {
 	flex: 0 0 auto;
 }
@@ -118,10 +122,14 @@
 	.meshterm .traffic-toolbar .panel-title-label {
 		flex: 1 1 100%;
 	}
+	.meshterm .traffic-screen .traffic-frames {
+		max-height: min(46dvh, 420px) !important;
+	}
 	.meshterm .traffic-detail,
 	.meshterm .traffic-diff {
 		width: 100%;
 		flex-basis: auto;
+		scroll-margin-top: calc(54px + env(safe-area-inset-top, 0px));
 	}
 	.meshterm .traffic-slot {
 		flex: 1 1 100%;
