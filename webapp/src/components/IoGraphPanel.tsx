@@ -361,7 +361,7 @@ export function IoGraphPanel({
         ref={boxRef}
         className="traffic-io-plot"
         aria-label="Capture IO graph, frames over time"
-        style={{ width: '100%', height: PLOT_HEIGHT, padding: '4px 0 0' }}
+        style={{ width: '100%', height: PLOT_HEIGHT }}
       />
 
       {graph.frames > 0 && (

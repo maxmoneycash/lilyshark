@@ -147,8 +147,8 @@ export function TrafficFrameTable({
       role="region"
       aria-label="Captured frames"
     >
-      <div className="scroll-x">
-        <table className="grid">
+      <div className="scroll-x traffic-scroll">
+        <table className="grid traffic-table">
           <thead ref={rows.headRef}>
             <tr>
               <th>#</th>

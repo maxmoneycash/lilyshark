@@ -189,6 +189,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   }, []);
   const onSelectFrame = useCallback(
     (index: number) => {
+      // Keyboard activation never hits the click-capture below, so mark a
+      // phone reveal here for every operator pick.
+      if (window.matchMedia('(max-width: 860px)').matches) {
+        pendingReveal.current = true;
+      }
       if (index === selectedRef.current) {
         if (pendingReveal.current) {
           pendingReveal.current = false;
@@ -1134,35 +1139,53 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               </div>
             )}
 
-            {/* The table mounts a screenful of rows, not the capture. */}
-            <TrafficFrameTable
-              frames={frames}
-              shown={shown}
-              pointers={pointers}
-              t0Us={t0}
-              selected={selected}
-              onSelect={onSelectFrame}
-              /* Only the capture the demo stream is actually feeding gets
-                 pulled to its newest row. */
-              follow={simulatedLive && slot !== null && slot.id === demoSlotId}
-            />
-
-            {filtered.length === 0 && filter.ok && !filter.empty && (
-              <div className="panel-foot dim" style={{ display: 'block' }}>
-                No frame in this capture matches the filter. The expression is
-                valid — these {frames.length} frames simply do not satisfy it.
+            {/* The table mounts a screenful of rows, not the capture. An empty
+                match is a heading in this hole — a header-only table with a
+                dim footnote used to leave half the pane blank. */}
+            {shown.length === 0 ? (
+              <div className="traffic-empty traffic-frames-empty" role="status">
+                {filtered.length === 0 && filter.ok && !filter.empty ? (
+                  <>
+                    <h2>No frame matches this filter.</h2>
+                    <p>
+                      The expression is valid — these {frames.length.toLocaleString()}{' '}
+                      frames simply do not satisfy it.
+                      {f
+                        ? ` Frame ${Number(f.sequence)} is still open in the inspector.`
+                        : ''}
+                    </p>
+                    <button type="button" onClick={() => setFilterText('')}>
+                      {following ? 'SHOW ALL FRAMES' : 'CLEAR'}
+                    </button>
+                  </>
+                ) : brush ? (
+                  <>
+                    <h2>Nothing was heard in {brushLabel(brush)}.</h2>
+                    <p>
+                      That silence is the reading — {filtered.length.toLocaleString()}{' '}
+                      frame(s) match the filter outside this range.
+                    </p>
+                    <button type="button" onClick={() => setBrush(null)}>WHOLE CAPTURE</button>
+                  </>
+                ) : (
+                  <>
+                    <h2>No frames in this capture.</h2>
+                    <p>Nothing has been recorded into this tab yet.</p>
+                  </>
+                )}
               </div>
-            )}
-
-            {/* Which of the two narrowed the table to nothing, said plainly:
-                an empty table with two controls above it explains nothing. */}
-            {shown.length === 0 && filtered.length > 0 && brush && (
-              <div className="panel-foot dim" style={{ display: 'block' }}>
-                Nothing was heard in {brushLabel(brush)}. That silence is the
-                reading — {filtered.length} frame(s) match the filter outside this
-                range.{' '}
-                <button onClick={() => setBrush(null)}>WHOLE CAPTURE</button>
-              </div>
+            ) : (
+              <TrafficFrameTable
+                frames={frames}
+                shown={shown}
+                pointers={pointers}
+                t0Us={t0}
+                selected={selected}
+                onSelect={onSelectFrame}
+                /* Only the capture the demo stream is actually feeding gets
+                   pulled to its newest row. */
+                follow={simulatedLive && slot !== null && slot.id === demoSlotId}
+              />
             )}
 
             <div className="panel-foot">
@@ -1338,7 +1361,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
           candidates={diffCandidates}
           bId={diffB?.id ?? ''}
           onPickB={setDiffBId}
-          onSelectA={setSelected}
+          onSelectA={onSelectFrame}
           onClose={() => setDiffOpen(false)}
         />
       )}
