@@ -59,7 +59,6 @@ export default function CommunityCoverageMap({ children, focusNode }: { children
       setCache(result.cache); setError(result.error ?? ''); setNow(Date.now());
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(result.cache)); }
       catch { setError('This browser could not save the coverage snapshot.'); }
-      if (result.cache.report) setMode('coverage');
     } finally {
       busy.current = false;
       if (generation === requestGeneration.current) setFetching(false);
