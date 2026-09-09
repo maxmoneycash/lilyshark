@@ -472,9 +472,9 @@ function Detail(props: {
 		],
 	];
 	return (
-		<section ref={panelRef} className="panel hot nodes-detail" id="nodes-detail" aria-labelledby="nodes-detail-name" style={{ width: 300, flexShrink: 0 }}>
+		<section ref={panelRef} className="panel hot nodes-detail" id="nodes-detail" aria-labelledby="nodes-detail-name">
 			<div className="panel-title">
-				<span>
+				<span className="nodes-detail-kicker">
 					{t("DETAIL // NODE")} {n.shortName}
 				</span>
 				<button
@@ -622,7 +622,7 @@ function Detail(props: {
 					)}
 				</div>
 			)}
-			<div className="nodes-detail-spacer" style={{ flex: 1 }} />
+			<div className="nodes-detail-spacer" />
 			{getDeviceLinkState().status === "linked" && !n.publicKey && (
 				<div
 					style={{
@@ -817,6 +817,10 @@ export default function Nodes({
 	const nodes = sortNodes(matching, sort.key, sort.dir, me);
 	const selectedNode =
 		selected !== undefined ? s.nodes.get(selected) : undefined;
+	const visibleSelected =
+		selectedNode && matching.some((n) => n.num === selectedNode.num)
+			? selectedNode
+			: undefined;
 	const short = (num: number) =>
 		s.nodes.get(num)?.shortName ?? `!${num.toString(16)}`;
 	const closeDetail = useCallback(() => {
@@ -872,15 +876,20 @@ export default function Nodes({
 						{isDemo() ? " · DEMO" : ""}
 					</span>
 					<input
+						type="search"
 						value={filter}
 						onChange={(e) => setFilter(e.target.value)}
 						placeholder={t("filter name / id_")}
 						className="nodes-filter"
 						aria-label={t("Filter nodes by name or id")}
+						autoComplete="off"
+						autoCorrect="off"
+						spellCheck={false}
+						enterKeyHint="search"
 					/>
 				</div>
 				<div className="scroll-y">
-					{isDemo() && (
+					{isDemo() && nodes.length > 0 && (
 						<p className="demo-mesh-banner">
 							Sample nodes around Palo Alto. Connect a radio to see your mesh.
 						</p>
@@ -1008,19 +1017,28 @@ export default function Nodes({
 					</table>
 					)}
 					{nodes.length === 0 && (
-						<div className="chat-empty nodes-empty">
-							<div className="chat-empty-title">
+						<div className="nodes-empty" role="status">
+							<h2>
 								{q
 									? t("NO MATCHES FOR \"{0}\"", filter)
 									: t("NO NODES HEARD")}
-							</div>
-							<div className="dim">
+							</h2>
+							<p>
 								{q
 									? t("Clear the filter or try another name.")
 									: link.status === "linked"
 										? t("This T-Deck is listening. Names appear after a nearby radio transmits.")
 										: t("Connect the T-Deck or wait for a frame with a stable source.")}
-							</div>
+							</p>
+							{q !== "" && (
+								<button
+									type="button"
+									className="nodes-empty-clear"
+									onClick={() => setFilter("")}
+								>
+									{t("CLEAR FILTER")}
+								</button>
+							)}
 						</div>
 					)}
 				</div>
@@ -1035,13 +1053,13 @@ export default function Nodes({
 				</div>
 			</div>
 
-			{selectedNode && (
+			{visibleSelected && (
 				<Detail
-					node={selectedNode}
-					isMe={selectedNode.num === s.myNodeNum && !isDemo()}
+					node={visibleSelected}
+					isMe={visibleSelected.num === s.myNodeNum && !isDemo()}
 					me={me}
-					trace={s.traceroutes.get(selectedNode.num)}
-					posTs={s.posUpdates.get(selectedNode.num)}
+					trace={s.traceroutes.get(visibleSelected.num)}
+					posTs={s.posUpdates.get(visibleSelected.num)}
 					short={short}
 					onOpenDm={onOpenDm}
 					onClose={closeDetail}
