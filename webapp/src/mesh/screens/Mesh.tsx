@@ -162,7 +162,9 @@ export default function Mesh() {
 	const [act, setAct] = useState<
 		{ node: number; hourBucket: number; n: number }[]
 	>([]);
-	const [actHours, setActHours] = useState(48);
+	const [actHours, setActHours] = useState(() =>
+		window.matchMedia("(max-width: 860px)").matches ? 24 : 48,
+	);
 	const [graphSize, setGraphSize] = useState({ w: W, h: H });
 
 	useEffect(() => {
@@ -416,20 +418,17 @@ export default function Mesh() {
 							</p>
 						</div>
 					) : (
-						<div style={{ flex: 1, overflow: "auto", padding: 12 }}>
-							<table style={{ borderCollapse: "collapse", fontSize: 11 }}>
+						<div
+							className="mesh-activity"
+							tabIndex={0}
+							role="region"
+							aria-label={t("Activity by node and hour")}
+						>
+							<table className="mesh-activity-table">
 								<tbody>
 									{grid.rows.map((f) => (
 										<tr key={f.node}>
-											<td
-												style={{
-													paddingRight: 10,
-													whiteSpace: "nowrap",
-													position: "sticky",
-													left: 0,
-													background: "var(--panel)",
-												}}
-											>
+											<td className="mesh-activity-node">
 												{short(f.node)}
 												{f.node === s.myNodeNum && ` (${t("ME")})`}
 											</td>
@@ -441,22 +440,16 @@ export default function Mesh() {
 												return (
 													<td
 														key={h}
+														className="mesh-activity-cell"
 														title={`${short(f.node)} · ${dateTime(d.getTime())} · ${t("{0} packets", n)}`}
 														style={{
-															width: 9,
-															height: 14,
-															padding: 0,
-															border: "1px solid var(--border)",
 															background: n === 0 ? "transparent" : fg(),
 															opacity: n === 0 ? 0.25 : op,
 														}}
 													/>
 												);
 											})}
-											<td
-												className="dim"
-												style={{ paddingLeft: 10, whiteSpace: "nowrap" }}
-											>
+											<td className="dim mesh-activity-total">
 												{f.total}
 											</td>
 										</tr>

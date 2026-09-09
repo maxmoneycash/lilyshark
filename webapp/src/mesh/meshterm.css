@@ -2015,6 +2015,39 @@ body:has(.meshterm .app.menu-open) {
 	line-height: 1.6;
 	color: var(--ink, var(--fg));
 }
+.meshterm main.mesh-screen .mesh-activity {
+	flex: 1;
+	min-width: 0;
+	max-width: 100%;
+	overflow: auto;
+	overscroll-behavior: contain;
+	padding: 12px;
+	-webkit-overflow-scrolling: touch;
+}
+.meshterm main.mesh-screen .mesh-activity-table {
+	border-collapse: collapse;
+	font-size: 11px;
+	width: max-content;
+}
+.meshterm main.mesh-screen .mesh-activity-node {
+	padding-right: 10px;
+	white-space: nowrap;
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: var(--panel);
+}
+.meshterm main.mesh-screen .mesh-activity-cell {
+	width: 9px;
+	min-width: 9px;
+	height: 14px;
+	padding: 0;
+	border: 1px solid var(--border);
+}
+.meshterm main.mesh-screen .mesh-activity-total {
+	padding-left: 10px;
+	white-space: nowrap;
+}
 @media (max-width: 860px) {
 	.meshterm main.mesh-screen .mesh-graph-layout.scroll-y {
 		overflow: hidden;
