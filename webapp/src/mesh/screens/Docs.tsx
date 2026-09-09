@@ -91,10 +91,16 @@ export default function Docs() {
 	const [error, setError] = useState<{ id?: string; message: string } | null>(
 		null,
 	);
+	const [listAttempt, setListAttempt] = useState(0);
+	const [docAttempt, setDocAttempt] = useState(0);
 	const current = docs.find((doc) => doc.id === location.id) ?? docs[0] ?? null;
 	const text = content?.id === current?.id ? content?.text : null;
 	const message =
 		error && (!error.id || error.id === current?.id) ? error.message : null;
+	const retry = () => {
+		if (docs.length) setDocAttempt((attempt) => attempt + 1);
+		else setListAttempt((attempt) => attempt + 1);
+	};
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const navRef = useRef<HTMLElement>(null);
 	const docsRef = useRef(docs);
@@ -131,6 +137,7 @@ export default function Docs() {
 
 	useEffect(() => {
 		const request = new AbortController();
+		setError(null);
 		fetch("/docs/manifest.json", { signal: request.signal })
 			.then((response) => {
 				if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -148,7 +155,7 @@ export default function Docs() {
 					});
 			});
 		return () => request.abort();
-	}, []);
+	}, [listAttempt]);
 
 	useEffect(() => {
 		if (!docs.length || !isDocsHash(window.location.hash)) return;
@@ -189,7 +196,7 @@ export default function Docs() {
 					});
 			});
 		return () => request.abort();
-	}, [current]);
+	}, [current, docAttempt]);
 
 	useLayoutEffect(() => {
 		const viewport = scrollRef.current;
@@ -273,31 +280,46 @@ export default function Docs() {
 						>
 							Back
 						</button>
+					) : !docs.length && message ? (
+						<span role="status">Documents unavailable</span>
 					) : (
 						<label htmlFor="docs-mobile-select">Document</label>
 					)}
-					<select
-						id="docs-mobile-select"
-						value={current?.id ?? ""}
-						disabled={!docs.length}
-						onChange={(event) => {
-							const doc = docs.find((entry) => entry.id === event.target.value);
-							if (doc) open(doc);
-						}}
-					>
-						{!docs.length && (
-							<option value="">
-								{message ? "Documents unavailable" : "Loading documents…"}
-							</option>
-						)}
-						{docs.map((doc) => (
-							<option key={doc.id} value={doc.id}>
-								{doc.title}
-							</option>
-						))}
-					</select>
+					{!docs.length && message ? (
+						<button type="button" className="docs-retry" onClick={retry}>
+							Retry
+						</button>
+					) : (
+						<select
+							id="docs-mobile-select"
+							value={current?.id ?? ""}
+							disabled={!docs.length}
+							onChange={(event) => {
+								const doc = docs.find(
+									(entry) => entry.id === event.target.value,
+								);
+								if (doc) open(doc);
+							}}
+						>
+							{!docs.length && (
+								<option value="">Loading documents…</option>
+							)}
+							{docs.map((doc) => (
+								<option key={doc.id} value={doc.id}>
+									{doc.title}
+								</option>
+							))}
+						</select>
+					)}
 				</div>
 				<nav className="docs-nav" ref={navRef} aria-label="Documents">
+					{!docs.length && (
+						<p className="dim docs-nav-empty" role="status">
+							{message
+								? "Documents unavailable"
+								: "Loading documents…"}
+						</p>
+					)}
 					{docs.map((doc) => (
 						<a
 							key={doc.id}
@@ -338,13 +360,24 @@ export default function Docs() {
 				>
 					<div className="docs-body">
 						{message && (
-							<p className="err" role="alert">
-								{message}
-							</p>
+							<div className="docs-error">
+								<p className="err" role="alert">
+									{message}
+								</p>
+								<button
+									type="button"
+									className="docs-retry"
+									onClick={retry}
+								>
+									Retry
+								</button>
+							</div>
 						)}
 						{!message && text == null && (
 							<p className="dim" role="status">
-								Loading document…
+								{docs.length
+									? "Loading document…"
+									: "Loading documents…"}
 							</p>
 						)}
 						{text != null && current && (

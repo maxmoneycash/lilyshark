@@ -52,6 +52,19 @@
 	text-transform: uppercase;
 	cursor: pointer;
 }
+.meshterm .docs-grid .docs-error {
+	display: grid;
+	justify-items: start;
+	gap: 12px;
+}
+.meshterm .docs-grid .docs-nav-empty {
+	margin: 0;
+	padding: 8px 10px;
+}
+.meshterm .docs-grid .docs-retry {
+	width: max-content;
+	max-width: 100%;
+}
 .meshterm .docs-grid .docs-nav a:hover,
 .meshterm .docs-grid .docs-nav a:active {
 	background: color-mix(in srgb, var(--fg) 10%, transparent);
@@ -147,7 +160,11 @@
 		font-size: 12px;
 		color: var(--fg-dim);
 	}
-	.meshterm .docs-grid .docs-mobile-picker select {
+	.meshterm .docs-grid .docs-mobile-picker > span {
+		overflow-wrap: anywhere;
+	}
+	.meshterm .docs-grid .docs-mobile-picker select,
+	.meshterm .docs-grid .docs-mobile-picker .docs-retry {
 		width: 100%;
 		min-width: 0;
 		min-height: 44px;
