@@ -846,7 +846,7 @@ function App() {
             )}
             {hasSerial && (<button
               type="button"
-              className="primary"
+              className={connected || lilyLinked ? undefined : "primary"}
               title="For a T-Deck running Lilyshark firmware: live device telemetry on TELEMETRY, your node on NODES, and Shelby pointer hand-off on TRAFFIC"
               onClick={() => {
                 if (!hasSerial) {
