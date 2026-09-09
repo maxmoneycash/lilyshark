@@ -295,8 +295,9 @@ function ingestContact(c: MeshCoreContact): number {
     shortName: c.advName ? shortNameOf(c.advName, num) : undefined,
     lastAdvert: c.lastAdvert || undefined,
     lastHeard: c.lastAdvert || undefined,
-    lat: c.advLat ? c.advLat / 1e6 : undefined,
-    lon: c.advLon ? c.advLon / 1e6 : undefined,
+    // MeshCore's unset position is the pair (0, 0); either axis alone may be 0.
+    lat: c.advLat !== 0 || c.advLon !== 0 ? c.advLat / 1e6 : undefined,
+    lon: c.advLat !== 0 || c.advLon !== 0 ? c.advLon / 1e6 : undefined,
     hopsAway: c.outPathLen >= 0 ? c.outPathLen : undefined,
     outPath,
   });
@@ -539,7 +540,7 @@ function wireEvents(c: Connection): void {
   c.on<{ lastSnr: number; lastRssi: number; raw: Uint8Array }>(
     Constants.PushCodes.LogRxData,
     (p) => {
-      addLog("RX {0} bytes · SNR {1} dB · RSSI {2} dBm", p.raw.length, p.lastSnr, p.lastRssi);
+      addLog("RX {0} bytes · SNR {1} DB · RSSI {2} DBM", p.raw.length, p.lastSnr, p.lastRssi);
     },
   );
 
@@ -830,8 +831,8 @@ async function configure(c: Connection): Promise<void> {
     longName: info.name,
     shortName: shortNameOf(info.name, myNum),
     lastHeard: Math.floor(Date.now() / 1000),
-    lat: info.advLat ? info.advLat / 1e6 : undefined,
-    lon: info.advLon ? info.advLon / 1e6 : undefined,
+    lat: info.advLat !== 0 || info.advLon !== 0 ? info.advLat / 1e6 : undefined,
+    lon: info.advLat !== 0 || info.advLon !== 0 ? info.advLon / 1e6 : undefined,
     hopsAway: 0,
   });
   addLog("Radio: {0}", info.name);
@@ -1064,7 +1065,7 @@ export async function applyTxPower(dbm: number): Promise<void> {
   mutate((s) => {
     if (s.selfInfo) s.selfInfo = { ...s.selfInfo, txPower: dbm };
   });
-  addLog("TX power: {0} dBm", dbm);
+  addLog("TX power: {0} DBM", dbm);
 }
 
 export async function sendAdvert(flood: boolean): Promise<void> {

@@ -2,14 +2,25 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { listMetrics, listTelemetryNodes, loadTelemetry } from "../db";
-import { demoTelemetry, demoTelemetryMetrics, demoTelemetryNodes } from "../demo";
+import {
+	demoTelemetry,
+	demoTelemetryMetrics,
+	demoTelemetryNodes,
+} from "../demo";
 import { saveText, stamp } from "../export";
 import { t, useLangTick } from "../i18n";
 import { useDeviceLink, type DeviceTelemetry } from "../../lib/deviceLink";
 import { getSnapshot, subscribe } from "../store";
 import { ThisDevicePanel } from "../ThisDevice";
 import { accent, fg, isLight, useThemeTick } from "../theme";
-import { telemetryBattery, telemetryCount, telemetrySignal, telemetryVoltage, unattributedFrames } from "../deviceTelemetry";
+import {
+	telemetryBattery,
+	telemetryCount,
+	telemetrySignal,
+	telemetryVoltage,
+	unattributedFrames,
+} from "../deviceTelemetry";
+import "./radio-analysis.css";
 
 type DeckMetric = {
 	id: string;
@@ -50,9 +61,21 @@ const DECK_METRICS: DeckMetric[] = [
 		label: "ANALYZER UNATTRIBUTED",
 		pick: unattributedFrames,
 	},
-	{ id: "dropCrc", label: "ANALYZER CRC REJECTED", pick: (s) => telemetryCount(s.dropCrc) },
-	{ id: "dropMalformed", label: "ANALYZER MALFORMED", pick: (s) => telemetryCount(s.dropMalformed) },
-	{ id: "dropNoSource", label: "ANALYZER NO SOURCE", pick: (s) => telemetryCount(s.dropNoSource) },
+	{
+		id: "dropCrc",
+		label: "ANALYZER CRC REJECTED",
+		pick: (s) => telemetryCount(s.dropCrc),
+	},
+	{
+		id: "dropMalformed",
+		label: "ANALYZER MALFORMED",
+		pick: (s) => telemetryCount(s.dropMalformed),
+	},
+	{
+		id: "dropNoSource",
+		label: "ANALYZER NO SOURCE",
+		pick: (s) => telemetryCount(s.dropNoSource),
+	},
 	{
 		id: "rssi",
 		label: "LAST PACKET RSSI (dBm)",
@@ -129,7 +152,12 @@ function DeckTrend() {
 			plotRef.current?.destroy();
 			plotRef.current = null;
 		};
-	}, [rows.length, metric.id, themeTick, link.history[link.history.length - 1]?.atMs]);
+	}, [
+		rows.length,
+		metric.id,
+		themeTick,
+		link.history[link.history.length - 1]?.atMs,
+	]);
 
 	useEffect(() => {
 		const box = plotDiv.current;
@@ -166,7 +194,11 @@ function DeckTrend() {
 				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
 					T-DECK // LIVE
 				</span>
-				<select aria-label="Deck telemetry metric" value={metric.id} onChange={(e) => setMetricId(e.target.value)}>
+				<select
+					aria-label="Deck telemetry metric"
+					value={metric.id}
+					onChange={(e) => setMetricId(e.target.value)}
+				>
 					{DECK_METRICS.map((m) => (
 						<option key={m.id} value={m.id}>
 							{m.label}
@@ -178,43 +210,23 @@ function DeckTrend() {
 					{rows.length} SAMPLES · EVERY 2s
 				</span>
 			</div>
-			<div
-				style={{
-					flex: 1,
-					display: "flex",
-					gap: 12,
-					minHeight: 0,
-					flexWrap: "wrap",
-				}}
-			>
+			<div className="telemetry-panels">
 				<div className="panel" style={{ flex: "999 1 320px", minWidth: 0 }}>
-					<div className="panel-title">
-						CHART // T-DECK · {metric.label}
-					</div>
-					<div className="scroll-y" style={{ padding: 14, position: "relative" }}>
+					<div className="panel-title">CHART // T-DECK · {metric.label}</div>
+					<div className="telemetry-chart-body">
 						{rows.length === 0 && (
-							<p className="dim" style={{ position: "absolute" }}>
-								{link.history.length === 0 ? "Waiting for telemetry from the linked deck."
+							<p className="dim telemetry-empty">
+								{link.history.length === 0
+									? "Waiting for telemetry from the linked deck."
 									: metric.id === "rssi" || metric.id === "snr"
 										? "No received frame with a reported signal measurement is available."
 										: "This measurement has not been reported by the deck."}
 							</p>
 						)}
-						<div
-							ref={plotDiv}
-							className="telemetry-plot"
-						/>
+						<div ref={plotDiv} className="telemetry-plot" />
 					</div>
 				</div>
-				<div
-					style={{
-						flex: "1 1 200px",
-						minWidth: 200,
-						display: "flex",
-						flexDirection: "column",
-						gap: 12,
-					}}
-				>
+				<div className="telemetry-stats">
 					{(
 						[
 							["MIN", rows.length ? min : undefined],
@@ -224,24 +236,17 @@ function DeckTrend() {
 					).map(([label, v]) => (
 						<div key={label} className="panel stat-tile">
 							<div className="label">{label}</div>
-							<div className="value">{v !== undefined ? fmt(v) : "Not reported"}</div>
+							<div
+								className="value"
+								title={v === undefined ? "Not reported" : undefined}
+							>
+								{v !== undefined ? fmt(v) : "—"}
+							</div>
 						</div>
 					))}
-					<div
-						style={{
-							flex: 1,
-							border: "1px dashed var(--border)",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							padding: 12,
-							textAlign: "center",
-						}}
-					>
-						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
-							USB samples from this deck. Node trends appear when nodes report telemetry.
-						</span>
-					</div>
+					<p className="dim telemetry-stats-note">
+						Live measurements from the connected T-Deck.
+					</p>
 				</div>
 			</div>
 		</>
@@ -565,7 +570,7 @@ export default function Telemetry() {
 
 	if (link.status === "linked") {
 		return (
-			<main style={{ flexDirection: "column" }}>
+			<main className="telemetry-screen" style={{ flexDirection: "column" }}>
 				<ThisDevicePanel />
 				<DeckTrend />
 			</main>
@@ -573,7 +578,7 @@ export default function Telemetry() {
 	}
 
 	return (
-		<main style={{ flexDirection: "column" }}>
+		<main className="telemetry-screen" style={{ flexDirection: "column" }}>
 			<ThisDevicePanel />
 			<div
 				className="telemetry-controls"
@@ -589,6 +594,7 @@ export default function Telemetry() {
 					{t("TELEMETRY //")}
 				</span>
 				<select
+					aria-label={t("Telemetry node")}
 					value={effectiveNode ?? ""}
 					onChange={(e) => setNode(Number(e.target.value))}
 				>
@@ -601,10 +607,13 @@ export default function Telemetry() {
 						</option>
 					))}
 				</select>
-				<select value={metric} onChange={(e) => setMetric(e.target.value)}>
-					{metrics.length === 0 && (
-						<option value="">{t("NO METRICS")}</option>
-					)}
+				<select
+					className="telemetry-metric-select"
+					aria-label={t("Telemetry metric")}
+					value={metric}
+					onChange={(e) => setMetric(e.target.value)}
+				>
+					{metrics.length === 0 && <option value="">{t("NO METRICS")}</option>}
 					{metrics.map((m) => (
 						<option key={m} value={m}>
 							{LABELS[m] ?? m.toUpperCase()}
@@ -613,7 +622,9 @@ export default function Telemetry() {
 				</select>
 
 				<select
+					className="telemetry-compare-select"
 					value=""
+					aria-label={t("Compare another node")}
 					title={t("Add another node to the same chart")}
 					disabled={compare.length >= SERIES_MAX}
 					onChange={(e) => {
@@ -637,18 +648,26 @@ export default function Telemetry() {
 				{compare.map((n, i) => (
 					<button
 						key={n}
-						style={{ borderColor: seriesColors()[i % SERIES_MAX], color: seriesColors()[i % SERIES_MAX] }}
+						style={{
+							borderColor: seriesColors()[i % SERIES_MAX],
+							color: seriesColors()[i % SERIES_MAX],
+						}}
 						title={t("Remove from the comparison")}
 						onClick={() => setCompare((c) => c.filter((x) => x !== n))}
 					>
 						{shortName(n)} · REMOVE
 					</button>
 				))}
-				<div style={{ display: "flex", gap: 4 }}>
+				<div
+					className="telemetry-ranges"
+					role="group"
+					aria-label={t("Time range")}
+				>
 					{RANGES.map(([label, d]) => (
 						<button
 							key={label}
 							className={days === d ? "tab active" : "tab"}
+							aria-pressed={days === d}
 							onClick={() => setDays(d)}
 						>
 							{label}
@@ -657,7 +676,6 @@ export default function Telemetry() {
 				</div>
 				<span className="spacer" />
 				<button
-
 					title={t("Export what the chart shows to CSV")}
 					disabled={!stats || exporting}
 					onClick={onExportCsv}
@@ -674,15 +692,7 @@ export default function Telemetry() {
 
 			{/* wraps on a phone: a 200 px stats column beside the chart leaves the
 			    chart a sliver, and neither is readable */}
-			<div
-				style={{
-					flex: 1,
-					display: "flex",
-					gap: 12,
-					minHeight: 0,
-					flexWrap: "wrap",
-				}}
-			>
+			<div className="telemetry-panels">
 				{/* the chart absorbs all the free width, so the stats column stays at
 				    its 200 px basis on desktop and only widens once it has wrapped */}
 				<div className="panel" style={{ flex: "999 1 320px", minWidth: 0 }}>
@@ -691,16 +701,11 @@ export default function Telemetry() {
 						{compare.length > 0 && ` + ${compare.map(shortName).join(" + ")}`} ·{" "}
 						{LABELS[metric] ?? (metric || "—")}
 					</div>
-					<div
-						className="scroll-y"
-						style={{
-							padding: 14,
-							position: "relative",
-						}}
-					>
+					<div className="telemetry-chart-body">
 						{!stats && (
-							<p className="dim" style={{ position: "absolute" }}>
-								{t("NO DATA — telemetry accumulates while the app is connected_",
+							<p className="dim telemetry-empty">
+								{t(
+									"No measurements in this range. Telemetry is saved as the connected radio reports it.",
 								)}
 							</p>
 						)}
@@ -709,15 +714,7 @@ export default function Telemetry() {
 					</div>
 				</div>
 
-				<div
-					style={{
-						flex: "1 1 200px",
-						minWidth: 200,
-						display: "flex",
-						flexDirection: "column",
-						gap: 12,
-					}}
-				>
+				<div className="telemetry-stats">
 					{compare.length > 0 && (
 						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
 							{t("{0} ONLY", nodeLabel)}
@@ -732,24 +729,17 @@ export default function Telemetry() {
 					).map(([label, v]) => (
 						<div key={label} className="panel stat-tile">
 							<div className="label">{label}</div>
-							<div className="value">{v !== undefined ? fmt(v) : "Not reported"}</div>
+							<div
+								className="value"
+								title={v === undefined ? "Not reported" : undefined}
+							>
+								{v !== undefined ? fmt(v) : "—"}
+							</div>
 						</div>
 					))}
-					<div
-						style={{
-							flex: 1,
-							border: "1px dashed var(--border)",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							padding: 12,
-							textAlign: "center",
-						}}
-					>
-						<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
-							{t("Telemetry is saved as the connected radio reports it.")}
-						</span>
-					</div>
+					<p className="dim telemetry-stats-note">
+						{t("Telemetry is saved as the connected radio reports it.")}
+					</p>
 				</div>
 			</div>
 		</main>

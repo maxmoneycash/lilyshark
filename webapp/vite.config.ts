@@ -1,5 +1,8 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { sharedCoverage } from './server/sharedCoverage'
+import { communityDirectory } from './server/communityDirectory'
+import { forwardCoverageRequest } from './server/meshmapperCoverage'
 import { createHash } from 'node:crypto'
 import { readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -99,8 +102,44 @@ self.addEventListener('fetch', (event) => {
   }
 }
 
+function coverageAPI(): Plugin {
+  return {
+    name: 'meshmapper-coverage-api',
+    configureServer(server) {
+      server.middlewares.use('/api/community-coverage', async (req, res) => {
+        if (req.method !== 'GET') { res.statusCode = 405; res.end(); return }
+        const result = await sharedCoverage()
+        res.statusCode = result.status
+        for (const [name, value] of Object.entries(result.headers)) res.setHeader(name, value)
+        res.end(result.body)
+      })
+      server.middlewares.use('/api/mesh-directory', async (req, res) => {
+        if (req.method !== 'GET') { res.statusCode = 405; res.end(); return }
+        res.setHeader('Content-Type', 'application/json')
+        try { res.end(JSON.stringify(await communityDirectory())) }
+        catch { res.statusCode = 502; res.end(JSON.stringify({ error: 'The node directory could not be loaded.' })) }
+      })
+      server.middlewares.use('/api/meshmapper-coverage', async (req, res) => {
+        res.setHeader('Cache-Control', 'private, no-store')
+        if (req.method !== 'POST') { res.statusCode = 405; res.end(); return }
+        let body = ''
+        for await (const chunk of req) {
+          body += chunk
+          if (body.length > 4096) { res.statusCode = 413; res.end(); return }
+        }
+        try {
+          const result = await forwardCoverageRequest(JSON.parse(body))
+          res.statusCode = result.status
+          for (const [name, value] of Object.entries(result.headers)) res.setHeader(name, value)
+          res.end(result.body)
+        } catch { res.statusCode = 400; res.end('{}') }
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), offlineWorker()],
+  plugins: [react(), coverageAPI(), offlineWorker()],
   build: {
     rollupOptions: {
       // Multi-page: the analyzer at / and the browser flasher at /flash/.

@@ -110,7 +110,7 @@ export function ThisDevicePanel() {
 						<div className="stat-tile">
 							<div className="label">LATEST FRAME RSSI</div>
 							<div className="value">
-								{rssi === undefined ? "Not reported" : `${rssi.toFixed(1)} dBm`}
+								{rssi === undefined ? "Not reported" : `${rssi.toFixed(1)} DBM`}
 								{telem.direction === 2 && <small>Transmitted frame · no receive signal</small>}
 								<Spark values={rssiSeries} />
 							</div>
@@ -118,7 +118,7 @@ export function ThisDevicePanel() {
 						<div className="stat-tile">
 							<div className="label">LATEST FRAME SNR</div>
 							<div className="value">
-								{snr === undefined ? "Not reported" : `${snr.toFixed(1)} dB`}
+								{snr === undefined ? "Not reported" : `${snr.toFixed(1)} DB`}
 								{telem.direction === 2 && <small>Transmitted frame · no receive signal</small>}
 								<Spark values={snrSeries} />
 							</div>
@@ -188,7 +188,7 @@ export function ThisDevicePanel() {
 										<span className="dim">
 											{f.raw?.direction === 2 ? "TX · delivery unconfirmed"
 												: f.raw?.direction === 1 && (f.raw.presentFields & RF_FIELD.rssi) !== 0
-													? `${(f.rssiX10 / 10).toFixed(0)} dBm` : "RSSI not reported"}
+													? `${(f.rssiX10 / 10).toFixed(0)} DBM` : "RSSI not reported"}
 										</span>
 									</div>
 								))}

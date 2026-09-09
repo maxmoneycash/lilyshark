@@ -1,6 +1,18 @@
 {
   "rewrites": [
     {
+      "source": "/api/community-coverage",
+      "destination": "/api/community-coverage"
+    },
+    {
+      "source": "/api/mesh-directory",
+      "destination": "/api/mesh-directory"
+    },
+    {
+      "source": "/api/meshmapper-coverage",
+      "destination": "/api/meshmapper-coverage"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://64-23-133-21.sslip.io/api/:path*"
     }

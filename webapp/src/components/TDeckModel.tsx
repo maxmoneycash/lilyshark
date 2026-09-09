@@ -38,8 +38,11 @@ export function TDeckModel({ screen }: { screen: string }) {
   }, [reduceMotion]);
 
   return (
-    <div className="tdeck-model" data-state={status} data-screen={screen}>
-      {status !== 'ready' && (
+    <div className="tdeck-model" data-state={status} data-screen={screen} aria-busy={status === 'loading'}>
+      {status === 'loading' && (
+        <div className="tdeck-model-loading" role="status">Loading the deck…</div>
+      )}
+      {status === 'fallback' && (
         <div className="tdeck-model-fallback">
           <TDeckPhoto screen={screen} alt="LILYGO T-Deck Plus running Lilyshark" />
         </div>

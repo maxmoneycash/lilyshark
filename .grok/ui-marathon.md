@@ -261,9 +261,23 @@ Each scheduled fire must:
 - [DONE] PROTOCOL DETAIL MEAN still uses mixed-case `dB` and `-60s`. MEAN is `DB`; axis chip is `-60S`.
 - [DONE] PACKET DETAIL SNR still uses mixed-case `dB`. Shared header is `DB`; RF AIR/ERR are `MS`/`HZ`.
 - [DONE] SPECTRUM complete NOISE still uses mixed-case `dBm`. Complete footer is `DBM`.
-- [OPEN] SPECTRUM idle plan and SCANNING lines still use mixed-case `MHz` / `kHz`.
-- [OPEN] PACKET DETAIL BW still uses lowercase `k` (`250.8k`).
-- [OPEN] Web analyzer RSSI/SNR still use mixed-case `dB` / `dBm` (ThisDevice, Traffic, Mesh).
+- [DONE] SPECTRUM idle plan and SCANNING lines still use mixed-case `MHz` / `kHz`. Idle plan is `MHZ` / `KHZ`; SCANNING lines were already `MHZ`.
+- [DONE] PACKET DETAIL BW still uses lowercase `k` (`250.8k`). BW is `K` on the packet header, RF tab, HOME radio card and RSSI panel, SETUP PROFILE card, and the profile editor metrics.
+- [DONE] Web analyzer RSSI/SNR still use mixed-case `dB` / `dBm` (ThisDevice, Traffic, Mesh). Units are `DB` / `DBM` across ThisDevice, TrafficTab, CaptureDiff, and the Mesh/Nodes/Map/Spectrum/Sniffer screens and radio log.
+
+- [DONE] Web Traffic airtime still used lowercase `ms`. The capture summary and packet RF detail now use `MS`; import timing and chart prose keep their existing wording.
+- [DONE] Firmware RADIO PROFILE list still used lowercase `k`. Rows now use `K`; refreshed the PROFILE render golden.
+- [DONE] Website intro and iOS Deck used older firmware screenshots. Regenerated all 42 shared 320x240 PNGs from current render goldens and deterministic live telemetry. `python3 scripts/generate_intro_frames.py` refreshes both copies; `--check` detects stale assets. The tour keeps its existing filenames and order.
+- [DONE] Live preview exports could highlight the wrong field tab. Each phase now selects NODES or RADIO, and the exporter writes a separate selected live packet without changing the 118-frame README animation.
+
+Follow-up verification (2026-09-08): host suite green, 557/557 web tests,
+typecheck and web/iOS simulator builds pass. Simulator render, interaction,
+and motion checks pass; `generate_intro_frames.py --check` reproduces all 42
+images. Web, iOS source, and built iOS bundle PNGs match byte for byte.
+Reviewed HOME/NODES/MAP/CHAT/RADIO at 320x240 and the website intro and Traffic
+units in Arc. Native Deck runtime was not rechecked. For host/web commands,
+prepend `/Users/maxmohammadi/.nvm/versions/node/v22.22.1/bin` to PATH: the shell's
+default x64 Node does not match the installed ARM web dependencies.
 
 ## Visual QA checklist (every pass)
 

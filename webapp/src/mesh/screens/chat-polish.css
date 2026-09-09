@@ -1,0 +1,171 @@
+.meshterm .chat-screen .chat-heading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.meshterm .chat-screen .chat-conversation-picker {
+	display: none;
+}
+
+.meshterm .chat-screen .chat-encryption {
+	flex: 0 0 auto;
+	font-size: 11px;
+	letter-spacing: 0.04em;
+}
+
+.meshterm .chat-screen .chat-tools {
+	gap: 8px;
+}
+
+.meshterm main.chat-screen > .node-menu {
+	width: max-content !important;
+	max-width: calc(100vw - 24px) !important;
+}
+
+.meshterm .chat-screen .chat-sender {
+	min-height: 28px;
+	min-width: 0;
+	border: 0;
+	padding: 0;
+	box-shadow: none;
+	background: transparent;
+	color: inherit;
+	font-size: inherit;
+	letter-spacing: 0;
+	vertical-align: baseline;
+}
+
+.meshterm .chat-screen .chat-sender.warn {
+	color: var(--warn);
+}
+
+.meshterm .chat-screen .chat-sender:active {
+	transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.meshterm .chat-screen .chat-sender:hover:not(:disabled),
+	.meshterm .chat-screen .chat-message-head .quote-btn:hover:not(:disabled) {
+		background: transparent;
+		color: var(--fg);
+		box-shadow: none;
+		text-decoration: underline;
+	}
+}
+
+.meshterm .chat-screen .chat-line {
+	padding-block: 4px 8px;
+}
+
+.meshterm .chat-screen .chat-message-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 8px;
+	min-height: 36px;
+}
+
+.meshterm .chat-screen .chat-message-time,
+.meshterm .chat-screen .chat-link-quality {
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.meshterm .chat-screen .chat-message-head .quote-btn {
+	margin-left: auto;
+	padding-inline: 8px;
+	box-shadow: none;
+	border: 0;
+	background: transparent;
+	opacity: 1;
+	color: var(--fg-dim);
+}
+
+.meshterm .chat-screen .chat-message-body {
+	line-height: 1.5;
+}
+
+.meshterm .chat-screen .reply-bar button {
+	flex: 0 0 auto;
+	min-width: max-content;
+}
+
+.meshterm .chat-screen .chat-line[role="button"]:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: 2px;
+}
+
+.meshterm .chat-screen .chat-empty {
+	border: 0;
+	padding: 12px 0;
+	line-height: 1.55;
+}
+
+.meshterm .chat-screen .chat-empty-title {
+	letter-spacing: 0;
+}
+
+.meshterm .chat-screen .chat-msgs[data-searching="true"] > :first-child,
+.meshterm .chat-screen .chat-msgs > .chat-empty:first-child {
+	margin-top: 0;
+}
+
+@media (max-width: 860px) {
+	.meshterm .chat-screen .chat-message-head {
+		gap: 4px 6px;
+	}
+
+	.meshterm .chat-screen .chat-convos {
+		display: none;
+	}
+
+	.meshterm .chat-screen .chat-titlebar {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 8px;
+		padding: 12px;
+	}
+
+	.meshterm .chat-screen .chat-heading-label {
+		display: none;
+	}
+
+	.meshterm .chat-screen .chat-conversation-picker {
+		display: block;
+		flex: 1;
+		width: 100%;
+		min-width: 0;
+		min-height: 44px;
+		font-size: 16px;
+	}
+
+	.meshterm .chat-screen .chat-tools {
+		flex-wrap: nowrap;
+		min-width: 0;
+		width: 100%;
+	}
+
+	.meshterm .chat-screen .chat-tools .chat-search {
+		flex: 1 1 0%;
+		width: 0;
+		font-size: 16px;
+	}
+
+	.meshterm .chat-screen .chat-tools button {
+		min-width: 0;
+		padding-inline: 8px;
+		font-size: 11px;
+		letter-spacing: 0.04em;
+	}
+
+	.meshterm .chat-screen .chat-input input {
+		font-size: 16px;
+	}
+
+	.meshterm .chat-screen .chat-sender {
+		min-height: 44px;
+	}
+}

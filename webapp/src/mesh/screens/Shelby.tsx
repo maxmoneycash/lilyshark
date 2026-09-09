@@ -14,6 +14,7 @@ import {
   SHELBY_POINTER_SIZE,
   type ShelbyPointer,
 } from "../../lib/lscap";
+import "./shelby.css";
 
 /**
  * SHELBY — what the firmware actually does with the storage network, and why.
@@ -32,7 +33,7 @@ const LAYOUT: [string, string, string][] = [
   ["4", "version", "1"],
   ["5", "flags", "encrypted · chunked · capture"],
   ["6..37", "commitment", "32-byte blob commitment — the content address"],
-  ["38..69", "owner", "32-byte Aptos account that paid for the blob"],
+  ["38..69", "owner", "32-byte account that uploaded the blob"],
   ["70..73", "size", "blob length in bytes"],
   ["74..77", "expiry", "unix seconds the storage is paid through"],
   ["78..79", "chunk index", "for captures split across several blobs"],
@@ -165,40 +166,33 @@ export function ShelbyScreen() {
   }, [bps, live]);
 
   return (
-    <main>
-      <div className="panel" style={{ flex: 1 }}>
+    <main className="shelby-screen">
+      <div className="panel shelby-overview" style={{ flex: 1 }}>
         <div className="panel-title">
-          PANEL // SHELBY · OFF-GRID STORAGE
+          SHELBY // CAPTURE STORAGE
           <span className="spacer" />
           <span className={err ? "warn" : stats ? "ok" : "dim"}>
-            {err ? "INDEXER UNREACHABLE" : stats ? "LIVE" : "READING…"}
+            {err ? "INDEXER UNREACHABLE" : stats ? "INDEXER LIVE" : "READING…"}
           </span>
         </div>
 
         <div className="scroll-y">
-          <div className="prose">
+          <div className="prose shelby-intro">
             <p>
-              A LoRa mesh moves on the order of a kilobit per second and is capped
-              by duty-cycle rules on top of that. A day of captured traffic will
-              never fit down it. So the T-Deck does not send the capture — it
-              writes the <code>.lscap</code> to Shelby, and puts an{" "}
-              {SHELBY_POINTER_SIZE}-byte receipt on the air instead. The receipt
-              fits in a single packet.
-            </p>
-            <p>
-              Every node in radio range decodes that receipt with no internet at
-              all. Whoever later has a connection resolves the commitment and
-              gets the bytes, content-addressed, exactly as captured.
+              <strong>A full capture, referenced in {SHELBY_POINTER_SIZE} bytes.</strong>{" "}
+              Send the small receipt over LoRa without internet. Upload and retrieve
+              the <code>.lscap</code> capture through Shelby online, leaving more
+              airtime for messages.
             </p>
           </div>
 
-          <div className="panel-title">THE PATH A CAPTURE TAKES</div>
-          <div className="flow">
+          <div className="panel-title">FROM RADIO TO STORAGE</div>
+          <div className="flow shelby-flow">
             {[
-              ["01", "CAPTURE", "T-Deck logs Meshtastic, MeshCore and Reticulum frames with their radio measurements to microSD"],
-              ["02", "STORE", "the .lscap blob is written to Shelby and paid for from the device's own Aptos account"],
-              ["03", "BROADCAST", `an ${SHELBY_POINTER_SIZE}-byte pointer carrying the commitment goes out over LoRa — one packet, no internet`],
-              ["04", "RESOLVE", "any listener decodes it offline; anyone with a connection fetches the blob by commitment"],
+              ["01", "CAPTURE", "Log radio frames and signal measurements to microSD."],
+              ["02", "UPLOAD", "Store the capture on Shelby through an internet connection."],
+              ["03", "ANNOUNCE", `Send its ${SHELBY_POINTER_SIZE}-byte SHLB receipt over the mesh.`],
+              ["04", "RETRIEVE", "Read the receipt offline; fetch the full capture online."],
             ].map(([n, k, v]) => (
               <div className="flow-step" key={n}>
                 <span className="flow-n">{n}</span>
@@ -208,34 +202,36 @@ export function ShelbyScreen() {
             ))}
           </div>
 
-          <div className="panel-title">
-            WIRE FORMAT · {SHELBY_POINTER_SIZE} BYTES
-          </div>
-          <div className="scroll-x">
-            <table className="grid">
-              <thead>
-                <tr>
-                  <th>BYTES</th>
-                  <th>FIELD</th>
-                  <th>MEANING</th>
-                </tr>
-              </thead>
-              <tbody>
-                {LAYOUT.map(([range, field, meaning]) => (
-                  <tr key={range}>
-                    <td>{range}</td>
-                    <td>{field}</td>
-                    <td>{meaning}</td>
+          <details className="shelby-wire">
+            <summary>
+              WIRE FORMAT · {SHELBY_POINTER_SIZE} BYTES
+            </summary>
+            <div className="scroll-x" tabIndex={0} role="region" aria-label="Shelby pointer wire format">
+              <table className="grid">
+                <thead>
+                  <tr>
+                    <th>BYTES</th>
+                    <th>FIELD</th>
+                    <th>MEANING</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {LAYOUT.map(([range, field, meaning]) => (
+                    <tr key={range}>
+                      <td>{range}</td>
+                      <td>{field}</td>
+                      <td>{meaning}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <div className="panel-foot dim">
-            The firmware encoder and this decoder are separate implementations of
-            the same 82 bytes, and are checked against each other byte for byte.
-          </div>
+            <div className="panel-foot dim">
+              Little-endian integers, version 1. C++, TypeScript, and Python
+              implementations share the same byte-exact test vector.
+            </div>
+          </details>
 
           <div className="panel-title">
             ON-CHAIN REGISTRY
@@ -243,21 +239,20 @@ export function ShelbyScreen() {
           </div>
           <div className="prose">
             <p>
-              This is the <code>capture_registry</code> contract on shelbynet,
-              read live in this browser straight from the fullnode — it records
-              who vouched for each capture, and when.
+              Anchored captures from this publisher, with size, storage expiry,
+              and commitment. Read directly from shelbynet.
             </p>
           </div>
           {regErr ? (
             <div className="panel-foot">
-              <span className="err">fullnode unreachable — {regErr}</span>
+              <span className="err">Registry unavailable: {regErr}</span>
             </div>
           ) : registry === null ? (
-            <div className="panel-foot dim">reading the chain…</div>
+            <div className="panel-foot dim">Reading the registry…</div>
           ) : registry.length === 0 ? (
-            <div className="panel-foot dim">no captures anchored yet</div>
+            <div className="panel-foot dim">No captures anchored by this publisher yet.</div>
           ) : (
-            <div className="scroll-x">
+            <div className="scroll-x shelby-registry" tabIndex={0} role="region" aria-label="Anchored captures">
               <table className="grid">
                 <thead>
                   <tr>
@@ -283,21 +278,21 @@ export function ShelbyScreen() {
             </div>
           )}
           <div className="panel-foot dim">
-            MODULE{" "}
+            <span>MODULE</span>
             <a
               href={`${SHELBY_FULLNODE}/accounts/${DEMO_BLOB.owner}/resource/${CAPTURE_REGISTRY}::Registry`}
               target="_blank"
               rel="noreferrer"
-              style={{ wordBreak: "break-all" }}
+              title={CAPTURE_REGISTRY}
             >
-              {CAPTURE_REGISTRY}
+              capture_registry ↗
             </a>
           </div>
         </div>
       </div>
 
-      <div className="panel" style={{ width: 360, flexShrink: 0 }}>
-        <div className="panel-title">WHY A POINTER</div>
+      <div className="panel shelby-evidence" style={{ width: 360, flexShrink: 0 }}>
+        <div className="panel-title">AIRTIME MODEL</div>
         <div className="scroll-y">
           <div className="kv">
             <span className="k">RADIO</span>
@@ -321,7 +316,7 @@ export function ShelbyScreen() {
                 </span>
                 <span className="k">RATIO</span>
                 <span className="v ok">
-                  {Math.round(airtime.blob / airtime.pointer).toLocaleString()}× less air
+                  {Math.round(airtime.blob / airtime.pointer).toLocaleString()}× smaller payload
                 </span>
               </>
             )}
@@ -335,15 +330,14 @@ export function ShelbyScreen() {
                 <span className="v">byte {live.offset} of the payload</span>
                 {live.ptr.commitment === DEMO_BLOB.commitment && (
                   <>
-                    <span className="k ok">STATUS</span>
-                    <span className="v ok">
-                      live on shelbynet —{' '}
+                    <span className="k">SAMPLE</span>
+                    <span className="v">
                       <a
                         href={`${SHELBY_RPC_BLOBS}/${DEMO_BLOB.owner}/${DEMO_BLOB.name}`}
                         target="_blank"
                         rel="noreferrer"
                       >
-                        fetch the bytes yourself
+                        Download capture from Shelby
                       </a>
                     </span>
                     <span className="k">OBJECT</span>

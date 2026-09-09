@@ -66,6 +66,7 @@ import {
 	frameLinkStep,
 	INITIAL_FRAME_LINK,
 } from "../frameLink";
+import "./radio-analysis.css";
 
 const BROADCAST = 0xffffffff;
 
@@ -113,7 +114,8 @@ interface HexPaneProps {
  */
 function HexPane({ bytes, highlight, onHoverByte, onPickByte }: HexPaneProps) {
 	const rowOffsets: number[] = [];
-	for (let off = 0; off < bytes.length; off += HEX_ROW_BYTES) rowOffsets.push(off);
+	for (let off = 0; off < bytes.length; off += HEX_ROW_BYTES)
+		rowOffsets.push(off);
 
 	const lit = (index: number): boolean =>
 		highlight !== null &&
@@ -165,7 +167,7 @@ function HexPane({ bytes, highlight, onHoverByte, onPickByte }: HexPaneProps) {
 									: "."}
 							</span>
 						) : (
-							<span key={`a${at}`}>{" "}</span>
+							<span key={`a${at}`}> </span>
 						),
 					)}
 					{"|"}
@@ -341,7 +343,13 @@ function FrameTable({ frames, sel, onPick, notes }: FrameTableProps) {
 	const newest = frames.length - 1;
 
 	return (
-		<div className="scroll-y" ref={rows.scrollRef}>
+		<div
+			className="scroll-y sniffer-table"
+			ref={rows.scrollRef}
+			tabIndex={0}
+			role="region"
+			aria-label="Captured frames"
+		>
 			<table className="grid">
 				<thead ref={rows.headRef}>
 					<tr>
@@ -549,24 +557,27 @@ function ExportButtons({
 		<>
 			<button
 				disabled={pcap.written === 0}
+				aria-label={`Export PCAP, ${frameCount(pcap.written)}`}
 				title="Download these frames as a LoRaTap pcap — the file Wireshark opens. The format has no field for a note, so notes are not written into it."
 				onClick={() => save("pcap")}
 			>
-				EXPORT PCAP ({frameCount(pcap.written)})
+				PCAP {pcap.written}
 			</button>
 			<button
 				disabled={records.length === 0}
+				aria-label={`Export CSV, ${frameCount(records.length)}`}
 				title="Download one row per frame, with the columns of the table above — for a spreadsheet. Notes come along in a note column."
 				onClick={() => save("csv")}
 			>
-				EXPORT CSV ({frameCount(records.length)})
+				CSV {records.length}
 			</button>
 			<button
 				disabled={records.length === 0}
+				aria-label={`Export JSON, ${frameCount(records.length)}`}
 				title="Download those same columns as a JSON array — for a script. Notes come along in a note field."
 				onClick={() => save("json")}
 			>
-				EXPORT JSON ({frameCount(records.length)})
+				JSON {records.length}
 			</button>
 			{omitted && (
 				<span className="warn" style={{ fontSize: 11 }}>
@@ -597,8 +608,8 @@ function CopyFrameLink({ seq }: { seq: number | undefined }) {
 		// the frame's, not the operator's.
 		return (
 			<span className="dim" style={{ fontSize: 11 }}>
-				This frame arrived without its raw record, so it carries no frame
-				number a link could name.
+				This frame arrived without its raw record, so it carries no frame number
+				a link could name.
 			</span>
 		);
 	}
@@ -653,7 +664,8 @@ function NoteCell({
 				marker === "other"
 					? `A note is filed under this frame's number, but it was written on a different frame — the radio has restarted its count since. It is not about these bytes and is not exported${text ? `: "${text}"` : ""}`
 					: marker === "same"
-						? (text ?? "This frame carries a note — open it to read or change it")
+						? (text ??
+							"This frame carries a note — open it to read or change it")
 						: undefined
 			}
 		>
@@ -699,8 +711,8 @@ function FrameNoteEditor({
 	if (seq === undefined) {
 		return (
 			<p className="dim" style={{ fontSize: 11, margin: "6px 0 0" }}>
-				This frame arrived without its raw record, so it carries no frame
-				number a note could be filed against.
+				This frame arrived without its raw record, so it carries no frame number
+				a note could be filed against.
 			</p>
 		);
 	}
@@ -721,7 +733,7 @@ function FrameNoteEditor({
 				value={draft}
 				rows={2}
 				maxLength={MAX_NOTE_LENGTH}
-				placeholder="What was happening when this frame arrived_"
+				placeholder="Add context for this frame"
 				onChange={(event) => setDraft(event.target.value)}
 				style={{
 					width: "100%",
@@ -754,12 +766,15 @@ function FrameNoteEditor({
 					SAVE NOTE
 				</button>
 				<span className="dim" style={{ fontSize: 10 }}>
-					{trimmed.length}/{MAX_NOTE_LENGTH} · SAVE AN EMPTY BOX TO REMOVE THE
-					NOTE
+					{trimmed.length}/{MAX_NOTE_LENGTH}
+					{note !== null && " · Save empty to remove"}
 				</span>
 			</div>
 			{message && (
-				<p className="dim" style={{ fontSize: 10, letterSpacing: 1, margin: "5px 0 0" }}>
+				<p
+					className="dim"
+					style={{ fontSize: 10, letterSpacing: 1, margin: "5px 0 0" }}
+				>
 					{message}
 				</p>
 			)}
@@ -917,7 +932,10 @@ export default function Sniffer() {
 	);
 
 	const rowNotes = useMemo(() => {
-		const out = new Map<HeardFrame, { standing: "same" | "other"; text: string }>();
+		const out = new Map<
+			HeardFrame,
+			{ standing: "same" | "other"; text: string }
+		>();
 		for (const target of noteTargets) {
 			const note = noteFor(notes, {
 				scope: SNIFFER_SCOPE,
@@ -925,15 +943,13 @@ export default function Sniffer() {
 			});
 			if (note === null) continue;
 			const standing = noteStanding(note, target.witness);
-			if (standing !== "absent") out.set(target.f, { standing, text: note.text });
+			if (standing !== "absent")
+				out.set(target.f, { standing, text: note.text });
 		}
 		return out;
 	}, [notes, noteTargets]);
 
-	const selTarget = useMemo(
-		() => (sel ? snifferNoteTarget(sel) : null),
-		[sel],
-	);
+	const selTarget = useMemo(() => (sel ? snifferNoteTarget(sel) : null), [sel]);
 	const selNote = selTarget === null ? null : noteFor(notes, selTarget.address);
 	const selStanding: "same" | "other" =
 		selNote !== null &&
@@ -971,12 +987,16 @@ export default function Sniffer() {
 	const dissection = useMemo(() => {
 		const raw = sel?.raw;
 		if (!raw) return null;
-		return dissectFrame(raw.bytes, frameProtocolHint(raw.profileId, sel.proto), {
-			// The device sends how long the frame really was; a capture shorter
-			// than that is one the radio cut short, and MeshCore and Reticulum
-			// call such a frame malformed rather than decoding past the cut.
-			truncated: raw.originalLength > raw.bytes.length,
-		});
+		return dissectFrame(
+			raw.bytes,
+			frameProtocolHint(raw.profileId, sel.proto),
+			{
+				// The device sends how long the frame really was; a capture shorter
+				// than that is one the radio cut short, and MeshCore and Reticulum
+				// call such a frame malformed rather than decoding past the cut.
+				truncated: raw.originalLength > raw.bytes.length,
+			},
+		);
 	}, [sel]);
 
 	const treeRows = useMemo(
@@ -1015,12 +1035,19 @@ export default function Sniffer() {
 	};
 
 	return (
-		<main style={{ flexDirection: "column" }}>
+		<main className="sniffer-screen" style={{ flexDirection: "column" }}>
 			<div
-				style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}
+				className="sniffer-controls"
+				style={{
+					display: "flex",
+					gap: 10,
+					alignItems: "center",
+					flexShrink: 0,
+					flexWrap: "wrap",
+				}}
 			>
 				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
-					SNIFFER // EVERY FRAME THE RADIO HEARS
+					SNIFFER // LIVE RADIO FRAMES
 				</span>
 				<button
 					disabled={frames.length === 0 && !session.paused}
@@ -1053,7 +1080,7 @@ export default function Sniffer() {
 				)}
 				{!linked && frames.length > 0 && (
 					<span className="dim" style={{ fontSize: 11 }}>
-						T-Deck not linked — this is what was heard before the link closed.
+						Disconnected. Captured frames remain available.
 					</span>
 				)}
 				<span className="spacer" />
@@ -1066,6 +1093,7 @@ export default function Sniffer() {
 			    belong in the same line as the controls that change what is
 			    listed. */}
 			<div
+				className="sniffer-exports"
 				style={{
 					display: "flex",
 					gap: 10,
@@ -1075,14 +1103,15 @@ export default function Sniffer() {
 				}}
 			>
 				<span className="dim" style={{ fontSize: 10, letterSpacing: 2 }}>
-					EXPORT //
+					EXPORT // FRAME COUNT
 				</span>
 				<button
 					disabled={rawRecords.length === 0}
+					aria-label={`Export capture, ${frameCount(rawRecords.length)}`}
 					title="Save the listed frames as a .lscap capture — the TRAFFIC screen opens it, and only frames that carry their raw bytes can be written"
 					onClick={onSave}
 				>
-					EXPORT CAPTURE ({frameCount(rawRecords.length)})
+					CAPTURE {rawRecords.length}
 				</button>
 				<ExportButtons
 					records={rawRecords}
@@ -1097,7 +1126,14 @@ export default function Sniffer() {
 			</div>
 
 			<div
-				style={{ flex: 1, display: "flex", gap: 12, minHeight: 0, flexWrap: "wrap" }}
+				className="sniffer-panels"
+				style={{
+					flex: 1,
+					display: "flex",
+					gap: 12,
+					minHeight: 0,
+					flexWrap: "wrap",
+				}}
 			>
 				{/* The table no longer takes every spare pixel: with a frame open the
 				    detail pane has to hold a dissection tree and a hex dump side by
@@ -1105,16 +1141,18 @@ export default function Sniffer() {
 				<div className="panel" style={{ flex: "1 1 380px", minWidth: 0 }}>
 					<div className="panel-title">
 						<span>CAPTURE // LIVE TABLE</span>
-						<span>CLICK A ROW TO TAKE IT APART</span>
+						{frames.length > 0 && <span>SELECT A FRAME TO INSPECT</span>}
 					</div>
 					{frames.length === 0 ? (
 						<p className="dim" style={{ padding: 16, fontSize: 12 }}>
 							{linked
-								? "Listening — the next frame the radio hears lands here_"
-								: "Nothing captured yet — connect a T-Deck over USB with the CONNECT button, and every frame its radio hears lands here_"}
+								? "Listening for the next radio frame."
+								: "serial" in navigator
+									? "Connect a T-Deck over USB to inspect live packets and raw bytes."
+									: "Open this page in desktop Chrome or Edge, then connect a T-Deck over USB to inspect live packets and raw bytes."}
 						</p>
 					) : (
-<FrameTable
+						<FrameTable
 							frames={frames}
 							sel={sel}
 							onPick={pickFrame}
@@ -1122,7 +1160,7 @@ export default function Sniffer() {
 						/>
 					)}
 					<div className="panel-foot">
-						<span>RSSI IN dBm · SNR IN dB</span>
+						<span>RSSI IN DBM · SNR IN DB</span>
 						<span className="spacer" />
 						{noteStoreMsg && <span className="warn">{noteStoreMsg}</span>}
 						{rawRecords.length < frames.length && (
@@ -1136,17 +1174,25 @@ export default function Sniffer() {
 
 				{sel && (
 					<div
-						className="panel hot"
-						style={{ flex: "1 1 460px", minWidth: 280, fontSize: 12 }}
+						className="panel hot sniffer-detail"
+						style={{ flex: "1 1 460px", minWidth: 0, fontSize: 12 }}
 					>
 						<div className="panel-title">
 							<span>FRAME // {sel.short ?? nodeId(sel.src)}</span>
 							<button
 								title="Close this frame"
+								aria-label="Close frame"
 								onClick={() => pickFrame(undefined)}
-								style={{ width: 22, height: 22, minWidth: 22 }}
+								style={{
+									flex: "none",
+									width: 44,
+									height: 44,
+									minWidth: 44,
+									padding: 0,
+									fontSize: 22,
+								}}
 							>
-								CLOSE
+								<span aria-hidden="true">×</span>
 							</button>
 						</div>
 						<div className="scroll-y" style={{ padding: "10px 12px" }}>
@@ -1158,7 +1204,7 @@ export default function Sniffer() {
 									["TYPE", sel.kind + (sel.sim ? " · SYNTHETIC" : "")],
 									[
 										"SIGNAL",
-										`${(sel.rssiX10 / 10).toFixed(1)} dBm · SNR ${(sel.snrX10 / 10).toFixed(1)} dB`,
+										`${(sel.rssiX10 / 10).toFixed(1)} DBM · SNR ${(sel.snrX10 / 10).toFixed(1)} DB`,
 									],
 									["HEARD AT", hhmm(sel.atMs)],
 									...(sel.hops !== undefined
@@ -1182,8 +1228,19 @@ export default function Sniffer() {
 										: []),
 								] as [string, string][]
 							).map(([label, value]) => (
-								<div key={label} style={{ display: "flex", gap: 10, lineHeight: 1.8 }}>
-									<span className="dim" style={{ width: 92, flexShrink: 0, fontSize: 10, letterSpacing: 1 }}>
+								<div
+									key={label}
+									style={{ display: "flex", gap: 10, lineHeight: 1.8 }}
+								>
+									<span
+										className="dim"
+										style={{
+											width: 92,
+											flexShrink: 0,
+											fontSize: 10,
+											letterSpacing: 1,
+										}}
+									>
 										{label}
 									</span>
 									<span style={{ wordBreak: "break-all" }}>{value}</span>
@@ -1202,7 +1259,12 @@ export default function Sniffer() {
 							>
 								<span
 									className="dim"
-									style={{ width: 92, flexShrink: 0, fontSize: 10, letterSpacing: 1 }}
+									style={{
+										width: 92,
+										flexShrink: 0,
+										fontSize: 10,
+										letterSpacing: 1,
+									}}
 								>
 									LINK
 								</span>
@@ -1221,7 +1283,12 @@ export default function Sniffer() {
 							>
 								<span
 									className="dim"
-									style={{ width: 92, flexShrink: 0, fontSize: 10, letterSpacing: 1 }}
+									style={{
+										width: 92,
+										flexShrink: 0,
+										fontSize: 10,
+										letterSpacing: 1,
+									}}
 								>
 									NOTE
 								</span>
@@ -1238,7 +1305,10 @@ export default function Sniffer() {
 							</div>
 							{sel.text && (
 								<div style={{ margin: "8px 0" }}>
-									<span className="dim" style={{ fontSize: 10, letterSpacing: 1 }}>
+									<span
+										className="dim"
+										style={{ fontSize: 10, letterSpacing: 1 }}
+									>
 										TEXT
 									</span>
 									<div style={{ wordBreak: "break-word" }}>{sel.text}</div>
@@ -1257,10 +1327,14 @@ export default function Sniffer() {
 									<div style={{ flex: "1 1 250px", minWidth: 0 }}>
 										<div
 											className="dim"
-											style={{ fontSize: 10, letterSpacing: 1, marginBottom: 5 }}
+											style={{
+												fontSize: 10,
+												letterSpacing: 1,
+												marginBottom: 5,
+											}}
 										>
-											DISSECTION // {dissection.primary.protocol.toUpperCase()} ·{" "}
-											{decodeSummary(dissection.primary)}
+											DISSECTION // {dissection.primary.protocol.toUpperCase()}{" "}
+											· {decodeSummary(dissection.primary)}
 										</div>
 										<DissectTree
 											rows={treeRows}
@@ -1271,10 +1345,17 @@ export default function Sniffer() {
 											onHover={setHoverPath}
 										/>
 									</div>
-									<div style={{ flex: "0 1 auto" }}>
+									<div
+										className="sniffer-bytes"
+										style={{ flex: "0 1 auto", minWidth: 0, maxWidth: "100%" }}
+									>
 										<div
 											className="dim"
-											style={{ fontSize: 10, letterSpacing: 1, marginBottom: 5 }}
+											style={{
+												fontSize: 10,
+												letterSpacing: 1,
+												marginBottom: 5,
+											}}
 										>
 											BYTES
 										</div>

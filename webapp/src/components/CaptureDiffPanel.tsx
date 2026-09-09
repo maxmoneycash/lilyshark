@@ -215,7 +215,7 @@ export function CaptureDiffPanel({
               <span className="v">
                 {summary.meanRssiDeltaDb === null
                   ? '—'
-                  : `${summary.meanRssiDeltaDb > 0 ? '+' : ''}${summary.meanRssiDeltaDb.toFixed(1)} dB`}
+                  : `${summary.meanRssiDeltaDb > 0 ? '+' : ''}${summary.meanRssiDeltaDb.toFixed(1)} DB`}
               </span>
             </span>
             <span className="stat">
@@ -223,7 +223,7 @@ export function CaptureDiffPanel({
               <span className="v">
                 {summary.meanSnrDeltaDb === null
                   ? '—'
-                  : `${summary.meanSnrDeltaDb > 0 ? '+' : ''}${summary.meanSnrDeltaDb.toFixed(1)} dB`}
+                  : `${summary.meanSnrDeltaDb > 0 ? '+' : ''}${summary.meanSnrDeltaDb.toFixed(1)} DB`}
               </span>
             </span>
           </div>

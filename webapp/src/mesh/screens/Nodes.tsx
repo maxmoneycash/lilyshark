@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { type Forecast, forecastBattery, forecastText } from "../battery";
 import { loadHopChanges, loadTelemetry, loadTraceroutes } from "../db";
 import {
@@ -32,6 +32,7 @@ import {
 } from "../store";
 import { isDemo } from "../demo";
 import { ThisDeviceRow } from "../ThisDevice";
+import "./nodes.css";
 
 // Click to copy the underlying text; confirmation appears briefly. The visible label
 // and the copied value can differ (coords show 4 decimals, copy full precision).
@@ -157,6 +158,8 @@ function sortNodesBy(
 
 function Th(props: {
 	label: string;
+	compactLabel?: string;
+	unit?: string;
 	k: SortKey;
 	sort: { key: SortKey; dir: 1 | -1 };
 	onSort: (k: SortKey) => void;
@@ -164,18 +167,24 @@ function Th(props: {
 	const active = props.sort.key === props.k;
 	return (
 		<th
-			onClick={() => props.onSort(props.k)}
-			style={{ cursor: "pointer", userSelect: "none" }}
+			scope="col"
+			aria-sort={active ? (props.sort.dir === 1 ? "ascending" : "descending") : undefined}
 		>
-			{props.label}{" "}
-			<span style={{ fontSize: 9, letterSpacing: 0 }}>
-				<span style={{ opacity: active && props.sort.dir === 1 ? 1 : 0.3 }}>
-					▲
+			<button
+				type="button"
+				className="nodes-sort"
+				onClick={() => props.onSort(props.k)}
+				aria-label={`${t("Sort by {0}", props.label)}${props.unit ? ` (${props.unit})` : ""}`}
+			>
+				<span className="nodes-sort-label">
+					<span className={props.compactLabel ? "nodes-sort-full" : undefined}>{props.label}</span>
+					{props.compactLabel && <span className="nodes-sort-compact" aria-hidden="true">{props.compactLabel}</span>}
+					{props.unit && <small className="nodes-sort-unit">{props.unit}</small>}
 				</span>
-				<span style={{ opacity: active && props.sort.dir === -1 ? 1 : 0.3 }}>
-					▼
+				<span className="nodes-sort-arrow" aria-hidden="true" data-active={active}>
+					{active ? (props.sort.dir === 1 ? "↑" : "↓") : "↕"}
 				</span>
-			</span>
+			</button>
 		</th>
 	);
 }
@@ -191,7 +200,7 @@ function RouteLine(props: {
 	// full sequence of nodes and arrows with the SNR of each segment
 	const nodes = [props.from, ...props.hops.map(props.short), props.to];
 	const arrow = (snr: number | undefined) =>
-		snr !== undefined ? ` ─(${(snr / 4).toFixed(1)} dB)→ ` : " → ";
+		snr !== undefined ? ` ─(${(snr / 4).toFixed(1)} DB)→ ` : " → ";
 	return (
 		<div style={{ fontSize: 11, lineHeight: 1.6 }}>
 			<span className="dim">{props.label}: </span>
@@ -213,6 +222,18 @@ function Detail(props: {
 	onClose: () => void;
 }) {
 	const { node: n } = props;
+	const panelRef = useRef<HTMLElement>(null);
+	const headingRef = useRef<HTMLHeadingElement>(null);
+	useLayoutEffect(() => {
+		const panel = panelRef.current;
+		if (panel && window.matchMedia("(max-width: 860px)").matches) {
+			const header = panel.closest(".app")?.querySelector("header");
+			panel.style.setProperty("--nodes-header-height", `${header?.getBoundingClientRect().height ?? 0}px`);
+			panel.scrollIntoView({ block: "start", behavior: "instant" });
+		}
+		// Focus without another scroll so the title stays below the sticky header.
+		headingRef.current?.focus({ preventScroll: true });
+	}, [n.num]);
 	const [tracing, setTracing] = useState(false);
 	const [traceErr, setTraceErr] = useState("");
 	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -361,7 +382,7 @@ function Detail(props: {
 		[
 			"SNR",
 			<span className={n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}>
-				{n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : n.viaNet ? "VIA NET" : "—"}
+				{n.snr !== undefined ? `${n.snr.toFixed(2)} DB` : n.viaNet ? "VIA NET" : "—"}
 			</span>,
 		],
 		[
@@ -440,7 +461,7 @@ function Detail(props: {
 		],
 	];
 	return (
-		<div className="panel hot" style={{ width: 300, flexShrink: 0 }}>
+		<section ref={panelRef} className="panel hot nodes-detail" id="nodes-detail" aria-labelledby="nodes-detail-name" style={{ width: 300, flexShrink: 0 }}>
 			<div className="panel-title">
 				<span>
 					{t("DETAIL // NODE")} {n.shortName}
@@ -452,17 +473,15 @@ function Detail(props: {
 					CLOSE
 				</button>
 			</div>
-			<div
-				style={{
-					padding: "12px 12px 4px",
-					fontSize: 16,
-					fontWeight: 700,
-					textShadow: "0 0 8px var(--glow)",
-				}}
+			<h2
+				id="nodes-detail-name"
+				className="nodes-detail-name"
+				ref={headingRef}
+				tabIndex={-1}
 			>
-				{n.longName}
+				{n.longName || n.shortName || `!${n.num.toString(16)}`}
 				{props.isMe && ` · (${t("ME")})`}
-			</div>
+			</h2>
 			<div
 				className="dim"
 				style={{ padding: "2px 12px 12px", fontSize: 11 }}
@@ -470,14 +489,14 @@ function Detail(props: {
 			>
 				{t("LAST PACKET {0} AGO", ago(n.lastHeard))}
 			</div>
-			<div className="kv" style={{ borderTop: "1px solid var(--border)" }}>
+			<dl className="kv nodes-facts">
 				{rows.map(([k, v]) => (
-					<span key={k} style={{ display: "contents" }}>
-						<span className="k">{k}</span>
-						<span>{v}</span>
-					</span>
+					<Fragment key={k}>
+						<dt className="k">{k}</dt>
+						<dd className="v">{v}</dd>
+					</Fragment>
 				))}
-			</div>
+			</dl>
 			{(props.trace || tracing || traceErr || history.length > 0) && (
 				<div
 					style={{
@@ -591,7 +610,7 @@ function Detail(props: {
 					)}
 				</div>
 			)}
-			<div style={{ flex: 1 }} />
+			<div className="nodes-detail-spacer" style={{ flex: 1 }} />
 			{getDeviceLinkState().status === "linked" && !n.publicKey && (
 				<div
 					style={{
@@ -732,7 +751,7 @@ function Detail(props: {
 					</button>
 				</div>
 			)}
-		</div>
+		</section>
 	);
 }
 
@@ -785,15 +804,19 @@ export default function Nodes({
 		selected !== undefined ? s.nodes.get(selected) : undefined;
 	const short = (num: number) =>
 		s.nodes.get(num)?.shortName ?? `!${num.toString(16)}`;
+	const closeDetail = () => {
+		setSelected(undefined);
+		rootRef.current?.querySelector<HTMLButtonElement>(`button[data-node-id="${selected}"]`)?.focus();
+	};
 
 	return (
-		<main ref={rootRef}>
+		<main ref={rootRef} className="nodes-screen">
 			<div className="panel nodes-roster" style={{ flex: 1, minWidth: 0 }}>
 				<div className="panel-title">
 					<span className="panel-title-label">
 						{t("PANEL // NODES")} · {nodes.length}
 						{q ? t(" OF {0}", all.length) : ""} {t("DETECTED")}
-						{isDemo() ? " · DEMO PALO ALTO" : ""}
+						{isDemo() ? " · DEMO" : ""}
 					</span>
 					<input
 						value={filter}
@@ -806,18 +829,16 @@ export default function Nodes({
 				<div className="scroll-y">
 					{isDemo() && (
 						<p className="demo-mesh-banner">
-							DEMO MESH IN PALO ALTO — NOT YOUR T-DECK. Connect with the header
-							CONNECT button (Lilyshark USB). These invented nodes drop the
-							moment the radio answers.
+							Sample nodes around Palo Alto. Connect a radio to see your mesh.
 						</p>
 					)}
 					{(nodes.length > 0 || link.status === "linked") && (
-					<table className="grid">
+					<table className="grid nodes-table" aria-label={t("Heard nodes")}>
 						<thead>
 							<tr>
 								<Th label={t("NODE")} k="name" sort={sort} onSort={onSort} />
 								<Th label={t("SHORT")} k="short" sort={sort} onSort={onSort} />
-								<Th label="SNR" k="snr" sort={sort} onSort={onSort} />
+								<Th label="SNR" unit="DB" k="snr" sort={sort} onSort={onSort} />
 								<Th
 									label={t("BATTERY")}
 									k="battery"
@@ -833,6 +854,7 @@ export default function Nodes({
 								<Th label={t("POSITION")} k="pos" sort={sort} onSort={onSort} />
 								<Th
 									label={t("LAST SEEN")}
+									compactLabel={t("SEEN")}
 									k="seen"
 									sort={sort}
 									onSort={onSort}
@@ -859,17 +881,31 @@ export default function Nodes({
 												: undefined
 										}
 									>
-										{n.fav && <span className="warn">FAV </span>}!
-										{n.num.toString(16)} · {n.longName}
-										{n.num === s.myNodeNum &&
-											(isDemo() ? " (DEMO)" : ` (${t("ME")})`)}
-										{n.type === ContactType.Repeater && " REPEATER"}
-										{n.publicKey && " · PKI"}
-										{n.ignored && " · IGNORED"}
+										<button
+											type="button"
+											className="nodes-open"
+											data-node-id={n.num}
+											aria-expanded={selected === n.num}
+											aria-controls={selected === n.num ? "nodes-detail" : undefined}
+											onClick={(event) => {
+												event.stopPropagation();
+												setSelected(selected === n.num ? undefined : n.num);
+											}}
+										>
+											<span className="nodes-name">{n.longName || n.shortName || `!${n.num.toString(16)}`}</span>
+											<span className="nodes-meta">
+												<span className="nodes-id">!{n.num.toString(16)}</span>
+												{n.type !== undefined && n.type !== ContactType.None && n.type !== ContactType.Chat && <span>{hwName(n.type)}</span>}
+												{n.publicKey && <span>PKI</span>}
+												{n.fav && <span>{t("FAVORITE")}</span>}
+												{n.num === s.myNodeNum && <span>{isDemo() ? "DEMO" : t("ME")}</span>}
+												{n.ignored && <span>{t("IGNORED")}</span>}
+											</span>
+										</button>
 									</td>
 									<td style={{ fontWeight: 700 }}>{n.shortName}</td>
-									<td className={n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}>
-										{n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : n.viaNet ? "NET" : "—"}
+									<td className={`nodes-snr ${n.viaNet && n.snr === undefined ? "" : snrClass(n.snr)}`}>
+										{n.snr !== undefined ? n.snr.toFixed(2) : n.viaNet ? "NET" : "—"}
 									</td>
 									<td
 										className={
@@ -895,7 +931,7 @@ export default function Nodes({
 											t("NO GPS FIX")
 										)}
 									</td>
-									<td title={dateTime(n.lastHeard * 1000)}>
+									<td className="nodes-seen" title={dateTime(n.lastHeard * 1000)}>
 										{ago(n.lastHeard)}
 									</td>
 								</tr>
@@ -924,9 +960,9 @@ export default function Nodes({
 					<span>{t("{0} NODES IN DB", all.length)}</span>
 					<span className="spacer" />
 					<span>
-						SNR: <span className="ok">≥5 dB OK</span> ·{" "}
-						<span className="warn">{t("0–5 dB FAIR")}</span> ·{" "}
-						<span className="err">{t("<0 dB BAD")}</span>
+						SNR: <span className="ok">≥5 DB OK</span> ·{" "}
+						<span className="warn">{t("0–5 DB FAIR")}</span> ·{" "}
+						<span className="err">{t("<0 DB BAD")}</span>
 					</span>
 				</div>
 			</div>
@@ -940,7 +976,7 @@ export default function Nodes({
 					posTs={s.posUpdates.get(selectedNode.num)}
 					short={short}
 					onOpenDm={onOpenDm}
-					onClose={() => setSelected(undefined)}
+					onClose={closeDetail}
 				/>
 			)}
 		</main>

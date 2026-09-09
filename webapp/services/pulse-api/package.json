@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "test:coverage": "node --import tsx --test src/coverage-service.test.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "start:source": "node --import tsx src/index.ts"
   },
   "dependencies": {
     "@aptos-labs/ts-sdk": "^5.2.1",

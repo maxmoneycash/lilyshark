@@ -79,6 +79,39 @@ export function updatePeakHold(prev: number[] | undefined, db: number[]): number
   return next;
 }
 
+export interface SpectrumPeakHold {
+  db?: number[];
+  uptoMs: number;
+  f0Hz?: number;
+  f1Hz?: number;
+  bins?: number;
+}
+
+/** Fold only new passes, retaining peaks after their waterfall rows expire.
+ * A retune starts a new trace because each bin now measures another frequency.
+ * Clearing db while retaining the cursor keeps old rows from restoring peaks. */
+export function foldSpectrumPeaks(
+  previous: SpectrumPeakHold,
+  sweeps: SpectrumSweep[],
+): SpectrumPeakHold {
+  const latest = sweeps[sweeps.length - 1];
+  if (!latest) return { uptoMs: 0 };
+  const sameBand = previous.f0Hz === latest.f0Hz &&
+    previous.f1Hz === latest.f1Hz && previous.bins === latest.db.length;
+  let db = sameBand ? previous.db : undefined;
+  const uptoMs = sameBand ? previous.uptoMs : -Infinity;
+  for (const sweep of sweeps) {
+    if (sweep.atMs > uptoMs) db = updatePeakHold(db, sweep.db);
+  }
+  return {
+    db,
+    uptoMs: latest.atMs,
+    f0Hz: latest.f0Hz,
+    f1Hz: latest.f1Hz,
+    bins: latest.db.length,
+  };
+}
+
 /** Fallback color range before any sweep arrives: LoRa noise floor to a
  *  strong nearby transmitter. */
 export const DEFAULT_DB_RANGE = { minDb: -130, maxDb: -60 };

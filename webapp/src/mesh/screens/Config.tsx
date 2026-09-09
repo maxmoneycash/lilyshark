@@ -36,6 +36,7 @@ import {
 	THEMES,
 	type Theme,
 } from "../theme";
+import "./config.css";
 
 // MeshCore channels live in fixed slots on the radio; the companion protocol
 // exposes at least these four.
@@ -45,13 +46,14 @@ function Section(props: {
 	title: string;
 	children: React.ReactNode;
 	onSave?: () => Promise<void>;
+	saveLabel?: string;
 }) {
 	const [msg, setMsg] = useState("");
 	const [cls, setCls] = useState("");
 	const [busy, setBusy] = useState(false);
 	return (
 		<div className="panel">
-			<div className="panel-title">{props.title}</div>
+			<h2 className="panel-title">{props.title}</h2>
 			{props.children}
 			{props.onSave && (
 				<div className="panel-actions">
@@ -84,9 +86,9 @@ function Section(props: {
 							}
 						}}
 					>
-						[ EXECUTE ]
+						{props.saveLabel ?? t("SAVE")}
 					</button>
-					<span className={cls} style={{ fontSize: 12 }}>
+					<span className={cls} role="status">
 						{msg}
 					</span>
 				</div>
@@ -136,6 +138,7 @@ export default function Config() {
 	const [bkMsg, setBkMsg] = useState("");
 	const [bkCls, setBkCls] = useState("");
 	const [importPending, setImportPending] = useState("");
+	const backupFile = useRef<HTMLInputElement>(null);
 	// advert
 	const [advMsg, setAdvMsg] = useState("");
 	const [advCls, setAdvCls] = useState("");
@@ -383,43 +386,40 @@ export default function Config() {
 	};
 
 	return (
-		<main style={{ overflowY: "auto", alignItems: "start" }}>
+		<main className="config-screen">
 			<div className="cfg-grid">
 				<div className="cfg-col">
 					<Section title="CONFIG // NET RELAY">
 						<div className="form-grid">
-							<label>RELAY</label>
+							<label htmlFor="cfg-relay">RELAY</label>
 							<select
+								id="cfg-relay"
 								value={net.enabled ? "on" : "off"}
-								style={{ width: 140 }}
 								onChange={(e) => setNetEnabled(e.target.value === "on")}
 							>
 								<option value="on">ON</option>
 								<option value="off">OFF</option>
 							</select>
-							<label>STATUS</label>
-							<span className={net.enabled && !net.connected ? "warn" : ""}>
+							<span className="cfg-label">STATUS</span>
+							<span className={net.enabled && !net.connected ? "warn" : "cfg-relay-status"} title={net.connected ? net.via : undefined}>
 								{!net.enabled
 									? "OFF"
 									: net.connected
-										? `CONNECTED · ${net.via.toUpperCase()} · ROOM ${net.room} · ${net.published} SENT / ${net.received} HEARD`
+										? <><span>CONNECTED · {net.room}</span><span className="dim">{net.published} SENT / {net.received} HEARD</span></>
 										: "CONNECTING…"}
 							</span>
 						</div>
-						<div className="hint">
-							Frames your deck hears are shared with other Lilyshark analyzers
-							over the internet, and theirs appear here and on your deck marked
-							NET. The default room is public — the same standing as the
-							LongFast radio channel it mirrors. Turn it off and the mesh is
-							radio-only.
-						</div>
+						<p className="cfg-help">
+							Share received packets over the internet with other Lilyshark
+							analyzers. Remote packets are marked NET. The default room is public.
+						</p>
 					</Section>
 					<Section title={t("CONFIG // APPLICATION")}>
 						<div className="form-grid">
-							<label>{t("TIME")}</label>
+							<label htmlFor="cfg-time">{t("TIME")}</label>
 							<select
+								id="cfg-time"
 								value={timeFmt}
-								style={{ width: 140 }}
 								onChange={(e) => {
 									const v = e.target.value as HourPref;
 									setHourPref(v);
@@ -427,16 +427,16 @@ export default function Config() {
 								}}
 							>
 								<option value="auto">
-									{t("AUTOMATIC")} · {is12h() ? "12 H" : "24 H"}
+									{t("AUTO")} · {is12h() ? "12 H" : "24 H"}
 								</option>
 								<option value="24">24 H · 15:04</option>
 								<option value="12">12 H · 3:04 PM</option>
 							</select>
-							<label>{t("COLOR")}</label>
-							<div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+							<label htmlFor="cfg-theme">{t("COLOR")}</label>
+							<div className="cfg-appearance">
 								<select
+									id="cfg-theme"
 									value={theme}
-									style={{ width: 140 }}
 									onChange={(e) => {
 										const v = e.target.value as Theme;
 										setTheme(v);
@@ -450,18 +450,14 @@ export default function Config() {
 									))}
 								</select>
 								<label
-									style={{
-										display: "flex",
-										gap: 6,
-										alignItems: "center",
-										whiteSpace: "nowrap",
-									}}
-									title={t("Same color, pure black background and a more vivid stroke")}
+									className="cfg-check"
+									title={t(
+										"Same color, pure black background and a more vivid stroke",
+									)}
 								>
 									<input
 										type="checkbox"
 										checked={hc}
-										style={{ width: "auto" }}
 										onChange={(e) => {
 											setHiContrast(e.target.checked);
 											setHcSel(e.target.checked);
@@ -472,40 +468,43 @@ export default function Config() {
 							</div>
 
 							<label
-								title={t("System notifications about nodes marked as favorites",
+								htmlFor="cfg-alerts"
+								title={t(
+									"System notifications about nodes marked as favorites",
 								)}
 							>
 								{t("FAVORITE ALERTS")}
 							</label>
 							<input
+								id="cfg-alerts"
 								type="checkbox"
 								checked={alerts.on}
-								style={{ justifySelf: "start", width: "auto" }}
+								style={{ justifySelf: "start" }}
 								onChange={(e) => saveAlerts({ on: e.target.checked })}
 							/>
-							<label>{t("WARN BATTERY <")}</label>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<label htmlFor="cfg-battery">{t("BATTERY BELOW")}</label>
+							<div className="cfg-unit-field">
 								<input
+									id="cfg-battery"
 									type="number"
 									min={1}
 									max={100}
 									disabled={!alerts.on}
 									value={alerts.battery}
-									style={{ width: 80 }}
 									onChange={(e) =>
 										saveAlerts({ battery: Number(e.target.value) })
 									}
 								/>
 								<span className="dim">%</span>
 							</div>
-							<label>{t("WARN NO SIGNAL")}</label>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<label htmlFor="cfg-silence">{t("SILENT FOR")}</label>
+							<div className="cfg-unit-field">
 								<input
+									id="cfg-silence"
 									type="number"
 									min={1}
 									disabled={!alerts.on}
 									value={alerts.silentH}
-									style={{ width: 80 }}
 									onChange={(e) =>
 										saveAlerts({ silentH: Number(e.target.value) })
 									}
@@ -513,18 +512,20 @@ export default function Config() {
 								<span className="dim">{t("h")}</span>
 							</div>
 							<label
-								title={t("Warns before the battery is low, based on the discharge rate. 0 = no warning",
+								htmlFor="cfg-runtime"
+								title={t(
+									"Warns before the battery is low, based on the discharge rate. 0 = no warning",
 								)}
 							>
-								{t("WARN RUNTIME <")}
+								{t("RUNTIME BELOW")}
 							</label>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<div className="cfg-unit-field">
 								<input
+									id="cfg-runtime"
 									type="number"
 									min={0}
 									disabled={!alerts.on}
 									value={alerts.runtimeH}
-									style={{ width: 80 }}
 									onChange={(e) =>
 										saveAlerts({ runtimeH: Number(e.target.value) })
 									}
@@ -532,21 +533,27 @@ export default function Config() {
 								<span className="dim">{t("h")}</span>
 							</div>
 						</div>
-						<p className="dim" style={{ padding: "0 14px 12px", fontSize: 11 }}>
-							{t("Only warns about favorite nodes, at most once every 6 h per node and reason.",
+						<p className="cfg-help">
+							{t(
+								"Alerts cover favorite nodes. Each warning repeats at most once every 6 hours per node.",
 							)}
 						</p>
 					</Section>
 
-					<Section title={t("CONFIG // USER")} onSave={saveUser}>
+					<Section
+						title={t("CONFIG // USER")}
+						onSave={saveUser}
+						saveLabel={t("SAVE NAME")}
+					>
 						<div className="form-grid">
-							<label>{t("ADVERT NAME")}</label>
+							<label htmlFor="cfg-advert-name">{t("ADVERT NAME")}</label>
 							<input
+								id="cfg-advert-name"
 								value={advertName}
 								maxLength={31}
 								onChange={(e) => setAdvertName(e.target.value)}
 							/>
-							<label>{t("NODE ID")}</label>
+							<span className="cfg-label">{t("NODE ID")}</span>
 							<span className="dim" title={self?.publicKey ?? ""}>
 								{self
 									? `${self.publicKey.slice(0, 16)}… · ${t("READ ONLY")}`
@@ -555,88 +562,101 @@ export default function Config() {
 						</div>
 					</Section>
 
-					<Section title="CONFIG // RADIO" onSave={saveRadio}>
+					<Section
+						title="CONFIG // RADIO"
+						onSave={saveRadio}
+						saveLabel={t("SAVE RADIO")}
+					>
 						<div className="form-grid">
-							<label>FREQ (kHz)</label>
+							<label htmlFor="cfg-frequency">FREQ (kHz)</label>
 							<input
+								id="cfg-frequency"
 								type="number"
 								min={0}
 								value={freq}
-								style={{ width: 120 }}
 								onChange={(e) => setFreq(Number(e.target.value))}
 							/>
-							<label>BW</label>
+							<label htmlFor="cfg-bandwidth" title="Bandwidth">
+								BW
+							</label>
 							<input
+								id="cfg-bandwidth"
+								aria-label="Bandwidth"
 								type="number"
 								min={0}
 								value={bw}
-								style={{ width: 120 }}
 								onChange={(e) => setBw(Number(e.target.value))}
 							/>
-							<label>SF</label>
+							<label htmlFor="cfg-spreading-factor" title="Spreading factor">
+								SF
+							</label>
 							<input
+								id="cfg-spreading-factor"
+								aria-label="Spreading factor"
 								type="number"
 								min={5}
 								max={12}
 								value={sf}
-								style={{ width: 70 }}
 								onChange={(e) => setSf(Number(e.target.value))}
 							/>
-							<label>CR</label>
+							<label htmlFor="cfg-coding-rate" title="Coding rate">
+								CR
+							</label>
 							<input
+								id="cfg-coding-rate"
+								aria-label="Coding rate"
 								type="number"
 								min={5}
 								max={8}
 								value={cr}
-								style={{ width: 70 }}
 								onChange={(e) => setCr(Number(e.target.value))}
 							/>
-							<label>TX POWER (dBm)</label>
+							<label htmlFor="cfg-tx-power">TX POWER (dBm)</label>
 							<input
+								id="cfg-tx-power"
 								type="number"
 								min={0}
 								max={self?.maxTxPower || 30}
 								value={txp}
-								style={{ width: 70 }}
 								onChange={(e) => setTxp(Number(e.target.value))}
 							/>
 						</div>
-						<p className="dim" style={{ padding: "0 14px 12px", fontSize: 11 }}>
-							{t("Changing FREQ/BW/SF/CR moves you off your mesh preset: only nodes with the same radio parameters can hear each other.",
+						<p className="cfg-help">
+							{t(
+								"To hear each other, nodes need matching frequency, bandwidth (BW), spreading factor (SF), and coding rate (CR).",
 							)}
 						</p>
 					</Section>
 				</div>
 				<div className="cfg-col">
 					<Section title={t("CONFIG // FIXED POSITION")}>
-						<div
-							style={{
-								padding: 14,
-								display: "flex",
-								flexDirection: "column",
-								gap: 10,
-								fontSize: 12,
-							}}
-						>
+						<div className="cfg-body">
 							<span className="dim">
-								{t("For nodes without GPS: the firmware broadcasts this position to the mesh.",
+								{t(
+									"For nodes without GPS: the firmware broadcasts this position to the mesh.",
 								)}
 							</span>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-								<label>LAT</label>
-								<input
-									placeholder={self?.advLat ? String(self.advLat) : "37.4419"}
-									value={posLat}
-									style={{ width: 120 }}
-									onChange={(e) => setPosLat(e.target.value)}
-								/>
-								<label>LON</label>
-								<input
-									placeholder={self?.advLon ? String(self.advLon) : "-122.1430"}
-									value={posLon}
-									style={{ width: 120 }}
-									onChange={(e) => setPosLon(e.target.value)}
-								/>
+							<div className="cfg-coordinates">
+								<label>
+									LATITUDE
+									<input
+										placeholder={self?.advLat ? String(self.advLat) : "37.4419"}
+										value={posLat}
+										onChange={(e) => setPosLat(e.target.value)}
+									/>
+								</label>
+								<label>
+									LONGITUDE
+									<input
+										placeholder={
+											self?.advLon ? String(self.advLon) : "-122.1430"
+										}
+										value={posLon}
+										onChange={(e) => setPosLon(e.target.value)}
+									/>
+								</label>
+							</div>
+							<div className="cfg-actions">
 								<button
 									className="primary"
 									disabled={!posLat.trim() || !posLon.trim()}
@@ -664,7 +684,7 @@ export default function Config() {
 										}
 									}}
 								>
-									{t("SET")}
+									{t("SET POSITION")}
 								</button>
 								<button
 									onClick={async () => {
@@ -683,7 +703,7 @@ export default function Config() {
 								</button>
 							</div>
 							{posMsg && (
-								<span className={posCls} style={{ fontSize: 11 }}>
+								<span className={posCls} role="status">
 									{posMsg}
 								</span>
 							)}
@@ -691,15 +711,7 @@ export default function Config() {
 					</Section>
 
 					<Section title={t("CONFIG // CHANNELS")}>
-						<div
-							style={{
-								padding: 14,
-								display: "flex",
-								flexDirection: "column",
-								gap: 8,
-								fontSize: 12,
-							}}
-						>
+						<div className="cfg-body">
 							<div
 								style={{
 									display: "flex",
@@ -711,7 +723,8 @@ export default function Config() {
 								}}
 							>
 								<input
-									placeholder={t("PASTE exported channels JSON…")}
+									aria-label={t("Channels JSON")}
+									placeholder={t("Paste JSON")}
 									value={chJson}
 									style={{ flex: 1 }}
 									onChange={(e) => {
@@ -728,7 +741,7 @@ export default function Config() {
 								</button>
 							</div>
 							{importMsg && (
-								<span className={importCls || "warn"} style={{ fontSize: 11 }}>
+								<span className={importCls || "warn"} role="status">
 									{importMsg}
 								</span>
 							)}
@@ -736,6 +749,7 @@ export default function Config() {
 								style={{
 									display: "flex",
 									gap: 8,
+									flexWrap: "wrap",
 									alignItems: "center",
 									borderBottom: "1px solid var(--border)",
 									paddingBottom: 10,
@@ -749,34 +763,27 @@ export default function Config() {
 								>
 									{t("EXPORT JSON")}
 								</button>
-								<span className="dim" style={{ fontSize: 11 }}>
-									{t("channels travel with their key: share with care")}
+								<span className="dim">
+									{t(
+										"Includes channel keys. Share only with people joining your channels.",
+									)}
 								</span>
 							</div>
 							{chMsg && (
-								<span className={chCls || "warn"} style={{ fontSize: 11 }}>
+								<span className={chCls || "warn"} role="status">
 									{chMsg}
 								</span>
 							)}
 							{CHANNEL_SLOTS.map((index) => {
 								const ch = s.channels.get(index);
 								return (
-									<div
-										key={index}
-										className={ch ? "" : "dim"}
-										style={{
-											display: "flex",
-											flexDirection: "column",
-											gap: 6,
-											border: "1px solid var(--border)",
-											padding: "6px 10px",
-										}}
-									>
-										<div
-											style={{ display: "flex", alignItems: "center", gap: 10 }}
-										>
-											<span style={{ fontWeight: 700 }}>{index}</span>
+									<div key={index} className={`cfg-channel${ch ? "" : " dim"}`}>
+										<div className="cfg-channel-row">
+											<span className="cfg-channel-index" aria-hidden="true">
+												{index}
+											</span>
 											<input
+												aria-label={t("Channel {0} name", index)}
 												placeholder={
 													index === 0 ? "public" : t("— free slot —")
 												}
@@ -790,29 +797,39 @@ export default function Config() {
 													setChNames({ ...chNames, [index]: e.target.value })
 												}
 											/>
-											<button onClick={() => saveChannel(index)}>
+											<button
+												aria-label={t("Save channel {0}", index)}
+												onClick={() => saveChannel(index)}
+											>
 												{t("SAVE")}
 											</button>
 										</div>
-										<div
-											style={{ display: "flex", alignItems: "center", gap: 8 }}
-										>
-											<span
+										<div className="cfg-channel-row">
+											<label
 												className="dim"
-												style={{ fontSize: 10, letterSpacing: 1 }}
+												htmlFor={`cfg-channel-key-${index}`}
 											>
 												PSK
-											</span>
+											</label>
 											<input
+												id={`cfg-channel-key-${index}`}
+												aria-label={t(
+													"Channel {0} pre-shared key (base64)",
+													index,
+												)}
+												spellCheck={false}
+												autoCapitalize="off"
+												autoCorrect="off"
 												placeholder={t("— no key —")}
 												value={chPsks[index] ?? pskToB64(ch?.secret)}
-												style={{ flex: 1, fontFamily: "inherit", fontSize: 11 }}
+												style={{ flex: 1 }}
 												onChange={(e) =>
 													setChPsks({ ...chPsks, [index]: e.target.value })
 												}
 											/>
 											<button
 												title={t("Generate a random 128-bit key")}
+												aria-label={t("Generate key for channel {0}", index)}
 												onClick={() => genPsk(index)}
 											>
 												GEN
@@ -826,20 +843,13 @@ export default function Config() {
 				</div>
 				<div className="cfg-col">
 					<Section title={t("MODULE // ADVERT")}>
-						<div
-							style={{
-								padding: 14,
-								display: "flex",
-								flexDirection: "column",
-								gap: 10,
-								fontSize: 12,
-							}}
-						>
+						<div className="cfg-body">
 							<span className="dim">
-								{t("An advert announces your node to the mesh. ZERO HOP reaches only direct neighbors; FLOOD is repeated by repeaters and crosses the whole mesh.",
+								{t(
+									"Announce your node to the mesh. ZERO HOP reaches direct neighbors; FLOOD ADVERT travels through repeaters.",
 								)}
 							</span>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<div className="cfg-actions">
 								<button
 									className="primary"
 									onClick={() => {
@@ -855,7 +865,7 @@ export default function Config() {
 											});
 									}}
 								>
-									[ FLOOD ADVERT ]
+									FLOOD ADVERT
 								</button>
 								<button
 									onClick={() => {
@@ -871,11 +881,11 @@ export default function Config() {
 											});
 									}}
 								>
-									[ ZERO HOP ]
+									ZERO HOP
 								</button>
 							</div>
 							{advMsg && (
-								<span className={advCls} style={{ fontSize: 11 }}>
+								<span className={advCls} role="status">
 									{advMsg}
 								</span>
 							)}
@@ -884,94 +894,72 @@ export default function Config() {
 
 					<Section title={t("CONFIG // DEVICE")}>
 						<div className="form-grid">
-							<label>{t("MODEL")}</label>
+							<span className="cfg-label">{t("MODEL")}</span>
 							<span className="dim">{s.deviceInfo?.model || "—"}</span>
-							<label>FIRMWARE</label>
+							<span className="cfg-label">FIRMWARE</span>
 							<span className="dim">
 								{s.deviceInfo
 									? `v${s.deviceInfo.firmwareVer} · ${s.deviceInfo.buildDate}`
 									: "—"}
 							</span>
-							<label>{t("BATTERY")}</label>
+							<span className="cfg-label">{t("BATTERY")}</span>
 							<span className="dim">
 								{s.deviceInfo?.batteryMv !== undefined
 									? `${s.deviceInfo.batteryMv} mV`
 									: "—"}
 							</span>
 						</div>
-						<div
-							style={{
-								padding: "0 14px 14px",
-								display: "flex",
-								flexDirection: "column",
-								gap: 10,
-								fontSize: 12,
-							}}
-						>
-							<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-								<button
-									className="primary"
-									style={{ width: 180 }}
-									onClick={onReboot}
-								>
-									{rebootArm ? t("[ SURE? ]") : "[ REBOOT ]"}
+						<div className="cfg-body cfg-body-continued">
+							<div className="cfg-actions">
+								<button className="primary" onClick={onReboot}>
+									{rebootArm ? t("CONFIRM REBOOT") : t("REBOOT")}
 								</button>
 								<span className="dim">
-									{t("reboots the device · ~8 s offline")}
+									{t("Radio offline for about 8 seconds.")}
 								</span>
 							</div>
-							{maint && <span className="warn">{maint}</span>}
+							{maint && (
+								<span className="warn" role="status">
+									{maint}
+								</span>
+							)}
 						</div>
 					</Section>
 
 					<Section title={t("CONFIG // BACKUP")}>
-						<div
-							style={{
-								padding: 14,
-								display: "flex",
-								flexDirection: "column",
-								gap: 10,
-								fontSize: 12,
-							}}
-						>
+						<div className="cfg-body">
 							<span className="dim">
-								{t("Full node config (name, radio and channels with keys) to JSON.",
+								{t(
+									"Save the node name, radio settings, and channels with their keys as JSON.",
 								)}
 							</span>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<div className="cfg-actions">
 								<button className="primary" onClick={onBackup}>
 									{t("SAVE BACKUP")}
 								</button>
-								<label
-									className="btn"
-									style={{
-										border: "1px solid var(--border)",
-										padding: "4px 10px",
-										cursor: "pointer",
-									}}
-								>
+								<button onClick={() => backupFile.current?.click()}>
 									{t("RESTORE…")}
-									<input
-										type="file"
-										accept=".json,application/json"
-										style={{ display: "none" }}
-										onChange={(e) => {
-											const f = e.target.files?.[0];
-											if (f) onRestore(f);
-											e.target.value = "";
-										}}
-									/>
-								</label>
-								<button onClick={onExportKey}>
-									{t("EXPORT PRIVATE KEY")}
 								</button>
+								<input
+									ref={backupFile}
+									type="file"
+									accept=".json,application/json"
+									hidden
+									onChange={(e) => {
+										const f = e.target.files?.[0];
+										if (f) onRestore(f);
+										e.target.value = "";
+									}}
+								/>
+								<button onClick={onExportKey}>{t("EXPORT PRIVATE KEY")}</button>
 							</div>
-							<span className="dim err" style={{ fontSize: 11 }}>
-								{t("The private key IS the node's identity: whoever holds it can impersonate it. Store it encrypted.",
+							<span className="dim">
+								{t(
+									"Your private key identifies your node. Anyone with the key can impersonate it; store it encrypted.",
 								)}
 							</span>
 							{bkMsg && (
-								<span className={bkCls} style={{ fontSize: 11 }}>
+								<span className={bkCls} role="status">
 									{bkMsg}
 								</span>
 							)}
@@ -979,61 +967,46 @@ export default function Config() {
 					</Section>
 
 					<Section title={t("CONFIG // DATABASE")}>
-						<div
-							style={{
-								padding: 14,
-								display: "flex",
-								flexDirection: "column",
-								gap: 10,
-								fontSize: 12,
-							}}
-						>
+						<div className="cfg-body">
 							<span className="dim">
 								{stats
-									? t("{0} messages · {1} telemetry samples · {2} nodes",
+									? t(
+											"{0} messages · {1} telemetry samples · {2} nodes",
 											stats.messages,
 											stats.telemetry,
 											stats.nodes,
 										)
 									: t("reading…")}
 							</span>
-							<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-								<span>{t("delete anything older than")}</span>
-								<input
-									type="number"
-									min={1}
-									value={purgeDays}
-									style={{ width: 80 }}
-									onChange={(e) => {
-										setPurgeDays(Number(e.target.value));
-										setPurgeArm(false);
-									}}
-								/>
-								<span>{t("days")}</span>
-								<button
-									className="danger"
-									style={{ width: 180 }}
-									onClick={onPurge}
-								>
-									{purgeArm ? t("[ SURE? ]") : t("[ PURGE ]")}
+							<div className="cfg-retention">
+								<label htmlFor="cfg-purge-days">{t("DELETE OLDER THAN")}</label>
+								<div className="cfg-unit-field">
+									<input
+										id="cfg-purge-days"
+										type="number"
+										min={1}
+										value={purgeDays}
+										onChange={(e) => {
+											setPurgeDays(Number(e.target.value));
+											setPurgeArm(false);
+										}}
+									/>
+									<span>{t("days")}</span>
+								</div>
+								<button className="danger" onClick={onPurge}>
+									{purgeArm ? t("CONFIRM PURGE") : t("PURGE")}
 								</button>
 							</div>
 							<span className="dim">
-								{t("affects messages and telemetry · nodes are untouched")}
+								{t("Deletes stored messages and telemetry. Keeps nodes.")}
 							</span>
-							{purgeMsg && <span className="warn">{purgeMsg}</span>}
-							<div
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 12,
-									borderTop: "1px solid var(--border)",
-									paddingTop: 10,
-								}}
-							>
-								<label
-									style={{ display: "flex", alignItems: "center", gap: 6 }}
-								>
+							{purgeMsg && (
+								<span className="warn" role="status">
+									{purgeMsg}
+								</span>
+							)}
+							<div className="cfg-auto-retention">
+								<label className="cfg-check">
 									<input
 										type="checkbox"
 										checked={autoPurge > 0}
@@ -1045,19 +1018,21 @@ export default function Config() {
 									/>
 									{t("PURGE ON STARTUP")}
 								</label>
-								<input
-									type="number"
-									min={1}
-									disabled={autoPurge === 0}
-									value={autoPurge || purgeDays}
-									style={{ width: 80 }}
-									onChange={(e) => {
-										const v = Number(e.target.value);
-										setAutoPurge(v);
-										setAutoPurgeDays(v);
-									}}
-								/>
-								<span>{t("days")}</span>
+								<div className="cfg-unit-field">
+									<input
+										aria-label={t("Days to keep on startup")}
+										type="number"
+										min={1}
+										disabled={autoPurge === 0}
+										value={autoPurge || purgeDays}
+										onChange={(e) => {
+											const v = Number(e.target.value);
+											setAutoPurge(v);
+											setAutoPurgeDays(v);
+										}}
+									/>
+									<span>{t("days")}</span>
+								</div>
 							</div>
 						</div>
 					</Section>

@@ -6,6 +6,7 @@ import {
   binCenterHz,
   dbRange,
   DEFAULT_DB_RANGE,
+  foldSpectrumPeaks,
   fmtMHz,
   freqTicks,
   hexToRgb,
@@ -92,6 +93,46 @@ test('updatePeakHold keeps the loudest value per bin', () => {
   assert.deepEqual(updatePeakHold(second, [-70, -71]), [-70, -71]);
   // The fold never mutates its input.
   assert.deepEqual(first, [-120, -90, -110]);
+});
+
+test('retuning either band edge never carries an old peak into the new frequencies', () => {
+  const first = sweep({ db: [-40, -110, -120], atMs: 10 });
+  const held = foldSpectrumPeaks({ uptoMs: 0 }, [first]);
+  for (const edges of [
+    { f0Hz: 920_000_000 },
+    { f1Hz: 922_000_000 },
+    { f0Hz: 920_000_000, f1Hz: 922_000_000 },
+  ]) {
+    // Even passes stamped in the same millisecond belong to a new band.
+    const retuned = sweep({ ...edges, db: [-110, -100, -115], atMs: 10 });
+    const ring = appendSpectrumSweep([first], retuned);
+    const peak = foldSpectrumPeaks(held, ring);
+    assert.deepEqual(peak.db, retuned.db);
+    assert.equal(peakBin(peak.db!), 1);
+  }
+  assert.deepEqual(held.db, first.db);
+});
+
+test('peak hold survives waterfall expiry, while clearing waits for a new pass', () => {
+  const first = sweep({ db: [-40, -100, -120], atMs: 10 });
+  const next = sweep({ db: [-110, -95, -115], atMs: 20 });
+  const held = foldSpectrumPeaks({ uptoMs: 0 }, [first]);
+  // The first pass has left the ring, but its peak remains held.
+  const updated = foldSpectrumPeaks(held, [next]);
+  assert.deepEqual(updated.db, [-40, -95, -115]);
+  const cleared = foldSpectrumPeaks({ ...updated, db: undefined }, [next]);
+  assert.equal(cleared.db, undefined);
+  const later = sweep({ db: [-105, -98, -110], atMs: 30 });
+  assert.deepEqual(foldSpectrumPeaks(cleared, [next, later]).db, later.db);
+});
+
+test('peak hold restarts when the bin count changes or history is emptied', () => {
+  const held = foldSpectrumPeaks({ uptoMs: 0 }, [sweep({ db: [-40, -90, -110] })]);
+  const rebinned = sweep({ db: [-120, -115] });
+  assert.deepEqual(foldSpectrumPeaks(held, [rebinned]).db, rebinned.db);
+  const empty = foldSpectrumPeaks(held, []);
+  assert.equal(empty.db, undefined);
+  assert.deepEqual(foldSpectrumPeaks(empty, [rebinned]).db, rebinned.db);
 });
 
 test('dbRange spans the data with a minimum spread', () => {

@@ -17,10 +17,12 @@
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
     "@liamcottle/meshcore.js": "^1.14.0",
+    "@maplibre/maplibre-gl-leaflet": "^0.1.4",
     "@radix-ui/react-radio-group": "^1.4.7",
     "dialkit": "^2.0.0",
     "framer-motion": "^13.1.0",
     "leaflet": "^1.9.4",
+    "maplibre-gl": "^6.8.0",
     "motion": "^13.2.0",
     "mqtt": "^5.15.2",
     "react": "^18.3.1",

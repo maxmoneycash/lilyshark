@@ -1,0 +1,168 @@
+.meshterm .nodes-screen .nodes-table th {
+	padding-block: 0;
+	letter-spacing: 0;
+}
+.meshterm .nodes-screen :is(.nodes-sort, .nodes-open) {
+	min-width: 0;
+	min-height: 44px;
+	width: 100%;
+	padding: 4px 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: inherit;
+	font: inherit;
+	letter-spacing: 0;
+	text-align: left;
+	white-space: normal;
+	transition: none;
+}
+.meshterm .nodes-screen :is(.nodes-sort, .nodes-open):is(:hover, :active):not(:disabled) {
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	color: inherit;
+	transform: none;
+}
+.meshterm .nodes-screen :is(.nodes-sort, .nodes-open):focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
+}
+.meshterm .nodes-screen .nodes-sort {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	line-height: 1.25;
+	font-size: 10px;
+}
+.meshterm .nodes-screen th[aria-sort] {
+	color: var(--ink, var(--fg));
+}
+.meshterm .nodes-sort-label {
+	min-width: 0;
+}
+.meshterm .nodes-sort-unit {
+	display: block;
+	font-size: 9px;
+	font-weight: 400;
+}
+.meshterm .nodes-sort-arrow {
+	flex: 0 0 1ch;
+	font-size: 12px;
+	opacity: .45;
+}
+.meshterm .nodes-sort-arrow[data-active='true'] {
+	opacity: 1;
+}
+.meshterm .nodes-sort-compact {
+	display: none;
+}
+.meshterm .nodes-screen .nodes-name {
+	display: block;
+	font-size: 13px;
+	line-height: 1.4;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+.meshterm .nodes-screen .nodes-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px 8px;
+	margin-top: 3px;
+	font-size: 10px;
+	line-height: 1.5;
+	font-weight: 400;
+	color: color-mix(in srgb, currentColor 72%, transparent);
+}
+.meshterm .nodes-id {
+	white-space: nowrap;
+}
+.meshterm .nodes-screen :is(.nodes-snr, .nodes-seen) {
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+.meshterm .nodes-screen .nodes-table th:is(:nth-child(3), :nth-child(7)) .nodes-sort {
+	justify-content: flex-end;
+	text-align: right;
+}
+.meshterm .nodes-detail-name {
+	margin: 0;
+	padding: 12px 12px 4px;
+	font-size: 16px;
+	line-height: 1.4;
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+.meshterm .nodes-detail-name:focus {
+	outline: none;
+}
+.meshterm .nodes-detail > .panel-title {
+	flex-wrap: nowrap;
+	gap: 12px;
+	padding: 8px 12px;
+}
+.meshterm .nodes-detail > .panel-title > button {
+	flex: 0 0 auto;
+	width: auto;
+	min-height: 44px;
+}
+.meshterm .nodes-detail .nodes-facts {
+	grid-template-columns: minmax(0, 11ch) minmax(0, 1fr);
+	gap: 8px 12px;
+	margin: 0;
+	padding: 12px;
+	border-top: 1px solid var(--border);
+	font-size: 12px;
+	line-height: 1.45;
+}
+.meshterm .nodes-detail .nodes-facts :is(.k, .v) {
+	min-width: 0;
+	margin: 0;
+	font-size: inherit;
+	font-weight: 400;
+	overflow-wrap: anywhere;
+}
+.meshterm .nodes-detail .nodes-facts .v {
+	font-variant-numeric: tabular-nums;
+}
+@media (max-width: 860px) {
+	.meshterm .nodes-screen .nodes-detail {
+		/* Leave room to align a short detail panel below the sticky header. */
+		min-height: calc(100dvh - var(--nodes-header-height, 64px) - 12px);
+		scroll-margin-top: calc(var(--nodes-header-height, 64px) + 12px);
+	}
+	.meshterm .nodes-detail-spacer {
+		display: none;
+	}
+	.meshterm .nodes-screen .nodes-table th:nth-child(3),
+	.meshterm .nodes-screen .nodes-table td:nth-child(3),
+	.meshterm .nodes-screen .nodes-table th:nth-child(7),
+	.meshterm .nodes-screen .nodes-table td:nth-child(7) {
+		width: 68px;
+	}
+	.meshterm .nodes-screen .nodes-table td {
+		padding-block: 8px;
+		vertical-align: middle;
+	}
+	.meshterm .nodes-screen .nodes-table td:first-child {
+		padding-block: 4px;
+	}
+	.meshterm .nodes-screen .nodes-snr {
+		font-size: 12px;
+	}
+	.meshterm .nodes-sort-full {
+		display: none;
+	}
+	.meshterm .nodes-sort-compact {
+		display: inline;
+	}
+	.meshterm .nodes-screen .nodes-meta {
+		font-size: 10px;
+		gap: 1px 6px;
+	}
+	.meshterm .nodes-screen .nodes-table .this-device-row td:nth-child(3) {
+		font-size: 10px;
+	}
+}

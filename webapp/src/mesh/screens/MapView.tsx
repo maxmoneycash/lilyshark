@@ -1,3 +1,6 @@
+import CommunityCoverageMap from "./CommunityCoverageMap";
+import { CoverageIcon } from "./CoverageControls";
+import { validCoordinates } from "../../lib/meshmapper";
 import { mapPinMarkup } from "../../components/UiIcon";
 import L from "leaflet";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -102,12 +105,12 @@ function cellPopup(
 				? t("NOT MEASURED")
 				: cell.bestSnrDb === null || cell.grade === null
 					? t("no figure reported")
-					: `${cell.bestSnrDb.toFixed(1)} dB · ${GRADE_LABEL[cell.grade]}`,
+					: `${cell.bestSnrDb.toFixed(1)} DB · ${GRADE_LABEL[cell.grade]}`,
 		),
-		dim("SNR", cell.provenance === "measured" ? stats(cell.snrDb, "dB") : "—"),
+		dim("SNR", cell.provenance === "measured" ? stats(cell.snrDb, "DB") : "—"),
 		dim(
 			"RSSI",
-			cell.provenance === "measured" ? stats(cell.rssiDbm, "dBm") : "—",
+			cell.provenance === "measured" ? stats(cell.rssiDbm, "DBM") : "—",
 		),
 		dim(
 			t("SAMPLES"),
@@ -149,7 +152,7 @@ interface Draft {
 	expireH: number; // hours · 0 = never expires
 }
 
-export default function MapView({
+function RadioMapView({
 	onOpenNode,
 	focusNode,
 }: {
@@ -162,8 +165,7 @@ export default function MapView({
 		deviceLink.status === "linked" &&
 		deviceLink.telemetry?.lat !== undefined &&
 		deviceLink.telemetry.lon !== undefined &&
-		(Math.abs(deviceLink.telemetry.lat) > 0.1 ||
-			Math.abs(deviceLink.telemetry.lon) > 0.1)
+		validCoordinates(deviceLink.telemetry.lat, deviceLink.telemetry.lon)
 			? { lat: deviceLink.telemetry.lat, lon: deviceLink.telemetry.lon }
 			: undefined;
 	// the markers are drawn with fg(): they have to be redrawn on a theme change
@@ -282,8 +284,8 @@ export default function MapView({
 		} else {
 			const group = L.layerGroup();
 			L.tileLayer(
-				"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-				{ attribution: "FIELD DARK" },
+				'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+				{ attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxNativeZoom: 19 },
 			).addTo(group);
 			const Contours = L.GridLayer.extend({
 				createTile(coords: L.Coords, done: (err: Error | null, tile: HTMLElement) => void) {
@@ -388,7 +390,7 @@ export default function MapView({
 			`</div>` +
 			`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;">` +
 			`<span style="opacity:.85;">ID</span><span>!${n.num.toString(16)}</span>` +
-			`<span style="opacity:.85;">SNR</span><span>${n.snr !== undefined ? `${n.snr.toFixed(2)} dB` : "—"}</span>` +
+			`<span style="opacity:.85;">SNR</span><span>${n.snr !== undefined ? `${n.snr.toFixed(2)} DB` : "—"}</span>` +
 			`<span style="opacity:.85;">BAT</span><span>${asciiBattery(n.batteryLevel)}</span>` +
 			`<span style="opacity:.85;">${t("SEEN")}</span><span title="${dateTime(n.lastHeard * 1000)}">${t("{0} ago", ago(n.lastHeard))}</span>` +
 			`</div>`;
@@ -416,12 +418,15 @@ export default function MapView({
 			)) {
 				btn.onclick = () => openNodeRef.current(Number(btn.dataset.num));
 			}
-			const marker = L.circleMarker([lat, lon], {
-				radius: group.length > 1 ? 8 : 6,
-				color,
-				fillColor: color,
-				fillOpacity: 0.85,
-				weight: group.length > 1 ? 2 : 1,
+			const marker = L.marker([lat, lon], {
+				title: label,
+				icon: L.divIcon({
+					className: group.length > 1 ? "coverage-cluster" : `coverage-repeater${hasMe ? " is-selected" : ""}`,
+					html: group.length > 1
+						? `<span class="coverage-cluster-face" style="width:26px;height:26px;${allNet ? `border-color:${color}` : ""}">${group.length}</span>`
+						: `<span class="coverage-repeater-face" style="background:${color}"></span>`,
+					iconSize: [44, 44], iconAnchor: [22, 22],
+				}),
 			})
 				.bindPopup(box, { maxHeight: 260 })
 				.bindTooltip(label, { permanent: false, direction: "right" })
@@ -769,6 +774,8 @@ export default function MapView({
 	return (
 		<main className="map-main">
 			<div className="panel" style={{ flex: 1 }}>
+				<details className="radio-map-options">
+					<summary><CoverageIcon name="filter" /><span>Map options</span><small>{drawn.length} nodes</small></summary>
 				<div className="panel-title">
 					<span className="panel-title-label">
 						{t("PANEL // TACTICAL MAP")} · {t("{0} NODES", s.nodes.size)} ·{" "}
@@ -824,25 +831,9 @@ export default function MapView({
 						</span>
 					</span>
 				</div>
+				</details>
 				<div className="map-wrap">
 					<div ref={divRef} style={{ height: "100%" }} />
-					{isDemo() && (
-						<div className="panel map-wait">
-							<div className="panel-title">DEMO MAP · PALO ALTO</div>
-							<div className="map-wait-body">
-								<p>
-									These pins are invented. They are not your T-Deck. Your
-									device last locked at a real GPS fix on its own screen.
-									This website only plots that fix after USB says{" "}
-									<strong>T-DECK LINKED</strong> and telemetry includes lat/lon.
-								</p>
-								<p>
-									Press CONNECT in the header. Pick the T-Deck. The demo mesh
-									clears. The map jumps to the coordinates on the device.
-								</p>
-							</div>
-						</div>
-					)}
 					{deviceLink.status === "linked" && !deviceFix && (
 						<div className="panel map-wait">
 							<div className="panel-title">THIS T-DECK IS NOT ON THE MAP YET</div>
@@ -869,6 +860,7 @@ export default function MapView({
 						</div>
 					)}
 					<div className="map-hud map-hud-top">
+						{isDemo() && <>DEMO MAP · PALO ALTO · </>}
 						{t("{0} NODES · {1} POINTS", drawn.length, points)} ·{" "}
 						{basemap === "sat"
 							? "ESRI SAT"
@@ -1121,4 +1113,8 @@ export default function MapView({
 			</div>
 		</main>
 	);
+}
+
+export default function MapView(props: { onOpenNode: (num: number) => void; focusNode?: number }) {
+  return <CommunityCoverageMap focusNode={props.focusNode}><RadioMapView {...props} /></CommunityCoverageMap>;
 }

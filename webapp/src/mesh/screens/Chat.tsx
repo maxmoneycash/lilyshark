@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { clearUnread, getSnapshot, subscribe, type Message } from "../store";
+import { clearUnread, DeviceStatus, getSnapshot, subscribe, type Message } from "../store";
 import { clearConvo, retryMessage, sendText } from "../radio";
 import { saveText, stamp } from "../export";
 import { getDeviceLinkState } from "../../lib/deviceLink";
 import { t } from "../i18n";
 import { dateTime, hhmm } from "../fmt";
+import "./chat-polish.css";
 
 // in search results the time alone isn't enough: they may be from another day
 const dateLabel = (ms: number) =>
@@ -54,12 +55,15 @@ export default function Chat({
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement | null>(null);
   // the 3 s disarm of the CLEAR confirmation
   const clearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [replyTo, setReplyTo] = useState<Message | undefined>();
   const followLatest = useRef(true);
   const previousView = useRef("");
   const previousLast = useRef("");
+  const searchTarget = useRef<string>();
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const [sendShake, setSendShake] = useState(false);
 
@@ -68,6 +72,32 @@ export default function Chat({
   }, [focusSearch]);
 
   useEffect(() => () => clearTimeout(clearTimer.current), []);
+
+  useLayoutEffect(() => {
+    const element = menuRef.current;
+    if (!menu || !element) return;
+    const bounds = element.getBoundingClientRect();
+    element.style.left = `${Math.max(12, Math.min(menu.x, window.innerWidth - bounds.width - 12))}px`;
+    element.style.top = `${Math.max(12, Math.min(menu.y, window.innerHeight - bounds.height - 12))}px`;
+    const items = [...element.querySelectorAll<HTMLButtonElement>("button")];
+    items[0]?.focus({ preventScroll: true });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenu(undefined);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const index = items.indexOf(document.activeElement as HTMLButtonElement);
+        const next = (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+        items[next]?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (menuTrigger.current?.isConnected) menuTrigger.current.focus({ preventScroll: true });
+    };
+  }, [menu]);
 
   // Search walks ALL conversations: finding an old message usually matters
   // more than which channel it was in. Each result says where it came from.
@@ -87,9 +117,22 @@ export default function Chat({
     previousView.current = `${convo}:${q}`;
     const messageArrived = previousLast.current !== lastMessageKey;
     previousLast.current = lastMessageKey;
-    if (q) return;
     const el = listRef.current;
     if (!el) return;
+    if (q) {
+      if (viewChanged) el.scrollTop = 0;
+      return;
+    }
+    if (searchTarget.current) {
+      const target = el.querySelector<HTMLElement>(`[data-message-key="${searchTarget.current}"]`);
+      searchTarget.current = undefined;
+      if (target) {
+        target.scrollIntoView({ block: "center", behavior: "instant" });
+        followLatest.current = false;
+        setHasNewMessages(false);
+        return;
+      }
+    }
     if (viewChanged || followLatest.current || (messageArrived && lastMessage?.mine)) {
       el.scrollTop = el.scrollHeight;
       followLatest.current = true;
@@ -137,6 +180,11 @@ export default function Chat({
       ? `@${s.nodes.get(Number(key.slice(3)))?.shortName ?? key.slice(3)}`
       : key);
   const convoLabel = labelOf(convo);
+  const openSearchMessage = (message: Message) => {
+    searchTarget.current = `${message.id}:${message.ts}`;
+    setConvo(message.convo);
+    setSearch("");
+  };
 
   const onSend = async () => {
     const text = draft.trim();
@@ -166,7 +214,7 @@ export default function Chat({
   };
 
   return (
-    <main>
+    <main className="chat-screen">
       <div className="panel chat-convos" style={{ width: 230, flexShrink: 0 }}>
         <div className="panel-title">{t("PANEL // CHANNELS")}</div>
         <div className="chat-convo-list">
@@ -212,22 +260,45 @@ export default function Chat({
       </div>
 
       <div className="panel chat-thread" style={{ flex: 1, minWidth: 0 }}>
-        <div className="panel-title">
-          <span className="panel-title-label">
-            PANEL // CHAT · {convoLabel}
+        <div className="panel-title chat-titlebar">
+          <div className="chat-heading">
+            <span className="chat-heading-label">CHAT · {convoLabel}</span>
+            <select
+              className="chat-conversation-picker"
+              aria-label={t("Conversation")}
+              value={convo}
+              onChange={(e) => setConvo(e.target.value)}
+            >
+              <optgroup label={t("Channels")}>
+                {channelConvos.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}{(s.unread.get(c.key) ?? 0) > 0 ? ` · ${s.unread.get(c.key)} unread` : ""}
+                  </option>
+                ))}
+              </optgroup>
+              {dmConvos.length > 0 && (
+                <optgroup label={t("Direct messages")}>
+                  {dmConvos.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label}{(s.unread.get(c.key) ?? 0) > 0 ? ` · ${s.unread.get(c.key)} unread` : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
             {convo.startsWith("dm:") &&
               (s.nodes.get(Number(convo.slice(3)))?.publicKey ? (
-                <span title={t("END-TO-END ENCRYPTED (PKI)")}> PKI</span>
+                <span className="chat-encryption" title={t("END-TO-END ENCRYPTED (PKI)")}>PKI</span>
               ) : (
                 <span
-                  className="warn"
+                  className="chat-encryption warn"
                   title={t("NO PUBLIC KEY: ENCRYPTED WITH THE CHANNEL PSK ONLY")}
                 >
                   {" "}
                   {t("NO PKI")}
                 </span>
               ))}
-          </span>
+          </div>
           <span className="chat-tools">
             <input
               ref={searchRef}
@@ -239,23 +310,23 @@ export default function Chat({
                   e.currentTarget.blur();
                 }
               }}
-              placeholder={t("SEARCH THE WHOLE HISTORY_")}
+              placeholder={t("Search")}
               aria-label={t("Search message history")}
               title={t("CTRL+F · ESC CLEARS")}
               className="chat-search"
             />
             <button
 
-              title={t("EXPORT THIS CONVERSATION TO A TEXT FILE")}
+              title={q ? t("Export search results to a text file") : t("Export this conversation to a text file")}
               disabled={msgs.length === 0}
               onClick={async () => {
                 try {
                   const path = await saveText(
-                    `meshcore-${convo.replace(":", "-")}-${stamp()}.txt`,
+                    `meshcore-${q ? "search" : convo.replace(":", "-")}-${stamp()}.txt`,
                     msgs
                       .map(
                         (m) =>
-                          `${new Date(m.ts).toISOString()} [${convoLabel}] <${m.mine ? t("ME") : nodeShort(m.from)}> ${m.text}${m.mine ? ` (${m.state})` : ""}`,
+                          `${new Date(m.ts).toISOString()} [${labelOf(m.convo)}] <${m.mine ? t("ME") : nodeShort(m.from)}> ${m.text}${m.mine ? ` (${m.state})` : ""}`,
                       )
                       .join("\n"),
                   );
@@ -271,6 +342,7 @@ export default function Chat({
               className="danger"
 
               title={t("DELETE ALL MESSAGES IN THIS CONVERSATION")}
+              aria-label={t("Clear {0} history", convoLabel)}
               disabled={convoCount === 0}
               onClick={() => {
                 if (confirmClear) {
@@ -292,12 +364,12 @@ export default function Chat({
             >
               {confirmClear ? t("SURE?") : t("CLEAR")}
             </button>
-            <span className="chat-known">{t("{0} KNOWN NODES", s.nodes.size)}</span>
           </span>
         </div>
         <div
           ref={listRef}
           className="scroll-y chat-msgs"
+          data-searching={Boolean(q)}
           tabIndex={0}
           role="region"
           aria-label={t("Messages in {0}", convoLabel)}
@@ -317,24 +389,26 @@ export default function Chat({
             <div className="chat-empty">
               <div className="chat-empty-title">
                 {q
-                  ? t("NO RESULTS FOR \"{0}\"", search)
-                  : t("NO MESSAGES IN {0}", convoLabel)}
+                  ? t("No messages match \"{0}\"", search)
+                  : t("No messages in {0} yet", convoLabel)}
               </div>
               <div className="dim">
                 {q
-                  ? t("TRY ANOTHER WORD OR CLEAR SEARCH WITH ESC.")
-                  : t("TYPE BELOW AND PRESS SEND E. ENTER ALSO TRANSMITS.")}
+                  ? t("Try another word or clear the search field.")
+                  : (s.status ?? DeviceStatus.Disconnected) >= DeviceStatus.Connected || getDeviceLinkState().status === "linked"
+                    ? t("Write a message below to start the conversation.")
+                    : t("Connect a radio to send and receive mesh messages.")}
               </div>
             </div>
           )}
           {!q && getDeviceLinkState().status === "linked" && (
             <div className="chat-hint">
-              {t("SAME RADIO AS THE T-DECK. DEVICE: CHAT TAB, TYPE, ENTER. TAB CYCLES LONGFAST OR A HEARD NODE.")}
+              {t("Messages sent here also appear in the T-Deck’s Chat tab.")}
             </div>
           )}
           {q && msgs.length > 0 && (
             <div className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
-              {t("{0} RESULTS · CLICK TO JUMP TO THE CONVERSATION", msgs.length)}
+              {t("{0} {1} across all conversations. Select a message to open it.", msgs.length, msgs.length === 1 ? "result" : "results")}
             </div>
           )}
           {msgs.map((m, i) => {
@@ -347,12 +421,20 @@ export default function Chat({
             {sep && <div className="chat-daysep">{dateSep(m.ts)}</div>}
             <div
               className={`chat-line${m.mine ? ` msg-mine${m.state === "failed" ? " failed" : ""}` : ""}`}
+              role={q ? "button" : undefined}
+              tabIndex={q ? 0 : undefined}
+              onKeyDown={q ? (e) => {
+                if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  openSearchMessage(m);
+                }
+              } : undefined}
               style={q ? { cursor: "pointer" } : undefined}
+              data-message-key={`${m.id}:${m.ts}`}
               onClick={
                 q
                   ? () => {
-                      setConvo(m.convo);
-                      setSearch("");
+                      openSearchMessage(m);
                     }
                   : undefined
               }
@@ -375,18 +457,22 @@ export default function Chat({
                     </div>
                   );
                 })()}
-              <span className="dim" title={dateTime(m.ts)}>[{hhmm(m.ts)}]</span>{" "}
-              <span
-                className={`nodelink ${m.mine ? "" : "warn"}`}
+              <div className="chat-message-head">
+              <time className="dim chat-message-time" dateTime={new Date(m.ts).toISOString()} title={dateTime(m.ts)}>{hhmm(m.ts, false)}</time>{" "}
+              <button
+                type="button"
+                className={`nodelink chat-sender ${m.mine ? "" : "warn"}`}
                 style={m.mine ? { fontWeight: 700 } : undefined}
                 title={t("NODE ACTIONS")}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setMenu({ num: m.from, x: e.clientX, y: e.clientY });
+                  const bounds = e.currentTarget.getBoundingClientRect();
+                  menuTrigger.current = e.currentTarget;
+                  setMenu({ num: m.from, x: e.clientX || bounds.left, y: e.clientY || bounds.bottom });
                 }}
               >
                 &lt;{m.mine ? t("ME") : nodeShort(m.from)}&gt;
-              </span>{" "}
+              </button>{" "}
               {!m.mine &&
                 (m.hops !== undefined || m.snr !== undefined) &&
                 (() => {
@@ -398,12 +484,11 @@ export default function Chat({
                         : m.hops !== undefined
                           ? t("{0} HOPS", m.hops)
                           : null,
-                    m.snr !== undefined ? `${m.snr.toFixed(1)} DB` : null,
+                    m.snr !== undefined ? `${m.snr.toFixed(1)} dB` : null,
                   ].filter(Boolean);
                   return (
                     <span
-                      className="dim"
-                      style={{ fontSize: 10 }}
+                      className="dim chat-link-quality"
                       title={t("HOPS TO REACH US (HOPSTART − HOPLIMIT) · SNR OF THE LAST HOP",
                       )}
                     >
@@ -411,6 +496,21 @@ export default function Chat({
                     </span>
                   );
                 })()}
+              {!q && (
+                <button
+                  className="quote-btn"
+                  title={t("REPLY")}
+                  aria-label={t("Reply to {0}", nodeShort(m.from))}
+                  onClick={() => {
+                    setReplyTo(m);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  {t("REPLY")}
+                </button>
+              )}
+              </div>
+              <div className="chat-message-body">
               {m.text}{" "}
               {m.mine && m.state === "queued" && (
                 <span className="warn">{t("⧗ QUEUED")}</span>
@@ -440,19 +540,7 @@ export default function Chat({
                   </button>
                 </>
               )}
-              {!q && (
-                <button
-                  className="quote-btn"
-                  title={t("REPLY")}
-                  aria-label={t("Reply to {0}", nodeShort(m.from))}
-                  onClick={() => {
-                    setReplyTo(m);
-                    inputRef.current?.focus();
-                  }}
-                >
-                  {t("REPLY")}
-                </button>
-              )}
+              </div>
             </div>
             </Fragment>
             );
@@ -495,9 +583,9 @@ export default function Chat({
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && onSend()}
-              placeholder={t("TYPE A MESSAGE")}
-              aria-label={t("Message")}
+              onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && onSend()}
+              placeholder={t("Message…")}
+              aria-label={t("Message {0}", convoLabel)}
               maxLength={200}
             />
             <span
@@ -515,7 +603,7 @@ export default function Chat({
               disabled={!draft.trim()}
               onClick={() => void onSend()}
             >
-              {t("SEND E")}
+              {t("SEND")}
             </button>
           </div>
         </div>
@@ -531,10 +619,11 @@ export default function Chat({
           return (
             <>
               <div className="menu-overlay" onClick={close} />
-              <div className="node-menu" style={{ left: menu.x, top: menu.y }}>
+              <div ref={menuRef} className="node-menu" role="menu" aria-label={t("Actions for {0}", nodeShort(menu.num))} style={{ left: menu.x, top: menu.y }}>
                 <div className="node-menu-title">{nodeShort(menu.num)}</div>
                 {menu.num !== s.myNodeNum && (
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setConvo(`dm:${menu.num}`);
                       setSearch("");
@@ -545,6 +634,7 @@ export default function Chat({
                   </button>
                 )}
                 <button
+                  role="menuitem"
                   onClick={() => {
                     onViewNode(menu.num);
                     close();
@@ -554,6 +644,7 @@ export default function Chat({
                 </button>
                 {hasPos && (
                   <button
+                    role="menuitem"
                     onClick={() => {
                       onViewOnMap(menu.num);
                       close();

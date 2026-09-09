@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { activityGrid } from "../activityGrid";
 import { loadActivity, loadAllTraceroutes, loadNeighbors } from "../db";
 import { demoNeighbors } from "../demo";
@@ -7,6 +13,7 @@ import { t } from "../i18n";
 import { buildEdges, type Edge, edgeKey as key, summarize } from "../mesh";
 import { getSnapshot, subscribe } from "../store";
 import { accent, fg, useThemeTick } from "../theme";
+import "./radio-analysis.css";
 
 /** Fruchterman-Reingold layout, fixed iterations (no animation).
  *  ponytail: O(n²) per iteration; with ~100 nodes that's fine and avoids a quadtree.
@@ -130,6 +137,13 @@ export default function Mesh() {
 	const [sel, setSel] = useState<number | undefined>();
 	const [reload, setReload] = useState(0);
 	const [view, setView] = useState<"graph" | "activity">("graph");
+	const graphViewport = useRef<HTMLDivElement>(null);
+	const nodeDetail = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (sel !== undefined && window.matchMedia("(max-width: 860px)").matches) {
+			nodeDetail.current?.scrollIntoView({ block: "nearest" });
+		}
+	}, [sel]);
 	// `hourBucket`, spelled the way loadActivity and the sightings store spell
 	// it. This was declared as `hhmm` and the grid below read `r.hhmm`, which
 	// is not a field any row has: every count landed under the single key
@@ -175,6 +189,27 @@ export default function Mesh() {
 	}, [edges]);
 
 	const pos = useMemo(() => layout(ids, edges, W, H), [ids, edges]);
+
+	useEffect(() => {
+		const viewport = graphViewport.current;
+		if (!viewport || view !== "graph") return;
+		const center = () => {
+			if (!window.matchMedia("(max-width: 860px)").matches) return;
+			const svg = viewport.querySelector("svg");
+			if (!svg) return;
+			const point = (s.myNodeNum === undefined
+				? undefined
+				: pos.get(s.myNodeNum)) ?? { x: W / 2, y: H / 2 };
+			viewport.scrollLeft =
+				(point.x * svg.clientWidth) / W - viewport.clientWidth / 2;
+			viewport.scrollTop =
+				(point.y * svg.clientHeight) / H - viewport.clientHeight / 2;
+		};
+		center();
+		const observer = new ResizeObserver(center);
+		observer.observe(viewport);
+		return () => observer.disconnect();
+	}, [pos, s.myNodeNum, view]);
 
 	const short = (num: number) =>
 		s.nodes.get(num)?.shortName ?? num.toString(16).slice(-4);
@@ -222,10 +257,11 @@ export default function Mesh() {
 	);
 
 	return (
-		<main style={{ flexDirection: "column" }}>
-			<div className="panel" style={{ flexShrink: 0 }}>
+		<main className="mesh-screen" style={{ flexDirection: "column" }}>
+			<div className="panel mesh-summary" style={{ flexShrink: 0 }}>
 				<div className="panel-title">{t("SUMMARY // MESH")}</div>
 				<div
+					className="mesh-summary-values"
 					style={{
 						display: "flex",
 						gap: 10,
@@ -247,7 +283,10 @@ export default function Mesh() {
 					)}
 					{tile(t("NEVER HEARD"), sum.neverHeard, "dim")}
 
-					<div className="panel" style={{ padding: "8px 12px", minWidth: 190 }}>
+					<div
+						className="panel mesh-hop-distribution"
+						style={{ padding: "8px 12px", minWidth: 190 }}
+					>
 						<div
 							className="dim"
 							style={{ fontSize: 10, letterSpacing: 2, marginBottom: 4 }}
@@ -257,6 +296,7 @@ export default function Mesh() {
 						{hops.map(([k, n]) => (
 							<div
 								key={String(k)}
+								className="mesh-hop-row"
 								style={{ display: "flex", gap: 8, fontSize: 12 }}
 							>
 								<span style={{ width: 70 }} className={k === "?" ? "dim" : ""}>
@@ -264,7 +304,7 @@ export default function Mesh() {
 										? t("UNKNOWN")
 										: k === 0
 											? t("DIRECT")
-											: `${k}`}
+											: `${k} ${k === 1 ? t("HOP") : t("HOPS")}`}
 								</span>
 								<span style={{ flex: 1 }}>
 									{"█".repeat(Math.min(12, Math.ceil((n / sum.total) * 24)))}
@@ -276,7 +316,7 @@ export default function Mesh() {
 
 					{sum.silent.length > 0 && (
 						<div
-							className="panel"
+							className="panel mesh-silent-nodes"
 							style={{ padding: "8px 12px", minWidth: 200 }}
 						>
 							<div
@@ -303,19 +343,19 @@ export default function Mesh() {
 				</div>
 			</div>
 
-			<div className="panel" style={{ flex: 1, minWidth: 0 }}>
-				<div className="panel-title">
+			<div className="panel mesh-topology" style={{ flex: 1, minWidth: 0 }}>
+				<div className="panel-title mesh-topology-toolbar">
 					<span style={{ display: "flex", gap: 10, alignItems: "center" }}>
 						<button
 							className={view === "graph" ? "tab active" : "tab"}
-
+							aria-pressed={view === "graph"}
 							onClick={() => setView("graph")}
 						>
 							{t("GRAPH")}
 						</button>
 						<button
 							className={view === "activity" ? "tab active" : "tab"}
-
+							aria-pressed={view === "activity"}
 							onClick={() => setView("activity")}
 						>
 							{t("ACTIVITY")}
@@ -330,33 +370,34 @@ export default function Mesh() {
 								<button
 									key={h}
 									className={actHours === h ? "tab active" : "tab"}
-
+									aria-pressed={actHours === h}
 									onClick={() => setActHours(h)}
 								>
 									{h === 168 ? t("7 D") : `${h} H`}
 								</button>
 							))}
 						<button
-
 							title={t("Reload neighbors and traceroutes from the database")}
 							onClick={() => setReload((v) => v + 1)}
 						>
 							⟳ {t("RELOAD")}
 						</button>
-						<span className="dim" style={{ fontSize: 11 }}>
-							{view === "activity"
-								? t("ONE CELL = ONE HOUR")
-								: t("{0} FROM NEIGHBORS",
-										edges.filter((e) => e.src === "neighbors").length,
-									)}
-						</span>
+						{view === "graph" && (
+							<span className="dim" style={{ fontSize: 11 }}>
+								{t(
+									"{0} FROM NEIGHBORS",
+									edges.filter((e) => e.src === "neighbors").length,
+								)}
+							</span>
+						)}
 					</span>
 				</div>
 
 				{view === "activity" ? (
 					grid.rows.length === 0 ? (
 						<p className="dim" style={{ padding: 16, fontSize: 12 }}>
-							{t("NO SIGHTINGS RECORDED — the history starts filling up now, with the app connected_",
+							{t(
+								"No sightings in this range. Connect a radio to record activity by node and hour.",
 							)}
 						</p>
 					) : (
@@ -380,8 +421,7 @@ export default function Mesh() {
 											{grid.hours.map((h) => {
 												const n = f.cells.get(h) ?? 0;
 												// intensity relative to the max, with a visible floor
-												const op =
-													n === 0 ? 0 : 0.25 + 0.75 * (n / grid.max);
+												const op = n === 0 ? 0 : 0.25 + 0.75 * (n / grid.max);
 												const d = new Date(h * 3_600_000);
 												return (
 													<td
@@ -412,12 +452,23 @@ export default function Mesh() {
 					)
 				) : ids.length === 0 ? (
 					<p className="dim" style={{ padding: 16, fontSize: 12 }}>
-						{t("NO LINKS — enable NEIGHBOR INFO in CONFIG or run traceroutes from NODES_",
+						{t(
+							"No links recorded. Enable Neighbor Info in Config, or run a traceroute from Nodes.",
 						)}
 					</p>
 				) : (
-					<div className="scroll-y" style={{ display: "flex", flexWrap: "wrap" }}>
+					<div
+						className="scroll-y mesh-graph-layout"
+						style={{ display: "flex", flexWrap: "wrap" }}
+					>
 						<div
+							ref={graphViewport}
+							className="mesh-graph-viewport"
+							role="region"
+							aria-label={t(
+								"Radio mesh topology. Scroll to explore the graph.",
+							)}
+							tabIndex={0}
 							style={{
 								flex: "999 1 320px",
 								minWidth: 0,
@@ -434,6 +485,8 @@ export default function Mesh() {
 							<svg
 								viewBox={`0 0 ${W} ${H}`}
 								style={{ width: "100%", height: "100%" }}
+								role="group"
+								aria-label={t("Radio nodes and links")}
 							>
 								{edges.map((e) => {
 									const pa = pos.get(e.a);
@@ -473,10 +526,27 @@ export default function Mesh() {
 									return (
 										<g
 											key={id}
+											role="button"
+											tabIndex={0}
+											aria-label={long(id)}
+											aria-pressed={sel === id}
 											opacity={dim}
 											style={{ cursor: "pointer" }}
 											onClick={() => setSel(sel === id ? undefined : id)}
+											onKeyDown={(event) => {
+												if (event.key === "Enter" || event.key === " ") {
+													event.preventDefault();
+													setSel(sel === id ? undefined : id);
+												}
+											}}
 										>
+											<circle
+												cx={p.x}
+												cy={p.y}
+												r={26}
+												fill="transparent"
+												aria-hidden="true"
+											/>
 											<circle
 												cx={p.x}
 												cy={p.y}
@@ -504,16 +574,25 @@ export default function Mesh() {
 
 						{sel !== undefined && (
 							<div
-								className="panel hot"
+								ref={nodeDetail}
+								className="panel hot mesh-node-detail"
 								style={{ flex: "1 1 260px", minWidth: 240, fontSize: 12 }}
 							>
 								<div className="panel-title">
 									<span>{short(sel)}</span>
 									<button
 										onClick={() => setSel(undefined)}
-
+										aria-label={t("Close node details")}
+										style={{
+											flex: "none",
+											width: 44,
+											height: 44,
+											minWidth: 44,
+											padding: 0,
+											fontSize: 22,
+										}}
 									>
-										CLOSE
+										<span aria-hidden="true">×</span>
 									</button>
 								</div>
 								<div style={{ padding: "10px 12px" }}>
@@ -538,22 +617,19 @@ export default function Mesh() {
 											.map((e) => {
 												const other = e.a === sel ? e.b : e.a;
 												return (
-													<div
+													<button
 														key={key(e.a, e.b)}
-														style={{ display: "flex", gap: 8, lineHeight: 1.7 }}
+														className="mesh-neighbor"
+														onClick={() => setSel(other)}
+														aria-label={t("Inspect {0}", long(other))}
 													>
-														<span
-															style={{ flex: 1, cursor: "pointer" }}
-															onClick={() => setSel(other)}
-														>
-															{short(other)}
-														</span>
+														<span>{short(other)}</span>
 														<span className="dim">
 															{e.snr !== undefined
 																? `${e.snr.toFixed(1)} dB`
 																: "—"}
 														</span>
-													</div>
+													</button>
 												);
 											})}
 									</div>
@@ -564,14 +640,19 @@ export default function Mesh() {
 				)}
 
 				<div className="panel-foot">
-					<span>{t("SOLID LINE = DIRECT NEIGHBOR")}</span>
-					<span className="spacer" />
-					{ids.length > 45 && (
-						<span className="dim">
-							{t("CLICK A NODE TO SEE NAMES")} ·{" "}
-						</span>
+					{view === "graph" ? (
+						<>
+							<span className="mesh-pan-hint">{t("SCROLL TO EXPLORE")} · </span>
+							<span>{t("SOLID LINE = DIRECT NEIGHBOR")}</span>
+							<span className="spacer" />
+							{ids.length > 45 && (
+								<span className="dim">{t("CLICK A NODE TO SEE NAMES")} · </span>
+							)}
+							<span>{t("DASHED = TRACEROUTE SEGMENT")}</span>
+						</>
+					) : (
+						<span>{t("ONE CELL = ONE HOUR · BRIGHTER = MORE PACKETS")}</span>
 					)}
-					<span>{t("DASHED = TRACEROUTE SEGMENT")}</span>
 				</div>
 			</div>
 		</main>

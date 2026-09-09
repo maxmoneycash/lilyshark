@@ -29,31 +29,81 @@ const FIRMWARE = {
 /** Small original glyphs for the step circles and buttons. */
 const Glyph = {
   download: (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M10 3v9m0 0l-3.5-3.5M10 12l3.5-3.5" />
       <path d="M4 15.5h12" />
     </svg>
   ),
   usb: (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <rect x="6.5" y="2.5" width="7" height="6" rx="1.5" />
       <path d="M10 8.5v6m0 0l-3-2.2m3 2.2l3-2.2" />
       <circle cx="10" cy="17" r="1.4" />
     </svg>
   ),
   bolt: (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M11 2.5L4.5 11H9l-1 6.5L14.5 9H10l1-6.5z" />
     </svg>
   ),
   copy: (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
       <path d="M10.5 5.5v-2a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3.5v5A1.5 1.5 0 0 0 4 10h1.5" />
     </svg>
   ),
   code: (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5" />
     </svg>
   ),
@@ -87,7 +137,13 @@ function CopyButton({ text }: { text: string }) {
       }}
     >
       <span aria-live="polite">
-        {status === "copied" ? <UiIcon name="check" /> : status === "error" ? "!" : Glyph.copy}
+        {status === "copied" ? (
+          <UiIcon name="check" />
+        ) : status === "error" ? (
+          "!"
+        ) : (
+          Glyph.copy
+        )}
       </span>
     </button>
   );
@@ -96,8 +152,18 @@ function CopyButton({ text }: { text: string }) {
 function BrowserPreview() {
   return (
     <figure className="analyzer-preview">
-      <div className="preview-titlebar" aria-hidden="true"><span>◦ ◦ ◦</span><span>LILYSHARK / TRAFFIC</span></div>
-      <img className="analyzer-preview-image" src="/flash/analyzer-preview.png" width={1440} height={894} loading="lazy" alt="Lilyshark traffic analyzer showing a synthetic sample capture, airtime graph, and decoded LoRa frame" />
+      <div className="preview-titlebar" aria-hidden="true">
+        <span>◦ ◦ ◦</span>
+        <span>LILYSHARK / TRAFFIC</span>
+      </div>
+      <img
+        className="analyzer-preview-image"
+        src="/flash/analyzer-preview.png"
+        width={1440}
+        height={894}
+        loading="lazy"
+        alt="Lilyshark traffic analyzer showing a synthetic sample capture, airtime graph, and decoded LoRa frame"
+      />
       <figcaption>Actual analyzer · synthetic sample capture</figcaption>
     </figure>
   );
@@ -105,7 +171,7 @@ function BrowserPreview() {
 
 function SourceMock() {
   const lines: [string, string][] = [
-    ["$", "git clone github.com/maxmoneycash/lilyshark"],
+    ["$", "git clone https://github.com/maxmoneycash/lilyshark"],
     ["$", "cd lilyshark"],
     ["$", "./scripts/build_release.sh"],
     ["", "dist/lilyshark-tdeck.factory.bin"],
@@ -120,12 +186,43 @@ function SourceMock() {
       aria-label="A terminal building Lilyshark from source"
       className="window-mock"
     >
-      <rect x="1" y="1" width="418" height="284" fill="none" stroke="currentColor" opacity="0.5" />
-      <line x1="1" y1="27" x2="419" y2="27" stroke="currentColor" opacity="0.4" />
+      <rect
+        x="1"
+        y="1"
+        width="418"
+        height="284"
+        fill="none"
+        stroke="currentColor"
+        opacity="0.5"
+      />
+      <line
+        x1="1"
+        y1="27"
+        x2="419"
+        y2="27"
+        stroke="currentColor"
+        opacity="0.4"
+      />
       {[13, 25, 37].map((cx) => (
-        <rect key={cx} x={cx - 3} y="11" width="6" height="6" fill="currentColor" opacity="0.55" />
+        <rect
+          key={cx}
+          x={cx - 3}
+          y="11"
+          width="6"
+          height="6"
+          fill="currentColor"
+          opacity="0.55"
+        />
       ))}
-      <text x="210" y="17.5" textAnchor="middle" fontSize="8" letterSpacing="1.2" fill="currentColor" opacity="0.75">
+      <text
+        x="210"
+        y="17.5"
+        textAnchor="middle"
+        fontSize="8"
+        letterSpacing="1.2"
+        fill="currentColor"
+        opacity="0.75"
+      >
         LILYSHARK — BUILD
       </text>
       {lines.map(([prompt, text], i) => {
@@ -133,19 +230,36 @@ function SourceMock() {
         return (
           <g key={text}>
             {prompt ? (
-              <text x="16" y={y} fontSize="10.5" fill="currentColor" opacity="0.55">
+              <text
+                x="16"
+                y={y}
+                fontSize="10.5"
+                fill="currentColor"
+                opacity="0.55"
+              >
                 {prompt}
               </text>
             ) : null}
-            <text x={prompt ? 30 : 30} y={y} fontSize="10.5" fill="currentColor" opacity={prompt ? 0.95 : 0.55}>
+            <text
+              x={prompt ? 30 : 30}
+              y={y}
+              fontSize="10.5"
+              fill="currentColor"
+              opacity={prompt ? 0.95 : 0.55}
+            >
               {text}
             </text>
           </g>
         );
       })}
-      <rect x="30" y={54 + lines.length * 26 - 8} width="7" height="11" fill="currentColor" opacity="0.8">
-        <animate attributeName="opacity" values="0.8;0.8;0;0" dur="1.1s" repeatCount="indefinite" />
-      </rect>
+      <rect
+        x="30"
+        y={54 + lines.length * 26 - 8}
+        width="7"
+        height="11"
+        fill="currentColor"
+        opacity="0.8"
+      />
     </svg>
   );
 }
@@ -153,14 +267,36 @@ function SourceMock() {
 /** Line art for the two non-hardware tiles, for the browser and source options. */
 function BrowserIcon() {
   return (
-    <svg width="120" height="80" viewBox="0 0 120 80" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg
+      width="120"
+      height="80"
+      viewBox="0 0 120 80"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
       <rect x="10" y="10" width="100" height="60" />
       <line x1="10" y1="26" x2="110" y2="26" />
       {[18, 26, 34].map((cx) => (
-        <circle key={cx} cx={cx} cy="18" r="1.8" fill="currentColor" stroke="none" />
+        <circle
+          key={cx}
+          cx={cx}
+          cy="18"
+          r="1.8"
+          fill="currentColor"
+          stroke="none"
+        />
       ))}
       {[36, 46, 56].map((y) => (
-        <line key={y} x1="20" y1={y} x2={y === 46 ? 88 : 100} y2={y} strokeWidth="3" />
+        <line
+          key={y}
+          x1="20"
+          y1={y}
+          x2={y === 46 ? 88 : 100}
+          y2={y}
+          strokeWidth="3"
+        />
       ))}
     </svg>
   );
@@ -168,7 +304,17 @@ function BrowserIcon() {
 
 function SourceIcon() {
   return (
-    <svg width="120" height="80" viewBox="0 0 120 80" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="120"
+      height="80"
+      viewBox="0 0 120 80"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <rect x="10" y="10" width="100" height="60" />
       <line x1="10" y1="26" x2="110" y2="26" />
       <path d="M26 40l10 8-10 8" />
@@ -191,7 +337,7 @@ const PLATFORMS = [
     caption: `running ${FIRMWARE.version}`,
     heading: "Lilyshark for T-Deck Plus.",
     tagline:
-      "LILYGO's pocket computer with a GPS on board — the full analyzer, with a fix for the nodes map.",
+      "Inspect LoRa packets, scan the band, and map nearby nodes with the built-in GPS.",
   },
   {
     id: "tdeck",
@@ -203,7 +349,7 @@ const PLATFORMS = [
     caption: `running ${FIRMWARE.version}`,
     heading: "Lilyshark for T-Deck.",
     tagline:
-      "The same image on the original board. Every radio and capture tool works; only the GPS fix is absent.",
+      "The full packet analyzer on the original T-Deck. Same radio tools and capture formats, without built-in GPS.",
   },
   {
     id: "browser",
@@ -215,7 +361,7 @@ const PLATFORMS = [
     caption: "web serial / bluetooth",
     heading: "Lilyshark in the browser.",
     tagline:
-      "The same analyzer as a web page. Plug a flashed deck into a computer over USB, or pair one over Bluetooth — nothing to install, and it keeps working with no internet.",
+      "Give your radio a bigger screen. Inspect live captures over USB, or follow mesh conversations over Bluetooth.",
   },
   {
     id: "source",
@@ -227,7 +373,7 @@ const PLATFORMS = [
     caption: "reproducible build",
     heading: "Build it yourself.",
     tagline:
-      "Clone the repository and build the same image this page serves. The release build is reproducible, so your checksum should match ours byte for byte.",
+      "Explore the firmware, change how it works, and build your own image with the pinned PlatformIO toolchain.",
   },
 ] as const;
 
@@ -242,21 +388,16 @@ const CHECKLISTS: Record<PlatformKind, string[]> = {
     "Capture to microSD, .lscap and PCAP",
   ],
   browser: [
-    "Live traffic from a deck you have flashed",
-    "Packet inspector, raw bytes included",
-    "Nodes, map, spectrum and telemetry",
-    "USB on desktop Chrome or Edge",
-    "Bluetooth pairing where the browser allows it",
-    "No account, no cloud, works offline",
-    "Open source, GPL-3.0",
+    "Decoded packets with raw bytes and RSSI/SNR",
+    "Node maps, spectrum traces, and telemetry",
+    "Export captures for further analysis",
+    "Explore sample traffic before connecting",
   ],
   source: [
-    "The exact image this page flashes",
-    "Deterministic build, checksums to compare",
-    "Pinned PlatformIO and toolchain",
-    "A desktop simulator that runs the firmware",
-    "One script to flash a connected deck",
-    "Open source, GPL-3.0",
+    "Reproducible release builds with SHA-256 hashes",
+    "A desktop simulator running the firmware UI",
+    "One script to flash a connected T-Deck",
+    "GPL-3.0 source, ready to modify",
   ],
 };
 
@@ -306,9 +447,9 @@ const STEPS: Record<
 };
 
 const STEP_HEADING: Record<PlatformKind, string> = {
-  firmware: "Three steps, one cable.",
-  browser: "Three steps, no install.",
-  source: "Three steps, from a clean clone.",
+  firmware: "From USB to live traffic.",
+  browser: "Connect your radio.",
+  source: "Build and run the firmware.",
 };
 
 const CLONE_CMD =
@@ -320,15 +461,28 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
   const [platform, setPlatform] = useState<PlatformId>("tdeck-plus");
   const selected = PLATFORMS.find((p) => p.id === platform) ?? PLATFORMS[0];
   const kind = selected.kind;
-  const [installer, setInstaller] = useState<"loading" | "ready" | "error">("loading");
+  const verifyRef = useRef<HTMLDivElement>(null);
+  const [installer, setInstaller] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
   useEffect(() => {
     if (installer !== "loading") return;
     let cancelled = false;
-    loadInstaller().then(() => { if (!cancelled) setInstaller("ready"); }, () => { if (!cancelled) setInstaller("error"); });
-    return () => { cancelled = true; };
+    loadInstaller().then(
+      () => {
+        if (!cancelled) setInstaller("ready");
+      },
+      () => {
+        if (!cancelled) setInstaller("error");
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [installer]);
   const openPage = (event: React.MouseEvent<HTMLAnchorElement>, tab: Tab) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return;
     event.preventDefault();
     onOpen(tab);
   };
@@ -348,18 +502,18 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
         <div className="lede">
           <div className="eyebrow">LILYSHARK / FIRMWARE INSTALLER</div>
           <h1>
-            Small board.
+            Inspect the mesh
             <br />
-            <span>Big bite.</span>
+            <span>from your T-Deck.</span>
           </h1>
           <p className="sub">
-            Turn your T-Deck into a handheld LoRa packet sniffer and RF
-            analyzer. Install Lilyshark straight from your browser.
+            Install over USB to inspect LoRa packets, scan the band, and track
+            signal history in the field.
           </p>
           <p className="release-note">
             <span className="status-dot" />
-            {FIRMWARE.version} <span className="release-divider">/</span> Open
-            source. Made for the field.
+            {FIRMWARE.version} <span className="release-divider">/</span>{" "}
+            GPL-3.0 firmware
           </p>
         </div>
 
@@ -376,7 +530,9 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
         >
           {PLATFORMS.map((p) => (
             <RadioGroup.Item key={p.id} value={p.id} className="device-card">
-              <span className="art" aria-hidden="true">{art(p.id, p.gps)}</span>
+              <span className="art" aria-hidden="true">
+                {art(p.id, p.gps)}
+              </span>
               <span className="device-copy">
                 <span className="device-name">{p.name}</span>
                 <span className="device-chip">{p.chip}</span>
@@ -386,14 +542,12 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
           ))}
         </RadioGroup.Root>
 
-        <div className="install-layout">
+        <div className="install-layout" data-kind={kind}>
           <div className="hero">
             <span className="hero-label">{selected.heroLabel}</span>
             <div className="preview-content" key={selected.id}>
               {kind === "firmware" ? (
-                <TDeckPhoto
-                  alt="Front view of a LILYGO T-Deck Plus displaying the Lilyshark firmware Home screen"
-                />
+                <TDeckPhoto alt="Front view of a LILYGO T-Deck Plus displaying the Lilyshark firmware Home screen" />
               ) : kind === "browser" ? (
                 <BrowserPreview />
               ) : (
@@ -401,13 +555,17 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
               )}
               <div className="hero-caption">
                 <span>
-                  <b>{kind === "firmware" ? "T-Deck Plus pictured" : selected.name}</b> · {kind === "firmware" ? "Firmware Home screen" : selected.caption}
+                  <b>
+                    {kind === "firmware"
+                      ? "T-Deck Plus pictured"
+                      : selected.name}
+                  </b>{" "}
+                  ·{" "}
+                  {kind === "firmware"
+                    ? "Firmware Home screen"
+                    : selected.caption}
                 </span>
               </div>
-            </div>
-            <div className="hero-footnote">
-              <span>DESIGNED FOR THE FIELD</span>
-              <span>LILYSHARK</span>
             </div>
           </div>
 
@@ -423,27 +581,22 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
             <h2 id="product-heading">{selected.heading}</h2>
             <p className="tagline">{selected.tagline}</p>
 
-            <ul className="checklist">
-              {CHECKLISTS[kind].map((item) => (
-                <li key={item}>
-                  <span className="tick"><UiIcon name="check" /></span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-
             {kind === "firmware" ? (
               <>
                 <div className="install-requirement">
                   {Glyph.usb}
                   <span>
-                    Connect your board with a USB data cable.{" "}
-                    Open this page in Chrome or Edge on a computer.
+                    Use a USB data cable and Chrome or Edge on a computer.
                   </span>
                 </div>
                 <div className="cta">
-                  {installer === "ready" ? <esp-web-install-button manifest={FIRMWARE.manifest}>
-                    <button slot="activate" className="flash-btn" type="button">
+                  {installer === "ready" ? (
+                    <esp-web-install-button manifest={FIRMWARE.manifest}>
+                      <button
+                        slot="activate"
+                        className="flash-btn"
+                        type="button"
+                      >
                       {Glyph.bolt}
                       <span className="cta-text">
                         Install Lilyshark
@@ -453,20 +606,33 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                       </span>
                     </button>
                     <span slot="unsupported" className="unsupported">
-                      In-browser flashing needs Web Serial — open this page in
-                      Chrome or Edge on a computer. The download links below
-                      work anywhere.
+                        This browser cannot flash over USB. Open this page in
+                        desktop Chrome or Edge, or download the image below.
                     </span>
                     <span slot="not-allowed" className="not-allowed">
-                      Serial access is blocked here; check the browser's site
-                      permissions.
+                        USB flashing needs HTTPS or localhost. Open the
+                        installer at{" "}
+                        <a href="https://lilyshark.com/flash/">lilyshark.com</a>
+                        .
                     </span>
-                  </esp-web-install-button> : installer === "loading" ? (
-                  <button className="flash-btn" type="button" disabled>Loading installer…</button>
+                    </esp-web-install-button>
+                  ) : installer === "loading" ? (
+                    <button className="flash-btn" type="button" disabled>
+                      Loading installer…
+                    </button>
                 ) : (
                   <div className="installer-error" role="alert">
-                    <p>The installer could not load. Retry, or download the firmware below.</p>
-                    <button type="button" className="outline-btn" onClick={() => setInstaller("loading")}>Retry installer</button>
+                      <p>
+                        The installer could not load. Retry, or download the
+                        firmware below.
+                      </p>
+                      <button
+                        type="button"
+                        className="outline-btn"
+                        onClick={() => setInstaller("loading")}
+                      >
+                        Retry installer
+                      </button>
                   </div>
                 )}
                 </div>
@@ -487,37 +653,45 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                 <p className="meta release-meta">
                   <span>{FIRMWARE.version}</span>
                   <span>977 KiB · Factory image</span>
-                  <a href="#verify">Verify checksum</a>
-                </p>
-                <p className="ownership-note">
-                  No account. No cloud. Yours to explore.
+                  <a
+                    href="#flash"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      verifyRef.current?.scrollIntoView({ block: "start" });
+                      verifyRef.current?.focus({ preventScroll: true });
+                    }}
+                  >
+                    Verify checksum
+                  </a>
                 </p>
               </>
             ) : kind === "browser" ? (
               <>
                 <div className="cta">
-                  <a className="flash-btn" href={tabHref("TRAFFIC")} onClick={(event) => openPage(event, "TRAFFIC")}>
+                  <a
+                    className="flash-btn"
+                    href={tabHref("TRAFFIC")}
+                    onClick={(event) => openPage(event, "TRAFFIC")}
+                  >
                     {Glyph.bolt}
                     <span className="cta-text">
                       Open the analyzer
-                      <span className="cta-sub">
-                        no install · works offline
-                      </span>
+                      <span className="cta-sub">start with sample traffic</span>
                     </span>
                   </a>
                 </div>
                 <div className="secondary">
-                  <a className="outline-btn" href={tabHref("DOCS")} onClick={(event) => openPage(event, "DOCS")}>
+                  <a
+                    className="outline-btn"
+                    href={tabHref("DOCS")}
+                    onClick={(event) => openPage(event, "DOCS")}
+                  >
                     {Glyph.code} Read the docs
-                  </a>
-                  <a className="outline-btn" href={tabHref("TRAFFIC")} onClick={(event) => openPage(event, "TRAFFIC")}>
-                    {Glyph.download} Try the demo
                   </a>
                 </div>
                 <p className="meta">
-                  The analyzer links to a deck over USB with Web Serial, or over
-                  Bluetooth where the browser supports it. Nothing is uploaded:
-                  every capture stays in the tab until you export it.
+                  USB carries the full analyzer telemetry. Bluetooth carries
+                  mesh conversations where the browser supports pairing.
                 </p>
               </>
             ) : (
@@ -549,6 +723,16 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                 </p>
               </>
             )}
+            <ul className="checklist">
+              {CHECKLISTS[kind].map((item) => (
+                <li key={item}>
+                  <span className="tick" aria-hidden="true">
+                    <UiIcon name="check" />
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
           </section>
         </div>
 
@@ -568,12 +752,17 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
 
         {kind === "firmware" ? (
           <div className="support-layout">
-              <div className="card verify-card" id="verify">
-                <div className="eyebrow">Trust, verified</div>
+            <div
+              className="card verify-card"
+              ref={verifyRef}
+              id="verify"
+              tabIndex={-1}
+            >
+              <div className="eyebrow">SHA-256 verification</div>
                 <h3>Check your image.</h3>
                 <p className="card-sub">
-                  Downloaded the binary? Check it against the SHA-256 below.
-                  This is the exact factory image served by the installer.
+                Downloaded the binary? Check it against the SHA-256 below. This
+                is the exact factory image served by the installer.
                 </p>
                 <div className="firmware-facts">
                   <span>{FIRMWARE.bytes} bytes</span>
@@ -588,21 +777,21 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                   <CopyButton text={`shasum -a 256 ${FIRMWARE.file}`} />
                 </div>
                 <p className="verify-note">
-                  The output should match the hash above. You can also follow
-                  the <a href={REPO}>reproducible-build instructions</a> and
-                  compare hashes.
+                The output should match the hash above. You can also follow the{" "}
+                <a href={REPO}>reproducible-build instructions</a> and compare
+                hashes.
                 </p>
               </div>
 
               <div className="help-panel">
-                <div className="eyebrow">A little help</div>
-                <h3>Before you unplug.</h3>
+              <div className="eyebrow">Troubleshooting</div>
+              <h3>Get your board connected.</h3>
                 <details>
                   <summary>My board doesn't appear</summary>
                   <div>
                     <span>
-                      · Swap the cable first — most "broken" flashes are
-                      charge-only cables.
+                    · Try another USB data cable. A charge-only cable will power
+                    the board without exposing a serial port.
                     </span>
                     <span>
                       · Force the bootloader: hold the trackball center down,
@@ -630,9 +819,15 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                       and the Shelby off-grid pointer pipeline.
                     </span>
                     <span>
-                      After flashing, open <a href={tabHref("TRAFFIC")} onClick={(event) => openPage(event, "TRAFFIC")}>the analyzer</a>, press
-                      CONNECT → LILYSHARK T-DECK · USB, and the device links to
-                      this site over the same cable.
+                    After flashing, open{" "}
+                    <a
+                      href={tabHref("TRAFFIC")}
+                      onClick={(event) => openPage(event, "TRAFFIC")}
+                    >
+                      the analyzer
+                    </a>
+                    , press CONNECT → LILYSHARK T-DECK · USB, and the device
+                    links to this site over the same cable.
                     </span>
                   </div>
                 </details>
@@ -640,9 +835,9 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
                   <summary>Can I install from my phone?</summary>
                   <div>
                     <p>
-                      Use Chrome or Edge on a computer to flash over USB. You
-                      can download the firmware on any device and transfer it to
-                      your computer.
+                    Use Chrome or Edge on a computer to flash over USB. You can
+                    download the firmware on any device and transfer it to your
+                    computer.
                     </p>
                   </div>
                 </details>
@@ -653,7 +848,6 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
             </div>
         ) : null}
       </div>
-
     </main>
   );
 }

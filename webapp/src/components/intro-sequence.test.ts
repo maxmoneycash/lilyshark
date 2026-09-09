@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import test from 'node:test';
 import {
   INTRO_FRAMES,
@@ -12,15 +12,25 @@ import {
   introSnapTop,
 } from './intro-sequence.ts';
 
-test('all 42 existing firmware screens appear once in their twelve narrative groups', () => {
+test('the tour preserves the deployed twelve chapters and all 42 firmware screens', () => {
   assert.equal(INTRO_SCREEN_GROUPS.length, 12);
   assert.equal(INTRO_FRAMES.length, 42);
+  assert.equal(INTRO_VIEWPORTS, 12);
   const screens = INTRO_FRAMES.map((frame) => frame.screen);
-  assert.equal(new Set(screens).size, 42);
-  const assets = new URL('../../public/intro/fw/', import.meta.url);
-  assert.equal(existsSync(assets), true);
-  const published = readdirSync(assets).filter((name) => name.endsWith('.png'));
-  assert.deepEqual([...screens].sort(), published.map((name) => `/intro/fw/${name}`).sort());
+  assert.deepEqual(screens, [
+    'splash', 'home',
+    'traffic', 'traffic-live', 'protocols', 'protocol-detail', 'nodes',
+    'map', 'node-detail', 'survey',
+    'utilization', 'timeline', 'timeline-live', 'traffic-filter',
+    'spectrum', 'spectrum-live', 'spectrum-warning',
+    'events', 'event-detail',
+    'packet-detail', 'packet-live', 'packet-pkt', 'packet-rf', 'packet-dec',
+    'packet-hex', 'packet-hex-2', 'packet-hex-3', 'packet-raw',
+    'setup-welcome', 'setup-capabilities', 'setup-network', 'setup-profile',
+    'setup-controls', 'setup-ready', 'device-status', 'help',
+    'settings', 'radio-profile', 'display-input', 'about', 'reset-setup',
+    'storage',
+  ].map(name => `/intro/fw/${name}.png`));
   for (const screen of screens) {
     assert.equal(existsSync(new URL(`../../public${screen}`, import.meta.url)), true, screen);
   }
@@ -41,7 +51,7 @@ test('every stop selects its intended frame at desktop and mobile viewport sizes
   }
 });
 
-test('rail and pager jumps begin the requested section and preserve within-section order', () => {
+test('chapter positions preserve the first screen and order within uneven groups', () => {
   for (let section = 0; section < INTRO_SCREEN_GROUPS.length; section += 1) {
     const first = introFrameIndex(introSectionProgress(section));
     assert.equal(INTRO_FRAMES[first].sectionIndex, section);
@@ -70,11 +80,11 @@ test('scrolling forward and back crosses every screen in sequence', () => {
 
 test('bounds include the final storage frame and clamp overscroll or invalid values', () => {
   for (const value of [-Infinity, -2, 0, NaN]) assert.equal(introFrameIndex(value), 0);
-  for (const value of [1, 2, Infinity]) assert.equal(introFrameIndex(value), 41);
+  for (const value of [1, 2, Infinity]) assert.equal(introFrameIndex(value), INTRO_FRAMES.length - 1);
   assert.equal(INTRO_FRAMES[introFrameIndex(1)].screen, '/intro/fw/storage.png');
   assert.equal(introSectionProgress(-1), 0);
   assert.equal(introSectionProgress(NaN), 0);
-  assert.equal(introSectionProgress(12), 1);
+  assert.equal(introSectionProgress(12), introFrameProgress(INTRO_SECTION_STARTS.at(-1)!));
   assert.equal(introFrameProgress(-10), 0);
   assert.equal(introFrameProgress(100), 1);
 });

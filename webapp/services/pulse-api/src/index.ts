@@ -6,6 +6,8 @@ import { logger } from "./logger";
 import { DataService } from "./data-service";
 import { UploadService } from "./upload-service";
 import { createRouter } from "./routes";
+import { getDatabase } from "./db";
+import { createDurableCoverageService } from "./coverage-service.js";
 
 async function main() {
   const config = loadConfig();
@@ -13,6 +15,10 @@ async function main() {
 
   const app = express();
   const dataService = new DataService(config);
+  // Keep this credential out of the logged general configuration object.
+  const communityCoverage = createDurableCoverageService(getDatabase(), {
+    key: () => process.env.COVERAGE_API_KEY,
+  });
 
   // Initialize Upload Service for Shelby Share feature
   let uploadService: UploadService | undefined;
@@ -54,6 +60,20 @@ async function main() {
   });
 
   // Routes
+  app.all("/api/community-coverage", async (req, res) => {
+    if (req.method !== "GET") {
+      res.setHeader("Allow", "GET");
+      return res.status(405).end();
+    }
+    try {
+      const result = await communityCoverage();
+      for (const [name, value] of Object.entries(result.headers)) res.setHeader(name, value);
+      return res.status(result.status).send(result.body);
+    } catch {
+      // Storage failure must not bypass the durable quota reservation.
+      return res.status(503).set("Cache-Control", "private, no-store").json({ error: "coverage_unavailable" });
+    }
+  });
   app.use("/api", createRouter(dataService, uploadService));
 
   // Root endpoint

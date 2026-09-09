@@ -8,10 +8,10 @@ export type TDeckTune = {
 };
 
 export const TDECK_TUNE_DEFAULTS: TDeckTune = {
-  halfHeight: 0.064,
-  pan: 0.3,
+  halfHeight: 0.082,
+  pan: 0,
   exposure: 1,
-  envIntensity: 1.05,
+  envIntensity: 1,
   breathe: 0.012,
 };
 

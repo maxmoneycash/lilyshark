@@ -21,7 +21,7 @@ let dbPromise: Promise<IDBDatabase> | undefined;
 
 export function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
+  const opening = new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -69,10 +69,44 @@ export function openDb(): Promise<IDBDatabase> {
         annotations.createIndex("scope", "scope");
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Safari can close a connection when its storage process restarts.
+      // A later operation must open a new connection instead of reusing it.
+      // Ignore late events from a connection that has already been replaced.
+      const forget = () => {
+        if (dbPromise === opening) dbPromise = undefined;
+      };
+      db.onclose = forget;
+      db.onversionchange = () => {
+        forget();
+        db.close();
+      };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
-  return dbPromise;
+  dbPromise = opening;
+  void opening.catch(() => {
+    // Includes synchronous open() exceptions as well as request failures.
+    // Keep the rejection visible to callers, but never cache it forever.
+    if (dbPromise === opening) dbPromise = undefined;
+  });
+  return opening;
+}
+
+/** One retry for Safari interrupting database startup after a browser resume.
+ * Only opening the connection is retried; no reads, writes, or radio actions
+ * are replayed. A second failure reaches the saved-history error state. */
+export async function openHistoryDb(): Promise<IDBDatabase> {
+  try {
+    return await openDb();
+  } catch (error) {
+    if (error && typeof error === "object" && "name" in error && error.name === "AbortError") {
+      return openDb();
+    }
+    throw error;
+  }
 }
 
 function reqAsPromise<T>(req: IDBRequest<T>): Promise<T> {

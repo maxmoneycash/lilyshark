@@ -1,108 +1,224 @@
-import { useEffect, useState } from "react";
+import {
+	type ReactNode,
+	type RefObject,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import {
+	type DocEntry,
+	docHash,
+	readDocLocation,
+	remarkDocHeadings,
+	resolveDocLink,
+} from "./docNavigation";
+import "./docs.css";
 
-/**
- * DOCS — the repository's documentation, published into the app.
- *
- * scripts/sync_docs_to_webapp.py copies the docs set into public/docs/ with a
- * manifest; this screen renders it. Inter-document links are resolved against
- * each doc's *repository* location (the manifest records it), so the same
- * relative links that work on GitHub work here; chart images resolve against
- * the published path.
- */
-
-interface DocEntry {
-	id: string;
-	title: string;
-	path: string;
-	source: string;
+/** Update edge cues after document loads, image loads, and resizing. */
+function useScrollEdges(ref: RefObject<HTMLElement>) {
+	useEffect(() => {
+		const element = ref.current;
+		if (!element) return;
+		const update = () => {
+			element.dataset.scrollEdges = [
+				element.scrollTop > 1 && "top",
+				element.scrollTop + element.clientHeight < element.scrollHeight - 1 &&
+					"bottom",
+				element.scrollLeft > 1 && "left",
+				element.scrollLeft + element.clientWidth < element.scrollWidth - 1 &&
+					"right",
+			]
+				.filter(Boolean)
+				.join(" ");
+		};
+		const resize = new ResizeObserver(update);
+		const observeChildren = () => {
+			resize.disconnect();
+			resize.observe(element);
+			for (const child of element.children) resize.observe(child);
+			update();
+		};
+		const mutation = new MutationObserver(observeChildren);
+		mutation.observe(element, { childList: true, subtree: true });
+		element.addEventListener("scroll", update, { passive: true });
+		observeChildren();
+		return () => {
+			resize.disconnect();
+			mutation.disconnect();
+			element.removeEventListener("scroll", update);
+		};
+	}, [ref]);
 }
 
-/** Resolve "a/../b" and "./b" path segments without touching the filesystem. */
-function normalizePath(p: string): string {
-	const out: string[] = [];
-	for (const seg of p.split("/")) {
-		if (seg === "" || seg === ".") continue;
-		if (seg === "..") out.pop();
-		else out.push(seg);
-	}
-	return "/" + out.join("/");
+function WideContent({
+	children,
+	code = false,
+}: {
+	children: ReactNode;
+	code?: boolean;
+}) {
+	const ref = useRef<HTMLDivElement>(null);
+	useScrollEdges(ref);
+	return (
+		<div
+			ref={ref}
+			className={code ? "docs-code-wrap" : "docs-table-wrap"}
+			tabIndex={0}
+			role="region"
+			aria-label={code ? "Code sample" : "Documentation table"}
+		>
+			{children}
+		</div>
+	);
 }
 
-function resolveLink(
-	href: string,
-	current: DocEntry,
-	docs: DocEntry[],
-): { doc?: DocEntry; url: string } {
-	if (/^(https?:|mailto:|#)/.test(href)) return { url: href };
-	const [pathOnly, frag] = href.split("#");
-	const suffix = frag ? `#${frag}` : "";
-
-	// Links in the markdown are written relative to the doc's repo location.
-	const srcBase = current.source.split("/").slice(0, -1).join("/");
-	const repoAbs = normalizePath(`${srcBase}/${pathOnly}`).slice(1);
-	const target = docs.find((d) => d.source === repoAbs);
-	if (target) return { doc: target, url: target.path + suffix };
-
-	// Otherwise it is an asset published next to the doc (charts, images).
-	const pubBase = current.path.split("/").slice(0, -1).join("/");
-	return { url: normalizePath(`${pubBase}/${pathOnly}`) + suffix };
-}
-
+/** Repository docs published by scripts/sync_docs_to_webapp.py. */
 export default function Docs() {
 	const [docs, setDocs] = useState<DocEntry[]>([]);
-	const [current, setCurrent] = useState<DocEntry | null>(null);
-	const [text, setText] = useState<string>("");
-	const [error, setError] = useState<string | null>(null);
+	const [location, setLocation] = useState(() =>
+		readDocLocation(window.location.hash),
+	);
+	const [content, setContent] = useState<{ id: string; text: string } | null>(
+		null,
+	);
+	const [error, setError] = useState<{ id?: string; message: string } | null>(
+		null,
+	);
+	const current = docs.find((doc) => doc.id === location.id) ?? docs[0] ?? null;
+	const text = content?.id === current?.id ? content?.text : null;
+	const message =
+		error && (!error.id || error.id === current?.id) ? error.message : null;
+	const scrollRef = useRef<HTMLDivElement>(null);
+	const navRef = useRef<HTMLElement>(null);
+	useScrollEdges(scrollRef);
+	useScrollEdges(navRef);
 
 	useEffect(() => {
-		fetch("/docs/manifest.json")
-			.then((r) => {
-				if (!r.ok) throw new Error(`HTTP ${r.status}`);
-				return r.json() as Promise<DocEntry[]>;
+		const onHash = () => setLocation(readDocLocation(window.location.hash));
+		window.addEventListener("hashchange", onHash);
+		return () => window.removeEventListener("hashchange", onHash);
+	}, []);
+
+	useEffect(() => {
+		const request = new AbortController();
+		fetch("/docs/manifest.json", { signal: request.signal })
+			.then((response) => {
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				return response.json() as Promise<DocEntry[]>;
 			})
 			.then((list) => {
+				if (request.signal.aborted) return;
 				setDocs(list);
-				setCurrent(list[0] ?? null);
+				if (!list.length) setError({ message: "No documents are available." });
 			})
-			.catch((e) => setError(String(e)));
+			.catch((failure) => {
+				if (!request.signal.aborted)
+					setError({
+						message: `Could not load the document list. ${failure.message}`,
+					});
+			});
+		return () => request.abort();
 	}, []);
 
 	useEffect(() => {
 		if (!current) return;
-		setText("");
+		const request = new AbortController();
 		setError(null);
-		fetch(current.path)
-			.then((r) => {
-				if (!r.ok) throw new Error(`HTTP ${r.status}`);
-				return r.text();
+		fetch(current.path, { signal: request.signal })
+			.then((response) => {
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				return response.text();
 			})
-			.then(setText)
-			.catch((e) => setError(String(e)));
+			.then((value) => {
+				if (!request.signal.aborted)
+					setContent({ id: current.id, text: value });
+			})
+			.catch((failure) => {
+				if (!request.signal.aborted)
+					setError({
+						id: current.id,
+						message: `Could not load this document. ${failure.message}`,
+					});
+			});
+		return () => request.abort();
 	}, [current]);
 
-	const open = (doc: DocEntry) => {
-		setCurrent(doc);
+	useLayoutEffect(() => {
+		const viewport = scrollRef.current;
+		if (!viewport) return;
+		const heading =
+			location.section && text != null
+				? document.getElementById(`docs-${location.section}`)
+				: null;
+		if (heading && viewport.contains(heading)) {
+			viewport.scrollTop +=
+				heading.getBoundingClientRect().top -
+				viewport.getBoundingClientRect().top -
+				16;
+			heading.focus({ preventScroll: true });
+		} else {
+			viewport.scrollTop = 0;
+		}
+	}, [location, text]);
+
+	const open = (doc: DocEntry, section = "") => {
+		setLocation({ id: doc.id, section });
+		window.location.hash = docHash(doc.id, section);
 	};
 
 	return (
-		<div className="docs-grid">
+		<main className="fill docs-grid">
 			<div className="panel docs-nav-panel">
 				<div className="panel-title">
 					<span>DOCUMENTATION</span>
 				</div>
-				<nav className="docs-nav">
-					{docs.map((d) => (
-						<button
-							key={d.id}
-							type="button"
-							onClick={() => open(d)}
-							aria-selected={current?.id === d.id}
-							className={current?.id === d.id ? "is-current" : undefined}
+				<label className="docs-mobile-picker">
+					<span>Document</span>
+					<select
+						value={current?.id ?? ""}
+						disabled={!docs.length}
+						onChange={(event) => {
+							const doc = docs.find((entry) => entry.id === event.target.value);
+							if (doc) open(doc);
+						}}
+					>
+						{!docs.length && (
+							<option value="">
+								{message ? "Documents unavailable" : "Loading documents…"}
+							</option>
+						)}
+						{docs.map((doc) => (
+							<option key={doc.id} value={doc.id}>
+								{doc.title}
+							</option>
+						))}
+					</select>
+				</label>
+				<nav className="docs-nav" ref={navRef} aria-label="Documents">
+					{docs.map((doc) => (
+						<a
+							key={doc.id}
+							href={`/${docHash(doc.id)}`}
+							onClick={(event) => {
+								if (
+									event.button ||
+									event.metaKey ||
+									event.ctrlKey ||
+									event.shiftKey ||
+									event.altKey
+								)
+									return;
+								event.preventDefault();
+								open(doc);
+							}}
+							aria-current={current?.id === doc.id ? "page" : undefined}
+							className={current?.id === doc.id ? "is-current" : undefined}
 						>
-							{d.title}
-						</button>
+							{doc.title}
+						</a>
 					))}
 				</nav>
 			</div>
@@ -110,62 +226,85 @@ export default function Docs() {
 			<div className="panel docs-doc-panel">
 				<div className="panel-title">
 					<span>{current?.title ?? "DOCS"}</span>
-					{current && (
-						<span className="dim" style={{ marginLeft: "auto" }}>
-							{current.source}
-						</span>
-					)}
+					{current && <span className="dim docs-source">{current.source}</span>}
 				</div>
-				<div className="docs-scroll">
+				<div
+					className="docs-scroll"
+					ref={scrollRef}
+					tabIndex={0}
+					role="region"
+					aria-label={current?.title ?? "Documentation"}
+					aria-busy={!message && text == null}
+				>
 					<div className="docs-body">
-					{error && <span className="err">COULD NOT LOAD: {error}</span>}
-					{!error && !text && <span className="dim">LOADING…</span>}
-					{text && current && (
-						<ReactMarkdown
-							remarkPlugins={[remarkGfm]}
-							components={{
-								a: ({ href, children }) => {
-									const { doc, url } = resolveLink(href ?? "", current, docs);
-									return (
-										<a
-											href={url}
-											onClick={(e) => {
-												if (doc) {
-													e.preventDefault();
-													open(doc);
-												}
-											}}
-											{...(doc ? {} : { target: "_blank", rel: "noreferrer" })}
-										>
-											{children}
-										</a>
-									);
-								},
-								img: ({ src, alt }) => {
-									const { url } = resolveLink(String(src ?? ""), current, docs);
-									return (
+						{message && (
+							<p className="err" role="alert">
+								{message}
+							</p>
+						)}
+						{!message && text == null && (
+							<p className="dim" role="status">
+								Loading document…
+							</p>
+						)}
+						{text != null && current && (
+							<ReactMarkdown
+								remarkPlugins={[remarkGfm, remarkDocHeadings]}
+								components={{
+									a: ({ href, children }) => {
+										const { doc, section, url } = resolveDocLink(
+											href ?? "",
+											current,
+											docs,
+										);
+										return (
+											<a
+												href={url}
+												onClick={(event) => {
+													if (
+														!doc ||
+														event.button ||
+														event.metaKey ||
+														event.ctrlKey ||
+														event.shiftKey ||
+														event.altKey
+													)
+														return;
+													event.preventDefault();
+													open(doc, section);
+												}}
+												{...(doc
+													? {}
+													: { target: "_blank", rel: "noreferrer" })}
+											>
+												{children}
+											</a>
+										);
+									},
+									img: ({ src, alt }) => (
 										<img
-											src={url}
+											src={resolveDocLink(String(src ?? ""), current, docs).url}
 											alt={alt ?? ""}
-											style={{ maxWidth: "100%", border: "1px solid var(--border)" }}
 										/>
-									);
-								},
-								// A wide comparison table must scroll in its own box rather
-								// than stretching the prose column past a readable measure.
-								table: ({ children }) => (
-									<div className="docs-table-wrap">
-										<table>{children}</table>
-									</div>
-								),
-							}}
-						>
-							{text}
-						</ReactMarkdown>
-					)}
+									),
+									table: ({ children }) => (
+										<WideContent>
+											<table>{children}</table>
+										</WideContent>
+									),
+									pre: ({ children }) => (
+										<WideContent code>
+											<pre>{children}</pre>
+										</WideContent>
+									),
+								}}
+							>
+								{text}
+							</ReactMarkdown>
+						)}
 					</div>
 				</div>
 			</div>
-		</div>
+		</main>
 	);
 }

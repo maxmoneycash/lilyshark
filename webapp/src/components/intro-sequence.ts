@@ -1,8 +1,5 @@
-/**
- * Keep the original twelve narrative groups, including every published render.
- * The four older stills (traffic, timeline, spectrum, packet-detail) are distinct
- * examples/empty states from their live counterparts, so they remain reachable.
- */
+/** Original live-site sequence, restored from lilyshark.com on 2026-09-08.
+ * Keep all 42 screens in their twelve narrative groups, including Home and setup. */
 export const INTRO_SCREEN_GROUPS: readonly (readonly string[])[] = [
   ['splash', 'home'],
   ['traffic', 'traffic-live', 'protocols', 'protocol-detail', 'nodes'],
@@ -26,7 +23,7 @@ export const INTRO_SECTION_STARTS = INTRO_SCREEN_GROUPS.map((_, sectionIndex) =>
   INTRO_FRAMES.findIndex((frame) => frame.sectionIndex === sectionIndex),
 );
 
-/** Preserve the original overall track length, including the sticky viewport. */
+/** One viewport per chapter: related screens share its scroll distance. */
 export const INTRO_VIEWPORTS = INTRO_SCREEN_GROUPS.length;
 
 function clampIndex(value: number, length: number): number {

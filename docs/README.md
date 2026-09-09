@@ -35,6 +35,8 @@ people arrive at documentation. If you already know the file you want, the
 | [related-networks.md](related-networks.md) | Meshtastic, MeshCore and Reticulum: what each is, and how they differ. |
 | [what-you-can-see.md](what-you-can-see.md) | What is actually readable off the air, and what is not. |
 | [meridian-gap.md](meridian-gap.md) | Why coverage has holes, and where they are. |
+| [coverage-map.md](coverage-map.md) | The native and web map, its data contracts, and verification. |
+| [radio-map-visibility.md](radio-map-visibility.md) | How a T-Deck gets a local position or public listing, and the firmware fixes. |
 
 ## I want to understand how it works
 
@@ -80,6 +82,7 @@ matters.
 | Read this | About |
 | --- | --- |
 | [meshcore-participation-plan.md](meshcore-participation-plan.md) | Participating in MeshCore properly, rather than merely decoding it. |
+| [design-guidance.md](design-guidance.md) | Verified design skills and the shared iOS/web map direction. |
 | [strategy/2026-q3-direction.md](strategy/2026-q3-direction.md) | Where this is going. |
 | [strategy/hardware-offering.md](strategy/hardware-offering.md) | What a hardware offering would be. |
 | [strategy/premium-tier.md](strategy/premium-tier.md) | What, if anything, is worth charging for. |

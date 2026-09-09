@@ -736,7 +736,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   return (
     <main>
       <div className="panel" style={{ flex: 1 }}>
-        <div className="panel-title">
+        <div className="panel-title traffic-toolbar">
           <span className="panel-title-label">PANEL // TRAFFIC{name ? ` · ${name}` : ''}</span>
           <span className="spacer" />
           <button onClick={() => fileRef.current?.click()} disabled={busy}>
@@ -804,16 +804,19 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               if (x) void openFile(x);
             }}
           />
-          <input
-            placeholder="shelby blob name_"
-            value={blob}
-            style={{ width: 160 }}
-            onChange={(e) => setBlob(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void fetchBlob()}
-          />
-          <button onClick={() => void fetchBlob()} disabled={busy || !blob.trim()}>
-            FETCH
-          </button>
+          <span className="traffic-fetch">
+            <input
+              aria-label="Shelby blob name"
+              placeholder="Shelby blob name"
+              value={blob}
+              style={{ width: 160 }}
+              onChange={(e) => setBlob(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void fetchBlob()}
+            />
+            <button onClick={() => void fetchBlob()} disabled={busy || !blob.trim()}>
+              FETCH
+            </button>
+          </span>
         </div>
 
         {error && <div className="panel-foot err">{error}</div>}
@@ -933,8 +936,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 <span className="v">
                   {reportedLabel(link.telemetry.bat)} · {reportedLabel(link.telemetry.gps)} · {reportedLabel(link.telemetry.profile)} · capture sequence{' '}
                   {link.telemetry.frames ?? 'not reported'} · latest frame RSSI{' '}
-                  {telemetrySignal(link.telemetry, 'rssi') !== undefined ? `${telemetrySignal(link.telemetry, 'rssi')!.toFixed(1)} dBm` : 'not reported'} · SNR{' '}
-                  {telemetrySignal(link.telemetry, 'snr') !== undefined ? `${telemetrySignal(link.telemetry, 'snr')!.toFixed(1)} dB` : 'not reported'}
+                  {telemetrySignal(link.telemetry, 'rssi') !== undefined ? `${telemetrySignal(link.telemetry, 'rssi')!.toFixed(1)} DBM` : 'not reported'} · SNR{' '}
+                  {telemetrySignal(link.telemetry, 'snr') !== undefined ? `${telemetrySignal(link.telemetry, 'snr')!.toFixed(1)} DB` : 'not reported'}
                 </span>
               </>
             )}
@@ -994,9 +997,9 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                       </span>
                     </>,
                   ],
-                  ['BEST SNR', <>{stats.bestSnrDb === null ? 'Not reported' : `${stats.bestSnrDb.toFixed(1)} dB`}</>],
-                  ['MEDIAN RSSI', <>{stats.medianRssiDbm === null ? 'Not reported' : `${stats.medianRssiDbm.toFixed(1)} dBm`}</>],
-                  ['AIRTIME', <><AnimatedNumber value={stats.airtimeMs} format={(n) => n.toFixed(0)} /> ms</>],
+                  ['BEST SNR', <>{stats.bestSnrDb === null ? 'Not reported' : `${stats.bestSnrDb.toFixed(1)} DB`}</>],
+                  ['MEDIAN RSSI', <>{stats.medianRssiDbm === null ? 'Not reported' : `${stats.medianRssiDbm.toFixed(1)} DBM`}</>],
+                  ['AIRTIME', <><AnimatedNumber value={stats.airtimeMs} format={(n) => n.toFixed(0)} /> MS</>],
                   [
                     'SHELBY PTRS',
                     <span className={pointerCount > 0 ? 'ok' : 'dim'}><AnimatedNumber value={pointerCount} /></span>,
@@ -1182,15 +1185,15 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               </span>
               <span className="k">RSSI</span>
               <span className="v">
-                {hasField(f, RF_FIELD.rssi) ? `${f.rssiDbm.toFixed(1)} dBm` : 'n/r'}
+                {hasField(f, RF_FIELD.rssi) ? `${f.rssiDbm.toFixed(1)} DBM` : 'n/r'}
               </span>
               <span className="k">SNR</span>
               <span className="v">
-                {hasField(f, RF_FIELD.snr) ? `${f.snrDb.toFixed(1)} dB` : 'n/r'}
+                {hasField(f, RF_FIELD.snr) ? `${f.snrDb.toFixed(1)} DB` : 'n/r'}
               </span>
               <span className="k">AIRTIME</span>
               <span className="v">
-                {hasField(f, RF_FIELD.airtime) ? `${(f.airtimeUs / 1000).toFixed(1)} ms` : 'n/r'}
+                {hasField(f, RF_FIELD.airtime) ? `${(f.airtimeUs / 1000).toFixed(1)} MS` : 'n/r'}
               </span>
               <span className="k">INTEGRITY</span>
               <span className={`v ${crcClass(f.crc)}`}>{f.crc}</span>

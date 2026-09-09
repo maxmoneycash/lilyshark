@@ -17,7 +17,7 @@ import { clearDemo, seedDemo } from "./demo";
 import { startNetNodes } from "./netNodes";
 import { forecastBattery } from "./battery";
 import { addLog, DeviceStatus, fmtLog, getSnapshot, subscribe } from "./store";
-import { getAutoPurgeDays, loadTelemetry, purgeOlderThan } from "./db";
+import { getAutoPurgeDays, loadTelemetry, openHistoryDb, purgeOlderThan } from "./db";
 import Chat from "./screens/Chat";
 import Nodes from "./screens/Nodes";
 import Mesh from "./screens/Mesh";
@@ -38,7 +38,7 @@ const Docs = lazy(() => import("./screens/Docs"));
 // they load on first visit like the other heavy screens.
 const Spectrum = lazy(() => import("./screens/Spectrum"));
 const Sniffer = lazy(() => import("./screens/Sniffer"));
-const DialKitDev = import.meta.env.DEV
+const DialKitDev = import.meta.env.DEV && new URLSearchParams(window.location.search).has("tdeck-tune")
   ? lazy(() => import("../components/DialKitDev").then((m) => ({ default: m.DialKitDev })))
   : null;
 import { useHourTick } from "./fmt";
@@ -219,9 +219,19 @@ function App() {
     media.addEventListener("change", onResize);
     return () => { document.removeEventListener("keydown", onKey); media.removeEventListener("change", onResize); };
   }, [menuOpen]);
-  // CONNECT opens a sheet with the steps and both transports; the header
-  // itself carries no dropdown.
+  // Offer the transports this browser can use in a compact native dialog.
   const [connectOpen, setConnectOpen] = useState(false);
+  const connectDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = connectDialog.current;
+    if (!connectOpen || !dialog) return;
+    const trigger = document.activeElement;
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      dialog.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+    };
+  }, [connectOpen]);
   const hasSerial = typeof navigator !== "undefined" && "serial" in navigator;
   const hasBle = typeof navigator !== "undefined" && "bluetooth" in navigator;
   const onIos = onApplePhone();
@@ -415,7 +425,12 @@ function App() {
           })
           .catch(() => {})
       : Promise.resolve()
-    ).then(() => loadHistory().catch((e) => setError(`BD: ${e}`)));
+    ).then(() => openHistoryDb())
+      .then(() => loadHistory())
+      .catch((error) => {
+        addLog("Saved history could not be loaded: {0}", String(error));
+        setError("Saved history could not be loaded. Reload to try again.");
+      });
 
     // Prefill the last transport used
     const last = loadLastMode();
@@ -693,7 +708,7 @@ function App() {
       </header>
 
       {connectOpen && (
-        <div className="overlay-sheet" role="dialog" aria-label="Connect a radio">
+        <dialog ref={connectDialog} className="overlay-sheet" aria-label="Connect a radio" onCancel={() => { setConnectOpen(false); setError(""); }}>
           <div className="sheet-bar">
             <div className="sheet-title">CONNECT A RADIO</div>
             <button
@@ -704,16 +719,20 @@ function App() {
                 setError("");
               }}
             >
-              CLOSE
+              <span aria-hidden="true">×</span>
             </button>
           </div>
-          {onIos && (
+          {!hasSerial && !hasBle && (
             <p className="sheet-note sheet-note-alert">
-              iPhone Safari cannot pair a radio. Apple blocks Bluetooth and USB
-              in every iOS browser. Use the Lilyshark iOS app on this phone.
+              This browser can explore the demo, but can’t connect to a radio.
+              {onIos && " Use the Lilyshark iOS app to connect on this phone."}
             </p>
           )}
+          {(hasSerial || hasBle) && <p className="sheet-note">Choose the firmware running on your radio.</p>}
           <div className="sheet-actions">
+            {!hasSerial && !hasBle && !connected && !lilyLinked && (
+              <button className="primary" onClick={() => { setConnectOpen(false); setTab("TRAFFIC"); }}>Explore demo</button>
+            )}
             {(connected || lilyLinked) && (
               <button
                 className="primary"
@@ -726,7 +745,7 @@ function App() {
                 {t("DISCONNECT")}
               </button>
             )}
-            <button
+            {hasSerial && (<button
               className="primary"
               title="For a T-Deck running Lilyshark firmware: live device telemetry on TELEMETRY, your node on NODES, and Shelby pointer hand-off on TRAFFIC"
               onClick={() => {
@@ -739,9 +758,10 @@ function App() {
                 void connectDeviceLink();
               }}
             >
-              LILYSHARK T-DECK · USB
+              Lilyshark · USB
             </button>
-            <button
+            )}
+            {hasBle && (<button
               title="For a T-Deck running Lilyshark firmware: pair over Bluetooth the way the Meshtastic phone app does — no cable, and it works with no internet at all"
               onClick={() => {
                 if (!hasBle) {
@@ -753,9 +773,10 @@ function App() {
                 void connectMeshtasticBle().catch((e) => setError(String(e)));
               }}
             >
-              LILYSHARK T-DECK · BLUETOOTH
+              Lilyshark · Bluetooth
             </button>
-            <button
+            )}
+            {hasSerial && (<button
               onClick={() => {
                 if (!hasSerial) {
                   setError(missingTransportError("usb"));
@@ -766,9 +787,10 @@ function App() {
                 void onConnect("serie");
               }}
             >
-              MESHCORE · USB
+              MeshCore · USB
             </button>
-            <button
+            )}
+            {hasBle && (<button
               onClick={() => {
                 if (!hasBle) {
                   setError(missingTransportError("ble"));
@@ -779,30 +801,17 @@ function App() {
                 void onConnect("ble");
               }}
             >
-              MESHCORE · BLUETOOTH
+              MeshCore · Bluetooth
             </button>
+            )}
           </div>
           {error && <p className="error">{error}</p>}
-          {!onIos && (
+          {(hasSerial || hasBle) && (
             <p className="sheet-note">
-              Pick by firmware. Lilyshark USB is the full analyzer. Lilyshark
-              Bluetooth is the mesh conversation. MeshCore buttons speak a
-              different protocol.
+              USB carries analyzer telemetry. Bluetooth carries mesh messages.
             </p>
           )}
-          {!onIos && !hasSerial && !hasBle && (
-            <p className="sheet-note">
-              This browser has neither Web Serial nor Web Bluetooth. Open
-              lilyshark.com in Chrome or Edge on a computer, or Chrome on
-              Android.
-            </p>
-          )}
-          {!onIos && !hasSerial && hasBle && (
-            <p className="sheet-note">
-              USB needs Chrome or Edge on a computer; Bluetooth works here.
-            </p>
-          )}
-        </div>
+        </dialog>
       )}
 
       {(error || (deviceLink.status === "error" && deviceLink.error)) && (
@@ -839,7 +848,13 @@ function App() {
         <TrafficTab demoActive={!connected && !lilyLinked && !everConnectedRef.current} />
       )}
       {tab === "SHELBY" && <ShelbyScreen />}
-      {tab === "INTRO" && <IntroTab onOpen={(next) => setTab(next as Tab)} />}
+      {tab === "INTRO" && (
+        <IntroTab
+          onOpen={(next) => setTab(next as Tab)}
+          onConnect={() => setConnectOpen(true)}
+          connected={connected || lilyLinked}
+        />
+      )}
       {tab === "FLASH" && <FlashPage onOpen={setTab} />}
       {tab === "PAPER" && <WhitepaperTab />}
       {tab === "DOCS" && <Docs />}

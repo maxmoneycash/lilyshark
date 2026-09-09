@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { getTDeckTune, subscribeTDeckTune } from './tdeck-tune';
 
 export interface TDeckViewer {
@@ -43,23 +43,27 @@ export function mountTDeck(
   camera.lookAt(0, .027, 0);
   const rig = new THREE.Group();
   scene.add(rig);
-  const environment = new RoomEnvironment();
+  // The approved .blend uses its scene world and three white area lights in
+  // material preview. Its saved forest studio-light selection is inactive.
+  const environment = new THREE.Scene();
+  environment.background = new THREE.Color().setRGB(.12 * .7, .12 * .7, .12 * .7);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const environmentMap = pmrem.fromScene(environment, .015, .1, 100, { size: 512 });
+  const environmentMap = pmrem.fromScene(environment);
   scene.environment = environmentMap.texture;
-  scene.environmentIntensity = 1.05;
-  environment.dispose();
+  scene.environmentIntensity = 1;
   pmrem.dispose();
-  scene.add(new THREE.HemisphereLight(0xfff3ea, 0x2a2428, .28));
-  const key = new THREE.DirectionalLight(0xfff6ee, 2.6);
-  key.position.set(-.45, .6, .85);
-  scene.add(key);
-  const fill = new THREE.DirectionalLight(0xb7c6e4, .38);
-  fill.position.set(.6, .05, .4);
-  scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffffff, 1.55);
-  rim.position.set(.15, .45, -.7);
-  scene.add(rim);
+  RectAreaLightUniformsLib.init();
+  for (const [power, size, x, y, z, rx, ry, rz] of [
+    [1.2, .18, -.14, -.12, .23, .6757764, 0, -.8621702],
+    [.7, .16, .18, .02, .12, .9856219, 0, 1.6814537],
+    [.8, .16, -.06, .08, -.19, -.4844779, -Math.PI, .6435010],
+  ]) {
+    const light = new THREE.RectAreaLight(0xffffff, 1, size, size);
+    light.power = power;
+    light.position.set(x, y, z);
+    light.rotation.set(rx, ry, rz);
+    scene.add(light);
+  }
 
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
@@ -76,13 +80,10 @@ export function mountTDeck(
   lcdTexture.minFilter = THREE.LinearFilter;
   lcdTexture.magFilter = THREE.NearestFilter;
   lcdTexture.generateMipmaps = false;
-  const lcdMaterial = new THREE.MeshStandardMaterial({
+  // The LCD is an illuminated UI, so its pixels should retain their source
+  // colors. PBR reflections were lifting black backgrounds into a gray veil.
+  const lcdMaterial = new THREE.MeshBasicMaterial({
     map: lcdTexture,
-    emissiveMap: lcdTexture,
-    emissive: 0xffffff,
-    emissiveIntensity: 1,
-    roughness: 0.32,
-    metalness: 0,
     toneMapped: false,
     dithering: true,
   });
@@ -91,6 +92,8 @@ export function mountTDeck(
 
   let disposed = false;
   let ready = false;
+  let modelLoaded = false;
+  let screenLoaded = false;
   let failed = false;
   let moving = true;
   let visible = true;
@@ -132,18 +135,24 @@ export function mountTDeck(
     if (!frame && !disposed && !failed && visible && !document.hidden) frame = requestAnimationFrame(render);
   }
 
+  // Reveal the assembled device only after its first display frame is decoded.
+  function showReady() {
+    if (ready || failed || disposed || !modelLoaded || !screenLoaded) return;
+    ready = true;
+    requestRender();
+    callbacks.onReady();
+  }
   function resize() {
     const width = Math.max(canvas.clientWidth, 1);
     const height = Math.max(canvas.clientHeight, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(width, height, false);
-    // The radio is the stage. On a wide canvas it sits slightly right so
-    // the copy can live in the left margin. The whip can crop off the top.
+    // Keep the handset readable, with enough width for idle motion.
     const aspect = width / height;
     const tune = getTDeckTune();
-    const halfHeight = Math.max(height < 400 ? tune.halfHeight * 0.875 : tune.halfHeight, .04 * height / width);
-    const pan = aspect > 1 ? halfHeight * aspect * tune.pan : 0;
-    camera.position.y = height < 400 ? -.004 : -.006;
+    const halfHeight = Math.max(tune.halfHeight, .048 / aspect);
+    const pan = -halfHeight * aspect * tune.pan;
+    camera.position.y = .015;
     renderer.toneMappingExposure = tune.exposure;
     scene.environmentIntensity = tune.envIntensity;
     camera.left = -halfHeight * aspect + pan;
@@ -207,20 +216,10 @@ export function mountTDeck(
         const polish = (material: THREE.Material) => {
           if (material.name === 'LCD display') {
             hasScreen = true;
-            if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
-              material.map = lcdTexture;
-              material.emissiveMap = lcdTexture;
-              material.emissive.set(0xffffff);
-              material.emissiveIntensity = Math.max(material.emissiveIntensity, 1);
-              material.toneMapped = false;
-              material.dithering = true;
-              material.needsUpdate = true;
-              return material;
-            }
             return lcdMaterial;
           }
           if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
-            material.envMapIntensity = 1.15;
+            material.envMapIntensity = 1;
             material.dithering = true;
             for (const map of [material.map, material.normalMap, material.roughnessMap, material.metalnessMap, material.aoMap]) {
               if (map) {
@@ -239,21 +238,23 @@ export function mountTDeck(
       // Source glTF: front +Y, antenna -Z. Present front +Z and antenna +Y.
       gltf.scene.rotation.x = Math.PI / 2;
       rig.add(gltf.scene);
-      ready = true;
-      requestRender();
-      callbacks.onReady();
+      modelLoaded = true;
+      resize();
+      showReady();
     })
     .catch(error => { if (error.name !== 'AbortError') fail(); });
 
   function setScreen(url: string) {
-    if (disposed || url === screenUrl) return;
+    if (disposed || failed || url === screenUrl) return;
     screenUrl = url;
     const request = ++screenRequest;
     const apply = (image: HTMLImageElement) => {
-      if (disposed || request !== screenRequest || !lcdContext) return;
+      if (disposed || failed || request !== screenRequest || !lcdContext) return;
       lcdContext.drawImage(image, 0, 0, 320, 240);
       lcdTexture.needsUpdate = true;
       canvas.dataset.screen = url;
+      screenLoaded = true;
+      showReady();
       requestRender();
     };
     const cached = screens.get(url);
@@ -261,13 +262,16 @@ export function mountTDeck(
     const image = new Image();
     image.src = url;
     image.decode().then(() => {
-      if (disposed) return;
+      if (disposed || failed) return;
       screens.set(url, image);
       while (screens.size > 8) screens.delete(screens.keys().next().value!);
       apply(image);
     }).catch(() => {
       // Keep the last successful screen; a stale response can never replace it.
-      if (!disposed && request === screenRequest) screenUrl = '';
+      if (!disposed && request === screenRequest) {
+        screenUrl = '';
+        if (!screenLoaded) fail();
+      }
     });
   }
 
@@ -366,7 +370,9 @@ export function mountTDeck(
       disposeModel();
       environmentMap.dispose();
       renderer.dispose();
-      renderer.forceContextLoss();
+      // Fast Refresh can mount a new viewer on the same canvas immediately.
+      // A queued context-loss event would then fail that replacement viewer.
+      if (!canvas.isConnected) renderer.forceContextLoss();
     },
   };
 }

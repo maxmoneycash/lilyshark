@@ -31,6 +31,10 @@ browser (Vite + React)
 - **`src/mesh/screens/`** — the rest of the terminal: a full MeshCore client
   (chat, nodes, map, mesh graph, telemetry, config, debug log) plus the
   SHELBY network screen and the WHITEPAPER reader.
+- **MAP** — Lilyshark's coverage and repeater map, with search, filters,
+  distance measurement, terrain planning and connected-radio diagnostics.
+  [Map architecture and verification](../docs/coverage-map.md) covers the
+  matching native implementation, authorized data feeds and remaining field checks.
 - **`api/[...path].ts`** — Vercel catch-all that proxies API calls to the
   backend with CORS headers. No secrets here; the network data is public.
 - **`services/pulse-api/`** — Express service that syncs the chain's `blobs`
@@ -43,23 +47,46 @@ browser (Vite + React)
 
 ## 3D introduction
 
-[IntroTab.tsx](src/components/IntroTab.tsx) maps native vertical scrolling to all
-42 firmware renders in `public/intro/fw/`, grouped under the original twelve
-narratives. The track remains twelve viewports long, with a snap stop for each
-screen. Section rail buttons jump to the group's first screen. The sequence and
-scroll calculations live in [intro-sequence.ts](src/components/intro-sequence.ts);
-its tests check asset coverage, ordering, section jumps, and reachable endpoints.
-There is no timer advancing the LCD.
+[IntroTab.tsx](src/components/IntroTab.tsx) preserves the original twelve chapters
+and all 42 device screens deployed on `lilyshark.com`. The copy and screen order
+were restored from `/assets/main-BwMualIR.js` on 2026-09-08, with the matching
+production PNGs in `public/intro/fw/`. The tour opens with Splash and Home, then
+visits traffic, radio measurements, packets, setup, controls, and storage.
+Every screen has a reachable scroll stop. The sequence and scroll calculations
+live in [intro-sequence.ts](src/components/intro-sequence.ts); tests cover the
+full order, asset presence, chapter positions, and reachable endpoints.
+The responsive layout, clear LCD rendering, and removal of the side dots and
+view-mode buttons remain independent of this restored content.
 
-[TDeckModel.tsx](src/components/TDeckModel.tsx) owns the React lifecycle, controls,
+For a future firmware-image update, regenerate the web and iOS Deck images below.
+This replaces the restored production PNGs with current simulator output:
+
+```sh
+python3 scripts/generate_intro_frames.py
+python3 scripts/generate_intro_frames.py --check
+```
+
+Run these commands from the repository root. The exporter builds the simulator,
+checks its pixel goldens, then exports 42 frames at 320×240 to both apps. It needs
+`uvx` and ImageMagick (`magick`). `--check` reports stale images without replacing
+them. The live previews come from deterministic telemetry, including a sweep in
+progress and a selected packet while reception continues.
+
+[TDeckModel.tsx](src/components/TDeckModel.tsx) owns the React lifecycle
 and loading/error photo fallback. It loads [tdeck-scene.ts](src/components/tdeck-scene.ts)
 on demand; that module owns Three.js, the LCD texture, pointer input, and GPU
 cleanup. One scene persists while screens change. The device floats and rotates
 independently of scrolling. Drag horizontally to spin it; `touch-action: pan-y`
 keeps vertical touch gestures available for scrolling. Arrow keys rotate and
-Home resets the view. Reduced motion disables automatic movement, and the pause
-control lets other visitors stop it. The photo fallback still receives the
-current firmware screen if WebGL or model loading fails.
+Home resets the view. Reduced motion disables automatic movement. The camera
+frames the handset for readable LCD content, with no view controls over the model.
+Loading reserves the model’s space without showing a different photograph.
+The photo fallback is used only if WebGL, model loading, or the initial LCD image
+fails. The live model is revealed after both the geometry and first screen are
+ready; the display uses unlit source colors to keep text and black levels clear.
+
+The development camera and lighting tuner is opt-in: open `/?tdeck-tune#intro`.
+It is excluded from production builds.
 
 The versioned model is
 [`public/models/tdeck-plus/tdeck-plus-v5.glb`](public/models/tdeck-plus/tdeck-plus-v5.glb)
