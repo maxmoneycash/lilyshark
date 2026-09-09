@@ -31,6 +31,8 @@
 	}
 
 	.meshterm main.paper-tab .pdf-toolbar {
+		top: calc(54px + env(safe-area-inset-top, 0px));
+		z-index: 3;
 		min-height: 44px;
 		padding: 4px max(12px, env(safe-area-inset-right)) 4px
 			max(12px, env(safe-area-inset-left));
