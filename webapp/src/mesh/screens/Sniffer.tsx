@@ -865,6 +865,12 @@ export default function Sniffer() {
 	framesRef.current = frames;
 	const seqsRef = useRef(seqs);
 	seqsRef.current = seqs;
+	const selRef = useRef(sel);
+	selRef.current = sel;
+	const detailRef = useRef<HTMLDivElement>(null);
+	// Phone row taps have to bring the stacked inspector into the document;
+	// without this, selection only pans more of the capture table.
+	const pendingReveal = useRef(false);
 
 	const dispatch = useCallback((event: FrameLinkEvent) => {
 		const step = frameLinkStep(linkRef.current, event);
@@ -885,20 +891,46 @@ export default function Sniffer() {
 		}
 	}, []);
 
+	const revealDetail = useCallback(() => {
+		if (!window.matchMedia("(max-width: 860px)").matches) return;
+		const target =
+			detailRef.current ??
+			document.querySelector<HTMLElement>(".sniffer-detail");
+		target?.scrollIntoView({ block: "start", behavior: "instant" });
+	}, []);
+
 	// Every selection the operator makes goes through here, and only these
 	// reach the address bar. A frame opened by a link is set straight from
 	// dispatch instead, because the hash it came from already names it.
 	const pickFrame = useCallback(
 		(frame: HeardFrame | undefined) => {
+			const already = frame !== undefined && frame === selRef.current;
+			// Keyboard activation never hits the click-capture below, so mark
+			// a phone reveal here for every operator pick.
+			if (frame && window.matchMedia("(max-width: 860px)").matches) {
+				pendingReveal.current = true;
+			}
 			setSel(frame);
 			dispatch({
 				kind: "pick",
 				hash: window.location.hash,
 				seq: frame?.raw?.seq ?? null,
 			});
+			if (!frame || !pendingReveal.current) return;
+			// Pane already in the document: bring it in now. First open waits
+			// for the effect below, because .sniffer-detail is not mounted yet.
+			if (already || detailRef.current) {
+				pendingReveal.current = false;
+				revealDetail();
+			}
 		},
-		[dispatch],
+		[dispatch, revealDetail],
 	);
+	useEffect(() => {
+		if (!pendingReveal.current) return;
+		pendingReveal.current = false;
+		if (sel) revealDetail();
+	}, [sel, revealDetail]);
 
 	// The hash the tab was opened with and one pasted into it later are the
 	// same event, read by the same function: a permalink dropped into an
@@ -1181,7 +1213,19 @@ export default function Sniffer() {
 				{/* The table no longer takes every spare pixel: with a frame open the
 				    detail pane has to hold a dissection tree and a hex dump side by
 				    side, and it can only do that with a real share of the width. */}
-				<div className="panel" style={{ flex: "1 1 380px", minWidth: 0 }}>
+				<div
+					className="panel"
+					style={{ flex: "1 1 380px", minWidth: 0 }}
+					onClickCapture={(event) => {
+						const hit = event.target;
+						if (
+							hit instanceof Element &&
+							hit.closest(".sniffer-table tbody tr[tabindex]")
+						) {
+							pendingReveal.current = true;
+						}
+					}}
+				>
 					<div className="panel-title">
 						<span>CAPTURE // LIVE TABLE</span>
 						{frames.length > 0 && <span>SELECT A FRAME TO INSPECT</span>}
@@ -1225,7 +1269,12 @@ export default function Sniffer() {
 				{sel && (
 					<div
 						className="panel hot sniffer-detail"
-						style={{ flex: "1 1 460px", minWidth: 0, fontSize: 12 }}
+						ref={detailRef}
+						style={{
+							flex: "1 1 460px",
+							minWidth: 0,
+							fontSize: 12,
+						}}
 					>
 						<div className="panel-title">
 							<span>FRAME // {sel.short ?? nodeId(sel.src)}</span>
