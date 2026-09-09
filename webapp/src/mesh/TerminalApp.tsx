@@ -87,10 +87,19 @@ class ScreenBoundary extends Component<
           <div className="panel" style={{ flex: 1 }}>
             <div className="panel-title">
               <span>{t("SCREEN ERROR")}</span>
+              <button type="button" className="primary" onClick={() => window.location.reload()}>
+                {t("RELOAD")}
+              </button>
             </div>
-            <pre className="err" style={{ padding: 16, whiteSpace: "pre-wrap" }}>
-              {String(this.state.err?.stack ?? this.state.err)}
-            </pre>
+            <div className="screen-error" role="alert">
+              <h2>{t("This screen failed to load.")}</h2>
+              <p>
+                {t("Reload to pick up a fresh build. If it happens again, the error below is what to send.")}
+              </p>
+              <pre className="err" tabIndex={0}>
+                {String(this.state.err.stack ?? this.state.err)}
+              </pre>
+            </div>
           </div>
         </main>
       );
@@ -912,7 +921,7 @@ function App() {
         <p className="error">{error || deviceLink.error}</p>
       )}
       {deviceLink.status === "connecting" && (
-        <p className="error">
+        <p className="link-wait" role="status">
           Waiting for the T-Deck after USB reset
           {deviceLink.lastRx ? ` · heard: ${deviceLink.lastRx}` : " · no serial yet"}
         </p>
@@ -933,7 +942,13 @@ function App() {
         fallback={
           <main>
             <div className="panel" style={{ flex: 1 }}>
-              <div className="panel-title">LOADING…</div>
+              <div className="panel-title">{t("LOADING")}</div>
+              <div className="screen-loading" role="status">
+                <h2>{t("Loading this screen…")}</h2>
+                <p>
+                  {t("Map, telemetry, docs, and the flash tools load on first visit so the rest of the analyzer stays light.")}
+                </p>
+              </div>
             </div>
           </main>
         }

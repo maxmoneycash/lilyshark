@@ -961,7 +961,9 @@
 	flex-wrap: wrap;
 	min-width: 0;
 }
-.meshterm .debug-empty {
+.meshterm .debug-empty,
+.meshterm .screen-loading,
+.meshterm .screen-error {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
@@ -970,7 +972,9 @@
 	max-width: 58ch;
 	padding: 20px 16px;
 }
-.meshterm .debug-empty h2 {
+.meshterm .debug-empty h2,
+.meshterm .screen-loading h2,
+.meshterm .screen-error h2 {
 	margin: 0 0 10px;
 	font-size: 15px;
 	line-height: 1.35;
@@ -978,11 +982,25 @@
 	font-weight: 700;
 	color: var(--fg);
 }
-.meshterm .debug-empty p {
+.meshterm .debug-empty p,
+.meshterm .screen-loading p,
+.meshterm .screen-error p {
 	margin: 0;
 	font-size: 13px;
 	line-height: 1.6;
 	color: var(--ink, var(--fg));
+}
+.meshterm .screen-error pre {
+	margin: 12px 0 0;
+	padding: 12px;
+	max-height: min(40vh, 16rem);
+	overflow: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.meshterm .screen-error pre:focus-visible {
+	outline: 2px solid var(--fg);
+	outline-offset: -2px;
 }
 .meshterm .debuglog {
 	flex: 1;
@@ -1144,11 +1162,17 @@
 	display: none;
 }
 
-.meshterm .error {
-	color: var(--err);
+.meshterm .error,
+.meshterm .link-wait {
 	margin: 4px 16px;
 	font-size: 12px;
 	flex-shrink: 0;
+}
+.meshterm .error {
+	color: var(--err);
+}
+.meshterm .link-wait {
+	color: var(--warn);
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
@@ -2403,10 +2427,6 @@ body:has(.meshterm .app.menu-open) {
 	align-items: center;
 	margin-top: 26px;
 }
-.meshterm .intro-cta button:not(.tab) {
-	min-height: 36px;
-	padding: 8px 12px;
-}
 .meshterm .intro-hint {
 	margin: 16px 0 0;
 	max-width: 46ch;
@@ -2519,7 +2539,6 @@ body:has(.meshterm .app.menu-open) {
 	.meshterm .intro-head { font-size: 27px; margin-bottom: 12px; }
 	.meshterm .intro-body { font-size: 14px; line-height: 1.6; }
 	.meshterm .intro-cta { margin-top: 16px; gap: 8px; }
-	.meshterm .intro-cta button:not(.tab) { min-height: 40px; }
 	.meshterm .intro-hint { margin-top: 12px; }
 	.meshterm .mesh-demo { margin-top: 14px; }
 	.meshterm .mesh-demo-canvas, .meshterm .mesh-demo-stage { min-height: 108px; }
@@ -3253,6 +3272,7 @@ body:has(.meshterm .app.menu-open) {
 }
 @media (max-width: 860px) {
 	.meshterm button:not(.tab),
+	.meshterm .intro-cta button:not(.cta-link),
 	.meshterm .panel-title :is(button, input, select),
 	.meshterm .chat-input input {
 		min-height: 44px;
@@ -3306,7 +3326,9 @@ body:has(.meshterm .app.menu-open) {
 		padding-bottom: max(12px, env(safe-area-inset-bottom));
 	}
 	.meshterm .debuglog,
-	.meshterm .debug-empty {
+	.meshterm .debug-empty,
+	.meshterm .screen-loading,
+	.meshterm .screen-error {
 		min-height: min(60dvh, 28rem);
 	}
 }
