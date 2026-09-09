@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
-import { TDeckPhoto } from './TDeckPhoto';
-import type { TDeckViewer } from './tdeck-scene';
+import { mountTDeck, preloadTDeck, type TDeckViewer } from './tdeck-scene';
 import './tdeck-model.css';
+
+preloadTDeck();
 
 /** A single persistent scene: scrolling changes the LCD, never the model. */
 export function TDeckModel({ screen }: { screen: string }) {
@@ -13,18 +14,20 @@ export function TDeckModel({ screen }: { screen: string }) {
   const settings = useRef({ screen, moving: !reduceMotion });
   settings.current = { screen, moving: !reduceMotion };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const node = canvas.current;
+    if (!node) return;
     let cancelled = false;
-    // Keep Three and its decoder out of the analyzer's initial JS execution.
-    import('./tdeck-scene').then(({ mountTDeck }) => {
-      if (cancelled || !canvas.current) return;
-      viewer.current = mountTDeck(canvas.current, {
+    try {
+      viewer.current = mountTDeck(node, {
         onReady: () => { if (!cancelled) setStatus('ready'); },
         onError: () => { if (!cancelled) setStatus('fallback'); },
       });
       viewer.current.setScreen(settings.current.screen);
       viewer.current.setMotion(settings.current.moving);
-    }).catch(() => { if (!cancelled) setStatus('fallback'); });
+    } catch {
+      if (!cancelled) setStatus('fallback');
+    }
     return () => {
       cancelled = true;
       viewer.current?.dispose();
@@ -43,8 +46,8 @@ export function TDeckModel({ screen }: { screen: string }) {
         <div className="tdeck-model-loading" role="status">Loading the deck…</div>
       )}
       {status === 'fallback' && (
-        <div className="tdeck-model-fallback">
-          <TDeckPhoto screen={screen} alt="LILYGO T-Deck Plus running Lilyshark" />
+        <div className="tdeck-model-fallback" role="status">
+          3D view needs WebGL.
         </div>
       )}
       <canvas

@@ -208,7 +208,7 @@ export function IntroTab({
                 )}
                 {idx === 0 && (
                   <p className="intro-hint">
-                    Drag the deck to turn it. Scroll to watch Meshtastic flood a packet and MeshCore route one with a receipt.
+                    Drag the deck to turn it in 3D. Scroll to watch Meshtastic flood a packet and MeshCore route one with a receipt.
                   </p>
                 )}
                 {showMeshDemo && (

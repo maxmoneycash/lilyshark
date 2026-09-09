@@ -72,18 +72,17 @@ checks its pixel goldens, then exports 42 frames at 320×240 to both apps. It ne
 them. The live previews come from deterministic telemetry, including a sweep in
 progress and a selected packet while reception continues.
 
-[TDeckModel.tsx](src/components/TDeckModel.tsx) owns the React lifecycle
-and loading/error photo fallback. It loads [tdeck-scene.ts](src/components/tdeck-scene.ts)
-on demand; that module owns Three.js, the LCD texture, pointer input, and GPU
-cleanup. One scene persists while screens change. The device floats and rotates
-independently of scrolling. Drag horizontally to spin it; `touch-action: pan-y`
-keeps vertical touch gestures available for scrolling. Arrow keys rotate and
-Home resets the view. Reduced motion disables automatic movement. The camera
-frames the handset for readable LCD content, with no view controls over the model.
-Loading reserves the model’s space without showing a different photograph.
-The photo fallback is used only if WebGL, model loading, or the initial LCD image
-fails. The live model is revealed after both the geometry and first screen are
-ready; the display uses unlit source colors to keep text and black levels clear.
+[TDeckModel.tsx](src/components/TDeckModel.tsx) owns the React lifecycle.
+[tdeck-scene.ts](src/components/tdeck-scene.ts) starts parsing the GLB as soon
+as the app module graph loads, then clones that scene onto the intro canvas.
+One scene persists while screens change. The device rests at a three-quarter
+tilt and can be dragged through a full yaw orbit with pitch. Arrow keys rotate
+and Home restores the rest pose. Reduced motion disables idle movement; drag
+still works. The camera frames the handset for readable LCD content, with no
+view controls over the model. Intro never paints `/intro/tdeck.webp`; a WebGL
+failure is a status line. The chassis is revealed as soon as the GLB parses —
+the first LCD image may fill in a frame later. The display uses unlit source
+colors to keep text and black levels clear.
 
 The development camera and lighting tuner is opt-in: open `/?tdeck-tune#intro`.
 It is excluded from production builds.

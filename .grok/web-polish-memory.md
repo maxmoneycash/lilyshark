@@ -121,3 +121,15 @@ caps height and scrolls, and the device row keeps a 240px floor.
 Arc visual check at 1440×900, 390×844, and 320×568: all 12 headings, 1/42
 through 42/42, no horizontal overflow. Antenna whip still exits the top of the
 stage on purpose. Dev server: `http://localhost:3002/#intro`.
+
+## Intro 3D-first, orbitable chassis — 2026-09-09
+
+The user still saw a 2D photograph for about a second, then the GLB. Intro
+must not mount `TDeckPhoto` / `/intro/tdeck.webp`. `tdeck-scene.ts` parses the
+GLB once at module load; `TDeckModel` attaches a clone in `useLayoutEffect`.
+Reload sampling on localhost never requested `tdeck.webp`; first sample at
+~575ms was `data-state=ready` with canvas opacity 1. Rest pose is tilted so
+the chassis has volume (side, thickness, antenna). Drag turns yaw through a
+full orbit and pitches; it does not spring back. Lighting is the Blender area
+lights plus a warm key, cool rim, and hemisphere bounce. LCD stays unlit.
+Flash keeps the 2D photo. Do not rewrite the twelve-chapter intro copy.

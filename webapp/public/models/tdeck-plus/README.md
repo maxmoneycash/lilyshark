@@ -31,7 +31,7 @@ const gltf = await loader.loadAsync('/models/tdeck-plus/tdeck-plus-v5.glb');
 gltf.scene.rotation.x = Math.PI / 2;
 ```
 
-The raw glTF node is `LCD glass`; Three.js sanitizes that name to `LCD_glass`. It contains two primitives. Find the display primitive by `material.name === 'LCD display'`, leaving the glass edge material intact. Its texture coordinates are exactly 0..1 in `TEXCOORD_0` (`geometry.attributes.uv`). Replacement canvas textures use `flipY = false`, channel 0, and sRGB color space. The viewer uses an unlit `MeshBasicMaterial` with `toneMapped = false` for this primitive so the illuminated display retains the source UI colors, without environment reflections lifting its black background. Initial readiness waits for both the model and its first display image; an initial image failure uses the photo fallback.
+The raw glTF node is `LCD glass`; Three.js sanitizes that name to `LCD_glass`. It contains two primitives. Find the display primitive by `material.name === 'LCD display'`, leaving the glass edge material intact. Its texture coordinates are exactly 0..1 in `TEXCOORD_0` (`geometry.attributes.uv`). Replacement canvas textures use `flipY = false`, channel 0, and sRGB color space. The viewer uses an unlit `MeshBasicMaterial` with `toneMapped = false` for this primitive so the illuminated display retains the source UI colors, without environment reflections lifting its black background. The chassis is shown as soon as the GLB is parsed; the first LCD image fills in afterwards. Intro never paints `/intro/tdeck.webp` — a WebGL or model failure is a short status line, not the 2D photo. Flash still uses the photograph.
 
 The original glTF coordinates are meters, with the front pointing +Y and the top/antenna pointing −Z. The rotation above makes the device upright with its front pointing +Z. Handset dimensions are 73.140 × 114.984 × 21.870 mm, including the trackball and rear insert. The complete antenna assembly is 295.764 mm tall. Exact bounds are in `optimization.json`.
 
@@ -61,9 +61,9 @@ mapping, and three white square area lights:
 
 | Light | Position (m) | Side (m) | Power |
 | --- | --- | --- | --- |
-| Key | −0.14, −0.12, 0.23 | 0.18 | 1.2 |
-| Fill | 0.18, 0.02, 0.12 | 0.16 | 0.7 |
-| Back | −0.06, 0.08, −0.19 | 0.16 | 0.8 |
+| Key | −0.16, −0.08, 0.26 | 0.20 | 1.85 |
+| Fill | 0.20, 0.04, 0.14 | 0.16 | 1.05 |
+| Back | −0.06, 0.10, −0.20 | 0.16 | 1.20 |
 
 The positions and rotations in `tdeck-scene.ts` use the same axes as the upright
 model. The constant world is PMREM-filtered locally; no lighting image needs to

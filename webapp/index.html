@@ -31,6 +31,8 @@
     <!-- No font requests: JetBrains Mono is self-hosted via @font-face in
          meshterm.css, which also wins the cascade — a Google Fonts copy here
          was two wasted preconnects and a render-blocking stylesheet. -->
+    <link rel="preload" href="/models/tdeck-plus/tdeck-plus-v5.glb" as="fetch" crossorigin />
+    <link rel="preload" href="/intro/fw/splash.png" as="image" />
   </head>
   <body>
     <div id="root" class="meshterm"></div>

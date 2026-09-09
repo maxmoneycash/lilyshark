@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from './mesh/TerminalApp'
 import { seedDemo } from './mesh/demo'
 import { applyTheme } from './mesh/theme'
+import { preloadTDeck } from './components/tdeck-scene'
+
+// Start the GLB + Three parse before React commits the intro, so the first
+// paint can be the chassis instead of a 2D photograph.
+preloadTDeck()
 
 // Before the first render, so there is no flash of the default theme.
 applyTheme()

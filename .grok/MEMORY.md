@@ -65,9 +65,54 @@ do not uninstall the real app. Other sessions may control booted simulators.
 
 ## Guided welcome home — 2026-09-08
 
-Disconnected iPhone Messages is `WelcomeHomeView`: interactive T-Deck, pinned
-Connect, pairing steps, capability cards, and a labelled Meshtastic flood vs
-MeshCore routed demo. iPad/macOS use the same view as the split-view detail.
+Disconnected iPhone Messages is `WelcomeHomeView`: one page scroll, sticky
+Connect above the tab bar, interactive T-Deck as the first hero (no card,
+no clip — chassis + SMA in frame; the whip may leave the top of the
+stage), then welcome copy, pairing steps, capability cards, and a labelled
+Meshtastic flood vs MeshCore routed demo.
+
+SceneKit framing must use the *rotated* AABB (`convertPosition` of the
+eight corners after the −π/2 pitch). `boundingBox` ignores the node's own
+eulerAngles, which cropped the LCD/bezel inside a rounded window. Camera
+recenters on the chassis so idle yaw stays on the handset. `TDeckStage`
+is ~52% on Welcome (min 420pt). The Connect fade is 12pt so the three
+steps stay readable above the button. Onboarding still uses ~56%;
+“Look around the deck” sits under the drag hint, not under Continue.
+Conversations is a push off that
+welcome, with Back. iPad/macOS use the same view as the split-view detail.
 The scanner no longer auto-presents on first launch; background scan still
 starts. Web INTRO keeps the 12 chapters and 42 screens; first chapter adds
 Connect, chapters 3–4 show the same routing demo. Do not rewrite intro copy.
+
+## Simulator Bluetooth pairing preview — 2026-09-08
+
+The iPhone Simulator cannot hear BLE, even with a physical T-Deck powered on
+and USB-plugged (`/dev/cu.usbmodem101`). On simulator, Connect a Radio fades
+in a “Lilyshark T-Deck Plus” Meshtastic row, then a pairing sheet with the
+3D deck, PIN `123456`, and Pair (six digits submit automatically). That is a
+UI walkthrough, not a live GATT link. After Pair, compact Messages shows
+Ready for messages / Lilyshark, then Public Channel above a one-row empty
+contacts note. The composer sits in a bottom safe-area inset so the floating
+tab bar does not cover it. Disconnect via `endSimulatorDeckPreview`. A real
+phone is required to pair the physical deck. Do not uninstall
+`com.lilyshark.app`. Overlay-install rebuilt `.app` bundles; do not use
+Argent `reinstall-app` on the real bundle id.
+
+Pairing-sheet polish (2026-09-08): native inline title “Bluetooth Pairing”
+with Cancel / Pair, drag indicator, `.large` detent. The PIN lives on the
+deck LCD via `ios/Resources/TDeck/screens/pairing.png` (not a sticker over
+the chassis). Digit cells sit in a bottom bar above the number pad; six
+digits submit; mismatch shakes and haptics. Scanner copy is one line.
+Empty contacts: “They appear when this deck hears someone on the mesh.”
+Verified overlay-install on iPhone 17 (`B365CF55-6DAC-4513-995F-853C1884D68F`).
+
+## Web intro T-Deck is 3D-first — 2026-09-09
+
+Intro never paints `/intro/tdeck.webp`. The GLB parse starts with the app
+module graph (`preloadTDeck` from `main.tsx`); the chassis is cloned onto
+the canvas as soon as that parse finishes. A missing LCD PNG must not hide
+the model. Rest pose is a three-quarter tilt (`REST_YAW` 0.58, `REST_PITCH`
+0.36). Drag orbits yaw freely with pitch; the pose stays where the pointer
+leaves it (Home restores rest). Flash still uses the photograph. Arc-checked
+at 1440×900 and 390×844 on `http://localhost:3002/#intro`. Do not commit
+unless asked.
