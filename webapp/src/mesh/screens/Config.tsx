@@ -58,6 +58,7 @@ function Section(props: {
 			{props.onSave && (
 				<div className="panel-actions">
 					<button
+						type="button"
 						className="primary"
 						disabled={busy}
 						onClick={async () => {
