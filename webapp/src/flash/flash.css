@@ -815,8 +815,13 @@
   }
   .meshterm .flash-page .flash-btn,
   .meshterm .flash-page .outline-btn {
-    min-height: 44px;
     width: 100%;
+  }
+  .meshterm .flash-page .flash-btn {
+    min-height: 56px;
+  }
+  .meshterm .flash-page .outline-btn {
+    min-height: 44px;
   }
   .meshterm .flash-page .cta {
     display: grid;
@@ -859,20 +864,53 @@
   .meshterm .flash-page .product {
     order: -1;
   }
+  .meshterm .flash-page .install-layout[data-kind="firmware"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 104px;
+    align-items: start;
+    column-gap: 14px;
+    row-gap: 16px;
+  }
   .meshterm .flash-page .install-layout[data-kind="firmware"] .hero {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 0;
+    padding: 2px 0 0;
+    background: none;
+    border: 0;
+    align-items: flex-start;
+  }
+  .meshterm .flash-page .install-layout[data-kind="firmware"] .product {
+    grid-column: 1;
+    grid-row: 1;
+    order: 0;
+  }
+  .meshterm .flash-page .install-layout[data-kind="firmware"] .hero-label,
+  .meshterm .flash-page .install-layout[data-kind="firmware"] .hero-caption {
     display: none;
+  }
+  .meshterm .flash-page .install-layout[data-kind="firmware"] .tdeck-photo {
+    width: 104px;
+    filter: drop-shadow(0 8px 10px #49313e30);
   }
 }
 @media (max-width: 619px) {
-  .meshterm .flash-page .device-chip {
-    max-width: 20ch;
-  }
   .meshterm .flash-page .device-card {
-    padding-right: 20px;
+    min-height: 0;
+    padding: 10px 12px;
     align-items: flex-start;
   }
   .meshterm .flash-page .device-chip {
-    min-height: 2.8em;
+    max-width: none;
+    min-height: 0;
+  }
+  .meshterm .flash-page .install-layout[data-kind="firmware"] {
+    grid-template-columns: minmax(0, 1fr) 88px;
+    column-gap: 10px;
+  }
+  .meshterm .flash-page .install-layout[data-kind="firmware"] .tdeck-photo {
+    width: 88px;
   }
 }
 
