@@ -247,6 +247,7 @@
 	flex: 0 0 auto;
 	height: var(--keyboard-inset, 0px);
 	pointer-events: none;
+	overflow-anchor: none;
 }
 
 @media (max-width: 860px) {
