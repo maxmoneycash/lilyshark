@@ -660,7 +660,7 @@ export default function Config() {
 								</label>
 							</div>
 							<div className="cfg-actions">
-								<button
+								<button type="button"
 									className="primary"
 									disabled={!posLat.trim() || !posLon.trim()}
 									onClick={async () => {
@@ -689,7 +689,7 @@ export default function Config() {
 								>
 									{t("SET POSITION")}
 								</button>
-								<button
+								<button type="button"
 									onClick={async () => {
 										setPosMsg("");
 										try {
@@ -725,7 +725,7 @@ export default function Config() {
 										setImportPending(""); // JSON changed → invalidates the confirmation
 									}}
 								/>
-								<button
+								<button type="button"
 									className="primary"
 									disabled={!chJson.trim()}
 									onClick={onImportChannels}
@@ -739,7 +739,7 @@ export default function Config() {
 								</span>
 							)}
 							<div className="cfg-toolbar">
-								<button
+								<button type="button"
 									className="primary"
 									disabled={s.channels.size === 0}
 									onClick={onExportChannels}
@@ -776,7 +776,7 @@ export default function Config() {
 													setChNames({ ...chNames, [index]: e.target.value })
 												}
 											/>
-											<button
+											<button type="button"
 												aria-label={t("Save channel {0}", index)}
 												onClick={() => saveChannel(index)}
 											>
@@ -805,7 +805,7 @@ export default function Config() {
 													setChPsks({ ...chPsks, [index]: e.target.value })
 												}
 											/>
-											<button
+											<button type="button"
 												title={t("Generate a random 128-bit key")}
 												aria-label={t("Generate key for channel {0}", index)}
 												onClick={() => genPsk(index)}
@@ -828,7 +828,7 @@ export default function Config() {
 								)}
 							</span>
 							<div className="cfg-actions">
-								<button
+								<button type="button"
 									className="primary"
 									onClick={() => {
 										setAdvMsg("");
@@ -845,7 +845,7 @@ export default function Config() {
 								>
 									FLOOD ADVERT
 								</button>
-								<button
+								<button type="button"
 									onClick={() => {
 										setAdvMsg("");
 										sendAdvert(false)
@@ -889,7 +889,7 @@ export default function Config() {
 						</div>
 						<div className="cfg-body cfg-body-continued">
 							<div className="cfg-actions">
-								<button className="primary" onClick={onReboot}>
+								<button type="button" className="primary" onClick={onReboot}>
 									{rebootArm ? t("CONFIRM REBOOT") : t("REBOOT")}
 								</button>
 								<span className="dim">
@@ -912,10 +912,10 @@ export default function Config() {
 								)}
 							</span>
 							<div className="cfg-actions">
-								<button className="primary" onClick={onBackup}>
+								<button type="button" className="primary" onClick={onBackup}>
 									{t("SAVE BACKUP")}
 								</button>
-								<button onClick={() => backupFile.current?.click()}>
+								<button type="button" onClick={() => backupFile.current?.click()}>
 									{t("RESTORE…")}
 								</button>
 								<input
@@ -929,7 +929,7 @@ export default function Config() {
 										e.target.value = "";
 									}}
 								/>
-								<button onClick={onExportKey}>{t("EXPORT PRIVATE KEY")}</button>
+								<button type="button" onClick={onExportKey}>{t("EXPORT PRIVATE KEY")}</button>
 							</div>
 							<span className="dim">
 								{t(
@@ -971,7 +971,7 @@ export default function Config() {
 									/>
 									<span>{t("days")}</span>
 								</div>
-								<button className="danger" onClick={onPurge}>
+								<button type="button" className="danger" onClick={onPurge}>
 									{purgeArm ? t("CONFIRM PURGE") : t("PURGE")}
 								</button>
 							</div>
