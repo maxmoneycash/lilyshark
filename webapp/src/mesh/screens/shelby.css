@@ -69,9 +69,39 @@
 .meshterm .shelby-registry td:nth-child(n + 2) {
   white-space: nowrap;
 }
+.meshterm .shelby-evidence {
+  width: 360px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.meshterm .shelby-empty {
+  max-width: 58ch;
+  padding: 16px;
+}
+.meshterm .shelby-empty h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.35;
+  letter-spacing: 0;
+  font-weight: 700;
+  color: var(--fg);
+}
+.meshterm .shelby-empty p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink, var(--fg));
+  overflow-wrap: anywhere;
+}
+.meshterm .shelby-empty[role="alert"] h2 {
+  color: var(--err);
+}
 @media (max-width: 860px) {
   .meshterm .shelby-screen .prose {
     padding: 12px;
+  }
+  .meshterm .shelby-flow {
+    grid-template-columns: minmax(0, 1fr);
   }
   .meshterm .shelby-flow .flow-step {
     padding: 10px 12px;
@@ -86,6 +116,9 @@
   .meshterm .shelby-registry table.grid {
     min-width: 720px;
   }
+  .meshterm .shelby-evidence {
+    width: auto;
+  }
   .meshterm .shelby-evidence .kv {
     grid-template-columns: minmax(0, 84px) minmax(0, 1fr);
     gap: 10px 12px;
@@ -95,5 +128,13 @@
   }
   .meshterm .shelby-evidence .shelby-wire .kv {
     padding: 10px 12px 12px;
+  }
+  .meshterm .shelby-empty {
+    padding: 16px 12px 20px;
+  }
+  .meshterm .shelby-screen a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
 }

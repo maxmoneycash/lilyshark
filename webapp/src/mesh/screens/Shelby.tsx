@@ -169,8 +169,7 @@ export function ShelbyScreen() {
     <main className="shelby-screen">
       <div className="panel shelby-overview" style={{ flex: 1 }}>
         <div className="panel-title">
-          SHELBY // CAPTURE STORAGE
-          <span className="spacer" />
+          <span className="panel-title-label">SHELBY // CAPTURE STORAGE</span>
           <span className={err ? "warn" : stats ? "ok" : "dim"}>
             {err ? "INDEXER UNREACHABLE" : stats ? "INDEXER LIVE" : "READING…"}
           </span>
@@ -237,13 +236,23 @@ export function ShelbyScreen() {
             {registry ? ` · ${registry.length} ANCHORED` : ""}
           </div>
           {regErr ? (
-            <div className="panel-foot">
-              <span className="err">Registry unavailable: {regErr}</span>
+            <div className="shelby-empty" role="alert">
+              <h2>Registry unavailable.</h2>
+              <p>{regErr}</p>
             </div>
           ) : registry === null ? (
-            <div className="panel-foot dim">Reading the registry…</div>
+            <div className="shelby-empty" role="status">
+              <h2>Reading the registry…</h2>
+              <p>
+                Asking the shelbynet fullnode for captures this publisher has
+                anchored.
+              </p>
+            </div>
           ) : registry.length === 0 ? (
-            <div className="panel-foot dim">No captures anchored by this publisher yet.</div>
+            <div className="shelby-empty" role="status">
+              <h2>No captures anchored yet.</h2>
+              <p>This publisher has not registered a blob on shelbynet.</p>
+            </div>
           ) : (
             <div className="scroll-x shelby-registry" tabIndex={0} role="region" aria-label="Anchored captures">
               <table className="grid">
@@ -284,7 +293,7 @@ export function ShelbyScreen() {
         </div>
       </div>
 
-      <div className="panel shelby-evidence" style={{ width: 360, flexShrink: 0 }}>
+      <div className="panel shelby-evidence">
         <div className="panel-title">AIRTIME MODEL</div>
         <div className="scroll-y">
           <div className="kv">
@@ -362,16 +371,29 @@ export function ShelbyScreen() {
           )}
 
           <div className="panel-title">NETWORK</div>
-          <div className="kv">
-            <span className="k">BLOBS</span>
-            <span className="v">{stats ? stats.totalBlobs.toLocaleString() : "—"}</span>
-            <span className="k">STORED</span>
-            <span className="v">{stats ? stats.totalStorageFormatted : "—"}</span>
-            <span className="k">UPLOAD RATE</span>
-            <span className="v">{stats ? `${stats.uploadRate.toFixed(0)} /min` : "—"}</span>
-            <span className="k">NETWORK</span>
-            <span className="v">shelbynet</span>
-          </div>
+          {err ? (
+            <div className="shelby-empty" role="alert">
+              <h2>Indexer unreachable.</h2>
+              <p>{err}</p>
+            </div>
+          ) : (
+            <div className="kv">
+              <span className="k">BLOBS</span>
+              <span className="v">
+                {stats ? stats.totalBlobs.toLocaleString() : "—"}
+              </span>
+              <span className="k">STORED</span>
+              <span className="v">
+                {stats ? stats.totalStorageFormatted : "—"}
+              </span>
+              <span className="k">UPLOAD RATE</span>
+              <span className="v">
+                {stats ? `${stats.uploadRate.toFixed(0)} /min` : "—"}
+              </span>
+              <span className="k">NETWORK</span>
+              <span className="v">shelbynet</span>
+            </div>
+          )}
         </div>
       </div>
     </main>
