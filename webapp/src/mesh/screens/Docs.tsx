@@ -314,11 +314,22 @@ export default function Docs() {
 				</div>
 				<nav className="docs-nav" ref={navRef} aria-label="Documents">
 					{!docs.length && (
-						<p className="dim docs-nav-empty" role="status">
-							{message
-								? "Documents unavailable"
-								: "Loading documents…"}
-						</p>
+						<div className="docs-nav-empty">
+							<p className={message ? "err" : "dim"} role="status">
+								{message
+									? "Documents unavailable"
+									: "Loading documents…"}
+							</p>
+							{message && (
+								<button
+									type="button"
+									className="docs-retry"
+									onClick={retry}
+								>
+									Retry
+								</button>
+							)}
+						</div>
 					)}
 					{docs.map((doc) => (
 						<a

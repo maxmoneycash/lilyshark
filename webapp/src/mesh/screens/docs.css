@@ -57,13 +57,54 @@
 	justify-items: start;
 	gap: 12px;
 }
-.meshterm .docs-grid .docs-nav-empty {
+.meshterm .docs-grid .docs-error .err {
 	margin: 0;
-	padding: 8px 10px;
+}
+.meshterm .docs-grid .docs-nav-empty {
+	display: grid;
+	justify-items: start;
+	align-content: start;
+	gap: 12px;
+	flex: 1;
+	min-height: 0;
+	padding: 10px;
+}
+.meshterm .docs-grid .docs-nav-empty p {
+	margin: 0;
 }
 .meshterm .docs-grid .docs-retry {
 	width: max-content;
 	max-width: 100%;
+}
+.meshterm .docs-grid .docs-nav .docs-retry {
+	text-align: center;
+	white-space: nowrap;
+	overflow-wrap: normal;
+	letter-spacing: 1px;
+	font-weight: 500;
+	line-height: 1.25;
+	padding: 8px 12px;
+	background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+	border: 1px solid var(--border);
+	box-shadow: 0 2px 0 var(--border);
+	color: var(--fg);
+}
+@media (hover: hover) and (pointer: fine) {
+	.meshterm .docs-grid .docs-nav .docs-retry:hover:not(:disabled) {
+		background: var(--fg);
+		color: var(--bg);
+		border-color: var(--fg);
+		box-shadow: 0 2px 0 color-mix(in srgb, var(--fg) 55%, transparent);
+	}
+}
+.meshterm .docs-grid .docs-nav .docs-retry:active:not(:disabled) {
+	transform: translateY(2px) scale(0.97);
+	box-shadow: 0 0 0 transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+	.meshterm .docs-grid .docs-nav .docs-retry:active:not(:disabled) {
+		transform: none;
+	}
 }
 .meshterm .docs-grid .docs-nav a:hover,
 .meshterm .docs-grid .docs-nav a:active {
