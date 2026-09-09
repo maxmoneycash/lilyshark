@@ -2,12 +2,21 @@
 	position: sticky;
 	top: 0;
 	z-index: 2;
+	flex-wrap: nowrap;
 	justify-content: space-between;
+	gap: 12px;
 	width: 100%;
 	max-width: min(100%, 860px);
 	padding: 8px 12px;
 	background: var(--bg);
 	border-bottom: 1px solid var(--border);
+}
+
+.meshterm main.paper-tab .pdf-toolbar span {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .meshterm main.paper-tab .pdf-toolbar a {
@@ -19,6 +28,19 @@
 	.meshterm main.paper-tab .pdf-scroll {
 		gap: 0;
 		padding: 0 0 24px;
+	}
+
+	.meshterm main.paper-tab .pdf-toolbar {
+		min-height: 44px;
+		padding: 4px max(12px, env(safe-area-inset-right)) 4px
+			max(12px, env(safe-area-inset-left));
+	}
+
+	.meshterm main.paper-tab .pdf-toolbar a {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+		padding: 0 2px;
 	}
 
 	.meshterm main.paper-tab .pdf-page {
