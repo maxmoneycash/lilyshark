@@ -124,6 +124,7 @@
 	}
 	.meshterm .traffic-screen .traffic-frames {
 		max-height: min(46dvh, 420px) !important;
+		overflow: auto !important;
 	}
 	.meshterm .traffic-detail,
 	.meshterm .traffic-diff {

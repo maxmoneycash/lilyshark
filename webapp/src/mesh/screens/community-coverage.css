@@ -15,6 +15,7 @@
   color: var(--fg); background: var(--bg);
 }
 :root.light .meshterm .community-map-screen {
+  --ink: inherit;
   --coverage-muted: var(--fg-dim);
   --coverage-material: var(--panel);
   --coverage-raised: color-mix(in srgb, var(--fg) 10%, var(--bg));
@@ -98,7 +99,7 @@
 .meshterm button.coverage-repeater-row { display: flex; align-items: center; width: 100%; gap: 10px; padding: 10px 14px; min-height: 60px; text-align: left; border-top-color: var(--border); font-size: 13px; white-space: normal; }
 .meshterm .coverage-repeater-row > span:nth-child(2) { min-width: 0; flex: 1; }
 .meshterm .coverage-repeater-row strong { display: block; overflow-wrap: anywhere; font-weight: 600; }
-.meshterm .coverage-repeater-row small { display: block; margin-top: 3px; color: var(--coverage-muted); font: 10px/1.4 inherit; }
+.meshterm .coverage-repeater-row small { display: block; margin-top: 3px; color: var(--coverage-muted); font-size: 10px; line-height: 1.4; }
 .meshterm .coverage-repeater-row > svg { flex-shrink: 0; width: 14px; color: var(--coverage-muted); }
 .meshterm .coverage-node-symbol { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; background: var(--bg); border: 1px solid var(--border); color: var(--coverage-muted); }
 .meshterm .coverage-list-empty, .meshterm .coverage-list-footnote { padding: 14px; margin: 0; font-size: 12px; }
@@ -110,7 +111,7 @@
 .meshterm .coverage-detail-scroll { max-height: min(410px, calc(100dvh - 270px)); }
 .meshterm .coverage-detail-scroll .coverage-scroll-viewport > div { padding: 0 16px 14px; }
 .meshterm .coverage-detail h2 { display: flex; align-items: center; gap: 8px; font: 700 16px/1.25 "JetBrains Mono", ui-monospace, Consolas, monospace; letter-spacing: 1px; overflow-wrap: anywhere; margin: 0 0 8px; }
-.meshterm .coverage-identity { font: 10px/1.6 inherit; color: var(--coverage-muted); overflow-wrap: anywhere; user-select: text; margin: 8px 0 12px; }
+.meshterm .coverage-identity { font-size: 10px; line-height: 1.6; color: var(--coverage-muted); overflow-wrap: anywhere; user-select: text; margin: 8px 0 12px; }
 .meshterm .coverage-detail-facts { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px 12px; font-size: 12px; margin: 12px 0; }
 .meshterm .coverage-detail-facts dt { color: var(--coverage-muted); }
 .meshterm .coverage-detail-facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; user-select: text; }
@@ -176,7 +177,7 @@
 .meshterm .coverage-terrain .coverage-note { color: var(--coverage-muted); font-size: 10px; }
 .meshterm .coverage-terrain-inputs { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; margin-top: 12px; }
 .meshterm .coverage-terrain-inputs label { font-size: 11px; display: grid; gap: 6px; }
-.meshterm .coverage-terrain-inputs input { box-sizing: border-box; width: 100%; min-height: 44px; font: 12px/1.4 inherit; color: inherit; background: var(--bg); border: 1px solid var(--border); padding: 8px; }
+.meshterm .coverage-terrain-inputs input { box-sizing: border-box; width: 100%; min-height: 44px; font-size: 12px; line-height: 1.4; color: inherit; background: var(--bg); border: 1px solid var(--border); padding: 8px; }
 .meshterm .coverage-terrain-verdict { display: flex; align-items: center; gap: 8px; }
 .meshterm .coverage-terrain-verdict i { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--warn); }
 .meshterm .coverage-terrain-verdict[data-clear=true] i { background: #40ba83; }

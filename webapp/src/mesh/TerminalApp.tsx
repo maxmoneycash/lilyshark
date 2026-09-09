@@ -728,13 +728,10 @@ function App() {
           <button
             type="button"
             className="primary"
-            title={t("Open this device's telemetry — disconnect from the status pill")}
-            onClick={() => {
-              setNodeFocus(undefined);
-              setMapFocus(undefined);
-              setMenuOpen(false);
-              setTab("TELEMETRY");
-            }}
+            title={t("Connection details")}
+            aria-haspopup="dialog"
+            aria-expanded={connectOpen}
+            onClick={openConnect}
           >
             {s.myNodeNum !== undefined
               ? (
@@ -746,7 +743,14 @@ function App() {
               : t("LINKED")}
           </button>
         ) : lilyLinked ? (
-          <button type="button" className="primary" onClick={() => void onLilyDisconnect()}>
+          <button
+            type="button"
+            className="primary"
+            title={t("Connection details")}
+            aria-haspopup="dialog"
+            aria-expanded={connectOpen}
+            onClick={openConnect}
+          >
             T-DECK LINKED
           </button>
         ) : connecting || lilyConnecting ? (

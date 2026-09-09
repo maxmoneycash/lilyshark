@@ -213,9 +213,11 @@
 		radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.1) 100%);
 }
 
-/* ── titlebar personalizada (decorations:false) ── */
+/* ── titlebar personalizada (decorations:false) ──
+   Hidden except on very wide desktops: the 30px window strip stole a row
+   from INTRO and every other screen on laptop widths. */
 .meshterm .titlebar {
-	display: flex;
+	display: none;
 	align-items: center;
 	justify-content: space-between;
 	height: 30px;
@@ -3192,13 +3194,18 @@ body:has(.meshterm .app.menu-open) {
 	.meshterm .traffic-fetch button { flex: 0 0 auto; }
 	.meshterm .stat-strip {
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
 		gap: 10px;
 	}
 	.meshterm .stat-strip .stat {
 		flex-direction: column;
+		align-items: flex-start;
 		gap: 2px;
-		white-space: nowrap;
+		min-width: 0;
+		white-space: normal;
+	}
+	.meshterm .stat-strip .v {
+		overflow-wrap: anywhere;
 	}
 	.meshterm .chat-input {
 		align-items: stretch;
