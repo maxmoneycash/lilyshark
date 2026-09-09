@@ -121,6 +121,9 @@ function upsertNode(
 
 function handle(message: FromRadio): void {
 	switch (message.kind) {
+		case "loraConfig":
+			mutate(s => { s.meshtasticRadio = message.config; });
+			break;
 		case "myInfo":
 			mutate((s) => {
 				s.myNodeNum = message.num;
@@ -224,6 +227,7 @@ async function drain(): Promise<void> {
 function setStatus(status: DeviceStatus): void {
 	mutate((s) => {
 		s.status = status;
+		if (status === DeviceStatus.Connecting || status === DeviceStatus.Disconnected) s.meshtasticRadio = undefined;
 	});
 }
 

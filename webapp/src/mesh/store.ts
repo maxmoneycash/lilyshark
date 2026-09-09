@@ -1,5 +1,6 @@
 import { hhmm } from "./fmt";
 import { t } from "./i18n";
+import type { MeshtasticRadioConfig } from "./meshtasticProto";
 
 /** Connection lifecycle. Numeric order matters: `status >= Connected` is the
  *  "link is up" test, mirroring how the UI reads it everywhere. */
@@ -135,6 +136,7 @@ interface State {
   status?: DeviceStatus;
   myNodeNum?: number;
   selfInfo?: SelfInfo;
+  meshtasticRadio?: MeshtasticRadioConfig;
   deviceInfo?: DeviceInfo;
   nodes: Map<number, NodeEntry>;
   messages: Message[];

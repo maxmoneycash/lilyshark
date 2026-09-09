@@ -15,6 +15,46 @@ import {
 	routingErrorText,
 } from "./meshtasticProto";
 
+const radioConfig = (hex: string) => {
+	const parsed = parseFromRadio(new Uint8Array(Buffer.from(hex, 'hex')));
+	assert.equal(parsed?.kind, 'loraConfig');
+	if (parsed?.kind !== 'loraConfig') throw new Error('Expected LoRa config');
+	return parsed.config;
+};
+test('reported radio configs match the exact active-profile firmware vectors', () => {
+	for (const [hex, frequency, bandwidth, sf, cr, tx, power] of [
+		['2a16321418fa01200b2805380140034801500a7500b86244', 906.875, 250, 11, 5, true, 10],
+		['2a18321618fa0120092805380140034801500a582d7500486444', 913.125, 250, 9, 5, true, 10],
+		['2a163214183e200a28083801400350165889017500a26344', 910.53125, 62.5, 10, 8, false, 22],
+	] as const) {
+		const config = radioConfig(hex);
+		assert.equal(config.usePreset, false);
+		assert.equal(config.frequencyMHz, frequency);
+		assert.equal(config.bandwidthKHz, bandwidth);
+		assert.equal(config.spreadingFactor, sf);
+		assert.equal(config.codingRate, cr);
+		assert.equal(config.txEnabled, tx);
+		assert.equal(config.txPower, power);
+	}
+});
+test('preset and invalid config fields cannot invent active RF settings', () => {
+	const preset = radioConfig('2a093207080118fa01200b');
+	assert.equal(preset.usePreset, true);
+	assert.equal(preset.frequencyMHz, undefined);
+	assert.equal(preset.bandwidthKHz, undefined);
+	assert.equal(preset.spreadingFactor, undefined);
+	const invalid = radioConfig('2a0c320a20ff012809750000c07f');
+	assert.equal(invalid.frequencyMHz, undefined);
+	assert.equal(invalid.spreadingFactor, undefined);
+	assert.equal(invalid.codingRate, undefined);
+	assert.equal(parseFromRadio(new Uint8Array([0x2a, 0x03, 0x32, 0x01, 0x80])), null);
+});
+test('reported frequency offset and sign-extended negative TX power are exact', () => {
+	const config = radioConfig('2a173215350000803e7500b8624450ffffffffffffffffff01');
+	assert.equal(config.frequencyMHz, 907.125);
+	assert.equal(config.txPower, -1);
+});
+
 test("routing errors preserve actionable reasons and unknown codes", () => {
 	assert.match(routingErrorText(4), /no working radio/i);
 	assert.match(routingErrorText(6), /channel is not on the deck/i);

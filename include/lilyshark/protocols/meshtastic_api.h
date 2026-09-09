@@ -20,6 +20,8 @@
 
 namespace lilyshark {
 
+struct RadioProfile;
+
 /// Classify a phone text send using Meshtastic Routing.Error values. Report a
 /// preflight refusal before the retry-exhausted fallback for a failed radio send.
 std::uint32_t apiTextRoutingError(bool sent, bool have_channel, bool simulate_mode,
@@ -43,6 +45,11 @@ struct ApiNodeEntry {
     std::int32_t latitude_i = 0;
     std::int32_t longitude_i = 0;
 };
+
+/// A live self-position report needs a present, valid fix and a change from
+/// the last successfully queued report. Missing fixes never become 0,0.
+bool apiSelfPositionNeedsReport(const ApiNodeEntry &current,
+                                const ApiNodeEntry &last_reported) noexcept;
 
 /// A message the phone wrote to ToRadio, reduced to what the deck acts on.
 struct ApiToRadio {
@@ -112,7 +119,12 @@ struct ApiChannelEntry {
     bool is_default = false;
 };
 
-std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
+/// LoRa configuration describes the active Meshtastic PHY using explicit
+/// parameters, never an assumed preset. Other protocols omit that message and
+/// still finish the configuration dump. tx_available describes current radio
+/// availability; reporting it does not change the transmitter.
+std::size_t encodeApiConfigMessage(const RadioProfile &profile, bool tx_available,
+                                   std::size_t index, std::uint32_t config_id,
                                    const char *firmware_version,
                                    const ApiNodeEntry *nodes, std::size_t node_count,
                                    const ApiChannelEntry *channels,

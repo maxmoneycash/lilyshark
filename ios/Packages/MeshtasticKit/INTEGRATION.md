@@ -37,7 +37,7 @@ Published state, all `@Published` on `ObservableObject`: `connectionState`,
 `Protocol/MeshtasticProto.swift` — the codec. `encodeWantConfig(nonce:)`,
 `encodeDisconnect()`, `encodeTextPacket(to:channel:packetID:text:wantAck:)`, and
 `parseFromRadio(_:) -> FromRadio?` returning `.myInfo`, `.metadata`,
-`.nodeInfo`, `.text`, `.position`, `.routing`, `.configComplete` or `.other`.
+`.nodeInfo`, `.text`, `.position`, `.routing`, `.loraConfig`, `.configComplete` or `.other`.
 `nil` means malformed, which on this link is a symptom rather than noise (see
 **Not verified** #4). Pure functions over `Data`, pinned by hand-computed vectors
 shared with the firmware's `test/meshtastic_api` and the web client's
@@ -197,19 +197,29 @@ Stated plainly, because each of these will otherwise be discovered as a bug.
    burst of `fromRadioSubject` events ending in `config_complete_id`, then a
    node list in the app.
 
-2. **The deck acts on three ToRadio messages only.** `parseApiToRadio`
+2. **The deck supports a limited ToRadio conversation.** `parseApiToRadio`
    (`src/core/meshtastic_api.cpp`) handles `want_config_id`, `disconnect`, and a
-   `packet` carrying a text. Everything else — position from the phone, channel
-   edits, config writes, admin messages, traceroute, telemetry — parses to
+   `packet` carrying text or phone position. A phone position is held as a
+   fallback for Meshtastic transmissions when the board lacks a usable fix;
+   it does not set a MeshCore advert position. Channel edits, config writes,
+   admin messages, traceroute and telemetry requests parse to
    `Kind::None` and is discarded **silently**. The app must not offer UI for them
    on a Meshtastic link.
 
-3. **The config dump is deliberately thin.** `encodeApiConfigMessage` sends
-   `my_info`, `metadata`, the node list, one primary channel with the default
-   PSK, and a LoRa config hardcoded to preset LONG_FAST / region US / hop limit
-   3. Battery, frequency, bandwidth, spreading factor, coding rate and TX power
-   have no source at all, so the Settings screen shows a deck's defaults rather
-   than its radio. Nothing should be written back.
+3. **Radio config and self position are reported and parsed.**
+   `encodeApiConfigMessage` sends `my_info`, `metadata`, the node list, the
+   default primary channel and configured secondary channel names. A supported
+   Meshtastic profile reports explicit bandwidth/SF/CR, US region, hop limit 3,
+   current TX availability, TX power, explicit slot where configured, and the
+   tuned MHz center in `override_frequency`. It no longer assumes LONG_FAST.
+   Other RF protocols omit LoRa config and still finish the dump. Both clients
+   now parse supported LoRa reports, with shared exact-wire tests for default,
+   Bay and custom profiles. Missing or unsupported values remain unknown;
+   DeviceConfig defaults are not received values. Battery uses DeviceMetrics.
+   Board GPS acquisition and changes now produce local BLE self NodeInfo
+   updates within five seconds while connected. Loss of fix preserves the
+   last reported position because an omitted position is not a revocation.
+   None of these reports writes settings or adds over-the-air transmissions.
 
 4. **Long FromRadio payloads are corrupted by design of the pair.** The firmware
    pops a new protobuf on *every* read callback instead of serving offsets into

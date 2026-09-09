@@ -11,6 +11,8 @@
 #include <cstring>
 
 #include "lilyshark/core/mesh_identity.h"
+#include "lilyshark/core/builtin_profiles.h"
+#include "lilyshark/core/profile_tuning.h"
 #include "lilyshark/protocols/meshtastic_api.h"
 
 using namespace lilyshark;
@@ -21,7 +23,7 @@ void testMyInfoExactBytes()
 {
     setLocalMeshtasticNodeNum(1);
     std::uint8_t out[64]{};
-    const std::size_t length = encodeApiConfigMessage(0, 0x42, "2.6.0", nullptr, 0,
+    const std::size_t length = encodeApiConfigMessage(*findBuiltinProfile(1), true, 0, 0x42, "2.6.0", nullptr, 0,
                                nullptr, 0, out, sizeof(out));
     // FromRadio.my_info (field 3, len-delimited): tag 0x1a, length 6.
     // MyNodeInfo.my_node_num (field 1 varint) = 1: 0x08 0x01.
@@ -35,18 +37,153 @@ void testConfigCompleteEchoesNonce()
 {
     std::uint8_t out[16]{};
     // With no nodes the sequence is my_info, metadata, channel, lora, complete.
-    const std::size_t length = encodeApiConfigMessage(4, 0xa5, "2.6.0", nullptr, 0,
+    const std::size_t length = encodeApiConfigMessage(*findBuiltinProfile(1), true, 4, 0xa5, "2.6.0", nullptr, 0,
                                nullptr, 0, out, sizeof(out));
     // FromRadio.config_complete_id (field 7 varint) = 0xa5: 0x38 0xa5 0x01.
     const std::uint8_t expected[] = {0x38, 0xa5, 0x01};
     assert(length == sizeof(expected));
     assert(std::memcmp(out, expected, length) == 0);
     // A zero nonce must still be echoed, or the app waits forever.
-    const std::size_t zero_length = encodeApiConfigMessage(4, 0, "2.6.0", nullptr, 0,
+    const std::size_t zero_length = encodeApiConfigMessage(*findBuiltinProfile(1), true, 4, 0, "2.6.0", nullptr, 0,
                                nullptr, 0, out, sizeof(out));
     const std::uint8_t zero_expected[] = {0x38, 0x00};
     assert(zero_length == sizeof(zero_expected));
     assert(std::memcmp(out, zero_expected, zero_length) == 0);
+}
+
+void testConfigReportsTheActiveMeshtasticProfile()
+{
+    std::uint8_t out[128]{};
+    // Independently assembled from config.proto field numbers. use_preset
+    // stays false; explicit parameters and the actual MHz center govern.
+    const std::uint8_t long_fast[] = {
+        0x2a, 0x16, 0x32, 0x14,  // FromRadio.config -> Config.lora
+        0x18, 0xfa, 0x01,        // bandwidth code 250 (kHz)
+        0x20, 0x0b, 0x28, 0x05,  // SF11, CR4/5
+        0x38, 0x01, 0x40, 0x03,  // US region, hop limit 3
+        0x48, 0x01, 0x50, 0x0a,  // TX available, 10 dBm
+        0x75, 0x00, 0xb8, 0x62, 0x44,  // override_frequency = 906.875 MHz
+    };
+    auto length = encodeApiConfigMessage(*findBuiltinProfile(1), true, 3, 42,
+        "2.6.0", nullptr, 0, nullptr, 0, out, sizeof(out));
+    assert(length == sizeof(long_fast));
+    assert(std::memcmp(out, long_fast, length) == 0);
+
+    const std::uint8_t bay_medium_fast[] = {
+        0x2a, 0x18, 0x32, 0x16,
+        0x18, 0xfa, 0x01,        // 250 kHz
+        0x20, 0x09, 0x28, 0x05,  // SF9, CR4/5
+        0x38, 0x01, 0x40, 0x03,
+        0x48, 0x01, 0x50, 0x0a,
+        0x58, 0x2d,              // explicit slot: wire 45 = internal 44
+        0x75, 0x00, 0x48, 0x64, 0x44,  // 913.125 MHz
+    };
+    length = encodeApiConfigMessage(*findBuiltinProfile(4), true, 3, 42,
+        "2.6.0", nullptr, 0, nullptr, 0, out, sizeof(out));
+    assert(length == sizeof(bay_medium_fast));
+    assert(std::memcmp(out, bay_medium_fast, length) == 0);
+}
+
+void testCustomConfigPreservesNarrowBandwidthAndDisabledTransmission()
+{
+    RadioProfile profile = *findBuiltinProfile(4);
+    profile.bandwidth_hz = 62500U;
+    profile.spreading_factor = 10U;
+    profile.coding_rate_denominator = 8U;
+    profile.frequency_slot = 136U;
+    profile.center_frequency_hz = 910531250U;
+    profile.tx_power_dbm = 22;
+    profile.preamble_symbols = derivePreambleSymbols(profile);
+    assert(isSupportedTunedProfile(profile));
+    std::uint8_t out[128]{};
+    const std::uint8_t expected[] = {
+        0x2a, 0x16, 0x32, 0x14,
+        0x18, 0x3e,              // firmware bandwidth code 62 = 62.5 kHz
+        0x20, 0x0a, 0x28, 0x08,
+        0x38, 0x01, 0x40, 0x03,
+        0x50, 0x16,              // 22 dBm; tx_enabled omitted means false
+        0x58, 0x89, 0x01,        // explicit wire slot 137
+        0x75, 0x00, 0xa2, 0x63, 0x44,  // 910.53125 MHz
+    };
+    const auto length = encodeApiConfigMessage(profile, false, 3, 42,
+        "2.6.0", nullptr, 0, nullptr, 0, out, sizeof(out));
+    assert(length == sizeof(expected));
+    assert(std::memcmp(out, expected, length) == 0);
+    // A partial config must never be delivered as if it were complete.
+    assert(encodeApiConfigMessage(profile, false, 3, 42, "2.6.0",
+        nullptr, 0, nullptr, 0, out, sizeof(expected) - 1U) == 0U);
+}
+
+void testOtherProtocolsFinishWithoutInventingMeshtasticRadioSettings()
+{
+    const RadioProfile profiles[] = {*findBuiltinProfile(2), *findBuiltinProfile(5), RadioProfile{}};
+    for (const auto &profile : profiles) {
+        std::uint8_t out[512]{};
+        for (std::size_t index = 0; index < 3U; ++index) {
+            const auto length = encodeApiConfigMessage(profile, true, index, 42,
+                "2.6.0", nullptr, 0, nullptr, 0, out, sizeof(out));
+            assert(length > 0U);
+            assert(out[0] != 0x2a);  // no FromRadio.config under a different protocol
+        }
+        const auto length = encodeApiConfigMessage(profile, true, 3, 42,
+            "2.6.0", nullptr, 0, nullptr, 0, out, sizeof(out));
+        const std::uint8_t complete[] = {0x38, 0x2a};
+        assert(length == sizeof(complete));
+        assert(std::memcmp(out, complete, length) == 0);
+        assert(encodeApiConfigMessage(profile, true, 4, 42, "2.6.0",
+            nullptr, 0, nullptr, 0, out, sizeof(out)) == 0U);
+    }
+}
+
+void testSelfPositionReportsAcquisitionMovementAndReconnection()
+{
+    ApiNodeEntry last_reported{};
+    ApiNodeEntry current{};
+    current.num = 0x12345678U;
+    current.is_self = true;
+    // Pair before GPS locks: an absent fix cannot manufacture a marker.
+    assert(!apiSelfPositionNeedsReport(current, last_reported));
+    current.has_position = true;
+    current.latitude_i = 377785000;
+    current.longitude_i = -1224218000;
+    assert(apiSelfPositionNeedsReport(current, last_reported));
+    // A full BLE queue leaves last_reported untouched, so the update retries.
+    assert(apiSelfPositionNeedsReport(current, last_reported));
+    last_reported = current;
+    assert(!apiSelfPositionNeedsReport(current, last_reported));
+    current.latitude_i += 500;
+    assert(apiSelfPositionNeedsReport(current, last_reported));
+    last_reported = current;
+    current.has_position = false;
+    assert(!apiSelfPositionNeedsReport(current, last_reported));
+    // The caller remembers loss of fix without sending a false coordinate.
+    last_reported.has_position = false;
+    current.has_position = true;
+    assert(apiSelfPositionNeedsReport(current, last_reported));
+    last_reported = ApiNodeEntry{};  // reconnect to a phone with no report yet
+    assert(apiSelfPositionNeedsReport(current, last_reported));
+}
+
+void testSelfPositionUsesPresenceAndCoordinateBounds()
+{
+    ApiNodeEntry current{};
+    current.num = 1U;
+    current.is_self = true;
+    current.has_position = true;
+    const ApiNodeEntry absent{};
+    // A measured 0,0 is valid; only an absent fix is unknown.
+    assert(apiSelfPositionNeedsReport(current, absent));
+    current.latitude_i = 900000001;
+    assert(!apiSelfPositionNeedsReport(current, absent));
+    current.latitude_i = 0;
+    current.longitude_i = -1800000001;
+    assert(!apiSelfPositionNeedsReport(current, absent));
+    current.longitude_i = 0;
+    current.is_self = false;
+    assert(!apiSelfPositionNeedsReport(current, absent));
+    current.is_self = true;
+    current.num = 0U;
+    assert(!apiSelfPositionNeedsReport(current, absent));
 }
 
 void testSequenceShapeAndTermination()
@@ -64,19 +201,19 @@ void testSequenceShapeAndTermination()
     std::uint8_t out[512]{};
     // my_info, metadata, two node_info, channel, lora, complete = 7 messages.
     for (std::size_t index = 0; index < 7U; ++index) {
-        const std::size_t length = encodeApiConfigMessage(index, 7, "2.6.0-lilyshark",
+        const std::size_t length = encodeApiConfigMessage(*findBuiltinProfile(1), true, index, 7, "2.6.0-lilyshark",
                                                           nodes, 2, nullptr, 0,
                                                           out, sizeof(out));
         assert(length > 0);
         assert(length <= sizeof(out));
     }
-    assert(encodeApiConfigMessage(7, 7, "2.6.0-lilyshark", nodes, 2,
+    assert(encodeApiConfigMessage(*findBuiltinProfile(1), true, 7, 7, "2.6.0-lilyshark", nodes, 2,
                                nullptr, 0, out,
                                   sizeof(out)) == 0);
 
     // The self node_info carries the user id string "!cda172e0" and T_DECK.
     const std::size_t self_length =
-        encodeApiConfigMessage(2, 7, "2.6.0-lilyshark", nodes, 2,
+        encodeApiConfigMessage(*findBuiltinProfile(1), true, 2, 7, "2.6.0-lilyshark", nodes, 2,
                                nullptr, 0, out, sizeof(out));
     assert(self_length > 0);
     assert(std::memcmp(out, "\x22", 1) == 0);  // FromRadio.node_info tag
@@ -229,10 +366,10 @@ void testChannelListIsAdvertisedWithNamesAndNoKeys()
     std::uint8_t out[512]{};
     // my_info, metadata, three channels, lora, complete = 7 with no nodes.
     for (std::size_t index = 0; index < 7U; ++index) {
-        assert(encodeApiConfigMessage(index, 9, "2.6.0", nullptr, 0, channels, 3,
+        assert(encodeApiConfigMessage(*findBuiltinProfile(1), true, index, 9, "2.6.0", nullptr, 0, channels, 3,
                                       out, sizeof(out)) > 0);
     }
-    assert(encodeApiConfigMessage(7, 9, "2.6.0", nullptr, 0, channels, 3, out,
+    assert(encodeApiConfigMessage(*findBuiltinProfile(1), true, 7, 9, "2.6.0", nullptr, 0, channels, 3, out,
                                   sizeof(out)) == 0);
 
     // Separate buffers: the two messages are compared against each other, and
@@ -242,7 +379,7 @@ void testChannelListIsAdvertisedWithNamesAndNoKeys()
 
     // The secondary channels carry their names...
     const std::size_t second =
-        encodeApiConfigMessage(3, 9, "2.6.0", nullptr, 0, channels, 3,
+        encodeApiConfigMessage(*findBuiltinProfile(1), true, 3, 9, "2.6.0", nullptr, 0, channels, 3,
                                secondary_bytes, sizeof(secondary_bytes));
     bool found_name = false;
     for (std::size_t i = 0; i + 11U <= second; ++i) {
@@ -254,7 +391,7 @@ void testChannelListIsAdvertisedWithNamesAndNoKeys()
     // one-byte 0x01 that names the published default. A phone that never
     // holds a key cannot leak one.
     const std::size_t primary =
-        encodeApiConfigMessage(2, 9, "2.6.0", nullptr, 0, channels, 3,
+        encodeApiConfigMessage(*findBuiltinProfile(1), true, 2, 9, "2.6.0", nullptr, 0, channels, 3,
                                primary_bytes, sizeof(primary_bytes));
     bool primary_has_psk = false;
     for (std::size_t i = 0; i + 3U <= primary; ++i) {
@@ -277,7 +414,7 @@ void testADeckWithNoStoredKeysStillAdvertisesTheDefault()
     // A phone shown an empty channel list would have nothing to send on, so
     // the primary is emitted even when the caller passes none.
     std::uint8_t out[512]{};
-    assert(encodeApiConfigMessage(2, 9, "2.6.0", nullptr, 0, nullptr, 0, out,
+    assert(encodeApiConfigMessage(*findBuiltinProfile(1), true, 2, 9, "2.6.0", nullptr, 0, nullptr, 0, out,
                                   sizeof(out)) > 0);
 }
 
@@ -354,7 +491,7 @@ void testWholeSessionHoldsTogether()
     std::size_t last_length = 0;
     std::uint8_t last_frame[512]{};
     for (std::size_t index = 0; index < 64U; ++index) {
-        const std::size_t length = encodeApiConfigMessage(
+        const std::size_t length = encodeApiConfigMessage(*findBuiltinProfile(1), true,
             index, asked_for, "2.6.0-lilyshark", nodes, 2, channels, 2, frame,
             sizeof(frame));
         if (length == 0U) break;
@@ -463,7 +600,7 @@ void testLiveNodeInfoMatchesTheDump()
 
     std::uint8_t from_dump[256]{};
     const std::size_t dump_length =
-        encodeApiConfigMessage(3, 7, "2.6.0", nodes, 2,
+        encodeApiConfigMessage(*findBuiltinProfile(1), true, 3, 7, "2.6.0", nodes, 2,
                                nullptr, 0, from_dump, sizeof(from_dump));
     std::uint8_t standalone[256]{};
     const std::size_t live_length =
@@ -578,7 +715,7 @@ void testPhonePacketIdSurvivesTheParse()
 void testEncodeRefusesTinyBuffers()
 {
     std::uint8_t out[4]{};
-    assert(encodeApiConfigMessage(0, 1, "2.6.0", nullptr, 0,
+    assert(encodeApiConfigMessage(*findBuiltinProfile(1), true, 0, 1, "2.6.0", nullptr, 0,
                                nullptr, 0, out, sizeof(out)) == 0);
     assert(encodeApiTextPacket(1, 2, 3, "hello", 0, 0, out, sizeof(out)) == 0);
 }
@@ -603,6 +740,11 @@ int main()
 {
     testMyInfoExactBytes();
     testConfigCompleteEchoesNonce();
+    testConfigReportsTheActiveMeshtasticProfile();
+    testCustomConfigPreservesNarrowBandwidthAndDisabledTransmission();
+    testOtherProtocolsFinishWithoutInventingMeshtasticRadioSettings();
+    testSelfPositionReportsAcquisitionMovementAndReconnection();
+    testSelfPositionUsesPresenceAndCoordinateBounds();
     testSequenceShapeAndTermination();
     testWantConfigParses();
     testPhoneTextParses();

@@ -280,6 +280,22 @@ public enum MeshtasticProto {
         }
     }
 
+    /// A reported LoRa config, separate from the client's UI defaults. A preset
+    /// does not reveal the actual center frequency; only an explicit override
+    /// plus its offset can do that without the channel/region calculation.
+    public struct LoRaConfig: Equatable, Sendable {
+        public var usePreset = false
+        public var modemPreset: UInt32 = 0
+        public var bandwidthKHz: Double?
+        public var spreadingFactor: UInt32?
+        public var codingRate: UInt32?
+        public var frequencyMHz: Double?
+        public var txPower: Int32?
+        public var region: UInt32?
+        public var txEnabled = false
+        public init() {}
+    }
+
     /// Everything a phone acts on, and `other` for everything it does not.
     ///
     /// `other` is not a failure: the radio sends channel and config messages
@@ -289,6 +305,7 @@ public enum MeshtasticProto {
         case myInfo(num: UInt32)
         case metadata(firmware: String)
         case nodeInfo(NodeInfo)
+        case loraConfig(LoRaConfig)
         case configComplete(nonce: UInt32)
         case text(TextMessage)
         case position(Position)
@@ -317,6 +334,12 @@ public enum MeshtasticProto {
                 return .myInfo(num: 0)
             case 4:
                 if let bytes = field.bytes { return parseNodeInfo(bytes) }
+            case 5:
+                guard let bytes = field.bytes, let configFields = readFields(bytes) else { return nil }
+                for config in configFields where config.number == 6 && config.wireType == ProtoWriter.wireLength {
+                    guard let lora = config.bytes else { return nil }
+                    return parseLoRaConfig(lora)
+                }
             case 7:
                 return .configComplete(nonce: truncate(field.value))
             case 13:
@@ -332,6 +355,42 @@ public enum MeshtasticProto {
             }
         }
         return .other
+    }
+
+    private static func parseLoRaConfig(_ bytes: [UInt8]) -> FromRadio? {
+        guard let fields = readFields(bytes) else { return nil }
+        var config = LoRaConfig()
+        var override: Float?
+        var offset: Float = 0
+        for field in fields {
+            switch (field.number, field.wireType) {
+            case (1, ProtoWriter.wireVarint): config.usePreset = field.value != 0
+            case (2, ProtoWriter.wireVarint): config.modemPreset = truncate(field.value)
+            case (3, ProtoWriter.wireVarint):
+                let special: [UInt64: Double] = [31: 31.25, 62: 62.5, 200: 203.125, 400: 406.25, 800: 812.5, 1600: 1625]
+                if field.value > 0, field.value <= 2000 { config.bandwidthKHz = special[field.value] ?? Double(field.value) }
+            case (4, ProtoWriter.wireVarint):
+                if (5...12).contains(field.value) { config.spreadingFactor = truncate(field.value) }
+            case (5, ProtoWriter.wireVarint):
+                if (4...8).contains(field.value) { config.codingRate = truncate(field.value) }
+            case (6, ProtoWriter.wireFixed32): offset = Float(bitPattern: truncate(field.value))
+            case (7, ProtoWriter.wireVarint): config.region = UInt32(exactly: field.value)
+            case (9, ProtoWriter.wireVarint): config.txEnabled = field.value != 0
+            case (10, ProtoWriter.wireVarint): config.txPower = Int32(bitPattern: truncate(field.value))
+            case (14, ProtoWriter.wireFixed32): override = Float(bitPattern: truncate(field.value))
+            default: break
+            }
+        }
+        if let override, override.isFinite, override > 0, offset.isFinite {
+            let frequency = Double(override) + Double(offset)
+            if frequency > 0 { config.frequencyMHz = frequency }
+        }
+        if config.usePreset {
+            config.bandwidthKHz = nil
+            config.spreadingFactor = nil
+            config.codingRate = nil
+        }
+        return .loraConfig(config)
     }
 
     private static func parseNodeInfo(_ bytes: [UInt8]) -> FromRadio {

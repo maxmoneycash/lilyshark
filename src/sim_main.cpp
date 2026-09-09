@@ -4711,7 +4711,7 @@ void draw_radio_listen_card(lv_obj_t *parent, const char *title, lv_color_t titl
     put_label(parent, freq, 16, 78, theme::cyan(), &font_pixel_18x24);
     put_label(parent, "MHZ", 152, 90, theme::text_muted(), &font_pixel_6x8);
     char params[48]{};
-    std::snprintf(params, sizeof(params), "BW %uk  SF%u  CR 4/%u  SYNC %04X",
+    std::snprintf(params, sizeof(params), "BW %uK  SF%u  CR 4/%u  SYNC %04X",
                   static_cast<unsigned>(profile.bandwidth_hz / 1000U),
                   profile.spreading_factor, profile.coding_rate_denominator,
                   profile.sync_word);
@@ -5217,7 +5217,7 @@ void build_spectrum(lv_obj_t * parent)
         std::snprintf(title, sizeof(title), "%s SPECTRAL SWEEP", spectrum_scan_mode_label());
         put_centered_label(parent, title, 62, theme::pink(), &font_pixel_6x8);
         char plan[72]{};
-        std::snprintf(plan, sizeof(plan), "%.1f - %.1f MHz  /  %lu kHz steps",
+        std::snprintf(plan, sizeof(plan), "%.1f - %.1f MHZ  /  %lu KHZ steps",
                       static_cast<double>(planned_request.start_frequency_hz) / 1000000.0,
                       static_cast<double>(planned_request.end_frequency_hz) / 1000000.0,
                       static_cast<unsigned long>(planned_request.step_hz / 1000U));
@@ -5844,12 +5844,12 @@ void build_packet_detail(lv_obj_t * parent)
               shown.state == DecodeState::Malformed ? theme::fault() : theme::amber(),
               &font_mono_10);
     if(record->raw.rf.hasField(RfFieldCodingRate)) {
-        std::snprintf(line, sizeof(line), "SF%u  BW %.1fk  CR4/%u  0x%04X",
+        std::snprintf(line, sizeof(line), "SF%u  BW %.1fK  CR4/%u  0x%04X",
                       record->raw.rf.spreading_factor,
                       static_cast<double>(record->raw.rf.bandwidth_hz) / 1000.0,
                       record->raw.rf.coding_rate_denominator, record->raw.rf.sync_word);
     } else {
-        std::snprintf(line, sizeof(line), "SF%u  BW %.1fk  CR --  0x%04X",
+        std::snprintf(line, sizeof(line), "SF%u  BW %.1fK  CR --  0x%04X",
                       record->raw.rf.spreading_factor,
                       static_cast<double>(record->raw.rf.bandwidth_hz) / 1000.0,
                       record->raw.rf.sync_word);
@@ -5920,7 +5920,7 @@ void build_packet_detail(lv_obj_t * parent)
                       static_cast<double>(record->raw.rf.center_frequency_hz) / 1000000.0);
         put_label(parent, line, 49, 124, theme::cyan(), &font_pixel_18x24);
         put_label(parent, "MHZ", 180, 136, theme::text_muted(), &font_pixel_6x8);
-        std::snprintf(line, sizeof(line), "BW %uk  SF%u  PRE %u",
+        std::snprintf(line, sizeof(line), "BW %uK  SF%u  PRE %u",
                       static_cast<unsigned>(record->raw.rf.bandwidth_hz / 1000U),
                       record->raw.rf.spreading_factor, record->raw.rf.preamble_symbols);
         put_label(parent, line, 49, 154, theme::text(), &font_pixel_6x8);
@@ -6160,7 +6160,7 @@ void build_packet_detail(lv_obj_t * parent)
     put_label(parent, detail_line, 49, 50,
               simulated_decoded.state == DecodeState::Malformed
                   ? theme::fault() : theme::amber(), &font_mono_10);
-    std::snprintf(detail_line, sizeof(detail_line), "SF%u  BW %.1fk  CR4/%u  0x%04X",
+    std::snprintf(detail_line, sizeof(detail_line), "SF%u  BW %.1fK  CR4/%u  0x%04X",
                   selected_packet.spreading_factor,
                   static_cast<double>(selected_packet.bandwidth_hz) / 1000.0,
                   selected_packet.coding_rate_denominator, selected_packet.sync_word);
@@ -6236,7 +6236,7 @@ void build_packet_detail(lv_obj_t * parent)
                       static_cast<double>(selected_packet.center_frequency_hz) / 1000000.0);
         put_label(parent, detail_line, 49, 124, theme::cyan(), &font_pixel_18x24);
         put_label(parent, "MHZ", 180, 136, theme::text_muted(), &font_pixel_6x8);
-        std::snprintf(detail_line, sizeof(detail_line), "BW %uk  SF%u  PRE %u",
+        std::snprintf(detail_line, sizeof(detail_line), "BW %uK  SF%u  PRE %u",
                       static_cast<unsigned>(selected_packet.bandwidth_hz / 1000U),
                       selected_packet.spreading_factor,
                       selected_packet.preamble_symbols);
@@ -7971,7 +7971,7 @@ void build_onboarding_profile(lv_obj_t * parent)
     char sf[8]{};
     char cr[8]{};
     char sync[8]{};
-    std::snprintf(bw, sizeof(bw), "%uk",
+    std::snprintf(bw, sizeof(bw), "%uK",
                   static_cast<unsigned>(profile.bandwidth_hz / 1000U));
     std::snprintf(sf, sizeof(sf), "%u", profile.spreading_factor);
     std::snprintf(cr, sizeof(cr), "4/%u", profile.coding_rate_denominator);
@@ -8532,7 +8532,7 @@ void build_home(lv_obj_t * parent)
     put_label(parent, snr_text, 252, 56, theme::text(), &font_pixel_6x8);
     std::snprintf(line, sizeof(line), "SF%u", profile.spreading_factor);
     put_label(parent, line, 252, 68, theme::text_muted(), &font_pixel_6x8);
-    std::snprintf(line, sizeof(line), "%uk",
+    std::snprintf(line, sizeof(line), "%uK",
                   static_cast<unsigned>(profile.bandwidth_hz / 1000U));
     put_label(parent, line, 252, 78, theme::text_muted(), &font_pixel_6x8);
     draw_home_meter(parent, 302, 28, rssi_dbm);
@@ -8604,7 +8604,7 @@ void build_radio_profiles(lv_obj_t * parent)
     for(std::size_t index = 0; index < count; ++index) {
         const RadioProfile &profile = builtinProfiles()[index];
         char value[24]{};
-        std::snprintf(value, sizeof(value), "%.3f  %uk  SF%u",
+        std::snprintf(value, sizeof(value), "%.3f  %uK  SF%u",
                       static_cast<double>(profile.center_frequency_hz) / 1000000.0,
                       static_cast<unsigned>(profile.bandwidth_hz / 1000U),
                       profile.spreading_factor);
@@ -14720,7 +14720,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, static_cast<std::size_t>(Screen::count)> expected_hashes = {{
         0xa9a8caf8710d718cULL, 0x1ece8eb6c377bf50ULL, 0x589780aa76be3d04ULL,
         0x932ca408b25d655fULL, 0x585c646383e0891bULL, 0x3d61199a6d61d28cULL,
-        0xf4b6c2d6b15e0fb6ULL, 0x942c5b2b206072e8ULL, 0x098fd1e6e6e19e17ULL,
+        0xf4b6c2d6b15e0fb6ULL, 0xc65716ef1a15e073ULL, 0x098fd1e6e6e19e17ULL,
         0xdd632ff9d4435212ULL, 0xcf2986864dd6c8e7ULL, 0xae5f04f11f7d4fb1ULL,
         0x7b72bbe0b82a7106ULL, 0x30bec8074daba286ULL,
     }};
@@ -14751,8 +14751,8 @@ bool run_simulator_render_test() noexcept
     }};
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xa066240e572f0e6aULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
-        0x0e1e58dbe10ceb99ULL, 0x495bf1d57fce9aadULL, 0xe0b75191155d9d8dULL,
-        0x0e8d5caa0f3b18beULL, 0x3018520fc760af29ULL, 0xadef2eb28eb36c85ULL,
+        0x0e1e58dbe10ceb99ULL, 0xf09c94be29f485c8ULL, 0xe0b75191155d9d8dULL,
+        0x0e8d5caa0f3b18beULL, 0x43e1c64bb1473281ULL, 0xa734c6fb43f11e34ULL,
         0x88a5b508b56dff44ULL, 0x8328031fef8d34f8ULL, 0x1e803963e44d0632ULL,
         0xde0a7b1d16ecf53aULL, 0x7ed210334475e24aULL, 0x14f80c364b5d4568ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,
@@ -14877,9 +14877,9 @@ bool run_simulator_render_test() noexcept
         "PACKET RAW", "PACKET HEX PAGE 2", "PACKET HEX PAGE 3", "EVENT DETAIL",
     }};
     constexpr std::array<std::uint64_t, interaction_names.size()> interaction_expected_hashes = {{
-        0x942c5b2b206072e8ULL, 0x9fbcc41ba7dc745eULL, 0x875baf65a7508f3aULL,
-        0x58a20e6754b3cf2fULL, 0xa61d3171e264c9ceULL, 0xe5269e10e20f51f8ULL,
-        0x27c2b90457f9839cULL, 0xaa632a3721716d88ULL,
+        0xc65716ef1a15e073ULL, 0xf547fbe95b5fade1ULL, 0x6a4a768a9799b435ULL,
+        0x4083790c3d07ccf8ULL, 0x583291435b1ac2d5ULL, 0xc8878fdbe8501d07ULL,
+        0x5645d3e05546937fULL, 0xaa632a3721716d88ULL,
     }};
     traffic_filter = TrafficFilter{};
     focus_simulator_inspector_packet();
@@ -15134,6 +15134,7 @@ bool run_simulator_readme_frames(const char *directory) noexcept
     std::size_t frame_index = 0U;
     auto write_phase = [&](Screen screen, std::size_t frame_count) noexcept {
         current_screen = screen;
+        field_tab = screen == Screen::nodes ? FieldTab::Nodes : FieldTab::Radio;
         for(std::size_t frame = 0U; frame < frame_count; ++frame) {
             advance_simulator_live_data(250U);
             build_current_screen();
@@ -15173,6 +15174,17 @@ bool run_simulator_readme_frames(const char *directory) noexcept
        !write_phase(Screen::utilization, 8U) ||
        !write_phase(Screen::timeline, 8U) ||
        !write_phase(Screen::events, 34U)) return false;
+
+    // The website and iOS Deck tour also show a selected packet after live RX.
+    // Keep it outside live-* so the README animation remains 118 frames long.
+    focus_simulator_inspector_packet();
+    if(!select_simulator_packet_for_detail()) return false;
+    current_screen = Screen::packet_detail;
+    packet_detail_tab = 0U;
+    advance_simulator_live_data(250U);
+    build_current_screen();
+    lv_refr_now(display);
+    if(!write_simulator_frame(directory, "packet-live", 0U)) return false;
 
     std::fprintf(stderr, "Lilyshark README live frames written: %zu\n", frame_index);
     return frame_index == 118U;
@@ -17242,15 +17254,34 @@ bool ble_config_active = false;
 std::size_t ble_config_index = 0;
 std::uint32_t ble_config_id = 0;
 
+ApiNodeEntry api_self_node() noexcept
+{
+    ApiNodeEntry node{};
+    node.num = localMeshtasticNodeNum();
+    formatLocalMeshtasticShortName(node.label, sizeof(node.label));
+    node.is_self = true;
+    const GpsStatus &gps = hardware_status.snapshot().gps;
+    if (app_settings.gps_enabled && gps.state == GpsState::Fix && gps.position_valid) {
+        node.has_position = true;
+        node.latitude_i = static_cast<std::int32_t>(std::llround(gps.latitude_degrees * 1e7));
+        node.longitude_i = static_cast<std::int32_t>(std::llround(gps.longitude_degrees * 1e7));
+    }
+    return node;
+}
+
 void service_ble_api() noexcept
 {
     // A phone connecting is an event on par with a node appearing, and it
     // was invisible: the deck paired silently and the operator learned it
     // only from the phone's side of the conversation.
     static bool phone_was_connected = false;
+    static ApiNodeEntry last_reported_self_position{};
+    static std::uint32_t self_position_due_ms = 0U;
     const bool phone_connected = tdeckBleStatus().connected;
     if (phone_connected != phone_was_connected) {
         phone_was_connected = phone_connected;
+        last_reported_self_position = ApiNodeEntry{};
+        self_position_due_ms = millis();
         std::snprintf(shell_notice, sizeof(shell_notice),
                       phone_connected ? "PHONE CONNECTED OVER BLUETOOTH"
                                       : "PHONE DISCONNECTED");
@@ -17363,26 +17394,37 @@ void service_ble_api() noexcept
             }
         }
     }
-    if (!ble_config_active) return;
+    if (!ble_config_active) {
+        // GPS often locks after pairing. Tell the paired phone when our own
+        // measured position changes, instead of leaving its map at the config
+        // dump's missing/old position. This is a local BLE NodeInfo, never a
+        // LoRa transmit. It carries no invented receive signal or timestamp.
+        const auto now_ms = static_cast<std::uint32_t>(millis());
+        if (phone_connected && static_cast<std::int32_t>(now_ms - self_position_due_ms) >= 0) {
+            self_position_due_ms = now_ms + 5000U;
+            const ApiNodeEntry current = api_self_node();
+            if (apiSelfPositionNeedsReport(current, last_reported_self_position)) {
+                std::uint8_t position_frame[128]{};
+                const std::size_t position_length = encodeApiNodeInfo(
+                    current, position_frame, sizeof(position_frame));
+                if (position_length > 0U && queueBleFromRadio(position_frame, position_length)) {
+                    last_reported_self_position = current;
+                }
+            } else if (!current.has_position) {
+                // An absent NodeInfo.position does not revoke a prior fix.
+                // Keep the phone's last reported position, but re-report on
+                // reacquisition even when the coordinates have not moved.
+                last_reported_self_position.has_position = false;
+            }
+        }
+        return;
+    }
 
     std::array<LiveNodeSummary, 8> heard{};
     const std::size_t heard_count = collect_live_nodes(heard);
     ApiNodeEntry nodes[9]{};
     std::size_t node_count = 0;
-    nodes[node_count].num = localMeshtasticNodeNum();
-    formatLocalMeshtasticShortName(nodes[node_count].label,
-                                   sizeof(nodes[node_count].label));
-    nodes[node_count].is_self = true;
-    {
-        const GpsStatus &gps = hardware_status.snapshot().gps;
-        if (gps.state == GpsState::Fix && gps.position_valid) {
-            nodes[node_count].has_position = true;
-            nodes[node_count].latitude_i =
-                static_cast<std::int32_t>(std::llround(gps.latitude_degrees * 1e7));
-            nodes[node_count].longitude_i =
-                static_cast<std::int32_t>(std::llround(gps.longitude_degrees * 1e7));
-        }
-    }
+    nodes[node_count] = api_self_node();
     ++node_count;
     for (std::size_t index = 0; index < heard_count && node_count < 9U; ++index) {
         const LiveNodeSummary &summary = heard[index];
@@ -17427,6 +17469,8 @@ void service_ble_api() noexcept
         // The version gates app features, so the leading 2.6.0 keeps a stock
         // app from refusing us; the suffix is what this firmware really is.
         const std::size_t frame_length = encodeApiConfigMessage(
+            radio_service.activeProfile(),
+            !app_settings.simulate_mode && radio_service.status().initialized,
             ble_config_index, ble_config_id, "2.6.0-lilyshark.8", nodes, node_count,
             api_channels.data(), api_channel_count, frame, sizeof(frame));
         if (frame_length == 0U) {

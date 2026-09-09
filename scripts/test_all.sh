@@ -94,6 +94,8 @@ build_and_run decoder_stress \
 build_and_run meshtastic_api \
   src/core/meshtastic_api.cpp \
   src/core/mesh_identity.cpp \
+  src/core/builtin_profiles.cpp \
+  src/core/profile_tuning.cpp \
   test/meshtastic_api/test_meshtastic_api.cpp
 
 build_and_run sha256 \

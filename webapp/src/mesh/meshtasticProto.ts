@@ -81,6 +81,8 @@ interface Field {
 	wire: number;
 	/** wire 0/5: the numeric value; wire 2: byte length. */
 	value: number;
+	/** Signed low32 bits, kept exactly even for sign-extended int32 varints. */
+	int32?: number;
 	/** wire 2 only. */
 	bytes?: Uint8Array;
 }
@@ -89,12 +91,15 @@ interface Field {
 function readFields(data: Uint8Array): Field[] | null {
 	const out: Field[] = [];
 	let at = 0;
+	let varintLow32 = 0;
 	const varint = (): number | null => {
 		let value = 0;
+		varintLow32 = 0;
 		let shift = 0;
 		while (shift < 64) {
 			if (at >= data.length) return null;
 			const part = data[at++];
+			if (shift < 32) varintLow32 |= (part & 0x7f) << shift;
 			// Beyond 32 bits JS bitwise breaks; accumulate with multiply.
 			value += (part & 0x7f) * 2 ** shift;
 			if ((part & 0x80) === 0) return value;
@@ -110,7 +115,7 @@ function readFields(data: Uint8Array): Field[] | null {
 		if (wire === 0) {
 			const value = varint();
 			if (value === null) return null;
-			out.push({ field, wire, value });
+			out.push({ field, wire, value, int32: varintLow32 });
 		} else if (wire === 5) {
 			if (at + 4 > data.length) return null;
 			const value =
@@ -160,8 +165,21 @@ export function encodeTextPacket(input: {
 
 // ── FromRadio (deck → page) ─────────────────────────────────────────────────
 
+export interface MeshtasticRadioConfig {
+	usePreset: boolean;
+	modemPreset: number;
+	bandwidthKHz?: number;
+	spreadingFactor?: number;
+	codingRate?: number;
+	frequencyMHz?: number;
+	txPower?: number;
+	region?: number;
+	txEnabled: boolean;
+}
+
 export type FromRadio =
 	| { kind: "myInfo"; num: number }
+	| { kind: "loraConfig"; config: MeshtasticRadioConfig }
 	| { kind: "metadata"; firmware: string }
 	| {
 			kind: "nodeInfo";
@@ -297,6 +315,15 @@ export function parseFromRadio(data: Uint8Array): FromRadio | null {
 			case 4:
 				if (f.bytes) return parseNodeInfo(f.bytes);
 				break;
+			case 5: {
+				if (!f.bytes) return null;
+				const config = readFields(f.bytes);
+				if (!config) return null;
+				for (const value of config) {
+					if (value.field === 6 && value.wire === 2 && value.bytes) return parseLoRaConfig(value.bytes);
+				}
+				break;
+			}
 			case 7:
 				return { kind: "configComplete", nonce: f.value };
 			case 13: {
@@ -311,6 +338,43 @@ export function parseFromRadio(data: Uint8Array): FromRadio | null {
 		}
 	}
 	return { kind: "other" };
+}
+
+function parseLoRaConfig(bytes: Uint8Array): FromRadio | null {
+	const fields = readFields(bytes);
+	if (!fields) return null;
+	const config: MeshtasticRadioConfig = { usePreset: false, modemPreset: 0, txEnabled: false };
+	let override: number | undefined, offset = 0;
+	const float = (bits: number) => {
+		const view = new DataView(new ArrayBuffer(4));
+		view.setUint32(0, bits, true); return view.getFloat32(0, true);
+	};
+	for (const field of fields) {
+		if (field.wire === 5) {
+			if (field.field === 6) offset = float(field.value);
+			if (field.field === 14) override = float(field.value);
+		}
+		if (field.wire !== 0) continue;
+		switch (field.field) {
+			case 1: config.usePreset = field.value !== 0; break;
+			case 2: config.modemPreset = field.value; break;
+			case 3: {
+				const special: Record<number, number> = { 31: 31.25, 62: 62.5, 200: 203.125, 400: 406.25, 800: 812.5, 1600: 1625 };
+				if (field.value > 0 && field.value <= 2000) config.bandwidthKHz = special[field.value] ?? field.value;
+				break;
+			}
+			case 4: if (field.value >= 5 && field.value <= 12) config.spreadingFactor = field.value; break;
+			case 5: if (field.value >= 4 && field.value <= 8) config.codingRate = field.value; break;
+			case 7: config.region = field.value; break;
+			case 9: config.txEnabled = field.value !== 0; break;
+			case 10: config.txPower = field.int32; break;
+		}
+	}
+	if (override !== undefined && Number.isFinite(override) && override > 0 && Number.isFinite(offset) && override + offset > 0) config.frequencyMHz = override + offset;
+	if (config.usePreset) {
+		delete config.bandwidthKHz; delete config.spreadingFactor; delete config.codingRate;
+	}
+	return { kind: 'loraConfig', config };
 }
 
 /** The deck's Routing.Error result describes its own transmission. */

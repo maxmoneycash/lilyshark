@@ -1,11 +1,26 @@
 #include "lilyshark/protocols/meshtastic_api.h"
 
 #include "lilyshark/core/mesh_identity.h"
+#include "lilyshark/core/profile_tuning.h"
+#include "lilyshark/core/radio_profile.h"
 
 #include <cstdio>
 #include <cstring>
 
 namespace lilyshark {
+
+bool apiSelfPositionNeedsReport(const ApiNodeEntry &current,
+                                const ApiNodeEntry &last_reported) noexcept
+{
+    if (!current.is_self || current.num == 0U || !current.has_position ||
+        current.latitude_i < -900000000 || current.latitude_i > 900000000 ||
+        current.longitude_i < -1800000000 || current.longitude_i > 1800000000) {
+        return false;
+    }
+    return !last_reported.has_position || current.num != last_reported.num ||
+           current.latitude_i != last_reported.latitude_i ||
+           current.longitude_i != last_reported.longitude_i;
+}
 
 std::uint32_t apiTextRoutingError(bool sent, bool have_channel, bool simulate_mode,
                                   bool radio_initialized, std::size_t text_length,
@@ -398,7 +413,8 @@ std::size_t encodeApiDeviceTelemetry(std::uint32_t packet_id,
     return from_radio.ok ? from_radio.length : 0U;
 }
 
-std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
+std::size_t encodeApiConfigMessage(const RadioProfile &profile, bool tx_available,
+                                   std::size_t index, std::uint32_t config_id,
                                    const char *firmware_version,
                                    const ApiNodeEntry *nodes, std::size_t node_count,
                                    const ApiChannelEntry *channels,
@@ -410,6 +426,13 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
     // have nothing to send on.
     if (channels == nullptr || channel_count == 0U) channel_count = 1U;
     if (out == nullptr || capacity == 0U) return 0;
+    // This firmware supports Meshtastic tuning only in its US 902–928 MHz
+    // profile band. A MeshCore/RNode profile has no equivalent Meshtastic
+    // configuration: sharing a BLE transport does not change its RF protocol.
+    const bool has_lora_config = profile.protocol_hint == ProtocolId::Meshtastic &&
+        isSupportedTunedProfile(profile);
+    const std::size_t lora_index = 2U + node_count + channel_count;
+    const std::size_t complete_index = lora_index + (has_lora_config ? 1U : 0U);
     Writer from_radio{out, capacity};
     std::uint8_t scratch[192]{};
     Writer child{scratch, sizeof(scratch)};
@@ -457,18 +480,30 @@ std::size_t encodeApiConfigMessage(std::size_t index, std::uint32_t config_id,
         // PRIMARY channels is malformed to every Meshtastic client.
         child.field_uint(3, channel_index == 0U ? 1U : 2U);
         from_radio.field_message(10, child);
-    } else if (index == 2U + node_count + channel_count) {
-        // FromRadio.config.lora -- enough for the app to state the region and
-        // preset instead of showing UNSET everywhere.
-        std::uint8_t lora_scratch[16]{};
+    } else if (has_lora_config && index == lora_index) {
+        // FromRadio.config.lora. Explicit PHY values remain correct after a
+        // profile is edited; a preset label would silently replace those values
+        // in a client. use_preset=false and modem_preset are proto3 defaults.
+        // config.proto's bandwidth comment says MHz, but firmware's
+        // MeshRadio.h bwCodeToKHz() consumes kHz codes (62 means 62.5 kHz).
+        std::uint8_t lora_scratch[64]{};
         Writer lora{lora_scratch, sizeof(lora_scratch)};
-        lora.field_uint(1, 1);  // use_preset (LONG_FAST is preset 0, the default)
+        lora.field_uint(3, profile.bandwidth_hz / 1000U);
+        lora.field_uint(4, profile.spreading_factor);
+        lora.field_uint(5, profile.coding_rate_denominator);
         lora.field_uint(7, 1);  // RegionCode.US
         lora.field_uint(8, 3);  // hop_limit
-        lora.field_uint(9, 1);  // tx_enabled
+        lora.field_uint(9, tx_available ? 1U : 0U);
+        lora.field_int32(10, profile.tx_power_dbm);
+        if (profile.frequency_tuning_policy == FrequencyTuningPolicy::ExplicitSlot) {
+            lora.field_uint(11, static_cast<std::uint32_t>(profile.frequency_slot) + 1U);
+        }
+        // Report the tuned center directly, including custom tuning. A client
+        // must not re-hash a channel name and display a different frequency.
+        lora.field_float(14, static_cast<float>(profile.center_frequency_hz) / 1000000.0f);
         child.field_message(6, lora);
         from_radio.field_message(5, child);
-    } else if (index == 3U + node_count + channel_count) {
+    } else if (index == complete_index) {
         // FromRadio.config_complete_id -- the nonce back, closing the dump.
         from_radio.field_uint(7, config_id);
         if (config_id == 0U) {

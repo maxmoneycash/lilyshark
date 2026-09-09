@@ -14,6 +14,55 @@ import XCTest
 
 final class MeshtasticProtoTests: XCTestCase {
 
+    func testActiveRadioConfigsMatchFirmwareVectors() throws {
+        // Exact encoder output, also pinned in test/meshtastic_api.
+        let vectors: [(String, Double, Double, UInt32, UInt32, Bool, Int32)] = [
+            ("2a16321418fa01200b2805380140034801500a7500b86244", 906.875, 250, 11, 5, true, 10),
+            ("2a18321618fa0120092805380140034801500a582d7500486444", 913.125, 250, 9, 5, true, 10),
+            ("2a163214183e200a28083801400350165889017500a26344", 910.53125, 62.5, 10, 8, false, 22),
+        ]
+        for (hex, frequency, bandwidth, sf, cr, tx, power) in vectors {
+            let config = try decodedLoRa(hex)
+            XCTAssertFalse(config.usePreset)
+            XCTAssertEqual(try XCTUnwrap(config.frequencyMHz), frequency, accuracy: 0.0001)
+            XCTAssertEqual(config.bandwidthKHz, bandwidth)
+            XCTAssertEqual(config.spreadingFactor, sf)
+            XCTAssertEqual(config.codingRate, cr)
+            XCTAssertEqual(config.txEnabled, tx)
+            XCTAssertEqual(config.txPower, power)
+        }
+    }
+
+    func testPresetAndInvalidConfigFieldsDoNotInventRFValues() throws {
+        let preset = try decodedLoRa("2a093207080118fa01200b")
+        XCTAssertTrue(preset.usePreset)
+        XCTAssertNil(preset.frequencyMHz)
+        XCTAssertNil(preset.bandwidthKHz)
+        XCTAssertNil(preset.spreadingFactor)
+        let invalid = try decodedLoRa("2a0c320a20ff012809750000c07f")
+        XCTAssertNil(invalid.frequencyMHz)
+        XCTAssertNil(invalid.spreadingFactor)
+        XCTAssertNil(invalid.codingRate)
+        XCTAssertNil(MeshtasticProto.parseFromRadio(Data([0x2a, 0x03, 0x32, 0x01, 0x80])))
+    }
+
+    func testFrequencyOffsetAndSignedPowerArePreserved() throws {
+        let config = try decodedLoRa("2a173215350000803e7500b8624450ffffffffffffffffff01")
+        XCTAssertEqual(config.frequencyMHz, 907.125)
+        XCTAssertEqual(config.txPower, -1)
+    }
+
+    private func decodedLoRa(_ hex: String) throws -> MeshtasticProto.LoRaConfig {
+        let bytes = stride(from: 0, to: hex.count, by: 2).map { offset in
+            let start = hex.index(hex.startIndex, offsetBy: offset)
+            return UInt8(hex[start..<hex.index(start, offsetBy: 2)], radix: 16)!
+        }
+        guard case .loraConfig(let config)? = MeshtasticProto.parseFromRadio(Data(bytes)) else {
+            throw NSError(domain: "Expected LoRa config", code: 1)
+        }
+        return config
+    }
+
     // MARK: - Telemetry
 
     func testDeviceTelemetryFromTheFirmwareParses() {
