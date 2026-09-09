@@ -25,7 +25,7 @@ import {
 	setChannelCfg,
 	setFixedPosition,
 } from "../radio";
-import { getSnapshot, mutate, subscribe } from "../store";
+import { DeviceStatus, getSnapshot, mutate, subscribe } from "../store";
 import { setNetEnabled, useNetState } from "../net";
 import {
 	getHiContrast,
@@ -47,6 +47,8 @@ function Section(props: {
 	children: React.ReactNode;
 	onSave?: () => Promise<void>;
 	saveLabel?: string;
+	saveDisabled?: boolean;
+	saveTitle?: string;
 }) {
 	const [msg, setMsg] = useState("");
 	const [cls, setCls] = useState("");
@@ -60,7 +62,8 @@ function Section(props: {
 					<button
 						type="button"
 						className="primary"
-						disabled={busy}
+						disabled={busy || !!props.saveDisabled}
+						title={props.saveDisabled ? props.saveTitle : undefined}
 						onClick={async () => {
 							setMsg(t("SAVING…"));
 							setCls("warn");
@@ -101,6 +104,12 @@ function Section(props: {
 export default function Config() {
 	const s = useSyncExternalStore(subscribe, getSnapshot);
 	const self = s.selfInfo;
+	const radioLinked =
+		(s.status ?? DeviceStatus.Disconnected) >= DeviceStatus.Connected;
+	const radioReady = radioLinked && !!self;
+	const radioWait = radioLinked
+		? t("The radio is linked. Settings appear here once config arrives.")
+		: undefined;
 
 	const net = useNetState();
 	const [advertName, setAdvertName] = useState("");
@@ -212,13 +221,14 @@ export default function Config() {
 	};
 
 	const saveUser = async () => {
+		if (!radioReady) throw new Error(t("radio config not received yet"));
 		const name = advertName.trim();
 		if (!name) throw new Error(t("the name cannot be empty"));
 		await setAdvertNameCfg(name);
 	};
 
 	const saveRadio = async () => {
-		if (!self) throw new Error(t("radio config not received yet"));
+		if (!self || !radioReady) throw new Error(t("radio config not received yet"));
 		await applyRadioParams(freq, bw, sf, cr);
 		if (txp !== self.txPower) await applyTxPower(txp);
 	};
@@ -547,13 +557,21 @@ export default function Config() {
 						title={t("CONFIG // USER")}
 						onSave={saveUser}
 						saveLabel={t("SAVE NAME")}
+						saveDisabled={!radioReady || !advertName.trim()}
+						saveTitle={
+							!radioReady
+								? radioWait ?? t("Connect a radio to save the advertised name.")
+								: t("the name cannot be empty")
+						}
 					>
 						<div className="form-grid">
 							<label htmlFor="cfg-advert-name">{t("ADVERT NAME")}</label>
 							<input
 								id="cfg-advert-name"
-								value={advertName}
+								value={self ? advertName : ""}
 								maxLength={31}
+								disabled={!radioReady}
+								placeholder="—"
 								onChange={(e) => setAdvertName(e.target.value)}
 							/>
 							<span className="cfg-label">{t("NODE ID")}</span>
@@ -563,12 +581,23 @@ export default function Config() {
 									: "—"}
 							</span>
 						</div>
+						{!radioReady && (
+							<p className="cfg-help" role="status">
+								{radioWait ??
+									t("Connect a radio to set the advertised name.")}
+							</p>
+						)}
 					</Section>
 
 					<Section
 						title="CONFIG // RADIO"
 						onSave={saveRadio}
 						saveLabel={t("SAVE RADIO")}
+						saveDisabled={!radioReady}
+						saveTitle={
+							radioWait ??
+							t("Connect a radio to save frequency and modem settings.")
+						}
 					>
 						<div className="form-grid">
 							<label htmlFor="cfg-frequency">FREQ (kHz)</label>
@@ -576,7 +605,9 @@ export default function Config() {
 								id="cfg-frequency"
 								type="number"
 								min={0}
-								value={freq}
+								disabled={!radioReady}
+								value={self ? freq : ""}
+								placeholder="—"
 								onChange={(e) => setFreq(Number(e.target.value))}
 							/>
 							<label htmlFor="cfg-bandwidth" title="Bandwidth">
@@ -587,7 +618,9 @@ export default function Config() {
 								aria-label="Bandwidth"
 								type="number"
 								min={0}
-								value={bw}
+								disabled={!radioReady}
+								value={self ? bw : ""}
+								placeholder="—"
 								onChange={(e) => setBw(Number(e.target.value))}
 							/>
 							<label htmlFor="cfg-spreading-factor" title="Spreading factor">
@@ -599,7 +632,9 @@ export default function Config() {
 								type="number"
 								min={5}
 								max={12}
-								value={sf}
+								disabled={!radioReady}
+								value={self ? sf : ""}
+								placeholder="—"
 								onChange={(e) => setSf(Number(e.target.value))}
 							/>
 							<label htmlFor="cfg-coding-rate" title="Coding rate">
@@ -611,7 +646,9 @@ export default function Config() {
 								type="number"
 								min={5}
 								max={8}
-								value={cr}
+								disabled={!radioReady}
+								value={self ? cr : ""}
+								placeholder="—"
 								onChange={(e) => setCr(Number(e.target.value))}
 							/>
 							<label htmlFor="cfg-tx-power">TX POWER (dBm)</label>
@@ -620,30 +657,49 @@ export default function Config() {
 								type="number"
 								min={0}
 								max={self?.maxTxPower || 30}
-								value={txp}
+								disabled={!radioReady}
+								value={self ? txp : ""}
+								placeholder="—"
 								onChange={(e) => setTxp(Number(e.target.value))}
 							/>
 						</div>
-						<p className="cfg-help">
-							{t(
-								"To hear each other, nodes need matching frequency, bandwidth (BW), spreading factor (SF), and coding rate (CR).",
-							)}
+						<p className="cfg-help" role={!radioReady ? "status" : undefined}>
+							{!radioReady
+								? (radioWait ??
+									t(
+										"Connect a radio to set frequency, bandwidth (BW), spreading factor (SF), coding rate (CR), and TX power.",
+									))
+								: t(
+										"To hear each other, nodes need matching frequency, bandwidth (BW), spreading factor (SF), and coding rate (CR).",
+									)}
 						</p>
 					</Section>
 				</div>
 				<div className="cfg-col">
 					<Section title={t("CONFIG // FIXED POSITION")}>
 						<div className="cfg-body">
-							<span className="dim">
-								{t(
-									"For nodes without GPS: the firmware broadcasts this position to the mesh.",
-								)}
+							<span className="dim" role={!radioReady ? "status" : undefined}>
+								{!radioReady
+									? (radioWait ??
+										t(
+											"Connect a radio to set a fixed position. The firmware then broadcasts it to the mesh for nodes without GPS.",
+										))
+									: t(
+											"For nodes without GPS: the firmware broadcasts this position to the mesh.",
+										)}
 							</span>
 							<div className="cfg-coordinates">
 								<label>
 									LATITUDE
 									<input
-										placeholder={self?.advLat ? String(self.advLat) : "37.4419"}
+										disabled={!radioReady}
+										placeholder={
+											self?.advLat
+												? String(self.advLat)
+												: radioReady
+													? "37.4419"
+													: "—"
+										}
 										value={posLat}
 										onChange={(e) => setPosLat(e.target.value)}
 									/>
@@ -651,8 +707,13 @@ export default function Config() {
 								<label>
 									LONGITUDE
 									<input
+										disabled={!radioReady}
 										placeholder={
-											self?.advLon ? String(self.advLon) : "-122.1430"
+											self?.advLon
+												? String(self.advLon)
+												: radioReady
+													? "-122.1430"
+													: "—"
 										}
 										value={posLon}
 										onChange={(e) => setPosLon(e.target.value)}
@@ -662,8 +723,15 @@ export default function Config() {
 							<div className="cfg-actions">
 								<button type="button"
 									className="primary"
-									disabled={!posLat.trim() || !posLon.trim()}
+									disabled={!radioReady || !posLat.trim() || !posLon.trim()}
+									title={
+										!radioReady
+											? radioWait ??
+												t("Connect a radio to set a fixed position.")
+											: undefined
+									}
 									onClick={async () => {
+										if (!radioReady) return;
 										setPosMsg("");
 										const lat = Number(posLat.replace(",", "."));
 										const lon = Number(posLon.replace(",", "."));
@@ -690,7 +758,15 @@ export default function Config() {
 									{t("SET POSITION")}
 								</button>
 								<button type="button"
+									disabled={!radioReady}
+									title={
+										!radioReady
+											? radioWait ??
+												t("Connect a radio to clear the advertised position.")
+											: undefined
+									}
 									onClick={async () => {
+										if (!radioReady) return;
 										setPosMsg("");
 										try {
 											await clearFixedPosition();
