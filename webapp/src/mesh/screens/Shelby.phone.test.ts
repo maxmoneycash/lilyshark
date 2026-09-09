@@ -11,6 +11,9 @@ test("SHELBY drops the 360px evidence column on a phone and uses readable empty 
   assert.match(tab, /className="shelby-empty"/);
   assert.match(tab, /Indexer unreachable\./);
   assert.match(tab, /Registry unavailable\./);
+  assert.match(tab, /Retry loading the registry/);
+  assert.match(tab, /Retry loading network stats/);
+  assert.match(css, /\.shelby-empty\[role="alert"\] \{[\s\S]*gap:\s*12px/);
   assert.match(css, /grid-template-columns:\s*minmax\(0, 1fr\)/);
   assert.match(css, /\.shelby-evidence \{[\s\S]*width:\s*auto/);
   assert.match(css, /min-height:\s*44px/);

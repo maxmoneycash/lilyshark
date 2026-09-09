@@ -93,7 +93,13 @@
   color: var(--ink, var(--fg));
   overflow-wrap: anywhere;
 }
+.meshterm .shelby-empty[role="alert"] {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
 .meshterm .shelby-empty[role="alert"] h2 {
+  margin-bottom: 0;
   color: var(--err);
 }
 @media (max-width: 860px) {
