@@ -956,6 +956,29 @@
 	flex-wrap: wrap;
 	min-width: 0;
 }
+.meshterm .debug-empty {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-height: 10rem;
+	max-width: 58ch;
+	padding: 20px 16px;
+}
+.meshterm .debug-empty h2 {
+	margin: 0 0 10px;
+	font-size: 15px;
+	line-height: 1.35;
+	letter-spacing: 0;
+	font-weight: 700;
+	color: var(--fg);
+}
+.meshterm .debug-empty p {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--ink, var(--fg));
+}
 .meshterm .debuglog {
 	flex: 1;
 	overflow-y: auto;
@@ -3124,7 +3147,8 @@ body:has(.meshterm .app.menu-open) {
 	.meshterm .debug-main {
 		padding-bottom: max(12px, env(safe-area-inset-bottom));
 	}
-	.meshterm .debuglog {
+	.meshterm .debuglog,
+	.meshterm .debug-empty {
 		min-height: min(60dvh, 28rem);
 	}
 }
@@ -3152,7 +3176,8 @@ body:has(.meshterm .app.menu-open) {
 	.meshterm .overlay-sheet .error,
 	.meshterm .chat-retry,
 	.meshterm .chat-send.is-shake,
-	.meshterm .chat-dock .error {
+	.meshterm .chat-dock .error,
+	.meshterm .cursor {
 		animation: none;
 	}
 }

@@ -996,7 +996,7 @@ function App() {
               theme's dark text unreadable */}
           <div className="panel" style={{ flex: 1 }}>
             <div className="panel-title">
-              <span>PANEL // DEBUG · SERIAL 115200 8N1</span>
+              <span className="panel-title-label">PANEL // DEBUG · SERIAL 115200 8N1</span>
               <span className="debug-tools">
                 <button
                   type="button"
@@ -1013,11 +1013,22 @@ function App() {
                 {t("{0} LINES", s.log.length)}
               </span>
             </div>
-            <pre className="debuglog" tabIndex={0} aria-label="Serial log">
-              {s.log.map(fmtLog).join("\n")}
-              {"\n"}
-              <span className="cursor" ref={debugCursorRef}>█</span>
-            </pre>
+            {s.log.length === 0 ? (
+              <div className="debug-empty" role="status">
+                <h2>{t("Serial is quiet.")}</h2>
+                <p>
+                  {t(
+                    "Connect a T-Deck or Meshtastic radio. This pane prints the 115200 8N1 log for the session. Export writes it to a text file.",
+                  )}
+                </p>
+              </div>
+            ) : (
+              <pre className="debuglog" tabIndex={0} aria-label="Serial log">
+                {s.log.map(fmtLog).join("\n")}
+                {"\n"}
+                <span className="cursor" ref={debugCursorRef}>█</span>
+              </pre>
+            )}
           </div>
         </main>
       )}
