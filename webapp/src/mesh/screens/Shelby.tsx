@@ -64,9 +64,24 @@ const utcDay = (unix: number) => new Date(unix * 1000).toISOString().slice(0, 10
 /** "0x6ab9…32c9" — the full 32 bytes would drown the table. */
 const shortHex = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 
+function RetryButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label}>
+      Retry
+    </button>
+  );
+}
+
 export function ShelbyScreen() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [statsAttempt, setStatsAttempt] = useState(0);
   /** Pointer coordinates decoded from the bundled synthetic fixture. */
   const [live, setLive] = useState<{ ptr: ShelbyPointer; offset: number; captureBytes: number } | null>(
     null,
@@ -76,6 +91,7 @@ export function ShelbyScreen() {
   /** The on-chain capture registry; null while the fullnode read is in flight. */
   const [registry, setRegistry] = useState<RegistryEntry[] | null>(null);
   const [regErr, setRegErr] = useState<string | null>(null);
+  const [regAttempt, setRegAttempt] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -96,7 +112,7 @@ export function ShelbyScreen() {
       alive = false;
       clearInterval(id);
     };
-  }, []);
+  }, [statsAttempt]);
 
   // Read the bundled synthetic fixture once. Its pointer coordinates reference
   // a real Shelby object, while its generated airtime metadata drives the demo
@@ -136,7 +152,7 @@ export function ShelbyScreen() {
     };
   }, []);
 
-  // Read the capture registry from the shelbynet fullnode once. A dead
+  // Read the capture registry from the shelbynet fullnode. A dead
   // fullnode only dims this one section; the rest of the screen stands.
   useEffect(() => {
     let alive = true;
@@ -154,7 +170,7 @@ export function ShelbyScreen() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [regAttempt]);
 
   /** How long the radio would need for the blob itself versus its pointer. */
   const airtime = useMemo(() => {
@@ -239,6 +255,14 @@ export function ShelbyScreen() {
             <div className="shelby-empty" role="alert">
               <h2>Registry unavailable.</h2>
               <p>{regErr}</p>
+              <RetryButton
+                onClick={() => {
+                  setRegErr(null);
+                  setRegistry(null);
+                  setRegAttempt((attempt) => attempt + 1);
+                }}
+                label="Retry loading the registry"
+              />
             </div>
           ) : registry === null ? (
             <div className="shelby-empty" role="status">
@@ -375,6 +399,13 @@ export function ShelbyScreen() {
             <div className="shelby-empty" role="alert">
               <h2>Indexer unreachable.</h2>
               <p>{err}</p>
+              <RetryButton
+                onClick={() => {
+                  setErr(null);
+                  setStatsAttempt((attempt) => attempt + 1);
+                }}
+                label="Retry loading network stats"
+              />
             </div>
           ) : (
             <div className="kv">
