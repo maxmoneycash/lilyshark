@@ -55,6 +55,8 @@ export default function Chat({
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const spacerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTrigger = useRef<HTMLButtonElement | null>(null);
   // the 3 s disarm of the CLEAR confirmation
@@ -72,6 +74,64 @@ export default function Chat({
   }, [focusSearch]);
 
   useEffect(() => () => clearTimeout(clearTimer.current), []);
+
+  // Sticky bottom:0 is the layout viewport; iOS keyboard covers it. CONNECT
+  // already pins to visualViewport — same inset math, same listeners.
+  useLayoutEffect(() => {
+    const dock = dockRef.current;
+    const spacer = spacerRef.current;
+    if (!dock) return;
+    const vv = window.visualViewport;
+    const parent = dock.parentElement;
+
+    const clearInset = () => {
+      parent?.style.removeProperty("--keyboard-inset");
+      spacer?.style.removeProperty("height");
+      dock.style.removeProperty("bottom");
+      dock.style.removeProperty("padding-bottom");
+    };
+
+    const syncVv = () => {
+      const pos = getComputedStyle(dock).position;
+      const focused = dock.contains(document.activeElement);
+      const obscured = vv ? window.innerHeight - vv.height - vv.offsetTop : 0;
+      if (!vv || (pos !== "sticky" && pos !== "-webkit-sticky") || !focused || obscured < 40) {
+        clearInset();
+        return;
+      }
+      const inset = `${obscured}px`;
+      parent?.style.setProperty("--keyboard-inset", inset);
+      if (spacer) spacer.style.height = inset;
+      dock.style.bottom = inset;
+      dock.style.paddingBottom = "0px";
+      if (followLatest.current) {
+        const list = listRef.current;
+        if (list && list.scrollHeight - list.clientHeight > 1) {
+          list.scrollTop = list.scrollHeight;
+        } else {
+          const se = document.scrollingElement;
+          if (se) se.scrollTop = se.scrollHeight;
+        }
+      }
+    };
+
+    const onFocusOut = () => {
+      requestAnimationFrame(syncVv);
+    };
+
+    vv?.addEventListener("resize", syncVv);
+    vv?.addEventListener("scroll", syncVv);
+    dock.addEventListener("focusin", syncVv);
+    dock.addEventListener("focusout", onFocusOut);
+    syncVv();
+    return () => {
+      vv?.removeEventListener("resize", syncVv);
+      vv?.removeEventListener("scroll", syncVv);
+      dock.removeEventListener("focusin", syncVv);
+      dock.removeEventListener("focusout", onFocusOut);
+      clearInset();
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const element = menuRef.current;
@@ -559,7 +619,12 @@ export default function Chat({
             );
           })}
         </div>
-        <div className="chat-dock">
+        <div
+          ref={spacerRef}
+          className="chat-keyboard-spacer"
+          aria-hidden="true"
+        />
+        <div ref={dockRef} className="chat-dock">
           {!q && hasNewMessages && (
             <button
               type="button"

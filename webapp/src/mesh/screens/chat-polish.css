@@ -242,3 +242,15 @@
 	box-shadow: none;
 	transform: none;
 }
+
+.meshterm .chat-screen .chat-keyboard-spacer {
+	flex: 0 0 auto;
+	height: var(--keyboard-inset, 0px);
+	pointer-events: none;
+}
+
+@media (max-width: 860px) {
+	.meshterm .chat-screen .chat-dock {
+		bottom: var(--keyboard-inset, 0px);
+	}
+}
