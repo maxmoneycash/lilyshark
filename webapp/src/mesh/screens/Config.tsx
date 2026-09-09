@@ -467,21 +467,23 @@ export default function Config() {
 								</label>
 							</div>
 
-							<label
-								htmlFor="cfg-alerts"
+							<span
+								className="cfg-label"
 								title={t(
 									"System notifications about nodes marked as favorites",
 								)}
 							>
 								{t("FAVORITE ALERTS")}
+							</span>
+							<label className="cfg-check" htmlFor="cfg-alerts">
+								<input
+									id="cfg-alerts"
+									type="checkbox"
+									checked={alerts.on}
+									onChange={(e) => saveAlerts({ on: e.target.checked })}
+								/>
+								{t("ON")}
 							</label>
-							<input
-								id="cfg-alerts"
-								type="checkbox"
-								checked={alerts.on}
-								style={{ justifySelf: "start" }}
-								onChange={(e) => saveAlerts({ on: e.target.checked })}
-							/>
 							<label htmlFor="cfg-battery">{t("BATTERY BELOW")}</label>
 							<div className="cfg-unit-field">
 								<input
@@ -712,21 +714,11 @@ export default function Config() {
 
 					<Section title={t("CONFIG // CHANNELS")}>
 						<div className="cfg-body">
-							<div
-								style={{
-									display: "flex",
-									gap: 8,
-									alignItems: "center",
-									borderBottom: "1px solid var(--border)",
-									paddingBottom: 10,
-									marginBottom: 2,
-								}}
-							>
+							<div className="cfg-toolbar">
 								<input
 									aria-label={t("Channels JSON")}
 									placeholder={t("Paste JSON")}
 									value={chJson}
-									style={{ flex: 1 }}
 									onChange={(e) => {
 										setChJson(e.target.value);
 										setImportPending(""); // JSON changed → invalidates the confirmation
@@ -745,17 +737,7 @@ export default function Config() {
 									{importMsg}
 								</span>
 							)}
-							<div
-								style={{
-									display: "flex",
-									gap: 8,
-									flexWrap: "wrap",
-									alignItems: "center",
-									borderBottom: "1px solid var(--border)",
-									paddingBottom: 10,
-									marginBottom: 2,
-								}}
-							>
+							<div className="cfg-toolbar">
 								<button
 									className="primary"
 									disabled={s.channels.size === 0}
@@ -783,16 +765,12 @@ export default function Config() {
 												{index}
 											</span>
 											<input
+												className="cfg-channel-name"
 												aria-label={t("Channel {0} name", index)}
 												placeholder={
 													index === 0 ? "public" : t("— free slot —")
 												}
 												value={chNames[index] ?? ch?.name ?? ""}
-												style={{
-													flex: 1,
-													border: "none",
-													background: "transparent",
-												}}
 												onChange={(e) =>
 													setChNames({ ...chNames, [index]: e.target.value })
 												}
@@ -822,7 +800,6 @@ export default function Config() {
 												autoCorrect="off"
 												placeholder={t("— no key —")}
 												value={chPsks[index] ?? pskToB64(ch?.secret)}
-												style={{ flex: 1 }}
 												onChange={(e) =>
 													setChPsks({ ...chPsks, [index]: e.target.value })
 												}
