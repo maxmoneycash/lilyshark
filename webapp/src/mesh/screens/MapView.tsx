@@ -804,9 +804,9 @@ function RadioMapView({
 						<span className="map-chip-row">
 							{(
 								[
-									["sat", t("SAT I")],
-									["map", t("MAP D")],
-									["chart", t("CHT G")],
+									["sat", t("SAT")],
+									["map", t("FIELD DARK")],
+									["chart", t("FIELD CHART")],
 								] as const
 							).map(([key, label]) => (
 								<button
@@ -861,19 +861,13 @@ function RadioMapView({
 					)}
 					<div className="map-hud map-hud-top">
 						{isDemo() && <>DEMO MAP · PALO ALTO · </>}
-						{t("{0} NODES · {1} POINTS", drawn.length, points)} ·{" "}
-						{basemap === "sat"
-							? "ESRI SAT"
-							: basemap === "map"
-								? "FIELD DARK"
-								: "FIELD CHART"}
+						{t("{0} NODES · {1} POINTS", drawn.length, points)}
+						{" · "}
+						{basemap === "sat" ? "SAT" : basemap === "map" ? "FIELD DARK" : "FIELD CHART"}
 						{deviceLink.status === "linked" && !deviceFix && (
 							<>
 								{" · "}
-								THIS DEVICE · {deviceLink.telemetry?.gps ?? "GPS"} ·{" "}
-								{deviceLink.telemetry?.gps?.includes("SEARCH")
-									? "WAITING FOR SATELLITES · NO MAP DOT UNTIL FIX"
-									: "NO FIX · NO MAP DOT"}
+								{deviceLink.telemetry?.gps ?? "GPS"} · {t("NO PIN UNTIL FIX")}
 							</>
 						)}
 						{deviceFix && (
@@ -883,14 +877,12 @@ function RadioMapView({
 								<SimulateBadge on={deviceLink.telemetry?.sim} />
 							</>
 						)}
-						{coverage && (
+						{coverage && coverage.cells.length > 0 && (
 							<>
 								{" · "}
 								{t(
-									"COVERAGE {0} MEASURED · {1} INTERNET · {2} SYNTHETIC · {3} UNHEARD",
+									"{0} MEASURED · {1} UNHEARD",
 									coverage.measuredCells,
-									coverage.reportedCells,
-									coverage.syntheticCells,
 									coverage.gaps.length,
 								)}
 							</>
@@ -899,137 +891,98 @@ function RadioMapView({
 					<div className="map-hud map-hud-bottom">
 						{wpMsg ||
 							(deviceLink.status === "linked" && drawn.length === 0
-								? "Listening. Your T-Deck plots when GPS has a fix. Other nodes plot when they transmit a position."
+								? t("Listening. A pin appears after GPS fix.")
 								: coverage
 									? coarse
-										? t("TAP A CELL FOR ITS EVIDENCE · LONG PRESS = NEW WAYPOINT")
-										: t("CLICK A CELL FOR ITS EVIDENCE · RIGHT CLICK = NEW WAYPOINT")
+										? t("TAP A CELL · LONG PRESS = WAYPOINT")
+										: t("CLICK A CELL · RIGHT CLICK = WAYPOINT")
 									: coarse
 										? t("LONG PRESS = NEW WAYPOINT")
 										: t("RIGHT CLICK = NEW WAYPOINT"))}
 					</div>
 					{coverage && (
-						<div
-							className="panel map-coverage-legend"
-						>
+						<div className="panel map-coverage-legend">
 							<div className="panel-title">
 								<span>{t("COVERAGE")}</span>
 								<span className="dim">
-									{coverage.cellSpanKm
-										? `${coverage.cellSpanKm.widthKm.toFixed(1)}×${coverage.cellSpanKm.heightKm.toFixed(1)} km`
-										: t("no cells")}
+									{coverage.cells.length === 0
+										? t("no cells")
+										: `${coverage.measuredCells} ${t("measured")}${
+												coverage.cellSpanKm
+													? ` · ${coverage.cellSpanKm.widthKm.toFixed(1)}×${coverage.cellSpanKm.heightKm.toFixed(1)} km`
+													: ""
+											}`}
 								</span>
 							</div>
-							<div
-								style={{
-									padding: 10,
-									display: "flex",
-									flexDirection: "column",
-									gap: 6,
-								}}
-							>
-								<span className="dim">
+							{coverage.cells.length === 0 ? (
+								<p className="map-coverage-empty">
 									{t(
-										"Fill: the best SNR measured in the box, in dB. One box is one geohash-{0} cell.",
-										coverage.precision,
+										"Nothing with a position has been heard yet. That is an absence of evidence, not a dead map.",
 									)}
-								</span>
-								{GRADE_ORDER.map((grade) => (
-									<span
-										key={grade}
-										style={{ display: "flex", gap: 8, alignItems: "center" }}
-									>
+								</p>
+							) : (
+								<div className="map-coverage-legend-body">
+									{GRADE_ORDER.map((grade) => (
 										<span
+											key={grade}
+											className="map-coverage-swatch"
+											title={GRADE_LEGEND[grade]}
+										>
+											<b
+												style={{
+													border: `1px solid ${fg()}`,
+													background: fg(alphaHex(gradeFillOpacity(grade))),
+												}}
+											/>
+											{grade.toUpperCase()}
+										</span>
+									))}
+									<span
+										className="map-coverage-swatch"
+										title={t("Heard, but no SNR figure came with it.")}
+									>
+										<b
 											style={{
-												width: 18,
-												height: 12,
-												flex: "0 0 auto",
 												border: `1px solid ${fg()}`,
-												background: fg(alphaHex(gradeFillOpacity(grade))),
+												background: fg(alphaHex(0.06)),
 											}}
 										/>
-										<span>{GRADE_LEGEND[grade]}</span>
+										{t("NO SNR")}
 									</span>
-								))}
-								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
 									<span
-										style={{
-											width: 18,
-											height: 12,
-											flex: "0 0 auto",
-											border: `1px solid ${fg()}`,
-											background: fg(alphaHex(0.06)),
-										}}
-									/>
-									<span>
-										{t(
-											"heard, but no SNR figure came with it — a node fix, not a measured reception",
+										className="map-coverage-swatch"
+										title={t("This radio demodulated a frame from the box.")}
+									>
+										<b style={{ border: `1px solid ${fg()}` }} />
+										{t("MEASURED")}
+									</span>
+									<span
+										className="map-coverage-swatch"
+										title={t(
+											"Internet layer only — somebody's radio heard it, not this one.",
 										)}
+									>
+										<b style={{ border: `1px dashed ${NET_AMBER}` }} />
+										{t("INTERNET")}
 									</span>
-								</span>
-								<span className="dim" style={{ marginTop: 2 }}>
-									{t("Outline: where the evidence came from.")}
-								</span>
-								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
 									<span
-										style={{
-											width: 18,
-											height: 12,
-											flex: "0 0 auto",
-											border: `1px solid ${fg()}`,
-										}}
-									/>
-									<span>{t("this radio demodulated a frame from the box")}</span>
-								</span>
-								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+										className="map-coverage-swatch"
+										title={t("Synthetic: demo mesh or SIMULATE, invented.")}
+									>
+										<b style={{ border: `1px dotted ${accent()}` }} />
+										{t("SYNTHETIC")}
+									</span>
 									<span
-										style={{
-											width: 18,
-											height: 12,
-											flex: "0 0 auto",
-											border: `1px dashed ${NET_AMBER}`,
-										}}
-									/>
-									<span>
-										{t(
-											"internet layer only — somebody's radio heard it, not this one, so there is no dB figure and never will be",
+										className="map-coverage-swatch"
+										title={t(
+											"Next to a measured box, nothing heard from it — not proof of a dead spot.",
 										)}
+									>
+										<b style={{ border: `1px dashed ${fg("55")}` }} />
+										{t("UNHEARD")}
 									</span>
-								</span>
-								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-									<span
-										style={{
-											width: 18,
-											height: 12,
-											flex: "0 0 auto",
-											border: `1px dotted ${accent()}`,
-										}}
-									/>
-									<span>{t("synthetic: demo mesh or SIMULATE, invented")}</span>
-								</span>
-								<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-									<span
-										style={{
-											width: 18,
-											height: 12,
-											flex: "0 0 auto",
-											border: `1px dashed ${fg("55")}`,
-										}}
-									/>
-									<span>
-										{t(
-											"next to a measured box, nothing heard from it — absence of evidence, not proof of a dead spot",
-										)}
-									</span>
-								</span>
-								{coverage.cells.length === 0 && (
-									<span className="dim">
-										{t(
-											"Nothing to draw: no frame or node with a position has been heard yet.",
-										)}
-									</span>
-								)}
-							</div>
+								</div>
+							)}
 						</div>
 					)}
 					{draft && (

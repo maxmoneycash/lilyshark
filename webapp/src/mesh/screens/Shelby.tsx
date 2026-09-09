@@ -179,20 +179,19 @@ export function ShelbyScreen() {
         <div className="scroll-y">
           <div className="prose shelby-intro">
             <p>
-              <strong>A full capture, referenced in {SHELBY_POINTER_SIZE} bytes.</strong>{" "}
-              Send the small receipt over LoRa without internet. Upload and retrieve
-              the <code>.lscap</code> capture through Shelby online, leaving more
-              airtime for messages.
+              <strong>{SHELBY_POINTER_SIZE}-byte SHLB receipt over LoRa.</strong>{" "}
+              Keep the <code>.lscap</code> on Shelby and fetch it when you have
+              internet.
             </p>
           </div>
 
           <div className="panel-title">FROM RADIO TO STORAGE</div>
           <div className="flow shelby-flow">
             {[
-              ["01", "CAPTURE", "Log radio frames and signal measurements to microSD."],
-              ["02", "UPLOAD", "Store the capture on Shelby through an internet connection."],
-              ["03", "ANNOUNCE", `Send its ${SHELBY_POINTER_SIZE}-byte SHLB receipt over the mesh.`],
-              ["04", "RETRIEVE", "Read the receipt offline; fetch the full capture online."],
+              ["01", "CAPTURE", "Frames and SNR to microSD."],
+              ["02", "UPLOAD", "Store the capture on Shelby (internet)."],
+              ["03", "ANNOUNCE", `${SHELBY_POINTER_SIZE}-byte receipt over the mesh.`],
+              ["04", "RETRIEVE", "Decode offline; fetch the file online."],
             ].map(([n, k, v]) => (
               <div className="flow-step" key={n}>
                 <span className="flow-n">{n}</span>
@@ -236,12 +235,6 @@ export function ShelbyScreen() {
           <div className="panel-title">
             ON-CHAIN REGISTRY
             {registry ? ` · ${registry.length} ANCHORED` : ""}
-          </div>
-          <div className="prose">
-            <p>
-              Anchored captures from this publisher, with size, storage expiry,
-              and commitment. Read directly from shelbynet.
-            </p>
           </div>
           {regErr ? (
             <div className="panel-foot">
@@ -300,7 +293,7 @@ export function ShelbyScreen() {
             <span className="k warn">DEMO RATE</span>
             <span className="v">
               {bps ? `${bps.toFixed(0)} bit/s` : "—"}
-              <span className="dim"> from synthetic sample metadata</span>
+              <span className="dim"> synthetic sample</span>
             </span>
             {airtime && live && (
               <>
@@ -323,8 +316,8 @@ export function ShelbyScreen() {
           </div>
 
           {live && (
-            <>
-              <div className="panel-title">DECODED FROM SYNTHETIC SAMPLE</div>
+            <details className="shelby-wire">
+              <summary>DECODED FROM SYNTHETIC SAMPLE</summary>
               <div className="kv">
                 <span className="k">FOUND AT</span>
                 <span className="v">byte {live.offset} of the payload</span>
@@ -345,9 +338,9 @@ export function ShelbyScreen() {
                   </>
                 )}
                 <span className="k">COMMITMENT</span>
-                <span className="v">{live.ptr.commitment}</span>
+                <span className="v shelby-hex">{live.ptr.commitment}</span>
                 <span className="k">OWNER</span>
-                <span className="v">{live.ptr.owner}</span>
+                <span className="v shelby-hex">{live.ptr.owner}</span>
                 <span className="k">SIZE</span>
                 <span className="v">{live.ptr.sizeBytes.toLocaleString()} B</span>
                 <span className="k">CHUNK</span>
@@ -365,7 +358,7 @@ export function ShelbyScreen() {
                     .join(" · ") || "none"}
                 </span>
               </div>
-            </>
+            </details>
           )}
 
           <div className="panel-title">NETWORK</div>

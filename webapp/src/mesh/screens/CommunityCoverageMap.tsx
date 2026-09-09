@@ -17,10 +17,10 @@ function restoreCache(): CoverageCache | undefined {
 }
 const EMPTY: MapperReport = { success: true, region: 'OAK', region_name: 'Oakland', generated_at: 0, data_age_seconds: null, grid_squares: [] };
 export default function CommunityCoverageMap({ children, focusNode }: { children: ReactNode; focusNode?: number }) {
-  const [mode, setMode] = useState<'coverage' | 'radio'>(focusNode === undefined ? 'coverage' : 'radio');
+  const [mode, setMode] = useState<'coverage' | 'radio'>('radio');
   const [area, setArea] = useState('oak');
   const [panel, setPanel] = useState<'sources' | 'radio'>();
-  const [visitedRadio, setVisitedRadio] = useState(focusNode !== undefined);
+  const [visitedRadio, setVisitedRadio] = useState(true);
   useEffect(() => { if (mode === 'radio') setVisitedRadio(true); }, [mode]);
   const [key, setKey] = useState('');
   const [cache, setCache] = useState<CoverageCache | undefined>(restoreCache);
@@ -70,17 +70,17 @@ export default function CommunityCoverageMap({ children, focusNode }: { children
       <div ref={tabs} className="coverage-tabs" role="tablist" aria-label="Map source" onKeyDown={event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
-        const next = event.key === 'Home' ? 'coverage' : event.key === 'End' ? 'radio' : mode === 'coverage' ? 'radio' : 'coverage';
+        const next = event.key === 'Home' ? 'radio' : event.key === 'End' ? 'coverage' : mode === 'radio' ? 'coverage' : 'radio';
         setMode(next);
         tabs.current?.querySelector<HTMLButtonElement>(`#map-tab-${next}`)?.focus();
       }}>
-        <button id="map-tab-coverage" className="coverage-tab" role="tab" aria-controls="map-panel-coverage" aria-selected={mode === 'coverage'} tabIndex={mode === 'coverage' ? 0 : -1} onClick={() => setMode('coverage')}>Coverage</button>
         <button id="map-tab-radio" className="coverage-tab" role="tab" aria-controls="map-panel-radio" aria-selected={mode === 'radio'} tabIndex={mode === 'radio' ? 0 : -1} onClick={() => setMode('radio')}>My mesh</button>
+        <button id="map-tab-coverage" className="coverage-tab" role="tab" aria-controls="map-panel-coverage" aria-selected={mode === 'coverage'} tabIndex={mode === 'coverage' ? 0 : -1} onClick={() => setMode('coverage')}>Coverage</button>
       </div>
       <div className="coverage-actions"><button aria-label="My radio" title="My radio" onClick={() => setPanel('radio')}><CoverageIcon name="radio" /><span>My radio</span></button><button aria-label="Map data" title="Map data" onClick={() => setPanel('sources')}><CoverageIcon name="data" /><span>Map data</span></button></div>
     </div>
-    <div id="map-panel-coverage" className="coverage-mode" role="tabpanel" aria-labelledby="map-tab-coverage" hidden={mode !== 'coverage'}><CoverageCanvas report={cache?.report ?? EMPTY} area={area} openSources={() => setPanel('sources')} openRadio={() => setPanel('radio')} serviceStatus={fetching ? 'Refreshing survey data…' : 'Regional survey feed not connected'} /></div>
     <div id="map-panel-radio" className="coverage-mode" role="tabpanel" aria-labelledby="map-tab-radio" hidden={mode !== 'radio'}>{visitedRadio && children}</div>
+    <div id="map-panel-coverage" className="coverage-mode" role="tabpanel" aria-labelledby="map-tab-coverage" hidden={mode !== 'coverage'}><CoverageCanvas report={cache?.report ?? EMPTY} area={area} openSources={() => setPanel('sources')} openRadio={() => setPanel('radio')} serviceStatus={fetching ? 'Refreshing survey data…' : 'Regional survey feed not connected'} refreshing={fetching} /></div>
     <dialog ref={dialog} className="coverage-dialog" onCancel={() => setPanel(undefined)} onClose={() => setPanel(undefined)} aria-labelledby="coverage-dialog-title">
       <div className="coverage-dialog-heading"><h2 id="coverage-dialog-title">{panel === 'radio' ? 'My radio' : 'Map data'}</h2><button className="coverage-icon-button" aria-label="Close map settings" onClick={() => setPanel(undefined)}><CoverageIcon name="close" /></button></div>
       {panel === 'radio' ? <RadioVisibility /> : <div className="coverage-settings">

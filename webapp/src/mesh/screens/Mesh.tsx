@@ -643,15 +643,15 @@ export default function Mesh() {
 					{view === "graph" ? (
 						<>
 							<span className="mesh-pan-hint">{t("SCROLL TO EXPLORE")} · </span>
-							<span>{t("SOLID LINE = DIRECT NEIGHBOR")}</span>
+							<span>{t("SOLID = NEIGHBOR")}</span>
 							<span className="spacer" />
 							{ids.length > 45 && (
-								<span className="dim">{t("CLICK A NODE TO SEE NAMES")} · </span>
+								<span className="dim">{t("TAP A NODE FOR NAMES")} · </span>
 							)}
-							<span>{t("DASHED = TRACEROUTE SEGMENT")}</span>
+							<span>{t("DASHED = TRACEROUTE")}</span>
 						</>
 					) : (
-						<span>{t("ONE CELL = ONE HOUR · BRIGHTER = MORE PACKETS")}</span>
+						<span>{t("ONE CELL = ONE HOUR")}</span>
 					)}
 				</div>
 			</div>

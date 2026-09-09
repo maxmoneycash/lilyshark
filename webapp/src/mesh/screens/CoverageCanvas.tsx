@@ -27,7 +27,7 @@ const observedTypes = (mask: number) => {
 const signalLabel = (value?: number | null) => value == null ? 'Unknown' : `${value.toFixed(1)} DB`;
 const numberLabel = (value: number) => new Intl.NumberFormat().format(value);
 
-export default function CoverageCanvas({ report, area, openSources, openRadio, serviceStatus }: { report: MapperReport; area: string; openSources: () => void; openRadio: () => void; serviceStatus?: string }) {
+export default function CoverageCanvas({ report, area, openSources, openRadio, serviceStatus, refreshing }: { report: MapperReport; area: string; openSources: () => void; openRadio: () => void; serviceStatus?: string; refreshing?: boolean }) {
   useThemeTick();
   const light = isLight(), markerColor = fg();
   const radio = useCoverageRadio();
@@ -280,6 +280,7 @@ export default function CoverageCanvas({ report, area, openSources, openRadio, s
 
       {(tileError || (directoryState === 'error' && !hasCoverage)) && <div className="coverage-map-error coverage-surface" role="status"><span>{tileError ? 'Some map tiles could not load. Try switching the map layer.' : 'The repeater directory is unavailable.'}</span>{directoryState === 'error' && <button onClick={() => setDirectoryAttempt(value => value + 1)}>Retry</button>}</div>}
       {hasCoverage && !cells.length && <div className="coverage-empty-filters coverage-surface" role="status"><strong>No matching coverage</strong><span>Try a wider time or signal range.</span><button onClick={resetFilters}>Reset filters</button></div>}
+      {!hasCoverage && !refreshing && directoryState === 'ready' && <div className="coverage-empty-filters coverage-surface" role="status"><strong>No surveyed coverage</strong><span>Repeater pins are directory positions, not measured cells.</span><button onClick={openSources}>Map data</button></div>}
     </div>
     <div className="coverage-map-footer"><span className="coverage-provenance">{hasCoverage ? `Saved survey · ${dateLabel(report.generated_at)}` : 'Directory · coverage unmeasured'}{usingFallback ? ' · Basic map' : ''}</span>{hasCoverage && <div className="coverage-legend" aria-label="Coverage legend">{COVERAGE_TYPES.filter(type => counts[type] > 0).map(type => <span key={type}><i style={{ background: COLORS[type] }} />{COVERAGE_LABELS[type]}</span>)}{cells.some(cell => !COVERAGE_TYPES.includes(cell.coverage_type as CoverageType)) && <span><i style={{ background: "#858e95" }} />Other</span>}</div>}{visibleCount > 800 && <span>Zoom in to show all {numberLabel(visibleCount)} cells.</span>}</div>
   </div>;
