@@ -133,3 +133,13 @@ the chassis has volume (side, thickness, antenna). Drag turns yaw through a
 full orbit and pitches; it does not spring back. Lighting is the Blender area
 lights plus a warm key, cool rim, and hemisphere bounce. LCD stays unlit.
 Flash keeps the 2D photo. Do not rewrite the twelve-chapter intro copy.
+
+## Overnight web grind — 2026-09-09
+
+User asked for an all-night swarm on every web tab, with a commit and push
+after each change. Branch `codex/ios-everyday-use`. Workflow
+`webapp-overnight` (user `~/.grok/workflows/webapp-overnight.rhai`) plus a
+durable 25-minute scheduler. Do not rewrite intro copy. Keep pink terminal
+identity. First wave covered Traffic/Spectrum/Sniffer/Telemetry, Chat/Nodes,
+Map/Mesh/Shelby, Flash/Docs/Config/Whitepaper, and shared chrome. Continue
+from `git log` on this branch; push after every logical fix.
