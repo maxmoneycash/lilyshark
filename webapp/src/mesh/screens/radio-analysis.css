@@ -304,24 +304,19 @@
 	}
 	.meshterm .mesh-graph-layout .mesh-graph-viewport {
 		height: min(60dvh, 480px) !important;
-		overflow: auto !important;
-		overscroll-behavior-x: contain;
-		overscroll-behavior-y: auto;
+		overflow: hidden !important;
 	}
 	.meshterm .mesh-graph-viewport svg {
 		display: block;
-		width: 1100px !important;
-		height: 734px !important;
-		max-width: none;
+		width: 100% !important;
+		height: 100% !important;
+		max-width: 100%;
 	}
 	.meshterm .mesh-graph-layout .mesh-node-detail {
 		min-width: 0 !important;
 	}
 	.meshterm .mesh-node-detail .mesh-neighbor {
 		min-height: 44px;
-	}
-	.meshterm .mesh-pan-hint {
-		display: inline;
 	}
 }
 
