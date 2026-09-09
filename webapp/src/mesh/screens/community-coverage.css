@@ -190,6 +190,8 @@
 .meshterm .community-map-screen .map-main { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 .meshterm .community-map-screen .map-main > .panel { position: relative; min-height: 0; border: 0; margin: 0; }
 .meshterm .community-map-screen .radio-map-options { position: absolute; z-index: 600; top: 88px; left: 12px; width: 300px; max-width: calc(100% - 84px); border: 1px solid var(--border); background: var(--panel); overflow: hidden; }
+/* GPS wait sits under My mesh/Coverage and beside Map options, not on the chips. */
+.meshterm .community-map-screen .map-wait { top: 88px; left: 324px; right: 68px; max-width: min(520px, calc(100% - 392px)); z-index: 550; }
 .meshterm .radio-map-options > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px 12px; cursor: pointer; font-size: 13px; list-style: none; }
 .meshterm .radio-map-options > summary::-webkit-details-marker { display: none; }
 .meshterm .radio-map-options > summary small { margin-left: auto; color: var(--coverage-muted); font-size: 11px; }
@@ -234,6 +236,7 @@
   .meshterm .coverage-actions button span { display: none; }
   .meshterm .coverage-explorer { width: 300px; }
   .meshterm .coverage-map-footer { max-width: calc(100% - 140px); font-size: 9px; }
+  .meshterm .community-map-screen .map-wait { top: 144px; left: 12px; right: 12px; max-width: none; }
 }
 @media (max-width: 560px) {
   .meshterm .coverage-navigation { top: 10px; gap: 8px; }
@@ -264,6 +267,7 @@
   .meshterm .saved-coverage-canvas .leaflet-control-attribution { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meshterm .community-map-screen .map-main .map-hud-top { top: 54px; bottom: auto; left: 12px; right: 12px; }
   .meshterm .community-map-screen .radio-map-options { right: 74px; width: auto; max-width: none; top: 88px; }
+  .meshterm .community-map-screen .map-wait { top: 144px; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); max-width: none; }
   .meshterm .community-map-screen .map-main .map-toolbar { flex-wrap: wrap; }
   .meshterm .community-map-screen .map-coverage-legend { left: 12px; right: 12px; width: auto; bottom: max(36px, calc(env(safe-area-inset-bottom, 0px) + 26px)); max-height: 28%; }
 }
