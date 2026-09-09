@@ -2295,6 +2295,14 @@ body:has(.meshterm .app.menu-open) {
 	margin: 0;
 	max-width: 640px;
 }
+@media (max-width: 860px) {
+	.meshterm .overlay-sheet {
+		padding: 16px;
+	}
+	.meshterm .sheet-actions {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
 
 /* With the sheet open the header rides on top of it, so the wordmark and the
    ✕ stay visible and tappable. `sticky` matters twice over: it beats the
