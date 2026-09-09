@@ -194,7 +194,7 @@
 .meshterm .radio-map-options > summary::-webkit-details-marker { display: none; }
 .meshterm .radio-map-options > summary small { margin-left: auto; color: var(--coverage-muted); font-size: 11px; }
 .meshterm .radio-map-options .panel-title { padding: 8px 12px; border: 0; border-top: 1px solid var(--border); background: transparent; }
-.meshterm .community-map-screen .map-main .panel-title-label { font-size: 10px; letter-spacing: 0; }
+.meshterm .community-map-screen .map-main .panel-title-label { font-size: 10px; letter-spacing: 1.4px; }
 .meshterm .community-map-screen .map-main .map-toolbar { gap: 8px; }
 .meshterm .community-map-screen .map-main .map-chip-row button { min-height: 32px; padding: 5px 8px; font-size: 10px; letter-spacing: 1px; --control-border: var(--border); }
 .meshterm .community-map-screen .map-main .map-chip-row button.primary { --control-bg: var(--bg); --control-ink: var(--fg); }

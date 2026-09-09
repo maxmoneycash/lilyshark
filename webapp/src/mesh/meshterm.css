@@ -214,8 +214,8 @@
 }
 
 /* ── titlebar personalizada (decorations:false) ──
-   Hidden except on very wide desktops: the 30px window strip stole a row
-   from INTRO and every other screen on laptop widths. */
+   Hidden: the 30px window strip stole a row from INTRO and every other
+   screen on laptop widths, and the header already carries the identity. */
 .meshterm .titlebar {
 	display: none;
 	align-items: center;
