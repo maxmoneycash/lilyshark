@@ -395,11 +395,14 @@ export default function Mesh() {
 
 				{view === "activity" ? (
 					grid.rows.length === 0 ? (
-						<p className="dim" style={{ padding: 16, fontSize: 12 }}>
-							{t(
-								"No sightings in this range. Connect a radio to record activity by node and hour.",
-							)}
-						</p>
+						<div className="mesh-empty" role="status">
+							<h2>{t("No sightings in this range.")}</h2>
+							<p>
+								{t(
+									"Connect a radio to record activity by node and hour. Each cell is one hour; a darker cell is a node that was heard more often.",
+								)}
+							</p>
+						</div>
 					) : (
 						<div style={{ flex: 1, overflow: "auto", padding: 12 }}>
 							<table style={{ borderCollapse: "collapse", fontSize: 11 }}>
@@ -451,11 +454,14 @@ export default function Mesh() {
 						</div>
 					)
 				) : ids.length === 0 ? (
-					<p className="dim" style={{ padding: 16, fontSize: 12 }}>
-						{t(
-							"No links recorded. Enable Neighbor Info in Config, or run a traceroute from Nodes.",
-						)}
-					</p>
+					<div className="mesh-empty" role="status">
+						<h2>{t("No links recorded.")}</h2>
+						<p>
+							{t(
+								"Enable Neighbor Info in Config, or run a traceroute from Nodes. Solid lines are neighbors; dashed lines are traceroutes.",
+							)}
+						</p>
+					</div>
 				) : (
 					<div
 						className="scroll-y mesh-graph-layout"

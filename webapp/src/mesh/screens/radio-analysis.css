@@ -188,6 +188,29 @@
 		width: 126px;
 	}
 }
+.meshterm .mesh-empty {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-height: 10rem;
+	max-width: 58ch;
+	padding: 20px 16px;
+}
+.meshterm .mesh-empty h2 {
+	margin: 0 0 10px;
+	font-size: 15px;
+	line-height: 1.35;
+	letter-spacing: 0;
+	font-weight: 700;
+	color: var(--fg);
+}
+.meshterm .mesh-empty p {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--ink, var(--fg));
+}
 .meshterm .mesh-topology-toolbar > span {
 	flex-wrap: wrap;
 	min-width: 0;
