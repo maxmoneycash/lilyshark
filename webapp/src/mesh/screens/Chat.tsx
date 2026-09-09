@@ -89,29 +89,38 @@ export default function Chat({
       spacer?.style.removeProperty("height");
       dock.style.removeProperty("bottom");
       dock.style.removeProperty("padding-bottom");
+      dock.style.removeProperty("margin-bottom");
     };
 
     const syncVv = () => {
-      const pos = getComputedStyle(dock).position;
       const focused = dock.contains(document.activeElement);
       const obscured = vv ? window.innerHeight - vv.height - vv.offsetTop : 0;
-      if (!vv || (pos !== "sticky" && pos !== "-webkit-sticky") || !focused || obscured < 40) {
+      if (!vv || !focused || obscured < 40) {
         clearInset();
         return;
       }
       const inset = `${obscured}px`;
-      parent?.style.setProperty("--keyboard-inset", inset);
-      if (spacer) spacer.style.height = inset;
-      dock.style.bottom = inset;
+      const pos = getComputedStyle(dock).position;
+      const sticky = pos === "sticky" || pos === "-webkit-sticky";
       dock.style.paddingBottom = "0px";
-      if (followLatest.current) {
-        const list = listRef.current;
-        if (list && list.scrollHeight - list.clientHeight > 1) {
-          list.scrollTop = list.scrollHeight;
-        } else {
-          const se = document.scrollingElement;
-          if (se) se.scrollTop = se.scrollHeight;
-        }
+      if (sticky) {
+        parent?.style.setProperty("--keyboard-inset", inset);
+        dock.style.bottom = inset;
+        dock.style.removeProperty("margin-bottom");
+        if (spacer) spacer.style.height = inset;
+      } else {
+        parent?.style.removeProperty("--keyboard-inset");
+        dock.style.removeProperty("bottom");
+        if (spacer) spacer.style.removeProperty("height");
+        dock.style.marginBottom = inset;
+      }
+      if (!followLatest.current) return;
+      const list = listRef.current;
+      if (list && list.scrollHeight - list.clientHeight > 1) {
+        list.scrollTop = list.scrollHeight;
+      } else {
+        const se = document.scrollingElement;
+        if (se) se.scrollTop = se.scrollHeight;
       }
     };
 
