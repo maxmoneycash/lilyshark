@@ -383,6 +383,10 @@ type PlatformId = (typeof PLATFORMS)[number]["id"];
 type PlatformKind = (typeof PLATFORMS)[number]["kind"];
 type Platform = (typeof PLATFORMS)[number];
 
+function flashLcd(platform: Platform): string | undefined {
+  return "screen" in platform ? platform.screen : undefined;
+}
+
 const CHECKLISTS: Record<PlatformKind, string[]> = {
   firmware: [
     "Live LoRa traffic and packet inspection",
@@ -496,7 +500,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
     ) : p.id === "source" ? (
       <SourceIcon />
     ) : (
-      <TDeckPhoto screen={p.screen} alt={p.name} />
+      <TDeckPhoto screen={flashLcd(p)} alt={p.name} />
     );
 
   return (
@@ -551,7 +555,7 @@ export function FlashPage({ onOpen }: { onOpen: (tab: Tab) => void }) {
             <div className="preview-content" key={selected.id}>
               {selected.kind === "firmware" ? (
                 <TDeckPhoto
-                  screen={selected.screen}
+                  screen={flashLcd(selected)}
                   alt={`Front view of a LILYGO ${selected.name} displaying the Lilyshark ${selected.caption}`}
                 />
               ) : selected.kind === "browser" ? (
