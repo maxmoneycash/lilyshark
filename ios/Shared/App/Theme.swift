@@ -14,23 +14,17 @@ import MeshCoreKit
 // MARK: - App Theme Preference
 
 enum AppTheme: String, CaseIterable {
-    case system = "System"
     case light = "Light"
-    case dark = "Dark"
 
     var colorScheme: ColorScheme? {
         switch self {
-        case .system: return nil
         case .light: return .light
-        case .dark: return .dark
         }
     }
 
     var displayName: String {
         switch self {
-        case .system: return String(localized: "System")
         case .light: return String(localized: "Light")
-        case .dark: return String(localized: "Dark")
         }
     }
 }

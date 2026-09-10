@@ -26,6 +26,7 @@ struct MeshMapView: View {
                     .accessibilityHidden(!showLocalMesh)
             }
         }
+        .ignoresSafeArea(edges: .top)
         .overlay(alignment: .top) { floatingMapControls }
         .onChange(of: showLocalMesh) { if showLocalMesh { openedLocalMesh = true } }
         .navigationTitle("Map")
@@ -58,9 +59,7 @@ struct MeshMapView: View {
                     }.pickerStyle(.segmented)
                 }
             }
-            .frame(maxWidth: 260, minHeight: Design.minimumTouchTarget)
-            .padding(.horizontal, Design.Space.hairline)
-            .background(.regularMaterial, in: Capsule())
+            .frame(maxWidth: 260)
             .accessibilityIdentifier("map-source-picker")
             Spacer(minLength: 0)
             Button { showRadio = true } label: {

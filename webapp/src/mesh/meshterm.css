@@ -2562,6 +2562,12 @@ body:has(.meshterm .app.menu-open) {
 	touch-action: none;
 	pointer-events: none;
 }
+@media (max-width: 860px) {
+	.meshterm .intro-device {
+		position: relative;
+		inset: auto;
+	}
+}
 .meshterm .intro-device * {
 	pointer-events: auto;
 }
@@ -2572,8 +2578,8 @@ body:has(.meshterm .app.menu-open) {
 @media (max-width: 860px) {
 	.meshterm .intro-stage {
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: minmax(240px, 1fr) minmax(0, auto) auto;
-		grid-template-areas: "copy" "progress";
+		grid-template-rows: minmax(0, auto) minmax(360px, 1fr) auto;
+		grid-template-areas: "copy" "device" "progress";
 		padding: 0 max(24px, env(safe-area-inset-right)) 12px max(24px, env(safe-area-inset-left));
 		gap: 16px;
 	}
@@ -2583,6 +2589,10 @@ body:has(.meshterm .app.menu-open) {
 		max-width: 560px;
 		max-height: min(48vh, 380px);
 		justify-self: center;
+	}
+	.meshterm .intro-device {
+		position: relative;
+		grid-area: device;
 	}
 	.meshterm .intro-head { font-size: 27px; margin-bottom: 12px; }
 	.meshterm .intro-body { font-size: 14px; line-height: 1.6; }
