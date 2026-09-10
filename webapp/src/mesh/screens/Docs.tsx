@@ -335,10 +335,9 @@ export default function Docs() {
 				<nav className="docs-nav" ref={navRef} aria-label="Documents">
 					{!docs.length && (
 						<div className="docs-nav-empty">
+							<h2>{message ? "Offline" : "Loading documents…"}</h2>
 							<p className={message ? "err" : "dim"} role="status">
-								{message
-									? "Documents unavailable"
-									: "Loading documents…"}
+								{message || "Checking for updates"}
 							</p>
 							{message && (
 								<RetryButton onClick={retry} label={retryLabel} />

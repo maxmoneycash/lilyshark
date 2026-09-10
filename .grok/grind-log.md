@@ -5,6 +5,9 @@ Ship: `git push origin HEAD:main` after `tsc --noEmit` and tests.
 Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 
 ## Done
+- Spectrum / Mesh / Telemetry empties: titled empties with a CONNECT key when unlinked
+- Chat empty: CONNECT key when unlinked
+- Docs empty / missing-manifest: titled empty with a retry
 
 - Intro chrome stripped (pager, drag/pause/reset, channel footer)
 - Connect buttons tappable on iPhone with Apple-API copy
@@ -34,11 +37,8 @@ Do not touch `ios/`. No Tailwind/shadcn dump. No decorative chrome.
 - Sniffer empty table is a titled empty with a CONNECT key that opens the sheet
 - Keyboard rings: inputs/selects/textarea, links, dissection tree, traffic rows, intro/chat regions, chat composer; node name opens the menu from the keyboard
 - Traffic with nothing open is a titled empty with SAMPLE and CONNECT keys
+- Debug log empty state: titled empty instead of a lone cursor
 
 ## Next (pick one per round)
 
-1. Debug log empty state: titled empty instead of a lone cursor
-2. Spectrum / Mesh / Telemetry empties: titled empties with a CONNECT key when unlinked
-3. Chat empty: CONNECT key when unlinked
-4. Docs empty / missing-manifest: titled empty with a retry
 5. Sticky filter chips that wrap without covering the table on phone

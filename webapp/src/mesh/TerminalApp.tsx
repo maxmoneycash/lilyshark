@@ -346,7 +346,6 @@ function App() {
       const next = (e as CustomEvent<string>).detail;
       if (isTab(next)) setTab(next);
     };
-    window.addEventListener("lilyshark-tab", onTab);
     // A permalink pasted into the address bar of an already-open tab changes
     // the hash without reloading, so the deep link has to be honoured here as
     // well as at mount. Screens update their own part of the hash with
@@ -355,10 +354,14 @@ function App() {
       setTabState(tabFromLocation(window.location));
       setMenuOpen(false);
     };
+    window.addEventListener("lilyshark-tab", onTab);
+    const openConnect = () => setConnectOpen(true);
+    window.addEventListener("lilyshark-connect", openConnect);
     window.addEventListener("hashchange", onHash);
     window.addEventListener("popstate", onHash);
     return () => {
       window.removeEventListener("lilyshark-tab", onTab);
+      window.removeEventListener("lilyshark-connect", openConnect);
       window.removeEventListener("hashchange", onHash);
       window.removeEventListener("popstate", onHash);
     };
@@ -1036,6 +1039,11 @@ function App() {
                     "Connect a T-Deck or Meshtastic radio. This pane prints the 115200 8N1 log for the session. Export writes it to a text file.",
                   )}
                 </p>
+                {!connected && !lilyLinked && (
+                  <button className="primary" onClick={() => setConnectOpen(true)}>
+                    {t("CONNECT")}
+                  </button>
+                )}
               </div>
             ) : (
               <pre className="debuglog" tabIndex={0} aria-label="Serial log">

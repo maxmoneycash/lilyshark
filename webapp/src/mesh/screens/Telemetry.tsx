@@ -227,8 +227,13 @@ function DeckTrend() {
 										? "Samples arrive about every two seconds once the T-Deck is talking."
 										: metric.id === "rssi" || metric.id === "snr"
 											? "No received frame with a reported signal measurement is available."
-											: "The deck has not reported this reading yet."}
+											: "No measurements in the history."}
 								</p>
+								{link.status !== "linked" && (
+									<button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))}>
+										CONNECT
+									</button>
+								)}
 							</div>
 						)}
 						<div ref={plotDiv} className="telemetry-plot" />
@@ -725,6 +730,11 @@ export default function Telemetry() {
 										"Telemetry is saved as the connected radio reports it.",
 									)}
 								</p>
+								{link.status !== "linked" && (
+									<button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))}>
+										{t("CONNECT")}
+									</button>
+								)}
 							</div>
 						)}
 						{/* Keep the host's height independent of the canvas and legend. */}

@@ -479,6 +479,11 @@ export default function Chat({
                     ? t("Write a message below to start the conversation.")
                     : t("Connect a radio to send and receive mesh messages.")}
               </div>
+              {(!q && (s.status ?? DeviceStatus.Disconnected) < DeviceStatus.Connected && getDeviceLinkState().status !== "linked") && (
+                <button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))} style={{ alignSelf: 'center', marginTop: 16 }}>
+                  {t("CONNECT")}
+                </button>
+              )}
             </div>
           )}
           {!q && getDeviceLinkState().status === "linked" && (

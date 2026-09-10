@@ -416,6 +416,11 @@ export default function Mesh() {
 									"Connect a radio to record activity by node and hour. Each cell is one hour; a darker cell is a node that was heard more often.",
 								)}
 							</p>
+							{link.status !== "linked" && (
+								<button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))}>
+									{t("CONNECT")}
+								</button>
+							)}
 						</div>
 					) : (
 						<div
@@ -466,6 +471,11 @@ export default function Mesh() {
 								"Connect a T-Deck to hear neighbors. Neighbor Info draws the solid links; a traceroute from Nodes fills the dashed hops.",
 							)}
 						</p>
+						{link.status !== "linked" && (
+							<button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))}>
+								{t("CONNECT")}
+							</button>
+						)}
 					</div>
 				) : (
 					<div className="scroll-y mesh-graph-layout">

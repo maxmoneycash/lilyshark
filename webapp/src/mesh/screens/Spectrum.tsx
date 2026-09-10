@@ -274,6 +274,11 @@ export default function Spectrum() {
 						: linked
 							? "Start a sweep to see received power across the band. The radio pauses packet reception while scanning; each pass adds a row to the waterfall."
 							: "Connect a T-Deck over USB, then start a sweep. Follow radio activity across a spectrum trace and waterfall, with peak hold to catch brief signals."}</p>
+					{!linked && (
+						<button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))}>
+							CONNECT
+						</button>
+					)}
 				</div>}
 				<div className="spectrum-charts" aria-hidden={!latest}>
 					<canvas
