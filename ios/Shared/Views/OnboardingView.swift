@@ -37,9 +37,6 @@ struct OnboardingView: View {
         .background(MeshTheme.background)
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack {
-                progressDots
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Step \(currentPage + 1) of \(lastPage + 1)")
                 Spacer()
                 if currentPage < lastPage {
                     Button { complete() } label: {
@@ -157,17 +154,7 @@ struct OnboardingView: View {
         }
     }
 
-    private var progressDots: some View {
-        HStack(spacing: Design.Space.tight) {
-            ForEach(0...lastPage, id: \.self) { index in
-                Capsule()
-                    .fill(index == currentPage ? MeshTheme.accent : MeshTheme.textSecondary.opacity(0.28))
-                    .frame(width: index == currentPage ? 22 : 8, height: 8)
-            }
-        }
-        .meshAnimation(Design.Motion.quick, value: currentPage)
-        .accessibilityHidden(true)
-    }
+
 
     private func pageTitle(_ title: LocalizedStringKey) -> some View {
         Text(title)

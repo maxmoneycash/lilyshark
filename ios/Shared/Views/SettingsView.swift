@@ -31,7 +31,6 @@ struct SettingsView: View {
     #if !os(watchOS)
     @Environment(RFMonitorStore.self) var rfMonitorStore
     #endif
-    @AppStorage("batteryChemistry") var batteryChemistryRaw: String = BatteryChemistry.lipo.rawValue
     @AppStorage("appTheme") var appTheme: String = AppTheme.system.rawValue
     @AppStorage("maxMessagesPerContact") var maxMessagesPerContact: Int = 500
     @AppStorage("iCloudSyncEnabled") var iCloudSyncEnabled: Bool = true
@@ -661,13 +660,6 @@ struct RadioDataSection: View {
 private extension SettingsView {
     var appearanceSection: some View {
         Section {
-            Picker("Theme", selection: $appTheme) {
-                ForEach(AppTheme.allCases, id: \.rawValue) { theme in
-                    Text(theme.displayName).tag(theme.rawValue)
-                }
-            }
-            .pickerStyle(.menu)
-
             Toggle(isOn: AppStorage(wrappedValue: false, "channelsFirst").projectedValue) {
                 Label("Channels First", systemImage: "arrow.up.arrow.down")
                     .foregroundStyle(MeshTheme.accent)
@@ -675,7 +667,7 @@ private extension SettingsView {
             .tint(MeshTheme.accent)
             .listRowBackground(MeshTheme.surface)
         } header: {
-            sectionInfoHeader("Appearance", info: "Choose how Lilyshark looks. System follows your device\u{2019}s Dark Mode setting.")
+            sectionInfoHeader("Appearance", info: "Choose how Lilyshark looks.")
         }
     }
 }

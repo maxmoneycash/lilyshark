@@ -178,7 +178,8 @@ export function mountTDeck(
     renderer.setSize(width, height, false);
     const aspect = width / height;
     const tune = getTDeckTune();
-    const halfHeight = Math.max(tune.halfHeight, .048 / aspect);
+    // Use .075 instead of .048 so the antenna doesn't clip on narrow screens
+    const halfHeight = Math.max(tune.halfHeight, .075 / aspect);
     const isMobile = window.innerWidth <= 860;
     const panOffset = isMobile ? 0 : -0.22;
     const pan = -halfHeight * aspect * (tune.pan + panOffset);

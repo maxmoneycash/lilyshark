@@ -184,10 +184,10 @@ struct MeshTextFieldStyle: TextFieldStyle {
 // MARK: - Theme Modifier
 
 struct MeshThemeModifier: ViewModifier {
-    @AppStorage("appTheme") private var appTheme: String = AppTheme.system.rawValue
+    @AppStorage("appTheme") private var appTheme: String = AppTheme.light.rawValue
 
     private var selectedTheme: AppTheme {
-        AppTheme(rawValue: appTheme) ?? .system
+        AppTheme(rawValue: appTheme) ?? .light
     }
 
     func body(content: Content) -> some View {
@@ -197,50 +197,22 @@ struct MeshThemeModifier: ViewModifier {
             .dynamicTypeSize(.accessibility3)
             #endif
             .tint(MeshTheme.accent)
-            // BOTH mechanisms, deliberately.
-            //
-            // preferredColorScheme travels with the view, so anything SwiftUI
-            // presents from here -- a sheet, a popover, a full-screen cover --
-            // inherits it at the moment it is created.
-            //
-            // applyToAllWindows reaches the windows that already exist, which
-            // is what a theme CHANGE has to update; the modifier is not
-            // re-evaluated for a sheet that is already on screen.
-            //
-            // Neither alone is enough, and the gap between them was visible:
-            // applyToAllWindows only touches windows present when it runs, so
-            // a sheet presented afterwards kept the system appearance while
-            // the main window carried the override. The scanner and settings
-            // sheets came up dark over a light app, status bar and all.
             .preferredColorScheme(selectedTheme.colorScheme)
             .onAppear { applyToAllWindows() }
             .onChange(of: appTheme) { applyToAllWindows() }
     }
 
-    /// Apply theme via UIKit window override — affects all windows including sheets.
-    /// SwiftUI's `.preferredColorScheme(nil)` doesn't propagate to sheets,
-    /// but UIKit's `overrideUserInterfaceStyle = .unspecified` does.
-    /// Called synchronously on main thread (from onAppear/onChange) to avoid
-    /// race conditions when the user switches themes rapidly.
     private func applyToAllWindows() {
         let theme = selectedTheme
         #if os(iOS)
-        let style: UIUserInterfaceStyle = switch theme {
-        case .light: .light
-        case .dark: .dark
-        case .system: .unspecified
-        }
+        let style: UIUserInterfaceStyle = .light
         for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
             for window in scene.windows {
                 window.overrideUserInterfaceStyle = style
             }
         }
         #elseif os(macOS)
-        switch theme {
-        case .light: NSApp?.appearance = NSAppearance(named: .aqua)
-        case .dark: NSApp?.appearance = NSAppearance(named: .darkAqua)
-        case .system: NSApp?.appearance = nil
-        }
+        NSApp?.appearance = NSAppearance(named: .aqua)
         #endif
     }
 }
