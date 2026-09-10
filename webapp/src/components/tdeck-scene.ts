@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { clampPitch, PITCH_DRAG, REST_PITCH, REST_ROLL, REST_YAW, YAW_DRAG } from './tdeck-pose';
 import { getTDeckTune, subscribeTDeckTune } from './tdeck-tune';
 
@@ -63,34 +62,28 @@ export function mountTDeck(
   camera.lookAt(look);
   const rig = new THREE.Group();
   scene.add(rig);
-  // The approved .blend uses its scene world and three white area lights in
-  // material preview. Its saved forest studio-light selection is inactive.
+  // Clean studio lighting
   const environment = new THREE.Scene();
   environment.background = new THREE.Color().setRGB(.16 * .7, .15 * .7, .14 * .7);
   const pmrem = new THREE.PMREMGenerator(renderer);
   const environmentMap = pmrem.fromScene(environment);
   scene.environment = environmentMap.texture;
-  scene.environmentIntensity = 1.12;
+  scene.environmentIntensity = 1.0;
   pmrem.dispose();
-  RectAreaLightUniformsLib.init();
-  for (const [power, size, x, y, z, rx, ry, rz] of [
-    [1.85, .2, -.16, -.08, .26, .6757764, 0, -.8621702],
-    [1.05, .16, .2, .04, .14, .9856219, 0, 1.6814537],
-    [1.2, .16, -.06, .1, -.2, -.4844779, -Math.PI, .6435010],
-  ]) {
-    const light = new THREE.RectAreaLight(0xffffff, 1, size, size);
-    light.power = power;
-    light.position.set(x, y, z);
-    light.rotation.set(rx, ry, rz);
-    scene.add(light);
-  }
-  const key = new THREE.DirectionalLight(0xfff6ea, .85);
+  
+  const key = new THREE.DirectionalLight(0xfff6ea, 1.2);
   key.position.set(.55, .82, .48);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0xc5d8f0, .4);
-  rim.position.set(-.55, .28, .22);
+  
+  const rim = new THREE.DirectionalLight(0xc5d8f0, 0.8);
+  rim.position.set(-.55, .28, -.22);
   scene.add(rim);
-  const bounce = new THREE.HemisphereLight(0xd7e4f2, 0x1c1612, .32);
+  
+  const fill = new THREE.DirectionalLight(0xffffff, 0.4);
+  fill.position.set(0, 0, .5);
+  scene.add(fill);
+
+  const bounce = new THREE.HemisphereLight(0xd7e4f2, 0x1c1612, .4);
   scene.add(bounce);
 
   const lcdCanvas = document.createElement('canvas');
@@ -186,7 +179,9 @@ export function mountTDeck(
     const aspect = width / height;
     const tune = getTDeckTune();
     const halfHeight = Math.max(tune.halfHeight, .048 / aspect);
-    const pan = -halfHeight * aspect * tune.pan;
+    const isMobile = window.innerWidth <= 860;
+    const panOffset = isMobile ? 0 : -0.22;
+    const pan = -halfHeight * aspect * (tune.pan + panOffset);
     renderer.toneMappingExposure = tune.exposure;
     scene.environmentIntensity = tune.envIntensity;
     camera.aspect = aspect;

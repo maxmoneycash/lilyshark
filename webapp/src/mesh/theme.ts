@@ -73,6 +73,14 @@ export const THEMES = {
 		hcBg: "#000000",
 		tint: "hue-rotate(216deg) saturate(1.5)",
 	},
+	slate: {
+		fg: "#9ca3af",
+		hc: "#f3f4f6",
+		bg: "#1f2937",
+		panel: "#374151",
+		hcBg: "#111827",
+		tint: "saturate(0)",
+	},
 } as const;
 
 export type Theme = keyof typeof THEMES;
@@ -89,6 +97,7 @@ export const THEME_LABELS: Record<Theme, string> = {
 	bone: "BONE",
 	boneInverted: "INVERTED BONE",
 	violet: "VIOLET",
+	slate: "SLATE",
 };
 
 /** Light-background themes: the map filter chain and the second color flip.
