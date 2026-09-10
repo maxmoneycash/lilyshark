@@ -2426,12 +2426,7 @@ body:has(.meshterm .app.menu-open) {
 	min-height: 0;
 	width: 100%;
 	max-width: 520px;
-	max-height: 100%;
 	align-self: center;
-	overflow-y: auto;
-	overflow-x: hidden;
-	scrollbar-width: thin;
-	scrollbar-color: var(--border) transparent;
 	z-index: 10;
 	pointer-events: none;
 }
@@ -2458,17 +2453,17 @@ body:has(.meshterm .app.menu-open) {
 .meshterm .intro-head {
 	margin: 0 0 18px;
 	font-size: clamp(28px, 2.8vw, 42px);
+	letter-spacing: -0.01em;
+	line-height: 1.15;
 	font-weight: 700;
-	letter-spacing: -0.02em;
-	line-height: 1.18;
 	text-wrap: balance;
 	color: var(--ink, var(--fg));
 }
 .meshterm .intro-body {
 	margin: 0;
-	max-width: 46ch;
-	font-size: 14px;
-	line-height: 1.75;
+	font-size: 16px;
+	line-height: 1.7;
+	text-wrap: pretty;
 	color: var(--ink);
 }
 .meshterm .intro-cta {
@@ -2578,8 +2573,8 @@ body:has(.meshterm .app.menu-open) {
 @media (max-width: 860px) {
 	.meshterm .intro-stage {
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: minmax(0, auto) minmax(360px, 1fr) auto;
-		grid-template-areas: "copy" "device" "progress";
+		grid-template-rows: minmax(0, 1fr) auto;
+		grid-template-areas: "copy" "progress";
 		padding: 48px max(24px, env(safe-area-inset-right)) 12px max(24px, env(safe-area-inset-left));
 		gap: 24px;
 	}
@@ -2587,15 +2582,10 @@ body:has(.meshterm .app.menu-open) {
 		align-self: center;
 		width: 100%;
 		max-width: 560px;
-		max-height: min(48vh, 380px);
 		justify-self: center;
 	}
-	.meshterm .intro-device {
-		position: relative;
-		grid-area: device;
-	}
-	.meshterm .intro-head { font-size: 27px; margin-bottom: 12px; }
-	.meshterm .intro-body { font-size: 14px; line-height: 1.6; }
+	.meshterm .intro-head { font-size: 27px; margin-bottom: 12px; text-wrap: balance; }
+	.meshterm .intro-body { font-size: 14px; line-height: 1.6; text-wrap: pretty; }
 	.meshterm .intro-cta { margin-top: 16px; gap: 8px; }
 	.meshterm .intro-hint { margin-top: 12px; }
 	.meshterm .mesh-demo { margin-top: 14px; }
@@ -2611,7 +2601,7 @@ body:has(.meshterm .app.menu-open) {
 	.meshterm .intro-head { font-size: 22px; margin-bottom: 8px; }
 	.meshterm .intro-body { font-size: 13px; line-height: 1.55; }
 	.meshterm .intro-cta { margin-top: 12px; }
-	.meshterm .intro-copy { max-height: min(40vh, 280px); align-self: center; }
+	.meshterm .intro-copy { align-self: center; }
 	.meshterm .mesh-demo-canvas, .meshterm .mesh-demo-stage { min-height: 88px; }
 	.meshterm .mesh-demo-canvas { height: 88px; }
 }

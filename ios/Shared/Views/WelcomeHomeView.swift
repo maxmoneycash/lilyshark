@@ -1,42 +1,134 @@
 #if os(iOS) || os(macOS)
 import SwiftUI
 
-/// The disconnected home: an interactive T-Deck, a clear Connect action, and
-/// a labelled demonstration of how Meshtastic floods versus MeshCore routes.
+/// The disconnected home: an interactive T-Deck, and the narrative
+/// copy matched identically to lilyshark.com.
 struct WelcomeHomeView: View {
     @Binding var showScanner: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    @State private var capabilityIndex = 0
+    @State private var visibleSectionIndex = 0
     @State private var routingDemo = MeshRoutingDemoView.Mode.flood
+
+    struct WelcomeSection: Identifiable {
+        let id = UUID()
+        let headline: String
+        let body: String
+        let screens: [String]
+    }
+
+    let sections: [WelcomeSection] = [
+        WelcomeSection(
+            headline: "Turn a $60 handheld into a LoRa packet sniffer.",
+            body: "Lilyshark is C++ firmware that turns the LILYGO T-Deck Plus — a $60 handheld with a LoRa radio, QWERTY keyboard and GPS — into a packet sniffer and RF analyzer for off-grid mesh networks.",
+            screens: ["splash", "home"]
+        ),
+        WelcomeSection(
+            headline: "Mesh networks already carry hundreds of thousands of users.",
+            body: "Meshtastic passed 40,000 GitHub stars and an 80,000-member subreddit, with 100+ supported boards, sub-$50 entry devices, and active meshes in most major US cities. When India ordered a mesh app off GitHub during the Delhi protests, it was carrying 430,000 daily users — and stayed up.",
+            screens: ["traffic", "traffic-live", "protocols", "protocol-detail", "nodes"]
+        ),
+        WelcomeSection(
+            headline: "LoRa carries kilometers per hop, not meters.",
+            body: "Bluetooth mesh dies at 30–300 m — it works at a protest because a protest is a crowd. LoRa carries 2–15 km per hop, across a city, a county, a disaster zone; MeshCore's source routing now spans 64 hops with deterministic delivery receipts.",
+            screens: ["map", "node-detail", "survey"]
+        ),
+        WelcomeSection(
+            headline: "Flooded meshes deliver less as they grow. We measured it.",
+            body: "A LongFast channel moves about 987 bit/s and flood routing repeats everything: we measured 7.36 transmissions per delivered message, reach collapsing from 68.6% to 25.8% as the mesh grows, saturation near 6,721 nodes. Growth is exactly what breaks it.",
+            screens: ["utilization", "timeline", "timeline-live", "traffic-filter"]
+        ),
+        WelcomeSection(
+            headline: "The firmware measures everything the radio hears.",
+            body: "So we built the instrument: a live spectrum waterfall with noise floor and channel occupancy, node rosters with SNR, RSSI and hop-count history, survey mode for coverage runs, and every frame kept with its radio physics.",
+            screens: ["spectrum", "spectrum-live", "spectrum-warning"]
+        ),
+        WelcomeSection(
+            headline: "Every anomaly becomes a logged event.",
+            body: "CRC failures, profile changes, storage faults, capture starts and stops — the firmware keeps a running event log with one-line causes, and each entry opens into its own detail screen. When something went wrong in the field, you can read back exactly when and why.",
+            screens: ["events", "event-detail"]
+        ),
+        WelcomeSection(
+            headline: "Three mesh protocols, one capture engine.",
+            body: "Meshtastic, MeshCore and Reticulum share one capture engine. Each decoder claims only what it can prove from the frame: packet fields, RF measurements and decode state are separate tabs on the same packet, so interpretation never overwrites measurement.",
+            screens: ["packet-detail", "packet-live", "packet-pkt", "packet-rf", "packet-dec"]
+        ),
+        WelcomeSection(
+            headline: "Down to the last byte.",
+            body: "What a decoder cannot prove stays as raw hex with frequency, bandwidth, SF, CR, CRC state and airtime. Captures write to microSD as .lscap and export as LoRaTap PCAP — desktop Wireshark opens them.",
+            screens: ["packet-hex", "packet-hex-2", "packet-hex-3", "packet-raw"]
+        ),
+        WelcomeSection(
+            headline: "A guided first run, not a config file.",
+            body: "The device explains its tools, checks what hardware it is running on, and walks a first-time user through network and radio-profile selection before the Home screen ever appears. No companion app, no serial console, no YAML.",
+            screens: ["setup-welcome", "setup-capabilities", "setup-network", "setup-profile"]
+        ),
+        WelcomeSection(
+            headline: "It teaches its own controls.",
+            body: "The trackball, keyboard and shortcuts are taught on the device, the hardware check reports radio, storage, GPS and battery, and Help stays one keypress away. A field tool has to work where the manual is whatever the screen says.",
+            screens: ["setup-controls", "setup-ready", "device-status", "help"]
+        ),
+        WelcomeSection(
+            headline: "Every control lives on the device.",
+            body: "Radio profiles, display and input, capture and storage, setup reset — all of it adjustable from the T-Deck itself. Change a spreading factor at the trailhead without opening a laptop.",
+            screens: ["settings", "radio-profile", "display-input", "about", "reset-setup"]
+        ),
+        WelcomeSection(
+            headline: "Captures are stored on Shelby; the mesh carries an 82-byte pointer.",
+            body: "Captures are evidence, so they live in Shelby's content-addressed storage on Aptos. A radio has no uplink — it broadcasts an 82-byte pointer instead, and any connected node resolves the bytes. Radio-frequency capture meets verifiable storage for the first time.",
+            screens: ["storage"]
+        )
+    ]
 
     var body: some View {
         GeometryReader { geo in
             ScrollView {
-                VStack(alignment: .leading, spacing: Design.Space.loose) {
-                    hero(stageHeight: TDeckStage.height(
-                        in: geo.size.height,
-                        accessibility: dynamicTypeSize.isAccessibilitySize,
-                        fraction: 0.52
-                    ))
-                    header
-                        .padding(.horizontal, Design.Space.loose)
-                    connectSteps
-                        .padding(.horizontal, Design.Space.loose)
-                    capabilitiesSection
-                        .padding(.horizontal, Design.Space.loose)
-                    meshTutorial
-                        .padding(.horizontal, Design.Space.loose)
+                LazyVStack(spacing: Design.Space.section, pinnedViews: [.sectionHeaders]) {
+                    Section {
+                        // The scrolling sections
+                        ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
+                            VStack(alignment: .leading, spacing: Design.Space.snug) {
+                                Text(section.headline)
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundStyle(MeshTheme.textPrimary)
+                                
+                                Text(section.body)
+                                    .font(.subheadline)
+                                    .lineSpacing(4)
+                                    .foregroundStyle(MeshTheme.textSecondary)
+
+                                // Inject mesh demo into the routing/flooding sections
+                                if index == 2 || index == 3 {
+                                    meshTutorial
+                                        .padding(.top, Design.Space.regular)
+                                }
+                            }
+                            .padding(.horizontal, Design.Space.loose)
+                            .frame(maxWidth: 640, alignment: .leading)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Design.Space.loose)
+                            .onAppear {
+                                withMeshAnimation(reduceMotion: reduceMotion) {
+                                    visibleSectionIndex = index
+                                }
+                            }
+                        }
+                    } header: {
+                        // Pinned 3D model
+                        hero(stageHeight: TDeckStage.height(
+                            in: geo.size.height,
+                            accessibility: dynamicTypeSize.isAccessibilitySize,
+                            fraction: 0.50
+                        ))
+                        .background(MeshTheme.background)
+                    }
                 }
                 .padding(.bottom, Design.Space.section)
-                .frame(maxWidth: 640, alignment: .leading)
-                .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
-            .contentMargins(.bottom, Design.Space.regular, for: .scrollContent)
         }
         .background(MeshTheme.background)
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -58,65 +150,20 @@ struct WelcomeHomeView: View {
         }
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: Design.Space.snug) {
-            Text("Welcome to Lilyshark")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(MeshTheme.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-            Text("Off-grid messages, maps, and radio analysis. Pair a deck to begin — or explore it here first.")
-                .font(.subheadline)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: 640, alignment: .leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     // MARK: - Interactive deck hero
 
     private func hero(stageHeight: CGFloat) -> some View {
-        VStack(spacing: Design.Space.snug) {
+        let currentScreen = sections[visibleSectionIndex].screens.first ?? "home"
+        
+        return VStack(spacing: 0) {
             TDeckSceneView(
-                screenFileName: Self.capabilities[capabilityIndex].screenFileName,
+                screenFileName: currentScreen,
                 pageOnVerticalDrag: false
             )
             .frame(height: stageHeight)
             .frame(maxWidth: .infinity)
-            .padding(.top, -Design.Space.tight)
-            .task(id: reduceMotion) {
-                await autoAdvanceCapabilities()
-            }
-            Text("Drag sideways to turn the deck")
-                .font(Design.Text.label)
-                .foregroundStyle(MeshTheme.textSecondary.opacity(0.85))
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, Design.Space.loose)
-                .accessibilityHidden(true)
         }
         .accessibilityElement(children: .contain)
-    }
-
-    private func advanceCapability(by delta: Int) {
-        let count = Self.capabilities.count
-        guard count > 0 else { return }
-        withMeshAnimation(reduceMotion: reduceMotion) {
-            capabilityIndex = (capabilityIndex + delta + count) % count
-        }
-    }
-
-    /// Same idle cycling as TDeckHeroView, but it moves the capability cards
-    /// too, so the copy under the model always matches the screen on its LCD.
-    private func autoAdvanceCapabilities() async {
-        guard !reduceMotion, Self.capabilities.count > 1 else { return }
-        while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 2_400_000_000)
-            guard !Task.isCancelled else { return }
-            advanceCapability(by: 1)
-        }
     }
 
     // MARK: - Connect
@@ -125,7 +172,7 @@ struct WelcomeHomeView: View {
         Button {
             showScanner = true
         } label: {
-            Label("Connect a Deck", systemImage: "antenna.radiowaves.left.and.right")
+            Label("Connect a Radio", systemImage: "antenna.radiowaves.left.and.right")
                 .frame(maxWidth: .infinity)
                 .touchable()
         }
@@ -133,159 +180,12 @@ struct WelcomeHomeView: View {
         .foregroundStyle(MeshTheme.textOnAccent)
         .sensoryFeedback(.impact(weight: .light), trigger: showScanner)
         .accessibilityHint("Scans for nearby decks and radios")
-        .frame(maxWidth: 640)
-        .frame(maxWidth: .infinity)
-    }
-
-    private struct ConnectStep: Identifiable {
-        let number: Int
-        let symbol: String
-        let title: String
-        let detail: String
-        var id: Int { number }
-    }
-
-    private static let steps: [ConnectStep] = [
-        ConnectStep(number: 1, symbol: "power", title: "Power on the deck", detail: "Keep the deck or radio close to this device."),
-        ConnectStep(number: 2, symbol: "hand.tap", title: "Tap Connect a Deck", detail: "The scanner lists every mesh device it can hear."),
-        ConnectStep(number: 3, symbol: "lock", title: "Choose it and enter the PIN", detail: "The radio shows its PIN on its own screen."),
-    ]
-
-    private var connectSteps: some View {
-        VStack(alignment: .leading, spacing: Design.Space.snug) {
-            sectionHeader("Connect in three steps")
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: Design.Space.regular) {
-                    ForEach(Self.steps) { step in
-                        stepCard(step)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                VStack(alignment: .leading, spacing: Design.Space.regular) {
-                    ForEach(Self.steps) { step in
-                        stepCard(step)
-                    }
-                }
-            }
-        }
-    }
-
-    private func stepCard(_ step: ConnectStep) -> some View {
-        HStack(alignment: .top, spacing: Design.Space.snug) {
-            ZStack {
-                Circle()
-                    .fill(MeshTheme.accent.opacity(0.15))
-                Text(verbatim: "\(step.number)")
-                    .font(Design.Text.label.weight(.semibold))
-                    .foregroundStyle(MeshTheme.accent)
-            }
-            .frame(width: 28, height: 28)
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Design.Space.hairline) {
-                Label(step.title, systemImage: step.symbol)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(MeshTheme.textPrimary)
-                Text(step.detail)
-                    .font(Design.Text.detail)
-                    .foregroundStyle(MeshTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    // MARK: - Capabilities
-
-    private struct DeckCapability: Identifiable {
-        let screenFileName: String
-        let symbol: String
-        let title: String
-        let detail: String
-        var id: String { screenFileName }
-    }
-
-    private static let capabilities: [DeckCapability] = [
-        DeckCapability(screenFileName: "home", symbol: "bubble.left.and.bubble.right",
-                       title: "Messages",
-                       detail: "Text the mesh from the deck or the phone — no cell service needed."),
-        DeckCapability(screenFileName: "map", symbol: "map",
-                       title: "Mesh map",
-                       detail: "Positions of the nodes your radio has actually heard."),
-        DeckCapability(screenFileName: "traffic-live", symbol: "antenna.radiowaves.left.and.right",
-                       title: "Live traffic",
-                       detail: "Frames decoded as they arrive, with protocol and RF fields."),
-        DeckCapability(screenFileName: "spectrum-live", symbol: "waveform",
-                       title: "Live spectrum",
-                       detail: "A waterfall of the band: noise floor, occupancy, busy warnings."),
-        DeckCapability(screenFileName: "survey", symbol: "figure.walk",
-                       title: "Coverage survey",
-                       detail: "Capture coverage on a walk or drive to see where the mesh reaches."),
-    ]
-
-    private var capabilitiesSection: some View {
-        VStack(alignment: .leading, spacing: Design.Space.snug) {
-            sectionHeader("What it can do")
-            Text("Tap a card to see that screen on the deck above.")
-                .font(Design.Text.detail)
-                .foregroundStyle(MeshTheme.textSecondary)
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: Design.Space.snug) {
-                    ForEach(Array(Self.capabilities.enumerated()), id: \.element.id) { index, capability in
-                        capabilityCard(capability, index: index)
-                    }
-                }
-                .padding(Design.Space.hairline)
-            }
-            .scrollIndicators(.hidden)
-            .sensoryFeedback(.selection, trigger: capabilityIndex)
-        }
-    }
-
-    private func capabilityCard(_ capability: DeckCapability, index: Int) -> some View {
-        let selected = index == capabilityIndex
-        return Button {
-            withMeshAnimation(reduceMotion: reduceMotion) { capabilityIndex = index }
-        } label: {
-            VStack(alignment: .leading, spacing: Design.Space.tight) {
-                Image(systemName: capability.symbol)
-                    .font(.title3)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(selected ? MeshTheme.accent : MeshTheme.textSecondary)
-                    .accessibilityHidden(true)
-                Text(capability.title)
-                    .font(.headline)
-                    .foregroundStyle(MeshTheme.textPrimary)
-                Text(capability.detail)
-                    .font(Design.Text.detail)
-                    .foregroundStyle(MeshTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(Design.Space.regular)
-            .padding(.bottom, Design.Space.tight)
-            .frame(width: 200, alignment: .topLeading)
-            .background(
-                selected ? MeshTheme.accent.opacity(0.14) : MeshTheme.surface,
-                in: RoundedRectangle(cornerRadius: Design.Radius.card, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: Design.Radius.card, style: .continuous)
-                    .strokeBorder(selected ? MeshTheme.accent.opacity(0.35) : Color.clear, lineWidth: 1)
-            }
-            .touchable()
-        }
-        .buttonStyle(.pressable)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     // MARK: - How the mesh works
 
     private var meshTutorial: some View {
         VStack(alignment: .leading, spacing: Design.Space.snug) {
-            sectionHeader("How the mesh works")
-            Text("Two mesh stacks, two ways to move a packet. Watch the pulse:")
-                .font(.body)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
             Picker("Routing strategy", selection: $routingDemo) {
                 ForEach(MeshRoutingDemoView.Mode.allCases) { mode in
                     Text(mode.title).tag(mode)
@@ -300,45 +200,23 @@ struct WelcomeHomeView: View {
                     in: RoundedRectangle(cornerRadius: Design.Radius.card, style: .continuous)
                 )
                 .overlay(alignment: .topTrailing) {
-                    demoBadge
+                    Text("ILLUSTRATIVE DEMO")
+                        .font(Design.Text.label.weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .padding(.horizontal, Design.Space.tight)
+                        .padding(.vertical, Design.Space.hairline)
+                        .background(MeshTheme.surfaceLight, in: Capsule())
                         .padding(Design.Space.tight)
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Demonstration of \(routingDemo.accessibilitySummary)")
-            Text(routingDemo.explanation)
-                .font(Design.Text.detail)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .meshAnimation(Design.Motion.quick, value: routingDemo)
-    }
-
-    /// The demo draws simplified nodes, hop counts, and timing; the badge keeps
-    /// anyone from mistaking it for a live capture.
-    private var demoBadge: some View {
-        Text("ILLUSTRATIVE DEMO")
-            .font(Design.Text.label.weight(.semibold))
-            .tracking(1.2)
-            .foregroundStyle(MeshTheme.textSecondary)
-            .padding(.horizontal, Design.Space.tight)
-            .padding(.vertical, Design.Space.hairline)
-            .background(MeshTheme.surfaceLight, in: Capsule())
-    }
-
-    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
-        Text(title)
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(MeshTheme.textPrimary)
-            .accessibilityAddTraits(.isHeader)
     }
 }
 
 /// A packet hopping node to node for the welcome tutorial's routing demo.
-///
-/// The scene is schematic by design — seven fixed nodes, a four-second cycle,
-/// no radio math — and the host view badges it "ILLUSTRATIVE DEMO". Reduce
-/// Motion freezes it on a mid-flight frame, so the routes are still readable
-/// as a static diagram rather than disappearing.
 struct MeshRoutingDemoView: View {
     enum Mode: String, CaseIterable, Identifiable {
         case flood
@@ -350,15 +228,6 @@ struct MeshRoutingDemoView: View {
             switch self {
             case .flood: return String(localized: "Meshtastic · Flood")
             case .routed: return String(localized: "MeshCore · Routed")
-            }
-        }
-
-        var explanation: String {
-            switch self {
-            case .flood:
-                return String(localized: "Meshtastic floods: every node that hears a packet repeats it. Simple and resilient, but one message becomes many transmissions — about seven per delivered message in measured captures — and reach drops as the mesh grows.")
-            case .routed:
-                return String(localized: "MeshCore routes: the path is discovered up front, then packets follow only that route — up to 64 hops — and a delivery receipt travels back along it. Lilyshark decks speak Meshtastic; MeshCore radios also expose radio settings and remote management.")
             }
         }
 

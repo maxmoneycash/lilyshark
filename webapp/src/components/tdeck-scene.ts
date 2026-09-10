@@ -178,10 +178,10 @@ export function mountTDeck(
     renderer.setSize(width, height, false);
     const aspect = width / height;
     const tune = getTDeckTune();
-    // Use .075 instead of .048 so the antenna doesn't clip on narrow screens
-    const halfHeight = Math.max(tune.halfHeight, .075 / aspect);
+    // Use .065 so it's large enough without clipping the antenna
+    const halfHeight = Math.max(tune.halfHeight, .065 / aspect);
     const isMobile = window.innerWidth <= 860;
-    const panOffset = isMobile ? 0 : -0.22;
+    const panOffset = isMobile ? 0 : -0.35;
     const pan = -halfHeight * aspect * (tune.pan + panOffset);
     renderer.toneMappingExposure = tune.exposure;
     scene.environmentIntensity = tune.envIntensity;
@@ -299,7 +299,6 @@ export function mountTDeck(
   }
   function pointerDown(event: PointerEvent) {
     if (!ready || !event.isPrimary || event.button !== 0) return;
-    event.preventDefault();
     velYaw = 0;
     velPitch = 0;
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp, dragging: true };
@@ -308,7 +307,6 @@ export function mountTDeck(
   }
   function pointerMove(event: PointerEvent) {
     if (pointer?.id !== event.pointerId) return;
-    event.preventDefault();
     if (!pointer.dragging) {
       pointer.dragging = true;
       if (!canvas.hasPointerCapture(event.pointerId)) canvas.setPointerCapture(event.pointerId);
@@ -360,9 +358,9 @@ export function mountTDeck(
     else { cancelAnimationFrame(frame); frame = 0; }
   });
   intersection.observe(canvas);
-  canvas.style.touchAction = 'none';
-  canvas.addEventListener('pointerdown', pointerDown, { passive: false });
-  canvas.addEventListener('pointermove', pointerMove, { passive: false });
+  canvas.style.touchAction = 'pan-y';
+  canvas.addEventListener('pointerdown', pointerDown);
+  canvas.addEventListener('pointermove', pointerMove);
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
   canvas.addEventListener('lostpointercapture', release);

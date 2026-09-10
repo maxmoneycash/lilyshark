@@ -205,7 +205,7 @@ struct NativeCoverageView: View {
                         highlightedRepeaterID = nil
                         selectedCell = cellsInView.prefix(cellLimit).first { $0.bounds.contains(latitude: coordinate.latitude, longitude: coordinate.longitude) }
                     }
-                    .mapStyle(satellite ? .hybrid(elevation: .realistic) : .standard(elevation: .realistic, pointsOfInterest: .excludingAll))
+                    .mapStyle(satellite ? .hybrid(elevation: .flat) : .standard(elevation: .flat, pointsOfInterest: .excludingAll))
                     .mapControls { MapScaleView() }
                     .overlay(alignment: .bottomTrailing) {
                         VStack(spacing: Design.Space.tight) {

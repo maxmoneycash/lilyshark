@@ -628,10 +628,9 @@ struct RadioMapView: View {
                     ForEach(visibleCoveragePoints) { point in
                         MapCircle(
                             center: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude),
-                            radius: 60
+                            radius: 15
                         )
-                        .foregroundStyle(coverageColor(rssi: point.rssi).opacity(0.35))
-                        .stroke(coverageColor(rssi: point.rssi).opacity(0.6), lineWidth: 1)
+                        .foregroundStyle(coverageColor(rssi: point.rssi).opacity(0.6))
                     }
                 }
 
@@ -657,6 +656,7 @@ struct RadioMapView: View {
                 }
             }
             .mapControls { MapScaleView() }
+            .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
             .ignoresSafeArea(.container, edges: .top)
             .overlay(alignment: .bottomTrailing) {
                 VStack(spacing: Design.Space.tight) {
@@ -868,12 +868,11 @@ struct RadioMapView: View {
                         Button {
                             navigationStore.sidebarSelection = .contact(contact.publicKeyPrefix)
                         } label: {
-                            Image(systemName: contactTypeIcon(contact))
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(MeshTheme.accent)
-                                .frame(width: 24, height: 24)
-                                .background(MeshTheme.surface, in: Circle())
-                                .overlay(Circle().strokeBorder(MeshTheme.accent, lineWidth: 1.5))
+                            Circle()
+                                .fill(contactTypeColor(contact))
+                                .frame(width: 14, height: 14)
+                                .overlay(Circle().strokeBorder(MeshTheme.surface, lineWidth: 2))
+                                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
                                 .frame(minWidth: Design.minimumTouchTarget, minHeight: Design.minimumTouchTarget)
                                 .contentShape(Circle())
                         }

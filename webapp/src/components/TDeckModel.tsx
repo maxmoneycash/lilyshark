@@ -42,14 +42,6 @@ export function TDeckModel({ screen }: { screen: string }) {
 
   return (
     <div className="tdeck-model" data-state={status} data-screen={screen} aria-busy={status === 'loading'}>
-      {status === 'loading' && (
-        <div className="tdeck-model-loading" role="status">Loading the deck…</div>
-      )}
-      {status === 'fallback' && (
-        <div className="tdeck-model-fallback" role="status">
-          3D view needs WebGL.
-        </div>
-      )}
       <canvas
         ref={canvas}
         className="tdeck-model-canvas"

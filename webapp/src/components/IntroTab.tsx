@@ -33,17 +33,17 @@ const SECTIONS: Section[] = [
   {
     screens: INTRO_SCREEN_GROUPS[0],
     head: "Turn a $60 handheld into a LoRa packet sniffer.",
-    body: "Lilyshark is C++ firmware that turns the LILYGO T-Deck Plus — a $60 handheld with a LoRa radio, QWERTY keyboard and GPS — into a packet sniffer and RF analyzer for off-grid mesh networks.",
+    body: "Lilyshark is C++ firmware that turns the LILYGO T-Deck Plus into a packet sniffer and RF analyzer for off-grid mesh networks.",
   },
   {
     screens: INTRO_SCREEN_GROUPS[1],
-    head: "Mesh networks already carry hundreds of thousands of users.",
-    body: "Meshtastic passed 40,000 GitHub stars and an 80,000-member subreddit, with 100+ supported boards, sub-$50 entry devices, and active meshes in most major US cities. When India ordered a mesh app off GitHub during the Delhi protests, it was carrying 430,000 daily users — and stayed up.",
+    head: "Hundreds of thousands of users.",
+    body: "Meshtastic has 40,000 GitHub stars and active meshes in most major cities. In protests, it carried 430,000 daily users — and stayed up.",
   },
   {
     screens: INTRO_SCREEN_GROUPS[2],
-    head: "LoRa carries kilometers per hop, not meters.",
-    body: "Bluetooth mesh dies at 30–300 m — it works at a protest because a protest is a crowd. LoRa carries 2–15 km per hop, across a city, a county, a disaster zone; MeshCore's source routing now spans 64 hops with deterministic delivery receipts.",
+    head: "Kilometers per hop, not meters.",
+    body: "Bluetooth mesh dies at 30–300m. LoRa carries 2–15km per hop across cities and disaster zones. MeshCore spans 64 hops with delivery receipts.",
   },
   {
     screens: INTRO_SCREEN_GROUPS[3],
@@ -233,12 +233,6 @@ export function IntroTab({
             <div className="intro-device">
               <TDeckModel screen={screenSrc} />
             </div>
-
-            <div className="intro-progress">
-              <span>{frameIndex + 1} / {INTRO_FRAMES.length}</span>
-              <span>{copyEdges.includes('bottom') ? 'Scroll to read more' : last ? 'Scroll back to explore' : 'Scroll to explore'}</span>
-            </div>
-
           </div>
         </div>
       </div>
