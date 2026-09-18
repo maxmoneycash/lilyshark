@@ -34,13 +34,14 @@ export function IntroPhone() {
   return (
     <main className="intro-main">
       <article className="intro-page" aria-label="Lilyshark introduction">
-        <header className="intro-page-hero">
+        {/* A div, not <header>: the phone shell makes every header sticky. */}
+        <div className="intro-page-hero">
           <h1 className="intro-page-title">{lead.head}</h1>
           <p className="intro-page-lead">{lead.body}</p>
           <div className="intro-page-device">
             <TDeckModel screen={lead.screens[deviceFrame] ?? lead.screens[0]} />
           </div>
-        </header>
+        </div>
 
         {chapters.map((chapter, i) => (
           <section className="intro-page-chapter" key={chapter.head}>
