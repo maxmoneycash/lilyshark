@@ -93,8 +93,11 @@ matters.
 | [real-mesh-map-qa-2026-09-15.md](real-mesh-map-qa-2026-09-15.md) | Real MeshCore directory, source/freshness evidence, cached nodes, and encrypted offline radio browsing. |
 | [node-map-qa-2026-09-15.md](node-map-qa-2026-09-15.md) | Node/map/conversation navigation, explicit layers, position evidence, and consistent text sizing. |
 | [message-delivery-qa-2026-09-15.md](message-delivery-qa-2026-09-15.md) | Message evidence, retry details, visible actions, quote sizing, and accessibility verification. |
+| [connected-ui-qa-2026-09-14.md](connected-ui-qa-2026-09-14.md) | What the iPhone app lets people do after connecting: Mesh start tab, actions, and navigation. |
+| [native-analyzer-qa-2026-09-14.md](native-analyzer-qa-2026-09-14.md) | Native iPhone walkthrough: Spectrum Clear button, named traffic filter menus, Radio rows at large text. |
 | [strategy/hardware-offering.md](strategy/hardware-offering.md) | What a hardware offering would be. |
 | [strategy/gadgets-sh-and-custom-hardware.md](strategy/gadgets-sh-and-custom-hardware.md) | Gadget gallery plans and the direction for an original hardware product. |
+| [strategy/lilyshark-original-device-brief.md](strategy/lilyshark-original-device-brief.md) | Working proposal for a first original Lilyshark device: buyer, defining session, and what the T-Deck stays for. |
 | [strategy/premium-tier.md](strategy/premium-tier.md) | What, if anything, is worth charging for. |
 | [strategy/season-0-event.md](strategy/season-0-event.md) | The Season 0 event. |
 | [strategy/reticulum-announcement.md](strategy/reticulum-announcement.md) | Announcing Reticulum support. |
