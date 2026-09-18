@@ -206,7 +206,11 @@ export function mountTDeck(
     camera.aspect = width / height;
     camera.fov = CAMERA_FOV;
     camera.updateProjectionMatrix();
-    requestRender();
+    // setSize clears the canvas, so a resize must paint a frame now, not
+    // merely queue one that the visibility gate may drop: a layout that
+    // settles after the first frame would otherwise stay blank.
+    if (ready && !disposed && !failed) render(performance.now());
+    else requestRender();
   }
 
   function attachModel(source: THREE.Group) {

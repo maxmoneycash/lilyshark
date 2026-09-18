@@ -47,12 +47,25 @@ export function IntroTab() {
     const observer = new ResizeObserver(resize);
     resize();
     observer.observe(el);
+    // On a phone the device box is sized explicitly from what the copy
+    // leaves over (a flex-grown box gave the canvas no definite height and
+    // it painted nothing), so the copy's height is published too.
+    const copy = textRef.current;
+    const copyResize = () => {
+      if (copy) el.style.setProperty('--intro-copy-height', `${copy.offsetHeight}px`);
+    };
+    const copyObserver = new ResizeObserver(copyResize);
+    copyResize();
+    if (copy) copyObserver.observe(copy);
     // A `#intro?chapter=N` link lands on that chapter's first screen.
     const chapter = introChapterFromHash(window.location.hash);
     if (chapter !== null) {
       el.scrollTop = introSectionProgress(chapter - 1) * (el.scrollHeight - el.clientHeight);
     }
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      copyObserver.disconnect();
+    };
   }, []);
 
   const { sectionIndex: idx, screen: screenSrc } = INTRO_FRAMES[frameIndex];

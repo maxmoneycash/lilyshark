@@ -2525,9 +2525,12 @@ body:has(.meshterm .app.menu-open) {
 		max-height: none;
 		overflow: visible;
 	}
+	/* Explicit height: stage minus copy minus padding and gap (--intro-chrome).
+	   A flex-grown box left the canvas with no definite height. */
 	.meshterm .intro-device {
-		flex: 1 1 0;
-		min-height: 150px;
+		flex: 0 0 auto;
+		--intro-chrome: 50px;
+		height: clamp(150px, calc(var(--intro-height, 100dvh) - var(--intro-copy-height, 0px) - var(--intro-chrome)), 60dvh);
 		max-height: 60dvh;
 		width: 100%;
 		margin-inline: 0;
