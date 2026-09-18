@@ -10,8 +10,6 @@ import {
   introSnapTop,
 } from './intro-sequence';
 import { INTRO_SECTIONS as SECTIONS } from './intro-copy';
-import { IntroPhone } from './IntroPhone';
-import { useIsPhone } from './useIsPhone';
 
 /**
  * INTRO — the device, scroll-driven.
@@ -24,14 +22,7 @@ import { useIsPhone } from './useIsPhone';
 
 
 
-/** Phones get a page that scrolls like any other; wider screens keep the
- *  pinned device with its scroll-driven screens. */
 export function IntroTab() {
-  const phone = useIsPhone();
-  return phone ? <IntroPhone /> : <IntroPinned />;
-}
-
-function IntroPinned() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [frameIndex, setFrameIndex] = useState(0);

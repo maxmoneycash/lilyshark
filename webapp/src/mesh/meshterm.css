@@ -2504,112 +2504,46 @@ body:has(.meshterm .app.menu-open) {
 	display: none;
 }
 
-/* ── Intro on a phone ───────────────────────────────────────────────────
-   An ordinary page (IntroPhone.tsx): headline, device, then one section per
-   chapter with its firmware screens in a sideways strip. The pinned,
-   scroll-driven stage above never renders at phone widths (useIsPhone). */
-.meshterm main.intro-main {
-	display: block;
-	padding: 0;
-	gap: 0;
-	overflow: visible;
+@media (max-width: 860px) {
+	.meshterm .intro-stage {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		padding: 24px max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left));
+		gap: 24px;
+	}
+	.meshterm .intro-copy {
+		order: 2;
+		flex: 0 0 auto;
+		align-self: center;
+		width: 100%;
+		max-width: 560px;
+		max-height: 60%;
+	}
+	.meshterm .intro-device { flex: 0 1 auto; height: min(52dvh, 480px); max-height: 60%; width: 100%; margin-inline: 0; }
+	.meshterm .intro-head { font-size: clamp(20px, 5.2vw, 26px); margin-bottom: 10px; text-wrap: balance; }
+	.meshterm .intro-body { font-size: 14px; line-height: 1.55; text-wrap: pretty; }
 }
-.meshterm .intro-page {
-	box-sizing: border-box;
-	width: 100%;
-	max-width: 640px !important; /* the phone shell widens main's children */
-	margin-inline: auto;
-	padding: 28px max(20px, env(safe-area-inset-right)) 56px max(20px, env(safe-area-inset-left));
-	color: var(--ink, var(--fg));
+
+@media (max-width: 860px) and (max-height: 720px) {
+	.meshterm .intro-stage {
+		padding: 16px max(20px, env(safe-area-inset-right)) 20px max(20px, env(safe-area-inset-left));
+		gap: 16px;
+	}
+	.meshterm .intro-head { font-size: 20px; margin-bottom: 8px; }
+	.meshterm .intro-body { font-size: 13px; line-height: 1.5; }
 }
-.meshterm .intro-page-hero {
-	display: grid;
-	gap: 14px;
-}
-.meshterm .intro-page-title {
-	margin: 0;
-	font-size: clamp(28px, 8vw, 38px);
-	line-height: 1.1;
-	letter-spacing: -0.02em;
-	font-weight: 700;
-	text-wrap: balance;
-}
-.meshterm .intro-page-lead {
-	margin: 0;
-	font-size: 16px;
-	line-height: 1.6;
-	text-wrap: pretty;
-}
-.meshterm .intro-page-device {
-	position: relative;
-	width: 100%;
-	height: min(78vw, 400px);
-	margin-top: 4px;
-}
-.meshterm .intro-page-chapter {
-	display: grid;
-	gap: 10px;
-	padding-top: 44px;
-}
-.meshterm .intro-page-count {
-	margin: 0;
-	font-size: 11px;
-	letter-spacing: 2px;
-	opacity: 0.6;
-}
-.meshterm .intro-page-head {
-	margin: 0;
-	font-size: clamp(21px, 5.8vw, 26px);
-	line-height: 1.2;
-	letter-spacing: -0.01em;
-	font-weight: 700;
-	text-wrap: balance;
-}
-.meshterm .intro-page-body {
-	margin: 0;
-	font-size: 15px;
-	line-height: 1.6;
-	text-wrap: pretty;
-}
-/* The strip bleeds to the screen edges so a swipe reads as "more this way". */
-.meshterm .intro-page-screens {
-	list-style: none;
-	margin: 8px calc(-1 * max(20px, env(safe-area-inset-right))) 0 calc(-1 * max(20px, env(safe-area-inset-left)));
-	padding: 0 max(20px, env(safe-area-inset-right)) 4px max(20px, env(safe-area-inset-left));
-	display: flex;
-	gap: 12px;
-	overflow-x: auto;
-	overflow-y: hidden;
-	overscroll-behavior-x: contain;
-	scroll-snap-type: x mandatory;
-	scroll-padding-inline: max(20px, env(safe-area-inset-left));
-	-webkit-overflow-scrolling: touch;
-	scrollbar-width: none;
-}
-.meshterm .intro-page-screens::-webkit-scrollbar {
-	display: none;
-}
-.meshterm .intro-page-screen {
-	flex: 0 0 auto;
-	width: min(76vw, 320px);
-	display: grid;
-	gap: 6px;
-	scroll-snap-align: start;
-}
-.meshterm .intro-page-screen img {
-	display: block;
-	width: 100%;
-	height: auto;
-	aspect-ratio: 4 / 3;
-	border-radius: 8px;
-	border: 1px solid var(--border);
-	background: #000;
-}
-.meshterm .intro-page-caption {
-	font-size: 11px;
-	letter-spacing: 1px;
-	text-transform: uppercase;
-	opacity: 0.7;
+
+@media (max-width: 860px) and (min-width: 600px) and (max-height: 480px) {
+	.meshterm .intro-stage {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr);
+		grid-template-areas: "copy device";
+		column-gap: 24px;
+	}
+	.meshterm .intro-copy { align-self: center; max-height: 100%; }
+	.meshterm .intro-device { height: 100%; max-height: 100%; }
 }
 
 /* ── Phone map window ─────────────────────────────────────────────────────
