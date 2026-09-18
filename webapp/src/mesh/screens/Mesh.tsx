@@ -259,7 +259,7 @@ export default function Mesh() {
 	);
 
 	const tile = (label: string, value: string | number, cls = "") => (
-		<div key={label} className="panel stat-tile" style={{ minWidth: 96 }}>
+		<div key={label} className="panel stat-tile">
 			<div className="label">{label}</div>
 			<div className={`value ${cls}`} style={{ fontSize: 20 }}>
 				{value}

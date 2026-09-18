@@ -1938,6 +1938,23 @@ body:has(.meshterm .app.menu-open) {
 	max-width: 200px;
 	min-width: 0;
 }
+.meshterm .mesh-summary-values .stat-tile {
+	min-width: 96px;
+}
+/* Narrow phones: three tiles a row, and a label wraps only at a space. Four
+   a row squeezed "WITH POSITION" into "POSITIO N" at 320px. */
+@media (max-width: 560px) {
+	.meshterm .mesh-summary-values .stat-tile {
+		flex: 1 1 calc(33.333% - 7px);
+		min-width: 0;
+		max-width: none;
+	}
+	.meshterm .stat-tile .label {
+		overflow-wrap: normal;
+		word-break: keep-all;
+		hyphens: none;
+	}
+}
 
 /* MESH graph: fit the pane so names stay 12px and on-canvas; wrap the
    legend instead of shoving SOLID/DASHED off the phone; never let the
