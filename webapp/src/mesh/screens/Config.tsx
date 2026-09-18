@@ -865,7 +865,7 @@ export default function Config() {
 												className="dim"
 												htmlFor={`cfg-channel-key-${index}`}
 											>
-												PSK
+												{t("KEY")}
 											</label>
 											<input
 												id={`cfg-channel-key-${index}`}
@@ -887,7 +887,7 @@ export default function Config() {
 												aria-label={t("Generate key for channel {0}", index)}
 												onClick={() => genPsk(index)}
 											>
-												GEN
+												{t("NEW KEY")}
 											</button>
 										</div>
 									</div>
