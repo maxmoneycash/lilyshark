@@ -19,6 +19,7 @@ import MeshtasticKit
 /// Live node details and the management tools supported by its protocol.
 struct ContactDetailSheet: View {
     let contact: Contact
+    var onOpen: ((Contact) -> Void)? = nil
     @Environment(ConnectionManager.self) private var connectionManager
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(ContactStore.self) private var contactStore
@@ -29,6 +30,8 @@ struct ContactDetailSheet: View {
     #if !os(watchOS)
     @Environment(LineOfSightStore.self) private var lineOfSightStore
     @State private var showLineOfSight = false
+    @Environment(NavigationStore.self) private var navigation
+    @State private var pendingMapKey: Data?
     #endif
 
     private var currentContact: Contact {
@@ -48,9 +51,7 @@ struct ContactDetailSheet: View {
     }
 
     private var reportedPosition: ContactStore.NodePosition? {
-        if isMeshtasticNode { return contactStore.nodePositions[currentContact.publicKeyPrefix] }
-        guard currentContact.latitude != 0 || currentContact.longitude != 0 else { return nil }
-        return .init(latitude: currentContact.latitude, longitude: currentContact.longitude)
+        contactStore.reportedPosition(for: currentContact)
     }
 
     private var isTracePending: Bool {
@@ -64,6 +65,16 @@ struct ContactDetailSheet: View {
     private var isPathPending: Bool { remoteSessionManager.pendingAdvertPathKey == currentContact.publicKeyPrefix }
     private var isDiscoveryPending: Bool { remoteSessionManager.pendingPathDiscoveryKey == currentContact.publicKeyPrefix }
     private var hasPath: Bool { currentContact.outPathLen > 0 && !currentContact.outPath.isEmpty }
+
+    private var primaryAction: (title: String, icon: String)? {
+        switch currentContact.type {
+        case .chat: ("Message", "bubble.left")
+        case .room: ("Open room", "person.2")
+        case .repeater where !isMeshtasticNode && !connectionManager.isMeshtasticLinkActive:
+            ("Manage repeater", "antenna.radiowaves.left.and.right")
+        default: nil
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -101,15 +112,17 @@ struct ContactDetailSheet: View {
             #endif
         }
         .meshTheme()
+        .onDisappear {
+            #if !os(watchOS)
+            if let key = pendingMapKey {
+                pendingMapKey = nil
+                navigation.showNodeOnMap(key)
+            }
+            #endif
+        }
         .onAppear {
             remoteSessionManager.showError = { msg in
                 Task { @MainActor in self.errorMessage = msg }
-            }
-            // Auto-request status for infrastructure nodes when sheet opens
-            if !isMeshtasticNode && !connectionManager.isMeshtasticLinkActive,
-               (currentContact.type == .repeater || currentContact.type == .room || currentContact.type == .sensor),
-               remoteSessionManager.statusByContact[currentContact.publicKeyPrefix] == nil {
-                remoteSessionManager.requestStatus(for: currentContact)
             }
         }
         .alert("Network Tools", isPresented: Binding(
@@ -262,8 +275,24 @@ struct ContactDetailSheet: View {
             }
             .accessibilityElement(children: .combine)
 
+            if let onOpen, let primaryAction {
+                Button {
+                    onOpen(currentContact)
+                    dismiss()
+                } label: {
+                    Label(primaryAction.title, systemImage: primaryAction.icon)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.meshPrimary)
+            }
+            if currentContact.type == .sensor && !isMeshtasticNode && !connectionManager.isMeshtasticLinkActive {
+                actionButton("Request telemetry", icon: "chart.line.uptrend.xyaxis", pending: isTelemetryPending) {
+                    remoteSessionManager.requestTelemetry(for: currentContact)
+                }
+            }
+
             VStack(alignment: .leading, spacing: Design.Space.tight) {
-                Text("Latest report")
+                Text(isMeshtasticNode ? "Latest report" : "Last advertisement")
                     .font(.headline)
                 if isMeshtasticNode, observation == nil {
                     Text("The deck has not supplied reception details for this node.")
@@ -279,7 +308,9 @@ struct ContactDetailSheet: View {
                         receptionRows
                     }
                 }
-                Text("Signal readings describe the receiving link, which may include a relay. Missing readings do not establish a direct connection.")
+                Text(isMeshtasticNode
+                     ? "Signal readings describe the receiving link, which may include a relay. Missing readings do not establish a direct connection."
+                     : "A saved advertisement does not confirm this node is reachable now.")
                     .font(.footnote)
                     .foregroundStyle(MeshTheme.textSecondary)
             }
@@ -292,22 +323,32 @@ struct ContactDetailSheet: View {
                 Text("Last reported position")
                     .font(.headline)
                 if let position = reportedPosition {
-                    LabeledContent("Latitude", value: formatCoordinate(position.latitude))
-                    LabeledContent("Longitude", value: formatCoordinate(position.longitude))
+                    if dynamicTypeSize.isAccessibilitySize {
+                        detailRow("Latitude", value: formatCoordinate(position.latitude))
+                        detailRow("Longitude", value: formatCoordinate(position.longitude))
+                    } else {
+                        LabeledContent("Latitude", value: formatCoordinate(position.latitude))
+                        LabeledContent("Longitude", value: formatCoordinate(position.longitude))
+                    }
                     if position.viaMQTT == true {
                         Label("Position supplied over MQTT", systemImage: "network")
                             .font(.footnote)
                             .foregroundStyle(MeshTheme.textSecondary)
                     }
-                    Text("Position fix time and accuracy have not been reported.")
+                    #if !os(watchOS)
+                    Button("Show on map", systemImage: "map") {
+                        pendingMapKey = currentContact.publicKeyPrefix
+                        dismiss()
+                    }
+                    .buttonStyle(.meshSecondary)
+                    #endif
+                    Text("Position fix time and accuracy are unavailable. This may be an older location.")
                         .font(.footnote)
                         .foregroundStyle(MeshTheme.textSecondary)
                 } else {
-                    ContentUnavailableView {
-                        Label("Position Not Reported", systemImage: "location.slash")
-                    } description: {
-                        Text("A position will appear when the radio shares coordinates for this node. A name or signal reading alone cannot place it on the map.")
-                    }
+                    Label("No position shared", systemImage: "location.slash")
+                        .font(.subheadline)
+                        .foregroundStyle(MeshTheme.textSecondary)
                 }
             }
             .padding(Design.Space.regular)
@@ -319,12 +360,14 @@ struct ContactDetailSheet: View {
 
     @ViewBuilder
     private var receptionRows: some View {
-        detailRow("SNR", value: observation?.snr.map { String(format: "%.1f dB", $0) } ?? "Not reported")
-        detailRow("RSSI", value: observation?.rssi.map { "\($0) dBm" } ?? "Not reported")
-        detailRow("Hops traveled", value: observation?.hops.map { "\($0)" } ?? "Not reported")
-        detailRow("Last heard", value: lastHeardText)
+        if isMeshtasticNode {
+            detailRow("SNR", value: observation?.snr.map { String(format: "%.1f dB", $0) } ?? "Not reported")
+            detailRow("RSSI", value: observation?.rssi.map { "\($0) dBm" } ?? "Not reported")
+            detailRow("Hops traveled", value: observation?.hops.map { "\($0)" } ?? "Not reported")
+        }
+        detailRow(isMeshtasticNode ? "Last heard" : "Advertised", value: lastHeardText)
         detailRow("Source", value: sourceText)
-        detailRow("Reception path", value: provenanceText)
+        if isMeshtasticNode { detailRow("Reception path", value: provenanceText) }
     }
 
     @ViewBuilder

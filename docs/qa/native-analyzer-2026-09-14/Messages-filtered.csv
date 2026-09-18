@@ -1,0 +1,2 @@
+sequence,timestamp_us,profile,origin,synthetic,direction,crc,captured_bytes,original_bytes,frequency_hz,rssi_dbm,snr_db,payload_hex
+"4","","Reticulum","Synthetic","true","rx","valid","145","145","","","","0x4008005d431b5b6734b43ec739192e701b380800fae321c442e3c9bdcd7a3e79d850e03c7ff426530212d7d9ef21f177fd8810a9d1010b57868b8eae6cb4885da9341a43f06b8447a66e37c996f7a304cce2bcbb3477872cd1a99466c409f4713e043c0b94cb41da649780200000c40a4669656c64206e6f7465c4144865617264206f6e203931332e313235204d487a80"

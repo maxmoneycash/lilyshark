@@ -35,24 +35,32 @@ final class ContactStore {
     /// The most recently received Meshtastic report. Signal, hops and its
     /// timestamp belong to one report so a new timestamp cannot refresh an
     /// older signal reading. Missing fields remain missing.
-    struct NodeObservation: Equatable {
-        enum Source: String { case deckRecord, packet }
-        let source: Source
-        let snr: Float?
-        let rssi: Int32?
-        let hops: UInt32?
-        let lastHeard: UInt32?
-        let viaMQTT: Bool?
-    }
-
-    struct NodePosition: Equatable {
-        let latitude: Double
-        let longitude: Double
-        var viaMQTT: Bool? = nil
-    }
+    typealias NodeObservation = RadioBrowsingSnapshot.Observation
+    typealias NodePosition = RadioBrowsingSnapshot.Position
 
     var nodeObservations: [Data: NodeObservation] = [:]
     var nodePositions: [Data: NodePosition] = [:]
+
+    /// Coordinates only. General node activity is not the time of a position
+    /// fix, so callers must not use lastAdvert/lastHeard to date this position.
+    func reportedPosition(for contact: Contact) -> NodePosition? {
+        let position: NodePosition
+        #if canImport(MeshtasticKit)
+        if MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) != nil {
+            guard let reported = nodePositions[contact.publicKeyPrefix] else { return nil }
+            position = reported // Explicit field presence permits a real 0,0.
+        } else {
+            guard contact.latitude != 0 || contact.longitude != 0 else { return nil }
+            position = .init(latitude: contact.latitude, longitude: contact.longitude)
+        }
+        #else
+        guard contact.latitude != 0 || contact.longitude != 0 else { return nil }
+        position = .init(latitude: contact.latitude, longitude: contact.longitude)
+        #endif
+        guard position.latitude.isFinite, position.longitude.isFinite,
+              (-90...90).contains(position.latitude), (-180...180).contains(position.longitude) else { return nil }
+        return position
+    }
 
     @discardableResult
     func recordNodeObservation(_ observation: NodeObservation, for key: Data) -> Bool {

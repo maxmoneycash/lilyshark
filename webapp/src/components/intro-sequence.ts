@@ -1,5 +1,5 @@
-/** Original live-site sequence, restored from lilyshark.com on 2026-09-08.
- * Keep all 42 screens in their twelve narrative groups, including Home and setup. */
+/** Twelve chapters, with a shorter setup/controls tour requested on 2026-09-13.
+ * The underlying firmware screens remain available; this is the intro selection. */
 export const INTRO_SCREEN_GROUPS: readonly (readonly string[])[] = [
   ['splash', 'home'],
   ['traffic', 'traffic-live', 'protocols', 'protocol-detail', 'nodes'],
@@ -9,9 +9,9 @@ export const INTRO_SCREEN_GROUPS: readonly (readonly string[])[] = [
   ['events', 'event-detail'],
   ['packet-detail', 'packet-live', 'packet-pkt', 'packet-rf', 'packet-dec'],
   ['packet-hex', 'packet-hex-2', 'packet-hex-3', 'packet-raw'],
-  ['setup-welcome', 'setup-capabilities', 'setup-network', 'setup-profile'],
-  ['setup-controls', 'setup-ready', 'device-status', 'help'],
-  ['settings', 'radio-profile', 'display-input', 'about', 'reset-setup'],
+  ['setup-welcome', 'setup-profile'],
+  ['setup-controls'],
+  ['radio-profile'],
   ['storage'],
 ].map((screens) => screens.map((name) => `/intro/fw/${name}.png`));
 

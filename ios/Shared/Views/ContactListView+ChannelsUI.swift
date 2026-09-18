@@ -16,6 +16,12 @@ import MeshCoreKit
 
 extension ContactListView {
 
+    var primaryChannelName: String {
+        guard let channel = channelStore.channels.first(where: { $0.index == 0 }),
+              !channel.name.isEmpty else { return "Public Channel" }
+        return channel.name
+    }
+
     /// The battery an operator sees without opening anything, so it shows only
     /// what is actually known: a percentage, a bolt for external power, or
     /// nothing at all. Kept out of the connection row's body because that body
@@ -182,7 +188,7 @@ extension ContactListView {
                     .foregroundStyle(MeshTheme.accent)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("Public Channel")
+                Text(primaryChannelName)
                     .font(.body)
                     .foregroundStyle(MeshTheme.textPrimary)
                 channelMessagePreview
@@ -220,6 +226,8 @@ extension ContactListView {
                 .padding(.vertical, 2)
                 .background(MeshTheme.interactiveGreen)
                 .clipShape(Capsule())
+                .fixedSize()
+                .accessibilityLabel("\(count) unread messages")
         }
     }
 
@@ -227,10 +235,10 @@ extension ContactListView {
     var channelsSection: some View {
         Section(isExpanded: $channelsExpanded) {
             // Public channel is always the first item
-            if matchesChannel(index: 0, name: "Public Channel") {
+            if matchesChannel(index: 0, name: primaryChannelName) {
             #if os(watchOS)
             NavigationLink {
-                ChannelChatView(channelIndex: 0, channelName: "Public Channel")
+                ChannelChatView(channelIndex: 0, channelName: primaryChannelName)
             } label: {
                 publicChannelRow
             }
@@ -311,32 +319,34 @@ extension ContactListView {
                 }
                 Spacer()
                 #if !os(watchOS)
-                Menu {
-                    Button { channelSheetAction = .createPrivate } label: {
-                        Label("Create Private Channel", systemImage: "lock.fill")
-                    }
-                    Button { channelSheetAction = .hashtag } label: {
-                        Label("Join Hashtag Channel", systemImage: "number")
-                    }
-                    Button { channelSheetAction = .joinPrivate } label: {
-                        Label("Join Private Channel", systemImage: "key.fill")
-                    }
-                    Button { showImportSheet = true } label: {
-                        Label("Paste Channel Link", systemImage: "doc.on.clipboard")
-                    }
-                    if !channelStore.channels.isEmpty {
-                        Divider()
-                        Button { showShareAllChannels = true } label: {
-                            Label("Share All Channels", systemImage: "square.and.arrow.up")
+                if !connectionManager.isMeshtasticLinkActive {
+                    Menu {
+                        Button { channelSheetAction = .createPrivate } label: {
+                            Label("Create Private Channel", systemImage: "lock.fill")
                         }
+                        Button { channelSheetAction = .hashtag } label: {
+                            Label("Join Hashtag Channel", systemImage: "number")
+                        }
+                        Button { channelSheetAction = .joinPrivate } label: {
+                            Label("Join Private Channel", systemImage: "key.fill")
+                        }
+                        Button { showImportSheet = true } label: {
+                            Label("Paste Channel Link", systemImage: "doc.on.clipboard")
+                        }
+                        if !channelStore.channels.isEmpty {
+                            Divider()
+                            Button { showShareAllChannels = true } label: {
+                                Label("Share All Channels", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(MeshTheme.accent)
+                            .touchable()
                     }
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundStyle(MeshTheme.accent)
-                        .touchable()
+                    .accessibilityLabel("Add channel")
+                    .menuIndicator(.hidden)
                 }
-                .accessibilityLabel("Add channel")
-                .menuIndicator(.hidden)
                 #endif
             }
         }
@@ -378,6 +388,8 @@ extension ContactListView {
                     .padding(.vertical, 2)
                     .background(MeshTheme.interactiveGreen)
                     .clipShape(Capsule())
+                    .fixedSize()
+                    .accessibilityLabel("\(count) unread messages")
             }
         }
         .contentShape(Rectangle())

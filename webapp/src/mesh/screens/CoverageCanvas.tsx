@@ -6,7 +6,8 @@ import { clusterMapPoints } from './coverageCluster';
 import { useCoverageRadio } from './useCoverageRadio';
 import { CoverageIcon, CoverageScrollSurface } from './CoverageControls';
 import { distanceMeters, type MapPoint } from '../../lib/terrainProfile';
-import type { DirectoryRepeater } from '../../lib/communityDirectory';
+import { DIRECTORY_SOURCE, directoryRoleLabel, parseDirectorySnapshot, type DirectoryRepeater } from '../../lib/communityDirectory';
+import { readDirectoryCache, saveDirectoryCache } from '../../lib/communityDirectoryCache';
 import { fg, isLight, useThemeTick } from '../theme';
 
 const AREA_VIEWS: Record<string, { name: string; center: L.LatLngTuple; zoom: number }> = {
@@ -15,8 +16,8 @@ const AREA_VIEWS: Record<string, { name: string; center: L.LatLngTuple; zoom: nu
   sfo: { name: 'San Francisco', center: [37.7749, -122.4194], zoom: 11 },
 };
 const COLORS: Record<CoverageType, string> = { BIDIR: '#40ba83', DISC: '#38b6ca', TX: '#e3a449', RX: '#a483db', DEAD: '#858e95', DROP: '#e57575' };
-type Repeater = MapperRepeater & { directory?: boolean; frequencyMHz?: number };
-const dateLabel = (epoch?: number | null) => epoch ? new Date(epoch * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not reported';
+type Repeater = MapperRepeater & Partial<DirectoryRepeater>;
+const dateLabel = (epoch?: number | null) => epoch ? new Date(epoch * 1000).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not reported';
 const observedTypes = (mask: number) => {
   if (!Number.isSafeInteger(mask) || mask < 0) return 'Not reported';
   const bits: [number, string][] = [[1, 'Two-way'], [2, 'Transmit'], [4, 'Receive'], [8, 'Discovery'], [16, 'Dead end'], [32, 'Dropped']];
@@ -27,13 +28,17 @@ const observedTypes = (mask: number) => {
 const signalLabel = (value?: number | null) => value == null ? 'Unknown' : `${value.toFixed(1)} DB`;
 const numberLabel = (value: number) => new Intl.NumberFormat().format(value);
 
-export default function CoverageCanvas({ report, area, openSources, openRadio, serviceStatus, refreshing }: { report: MapperReport; area: string; openSources: () => void; openRadio: () => void; serviceStatus?: string; refreshing?: boolean }) {
+export interface DirectoryStatus { state: 'loading' | 'ready' | 'error'; notice: string }
+export default function CoverageCanvas({ report, area, openSources, openRadio, serviceStatus, refreshDirectory, onDirectoryChange, onDirectoryStatus }: { report: MapperReport; area: string; openSources: () => void; openRadio: () => void; serviceStatus?: string; refreshDirectory: number; onDirectoryChange: (info: { count: number; at: number }) => void; onDirectoryStatus: (status: DirectoryStatus) => void }) {
   useThemeTick();
   const light = isLight(), markerColor = fg();
   const radio = useCoverageRadio();
   const [directory, setDirectory] = useState<DirectoryRepeater[]>([]);
   const [directoryState, setDirectoryState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [directoryAttempt, setDirectoryAttempt] = useState(0);
+  const [directoryAt, setDirectoryAt] = useState<number>();
+  const [directoryNotice, setDirectoryNotice] = useState('');
+  useEffect(() => { onDirectoryStatus({ state: directoryState, notice: directoryNotice }); }, [directoryState, directoryNotice, onDirectoryStatus]);
   const [panel, setPanel] = useState<'filters' | 'repeaters'>();
   const [basemap, setBasemap] = useState<'street' | 'satellite'>('street');
   const [clusterMembers, setClusterMembers] = useState<Repeater[]>();
@@ -63,24 +68,49 @@ export default function CoverageCanvas({ report, area, openSources, openRadio, s
   const view = AREA_VIEWS[area] ?? AREA_VIEWS.oak;
   const filtered = types.length !== COVERAGE_TYPES.length || snr !== 'any' || days !== '0';
   const cells = useMemo(() => filterCoverage(report, { types, minimumSNR: snr === 'any' ? undefined : Number(snr), since: days === '0' ? undefined : Date.now() / 1000 - Number(days) * 86400 }), [report, types, snr, days]);
-  const repeaters: Repeater[] = useMemo(() => (report.repeaters ?? directory).filter(n => !search.trim() || `${n.name ?? ''} ${n.hex}`.toLowerCase().includes(search.trim().toLowerCase())), [report, directory, search]);
+  const repeaters: Repeater[] = useMemo(() => directory.filter(n => !search.trim() || `${n.name ?? ''} ${n.hex}`.toLowerCase().includes(search.trim().toLowerCase())), [directory, search]);
   const visibleIDs = useMemo(() => new Set(visibleRepeaters.map(repeaterID)), [visibleRepeaters]);
-  const listedRepeaters = clusterMembers ?? (search.trim() ? [...visibleRepeaters, ...repeaters.filter(node => !visibleIDs.has(repeaterID(node)))] : visibleRepeaters);
+  const hasSearch = !!search.trim();
+  const listedRepeaters = useMemo(() => clusterMembers ?? (hasSearch ? [...visibleRepeaters, ...repeaters.filter(node => !visibleIDs.has(repeaterID(node)))] : visibleRepeaters), [clusterMembers, hasSearch, visibleRepeaters, repeaters, visibleIDs]);
   const counts = useMemo(() => Object.fromEntries(COVERAGE_TYPES.map(type => [type, cells.filter(c => c.coverage_type === type).length])), [cells]);
   useEffect(() => { if ((selected || selectedRepeater) && keyboardSelection.current) detailClose.current?.focus({ preventScroll: true }); }, [selected, selectedRepeater]);
 
   useEffect(() => {
     const controller = new AbortController();
+    let cancelled = false;
+    let hasSavedPositions = false;
+    const timeout = setTimeout(() => controller.abort(), 30_000);
     setDirectoryState('loading');
-    fetch('/api/mesh-directory', { signal: controller.signal }).then(async response => {
+    setDirectoryNotice('');
+    void (async () => {
+      const saved = await readDirectoryCache();
+      if (cancelled) return;
+      if (saved) {
+        hasSavedPositions = saved.nodes.length > 0;
+        setDirectory(saved.nodes); setDirectoryAt(saved.at);
+        onDirectoryChange({ count: saved.nodes.length, at: saved.at });
+        if (!directoryAttempt && !refreshDirectory && Date.now() - saved.at < 300_000) {
+          setDirectoryState('ready'); return;
+        }
+      }
+      const response = await fetch('/api/mesh-directory', { signal: controller.signal });
       if (!response.ok) throw new Error('directory');
-      const body = await response.json() as { nodes: DirectoryRepeater[] };
-      if (!Array.isArray(body.nodes)) throw new Error('directory');
-      setDirectory(body.nodes.filter(n => typeof n.hex === 'string' && validCoordinates(n.lat, n.lon)));
-      setDirectoryState('ready');
-    }).catch(() => { if (!controller.signal.aborted) setDirectoryState('error'); });
-    return () => controller.abort();
-  }, [directoryAttempt]);
+      const snapshot = parseDirectorySnapshot(await response.json());
+      if (cancelled) return;
+      setDirectory(snapshot.nodes); setDirectoryAt(snapshot.at); setDirectoryState('ready');
+      onDirectoryChange({ count: snapshot.nodes.length, at: snapshot.at });
+      const stored = await saveDirectoryCache(snapshot);
+      if (!cancelled && !stored) setDirectoryNotice('Positions could not be saved in this browser.');
+    })().catch(() => {
+      if (!cancelled) {
+        setDirectoryState('error');
+        setDirectoryNotice(hasSavedPositions
+          ? 'Directory refresh failed. Saved positions remain available.'
+          : 'Public nodes could not be loaded. Check your connection and retry.');
+      }
+    }).finally(() => clearTimeout(timeout));
+    return () => { cancelled = true; clearTimeout(timeout); controller.abort(); };
+  }, [directoryAttempt, refreshDirectory, onDirectoryChange]);
 
   useEffect(() => {
     if (!div.current) return;
@@ -200,7 +230,7 @@ export default function CoverageCanvas({ report, area, openSources, openRadio, s
         if (group.length > 1) {
           const size = group.length < 10 ? 22 : group.length < 100 ? 24 : 28;
           const active = selectedRepeater && group.some(node => repeaterID(node) === repeaterID(selectedRepeater));
-          L.marker([lat, lon], { bubblingMouseEvents: true, title: `${group.length} repeaters. ${instance.getZoom() >= 19 ? 'Show cluster members' : 'Zoom in to explore'}`, icon: L.divIcon({ className: `coverage-cluster${active ? ' is-selected' : ''}`, html: `<span class="coverage-cluster-face" style="width:${size}px;height:${size}px">${group.length}</span>`, iconSize: [44, 44], iconAnchor: [22, 22] }) }).on('click', () => {
+          L.marker([lat, lon], { bubblingMouseEvents: true, title: `${group.length} nodes. ${instance.getZoom() >= 19 ? 'Show cluster members' : 'Zoom in to explore'}`, icon: L.divIcon({ className: `coverage-cluster${active ? ' is-selected' : ''}`, html: `<span class="coverage-cluster-face" style="width:${size}px;height:${size}px">${group.length}</span>`, iconSize: [44, 44], iconAnchor: [22, 22] }) }).on('click', () => {
             if (measuringRef.current) return;
             setSelected(undefined); setSelectedRepeater(undefined); setTerrainOpen(false);
             if (instance.getZoom() >= 19) { setClusterMembers([...group]); setPanel('repeaters'); }
@@ -210,7 +240,7 @@ export default function CoverageCanvas({ report, area, openSources, openRadio, s
           const node = group[0];
           const label = document.createElement('span'); label.textContent = node.name ?? node.hex;
           const active = selectedRepeater && repeaterID(node) === repeaterID(selectedRepeater);
-          L.marker([lat, lon], { bubblingMouseEvents: true, title: node.name || 'Unnamed repeater', zIndexOffset: active ? 500 : 0, icon: L.divIcon({ className: `coverage-repeater${active ? ' is-selected' : ''}`, html: '<span class="coverage-repeater-face"></span>', iconSize: [44, 44], iconAnchor: [22, 22] }) })
+          L.marker([lat, lon], { bubblingMouseEvents: true, title: node.name || 'Unnamed node', zIndexOffset: active ? 500 : 0, icon: L.divIcon({ className: `coverage-repeater${active ? ' is-selected' : ''}`, html: '<span class="coverage-repeater-face"></span>', iconSize: [44, 44], iconAnchor: [22, 22] }) })
             .bindTooltip(label).on('click', (event: L.LeafletMouseEvent) => { if (!measuringRef.current) { keyboardSelection.current = event.originalEvent instanceof KeyboardEvent; setSelectedRepeater(node); setSelected(undefined); setTerrainOpen(false); setPanel(undefined); } }).addTo(layer);
         }
       }
@@ -242,24 +272,24 @@ export default function CoverageCanvas({ report, area, openSources, openRadio, s
   };
   return <div className="saved-coverage">
     <div className={`coverage-map-stage ${measuring ? 'is-measuring' : ''}`} data-detail={!!(selected || selectedRepeater || terrainOpen)}>
-      <div ref={div} className="saved-coverage-canvas" aria-label="Community coverage and repeater map" />
+      <div ref={div} className="saved-coverage-canvas" aria-label="MeshCore public nodes and community coverage" />
       <div className="coverage-explorer coverage-surface">
         <h1 className="coverage-sr-only">Explore the mesh</h1>
-        <div className="coverage-search-row"><CoverageIcon name="search" /><input aria-label="Find repeater" type="search" placeholder="Find a repeater" value={search} onFocus={() => openPanel('repeaters')} onChange={event => { setSearch(event.target.value); openPanel('repeaters'); }} /><button ref={filterControl} className={`coverage-icon-button ${panel === 'filters' || filtered ? 'is-selected' : ''}`} aria-label="Coverage filters" aria-expanded={panel === 'filters'} onClick={() => panel === 'filters' ? setPanel(undefined) : openPanel('filters')}><CoverageIcon name="filter" />{filtered && <span className="coverage-filter-dot" />}</button></div>
-        <div className="coverage-summary"><button onClick={() => panel === 'repeaters' ? setPanel(undefined) : openPanel('repeaters')} aria-expanded={panel === 'repeaters'}><span className="coverage-repeater-dot" />{numberLabel(visibleRepeaters.length)} in view<CoverageIcon name="arrow" /></button><button className="coverage-summary-source" onClick={openSources} title={hasCoverage ? `${numberLabel(visibleCount)} survey cells in view` : serviceStatus || 'Directory positions. Connect a survey feed for measured coverage.'}>{hasCoverage ? 'Survey' : directoryState === 'loading' ? 'Loading…' : 'Directory'}<CoverageIcon name="data" /></button></div>
+        <div className="coverage-search-row"><CoverageIcon name="search" /><input aria-label="Find node" type="search" placeholder="Find a node" value={search} onFocus={() => openPanel('repeaters')} onChange={event => { setSearch(event.target.value); openPanel('repeaters'); }} /><button ref={filterControl} className={`coverage-icon-button ${panel === 'filters' || filtered ? 'is-selected' : ''}`} aria-label="Coverage filters" aria-expanded={panel === 'filters'} onClick={() => panel === 'filters' ? setPanel(undefined) : openPanel('filters')}><CoverageIcon name="filter" />{filtered && <span className="coverage-filter-dot" />}</button></div>
+        <div className="coverage-summary"><button onClick={() => panel === 'repeaters' ? setPanel(undefined) : openPanel('repeaters')} aria-expanded={panel === 'repeaters'}><span className="coverage-repeater-dot" />{numberLabel(visibleRepeaters.length)} in view<CoverageIcon name="arrow" /></button><button className="coverage-summary-source" onClick={openSources} title={hasCoverage ? `${numberLabel(visibleCount)} survey cells in view` : serviceStatus || 'Directory positions. Connect a survey feed for measured coverage.'}>{directoryState === 'loading' ? 'Loading…' : 'MeshCore'}<CoverageIcon name="data" /></button></div>
         {panel === 'filters' && <CoverageScrollSurface label="Coverage filters" className="coverage-explorer-scroll">
           <div className="coverage-panel-heading"><h2>Coverage filters</h2><button className="coverage-icon-button" aria-label="Close filters" onClick={() => setPanel(undefined)}><CoverageIcon name="close" /></button></div>
           <div className="coverage-filter-options"><fieldset disabled={!hasCoverage}><legend>Observation type</legend><div className="coverage-type-options">{COVERAGE_TYPES.map(type => <button key={type} aria-pressed={types.includes(type)} className={types.includes(type) ? 'is-selected' : ''} onClick={() => setTypes(value => value.includes(type) ? value.filter(t => t !== type) : [...value, type])}><i style={{ background: COLORS[type] }} />{COVERAGE_LABELS[type]}<span>{counts[type] ?? 0}</span></button>)}</div></fieldset>
             <div className="coverage-filter-selects"><label>Minimum SNR<select value={snr} disabled={!hasCoverage} onChange={event => setSNR(event.target.value)}><option value="any">Any signal</option><option value="-10">−10 DB</option><option value="0">0 DB</option><option value="10">10 DB</option></select></label><label>Observed within<select value={days} disabled={!hasCoverage} onChange={event => setDays(event.target.value)}><option value="0">All time</option><option value="1">24 hours</option><option value="7">7 days</option><option value="30">30 days</option></select></label></div>
-            <label className="coverage-switch"><span>Repeater pins</span><input type="checkbox" checked={showRepeaters} onChange={event => setShowRepeaters(event.target.checked)} /></label>
+            <label className="coverage-switch"><span>Node pins</span><input type="checkbox" checked={showRepeaters} onChange={event => setShowRepeaters(event.target.checked)} /></label>
             {!hasCoverage && <p className="coverage-secondary">Coverage filters become available when a survey feed is connected.</p>}
             <button className="coverage-text-button" onClick={resetFilters}>Reset filters</button>
           </div>
         </CoverageScrollSurface>}
-        {panel === 'repeaters' && <CoverageScrollSurface label="Repeater search results" className="coverage-explorer-scroll">
-          <div className="coverage-panel-heading"><h2>{clusterMembers ? `${numberLabel(clusterMembers.length)} at this location` : search.trim() ? `${numberLabel(repeaters.length)} matches worldwide` : 'Repeaters in view'}</h2><button className="coverage-icon-button" aria-label="Close repeater list" onClick={() => setPanel(undefined)}><CoverageIcon name="close" /></button></div>
-          {listedRepeaters.slice(0, 50).map(node => <button className="coverage-repeater-row" key={repeaterID(node)} onClick={event => selectRepeater(node, event.detail === 0)}><span className="coverage-node-symbol"><CoverageIcon name="radio" /></span><span><strong>{node.name || 'Unnamed repeater'}</strong><small>{node.enabled === 2 ? 'Ambiguous identity' : `${node.hex.slice(0, 12).toUpperCase()}${node.hex.length > 12 ? '…' : ''}`}{!validCoordinates(node.lat, node.lon) ? ' · No position' : ''}</small></span><CoverageIcon name="arrow" /></button>)}
-          {!listedRepeaters.length && <div className="coverage-list-empty"><strong>{directoryState === 'loading' ? 'Loading repeaters' : 'No repeaters found'}</strong><p>{search.trim() ? 'Try a shorter name or public key.' : 'Zoom out or move the map to explore another area.'}</p></div>}
+        {panel === 'repeaters' && <CoverageScrollSurface label="Node search results" className="coverage-explorer-scroll">
+          <div className="coverage-panel-heading"><h2>{clusterMembers ? `${numberLabel(clusterMembers.length)} at this location` : search.trim() ? `${numberLabel(repeaters.length)} matches worldwide` : 'Nodes in view'}</h2><button className="coverage-icon-button" aria-label="Close node list" onClick={() => setPanel(undefined)}><CoverageIcon name="close" /></button></div>
+          {listedRepeaters.slice(0, 50).map(node => <button className="coverage-repeater-row" key={repeaterID(node)} onClick={event => selectRepeater(node, event.detail === 0)}><span className="coverage-node-symbol"><CoverageIcon name="radio" /></span><span><strong>{node.name || 'Unnamed node'}</strong><small>{directoryRoleLabel(node.type)} · {node.hex.slice(0, 12).toUpperCase()}…{!validCoordinates(node.lat, node.lon) ? ' · No position' : ''}</small></span><CoverageIcon name="arrow" /></button>)}
+          {!listedRepeaters.length && <div className="coverage-list-empty"><strong>{directoryState === 'loading' ? 'Loading nodes' : 'No nodes found'}</strong><p>{search.trim() ? 'Try a shorter name or public key.' : 'Zoom out or move the map to explore another area.'}</p></div>}
           {listedRepeaters.length > 50 && <p className="coverage-list-footnote">Showing 50 of {numberLabel(listedRepeaters.length)}. Search by name to narrow the list.</p>}
         </CoverageScrollSurface>}
       </div>
@@ -268,20 +298,38 @@ export default function CoverageCanvas({ report, area, openSources, openRadio, s
         <div className="coverage-tool-group coverage-surface coverage-zoom-tools"><button className="coverage-icon-button" aria-label="Zoom in" onClick={() => map.current?.zoomIn()}><CoverageIcon name="plus" /></button><button className="coverage-icon-button" aria-label="Zoom out" onClick={() => map.current?.zoomOut()}><CoverageIcon name="minus" /></button></div>
       </div>
       {!!measurement.length || measuring ? <div className="coverage-measure-summary coverage-surface" role="status"><span className="coverage-node-symbol"><CoverageIcon name="measure" /></span><div><strong>{measurement.length === 2 ? `${(distanceMeters(measurement[0], measurement[1]) / 1000).toFixed(2)} KM` : `Choose point ${measurement.length ? 'B' : 'A'}`}</strong><small>{measurement.length === 2 ? 'Straight-line distance' : 'Click or tap anywhere on the map'}</small></div>{measurement.length === 2 && <button onClick={() => { closeDetail(); setPanel(undefined); setTerrainOpen(value => !value); }} aria-expanded={terrainOpen}><CoverageIcon name="terrain" />Terrain</button>}<button className="coverage-icon-button" aria-label="Clear measurement" onClick={clearMeasurement}><CoverageIcon name="close" /></button></div> : null}
-      {(selected || selectedRepeater) && <section className="coverage-detail coverage-surface" aria-label={selected ? 'Coverage cell details' : 'Repeater details'}>
-        <div className="coverage-detail-heading"><span className="coverage-eyebrow">{selected ? 'SURVEY OBSERVATION' : 'REPEATER'}</span><button ref={detailClose} className="coverage-icon-button" aria-label="Close detail" onClick={() => closeDetail()}><CoverageIcon name="close" /></button></div>
+      {(selected || selectedRepeater) && <section className="coverage-detail coverage-surface" aria-label={selected ? 'Coverage cell details' : 'Node details'}>
+        <div className="coverage-detail-heading"><span className="coverage-eyebrow">{selected ? 'SURVEY OBSERVATION' : directoryRoleLabel(selectedRepeater?.type).toUpperCase()}</span><button ref={detailClose} className="coverage-icon-button" aria-label="Close detail" onClick={() => closeDetail()}><CoverageIcon name="close" /></button></div>
         <CoverageScrollSurface label="Map detail" className="coverage-detail-scroll">
-          {selectedRepeater && <><h2>{selectedRepeater.name || 'Unnamed repeater'}</h2><p className="coverage-detail-meta">{selectedRepeater.frequencyMHz != null && <span>{selectedRepeater.frequencyMHz.toFixed(3)} MHZ · </span>}Last reported {dateLabel(selectedRepeater.last_heard)}</p><p className="coverage-secondary">{selectedRepeater.directory ? 'Directory position. Reception by your radio is unconfirmed.' : 'Community observation. Reception by your radio is unconfirmed.'}</p><details className="coverage-detail-disclosure"><summary>Details</summary><p className="coverage-identity">{selectedRepeater.hex}</p><dl className="coverage-detail-facts"><dt>Position</dt><dd>{validCoordinates(selectedRepeater.lat, selectedRepeater.lon) ? `${selectedRepeater.lat!.toFixed(5)}, ${selectedRepeater.lon!.toFixed(5)}` : 'Not reported'}</dd>{selectedRepeater.advert_bytes != null && <><dt>Path ID width</dt><dd>{selectedRepeater.advert_bytes} {selectedRepeater.advert_bytes === 1 ? 'byte' : 'bytes'}</dd></>}{selectedRepeater.enabled === 2 && <><dt>Identity</dt><dd>Ambiguous public-key prefix</dd></>}</dl></details><button className="coverage-detail-action" disabled={!validCoordinates(selectedRepeater.lat, selectedRepeater.lon)} onClick={() => { setMeasurement([{ lat: selectedRepeater.lat!, lon: selectedRepeater.lon! }]); setMeasuring(true); closeDetail(); }}><CoverageIcon name="measure" />Measure from here</button></>}
+          {selectedRepeater && <>
+            <h2>{selectedRepeater.name || 'Unnamed node'}</h2>
+            <p className="coverage-detail-meta">{directoryRoleLabel(selectedRepeater.type)}
+              {selectedRepeater.frequencyMHz != null && ` · ${selectedRepeater.frequencyMHz.toFixed(3)} MHz`}</p>
+            <p className="coverage-secondary">Published MeshCore position. Reception by your radio is unconfirmed.</p>
+            <dl className="coverage-detail-facts">
+              <dt>Advertisement</dt><dd>{dateLabel(selectedRepeater.last_heard)}</dd>
+              <dt>Record updated</dt><dd>{dateLabel(selectedRepeater.updatedAt)}</dd>
+              <dt>Source</dt><dd>MeshCore public directory{selectedRepeater.source ? ` · ${selectedRepeater.source}` : ''}</dd>
+            </dl>
+            <details className="coverage-detail-disclosure"><summary>Identity and position</summary>
+              <p className="coverage-identity">{selectedRepeater.hex}</p>
+              <p>{selectedRepeater.lat!.toFixed(5)}, {selectedRepeater.lon!.toFixed(5)}</p>
+              <a href={`${DIRECTORY_SOURCE}?public_key=${selectedRepeater.hex}`} target="_blank" rel="noreferrer">View source record</a>
+            </details>
+            <button className="coverage-detail-action" onClick={() => { setMeasurement([{ lat: selectedRepeater.lat!, lon: selectedRepeater.lon! }]); setMeasuring(true); closeDetail(); }}><CoverageIcon name="measure" />Measure from here</button>
+          </>}
           {selected && <><h2><i className="coverage-status-dot" style={{ background: COLORS[selected.coverage_type as CoverageType] ?? '#858e95' }} />{COVERAGE_LABELS[selected.coverage_type as CoverageType] ?? 'Other observation'}</h2><p className="coverage-detail-meta">Observed {dateLabel(selected.timestamp)}</p><div className="coverage-cell-metrics"><div><strong>{selected.count == null ? '—' : numberLabel(selected.count)}</strong><span>Samples</span></div><div><strong>{signalLabel(selected.snr)}</strong><span>Average SNR</span></div></div>{selected.status_mask != null && <p className="coverage-secondary">Observed types: {observedTypes(selected.status_mask)}</p>}<details className="coverage-detail-disclosure"><summary>Details</summary><p className="coverage-identity">Cell {selected.grid_id}</p><dl className="coverage-detail-facts"><dt>SNR range</dt><dd>{signalLabel(selected.snr_min)} / {signalLabel(selected.snr_max)}</dd><dt>Noise above floor</dt><dd>{signalLabel(selected.noise)}</dd><dt>Quality</dt><dd>{selected.effective == null ? 'Unknown' : `${selected.effective} / 3`}</dd><dt>First seen</dt><dd>{dateLabel(selected.first_seen)}</dd></dl></details><p className="coverage-secondary">Cell summary. Individual packet routes are not included.</p></>}
 
         </CoverageScrollSurface>
       </section>}
       {terrainOpen && measurement.length === 2 && <CoverageTerrainPanel points={measurement} close={() => setTerrainOpen(false)} />}
 
-      {(tileError || (directoryState === 'error' && !hasCoverage)) && <div className="coverage-map-error coverage-surface" role="status"><span>{tileError ? 'Some map tiles could not load. Try switching the map layer.' : 'The repeater directory is unavailable.'}</span>{directoryState === 'error' && <button onClick={() => setDirectoryAttempt(value => value + 1)}>Retry</button>}</div>}
+      {(tileError || directoryState === 'error' || directoryNotice) && <div className="coverage-map-error coverage-surface" role="status">
+        <span>{tileError ? 'Some map tiles could not load. Try switching the map layer.' : directory.length ? directoryNotice : 'The MeshCore directory could not be loaded.'}</span>
+        {directoryState === 'error' && <button onClick={() => setDirectoryAttempt(value => value + 1)}>Retry directory</button>}
+      </div>}
       {hasCoverage && !cells.length && <div className="coverage-empty-filters coverage-surface" role="status"><strong>No matching coverage</strong><span>Try a wider time or signal range.</span><button onClick={resetFilters}>Reset filters</button></div>}
-      {!hasCoverage && !refreshing && directoryState === 'ready' && <div className="coverage-empty-filters coverage-surface" role="status"><strong>No surveyed coverage</strong><span>Repeater pins are directory positions, not measured cells.</span><button onClick={openSources}>Map data</button></div>}
     </div>
-    <div className="coverage-map-footer"><span className="coverage-provenance">{hasCoverage ? `Saved survey · ${dateLabel(report.generated_at)}` : 'Directory · coverage unmeasured'}{usingFallback ? ' · Basic map' : ''}</span>{hasCoverage && <div className="coverage-legend" aria-label="Coverage legend">{COVERAGE_TYPES.filter(type => counts[type] > 0).map(type => <span key={type}><i style={{ background: COLORS[type] }} />{COVERAGE_LABELS[type]}</span>)}{cells.some(cell => !COVERAGE_TYPES.includes(cell.coverage_type as CoverageType)) && <span><i style={{ background: "#858e95" }} />Other</span>}</div>}{visibleCount > 800 && <span>Zoom in to show all {numberLabel(visibleCount)} cells.</span>}</div>
+    <div className="coverage-map-footer"><span className="coverage-provenance">{directoryAt ? `${numberLabel(directory.length)} published nodes · Downloaded ${dateLabel(directoryAt / 1000)}` : 'MeshCore public directory'}{usingFallback ? ' · Basic map' : ''}</span>{hasCoverage && <div className="coverage-legend" aria-label="Coverage legend">{COVERAGE_TYPES.filter(type => counts[type] > 0).map(type => <span key={type}><i style={{ background: COLORS[type] }} />{COVERAGE_LABELS[type]}</span>)}{cells.some(cell => !COVERAGE_TYPES.includes(cell.coverage_type as CoverageType)) && <span><i style={{ background: "#858e95" }} />Other</span>}</div>}{visibleCount > 800 && <span>Zoom in to show all {numberLabel(visibleCount)} cells.</span>}</div>
   </div>;
 }

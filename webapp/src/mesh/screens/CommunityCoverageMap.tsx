@@ -2,9 +2,10 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { type CoverageCache, type MapperReport, parseCoverage, refreshCoverage, refreshCoverageFromService, SHARED_COVERAGE_FINGERPRINT } from '../../lib/meshmapper';
 import { sendAdvert } from '../radio';
 import { useCoverageRadio } from './useCoverageRadio';
-import CoverageCanvas from './CoverageCanvas';
+import CoverageCanvas, { type DirectoryStatus } from './CoverageCanvas';
 import { CoverageIcon } from './CoverageControls';
 import './community-coverage.css';
+import { DIRECTORY_SOURCE } from '../../lib/communityDirectory';
 
 const CACHE_KEY = 'lilyshark.meshmapper.coverage.v1';
 function restoreCache(): CoverageCache | undefined {
@@ -17,30 +18,21 @@ function restoreCache(): CoverageCache | undefined {
 }
 const EMPTY: MapperReport = { success: true, region: 'OAK', region_name: 'Oakland', generated_at: 0, data_age_seconds: null, grid_squares: [] };
 export default function CommunityCoverageMap({ children, focusNode }: { children: ReactNode; focusNode?: number }) {
-  const [mode, setMode] = useState<'coverage' | 'radio'>('radio');
+  const [mode, setMode] = useState<'coverage' | 'radio'>(focusNode === undefined ? 'coverage' : 'radio');
   const [area, setArea] = useState('oak');
   const [panel, setPanel] = useState<'sources' | 'radio'>();
-  const [visitedRadio, setVisitedRadio] = useState(true);
+  const [visitedRadio, setVisitedRadio] = useState(focusNode !== undefined);
   useEffect(() => { if (mode === 'radio') setVisitedRadio(true); }, [mode]);
   const [key, setKey] = useState('');
   const [cache, setCache] = useState<CoverageCache | undefined>(restoreCache);
   const [error, setError] = useState('');
   const [fetching, setFetching] = useState(false);
-  const initialCache = useRef(cache);
+  const [directoryInfo, setDirectoryInfo] = useState<{ count: number; at: number }>();
+  const [refreshDirectory, setRefreshDirectory] = useState(0);
+  const [directoryStatus, setDirectoryStatus] = useState<DirectoryStatus>({ state: 'loading', notice: '' });
   const requestGeneration = useRef(0);
-  useEffect(() => {
-    let active = true;
-    const generation = ++requestGeneration.current;
-    setFetching(true);
-    void refreshCoverageFromService(initialCache.current).then(result => {
-      if (!active || generation !== requestGeneration.current) return;
-      setCache(result.cache); setError(result.error ?? '');
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify(result.cache)); } catch { /* The map can still show the in-memory snapshot. */ }
-    }).finally(() => {
-      if (active && generation === requestGeneration.current) setFetching(false);
-    });
-    return () => { active = false; };
-  }, []);
+  // Surveys are an optional feed. Browsing public nodes needs no survey request.
+  useEffect(() => () => { requestGeneration.current += 1; }, []);
   const busy = useRef(false);
   const [now, setNow] = useState(Date.now);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -69,23 +61,30 @@ export default function CommunityCoverageMap({ children, focusNode }: { children
       <div ref={tabs} className="coverage-tabs" role="tablist" aria-label="Map source" onKeyDown={event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
-        const next = event.key === 'Home' ? 'radio' : event.key === 'End' ? 'coverage' : mode === 'radio' ? 'coverage' : 'radio';
+        const next = event.key === 'Home' ? 'coverage' : event.key === 'End' ? 'radio' : mode === 'radio' ? 'coverage' : 'radio';
         setMode(next);
         tabs.current?.querySelector<HTMLButtonElement>(`#map-tab-${next}`)?.focus();
       }}>
+        <button id="map-tab-coverage" className="coverage-tab" role="tab" aria-controls="map-panel-coverage" aria-selected={mode === 'coverage'} tabIndex={mode === 'coverage' ? 0 : -1} onClick={() => setMode('coverage')}>MeshCore</button>
         <button id="map-tab-radio" className="coverage-tab" role="tab" aria-controls="map-panel-radio" aria-selected={mode === 'radio'} tabIndex={mode === 'radio' ? 0 : -1} onClick={() => setMode('radio')}>My mesh</button>
-        <button id="map-tab-coverage" className="coverage-tab" role="tab" aria-controls="map-panel-coverage" aria-selected={mode === 'coverage'} tabIndex={mode === 'coverage' ? 0 : -1} onClick={() => setMode('coverage')}>Coverage</button>
       </div>
       <div className="coverage-actions"><button aria-label="My radio" title="My radio" onClick={() => setPanel('radio')}><CoverageIcon name="radio" /><span>My radio</span></button><button aria-label="Map data" title="Map data" onClick={() => setPanel('sources')}><CoverageIcon name="data" /><span>Map data</span></button></div>
     </div>
     <div id="map-panel-radio" className="coverage-mode" role="tabpanel" aria-labelledby="map-tab-radio" hidden={mode !== 'radio'}>{visitedRadio && children}</div>
-    <div id="map-panel-coverage" className="coverage-mode" role="tabpanel" aria-labelledby="map-tab-coverage" hidden={mode !== 'coverage'}><CoverageCanvas report={cache?.report ?? EMPTY} area={area} openSources={() => setPanel('sources')} openRadio={() => setPanel('radio')} serviceStatus={fetching ? 'Refreshing survey data…' : 'Regional survey feed not connected'} refreshing={fetching} /></div>
+    <div id="map-panel-coverage" className="coverage-mode" role="tabpanel" aria-labelledby="map-tab-coverage" hidden={mode !== 'coverage'}><CoverageCanvas report={cache?.report ?? EMPTY} area={area} openSources={() => setPanel('sources')} openRadio={() => setPanel('radio')} serviceStatus={fetching ? 'Refreshing survey data…' : 'Regional survey feed not connected'} refreshDirectory={refreshDirectory} onDirectoryChange={setDirectoryInfo} onDirectoryStatus={setDirectoryStatus} /></div>
     <dialog ref={dialog} className="coverage-dialog" onCancel={() => setPanel(undefined)} onClose={() => setPanel(undefined)} aria-labelledby="coverage-dialog-title">
       <div className="coverage-dialog-heading"><h2 id="coverage-dialog-title">{panel === 'radio' ? 'My radio' : 'Map data'}</h2><button className="coverage-icon-button" aria-label="Close map settings" onClick={() => setPanel(undefined)}><CoverageIcon name="close" /></button></div>
       {panel === 'radio' ? <RadioVisibility /> : <div className="coverage-settings">
+        <h3>MeshCore public directory</h3>
+        <p>Published contacts, repeaters, rooms, and sensors with reported positions.</p>
+        {directoryInfo && <dl className="coverage-facts"><dt>Nodes</dt><dd>{directoryInfo.count.toLocaleString()}</dd><dt>Downloaded</dt><dd>{new Date(directoryInfo.at).toLocaleString()}</dd></dl>}
+        <a href={DIRECTORY_SOURCE} target="_blank" rel="noreferrer">Official MeshCore map</a>
+        <button disabled={directoryStatus.state === 'loading'} onClick={() => setRefreshDirectory(value => value + 1)}>{directoryStatus.state === 'loading' ? 'REFRESHING NODES…' : 'REFRESH NODES'}</button>
+        {directoryStatus.notice && <p className="coverage-note" role="status">{directoryStatus.notice}</p>}
+        <p className="coverage-note">Downloaded positions are saved in this browser. Offline basemap areas are not downloaded. Public listing does not establish reception by your radio or current availability.</p>
         <label>Map area<select value={area} onChange={e => setArea(e.target.value)}><option value="oak">Oakland</option><option value="baus">San Francisco Bay Area</option><option value="sfo">San Francisco</option></select></label>
         <h3>Regional survey</h3>
-        <p>Measured coverage appears automatically when your regional feed is available. Saved observations remain on this device between sessions.</p>
+        <p>Refresh to load measured coverage from an available regional feed. Saved observations remain on this device between sessions.</p>
         <button disabled={fetching || !!(cache && now < cache.nextAllowed) || !!(cache && cache.fingerprint !== SHARED_COVERAGE_FINGERPRINT && !key.trim())} onClick={() => void refresh()}>{fetching ? 'REFRESHING…' : 'REFRESH SURVEY'}</button>
         {cache && now < cache.nextAllowed && <p className="coverage-note">Next refresh after {new Date(cache.nextAllowed).toLocaleTimeString()}. Refreshes are at least 15 minutes apart.</p>}
         {error && <p className="coverage-note" role="status">{error}</p>}
@@ -98,7 +97,7 @@ export default function CommunityCoverageMap({ children, focusNode }: { children
         </form></details>
         {cache?.report && <button disabled={fetching} onClick={() => { requestGeneration.current += 1; setCache(undefined); setKey(''); setError(''); try { localStorage.removeItem(CACHE_KEY); } catch { /* no persisted cache */ } }}>REMOVE SAVED SURVEY</button>}
         <h3>What’s on the map</h3>
-        {cache?.report ? <dl className="coverage-facts"><dt>Region</dt><dd>{cache.report.region_name}</dd><dt>Snapshot</dt><dd>{new Date(cache.report.generated_at * 1000).toLocaleString()}</dd><dt>Grid cells</dt><dd>{cache.report.grid_squares.length}</dd></dl> : <p>The public repeater directory is available without a coverage key. Directory pins do not represent surveyed coverage.</p>}
+        {cache?.report ? <dl className="coverage-facts"><dt>Region</dt><dd>{cache.report.region_name}</dd><dt>Snapshot</dt><dd>{new Date(cache.report.generated_at * 1000).toLocaleString()}</dd><dt>Grid cells</dt><dd>{cache.report.grid_squares.length}</dd></dl> : <p>The public node directory is available without a coverage key. Directory pins do not represent surveyed coverage.</p>}
         <p>My mesh shows contacts and the connected radio with reported positions. Phone position, radio position, and community coverage are separate measurements.</p>
       </div>}
     </dialog>

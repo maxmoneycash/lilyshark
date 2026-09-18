@@ -81,10 +81,10 @@ final class ChannelStore {
     /// instead. Without it the broadcast thread exists in the message store
     /// with nothing in the UI to open it.
     func seedPrimaryChannelForDeck() {
+        hasCompletedInitialChannelSync = true
         guard !channels.contains(where: { $0.index == 0 }) else { return }
         // Flags zero is what makes index 0 read as the open public channel.
         channels.insert(MeshChannel(index: 0, name: "Primary", flags: 0), at: 0)
-        hasCompletedInitialChannelSync = true
     }
 
     // MARK: - Channel Notification Modes

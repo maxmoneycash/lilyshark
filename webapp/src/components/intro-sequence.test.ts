@@ -12,9 +12,9 @@ import {
   introSnapTop,
 } from './intro-sequence.ts';
 
-test('the tour preserves the deployed twelve chapters and all 42 firmware screens', () => {
+test('the tour keeps twelve chapters with a concise setup and controls selection', () => {
   assert.equal(INTRO_SCREEN_GROUPS.length, 12);
-  assert.equal(INTRO_FRAMES.length, 42);
+  assert.equal(INTRO_FRAMES.length, 33);
   assert.equal(INTRO_VIEWPORTS, 12);
   const screens = INTRO_FRAMES.map((frame) => frame.screen);
   assert.deepEqual(screens, [
@@ -26,15 +26,15 @@ test('the tour preserves the deployed twelve chapters and all 42 firmware screen
     'events', 'event-detail',
     'packet-detail', 'packet-live', 'packet-pkt', 'packet-rf', 'packet-dec',
     'packet-hex', 'packet-hex-2', 'packet-hex-3', 'packet-raw',
-    'setup-welcome', 'setup-capabilities', 'setup-network', 'setup-profile',
-    'setup-controls', 'setup-ready', 'device-status', 'help',
-    'settings', 'radio-profile', 'display-input', 'about', 'reset-setup',
+    'setup-welcome', 'setup-profile',
+    'setup-controls',
+    'radio-profile',
     'storage',
   ].map(name => `/intro/fw/${name}.png`));
   for (const screen of screens) {
     assert.equal(existsSync(new URL(`../../public${screen}`, import.meta.url)), true, screen);
   }
-  assert.deepEqual(INTRO_SECTION_STARTS, [0, 2, 7, 10, 14, 17, 19, 24, 28, 32, 36, 41]);
+  assert.deepEqual(INTRO_SECTION_STARTS, [0, 2, 7, 10, 14, 17, 19, 24, 28, 30, 31, 32]);
 });
 
 test('every stop selects its intended frame at desktop and mobile viewport sizes', () => {

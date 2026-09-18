@@ -8,7 +8,7 @@ USB CDC only. This document specifies the Bluetooth Low Energy carrier for
 the *same* protocol, so that field use can be one-handed and cable-free.
 
 Nothing in the LSK protocol itself changes. Same `LSK HELLO` handshake, same
-`LSK ID` / `LSK T` / `LSK F` / `LSK P` / `LSK OK` / `LSK ERR` lines, same
+`LSK ID` / `LSK T` / `LSK F` / `LSK S` / `LSK P` / `LSK OK` / `LSK ERR` lines, same
 JSON bodies. Only the pipe changes.
 
 ## What exists today
@@ -20,12 +20,14 @@ JSON bodies. Only the pipe changes.
   shares the handshake, reboot tolerance and retry budget in
   `webapp/src/lib/deviceLink.ts` with the Web Serial path. Covered by
   `webapp/src/lib/bleTransport.test.ts` against faked GATT objects.
-- **Firmware:** nothing. `src/sim_main.cpp` drains `Serial` in `loop()` and
-  writes every LSK line with `Serial.printf`. The `t-deck` PlatformIO
-  environment pulls in no BLE stack (`platformio.ini` `lib_deps` is LVGL,
-  TFT_eSPI, TinyGPSPlus, RadioLib), and no `NimBLE`, `BLEDevice`,
-  `BLEServer`, `BLECharacteristic` or `esp_ble_*` symbol appears anywhere in
-  `src/` or `include/`.
+- **Firmware:** the separate LSK analyzer service specified here is absent.
+  `src/sim_main.cpp` drains `Serial` in `loop()` and writes LSK lines to USB.
+  The firmware already has a **Meshtastic BLE service** in
+  `src/device/tdeck_ble.cpp`, using the ESP32 BLE stack. That service carries
+  Meshtastic protobuf traffic; it is not the LSK byte stream or these UUIDs.
+- **Native Mac app:** USB spectrum scans and traffic recording use
+  `MeshtasticKit`'s LSK serial transport. This does not add LSK BLE to the
+  firmware or enable live analyzer recording on iOS.
 - **UI:** the connect sheet shows the Bluetooth option as unavailable and
   says the firmware does not support it yet, rather than offering a button
   that would always time out.

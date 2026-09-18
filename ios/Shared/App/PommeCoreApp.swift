@@ -138,6 +138,12 @@ struct PommeCoreApp: App {
                 viewModel.messageStoreManager.updateAppBadge()
                 viewModel.connectionManager.reconnectWiFiIfNeeded()
             }
+            if newPhase == .background {
+                viewModel.messageStoreManager.flushDirtyMessages()
+                if let snapshot = viewModel.makeRadioBrowsingSnapshot() {
+                    viewModel.persistRadioBrowsingSnapshot(snapshot)
+                }
+            }
             if newPhase == .background && appLock.appLockEnabled {
                 appLock.isUnlocked = false
             }
@@ -247,15 +253,16 @@ struct ContentView: View {
     @State private var hasRequestedAutoScan = false
     /// Bridged from OnboardingView's "Open Settings Now" button.
     @AppStorage("openSettingsAfterOnboarding") private var openSettingsAfterOnboarding = false
-    #if os(iOS) && !targetEnvironment(macCatalyst)
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
 
     var body: some View {
         #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
+        #if LILYSHARK_UI_MESH_FIXTURE
+        appNavigation
+        #else
         // Exercise the production Messages routes without startup services,
         // auto-scan, external URL handlers, or the other app sections.
         messagesNavigation
+        #endif
         #elseif os(watchOS)
         NavigationStack {
             ContactListView(showScanner: $showScanner)
@@ -445,9 +452,22 @@ struct ContentView: View {
         #if os(iOS) && !targetEnvironment(macCatalyst)
         @Bindable var navigation = navigationStore
         TabView(selection: $navigation.section) {
-            Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: AppSection.messages) {
-                messagesRoot
+            Tab("Mesh", systemImage: "point.3.connected.trianglepath.dotted", value: AppSection.mesh) {
+                NavigationStack {
+                    if connectionManager.connectionState == .disconnected
+                        && contactStore.contacts.isEmpty
+                        && messageStoreManager.messagesByContact.isEmpty {
+                        WelcomeHomeView(showScanner: $showScanner)
+                            .lilysharkNavigationTitle()
+                    } else {
+                        MeshHomeView()
+                    }
+                }.id(navigation.radioSessionGeneration)
             }
+            Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: AppSection.messages) {
+                messagesNavigation.id(navigation.radioSessionGeneration)
+            }
+            .badge(messageStoreManager.unreadCounts.values.reduce(0, +))
             Tab("Map", systemImage: "map", value: AppSection.map) {
                 NavigationStack { MeshMapView() }
             }
@@ -459,51 +479,9 @@ struct ContentView: View {
             }
         }
         #else
-        messagesRoot
-        #endif
-    }
-
-    /// Phone portrait lands on the guided welcome instead of an empty list.
-    @ViewBuilder
-    private var messagesRoot: some View {
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        if showsDisconnectedWelcome {
-            NavigationStack {
-                WelcomeHomeView(showScanner: $showScanner)
-                    .lilysharkNavigationTitle()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            NavigationLink {
-                                ContactListView(
-                                    showScanner: $showScanner,
-                                    showDiscover: $showDiscover,
-                                    showSettings: $showSettings,
-                                    showRemoteManagement: $showRemoteManagement,
-                                    showAdvertSent: $showAdvertSent
-                                )
-                            } label: {
-                                Image(systemName: "bubble.left.and.bubble.right")
-                            }
-                            .accessibilityLabel("Conversations")
-                            .accessibilityHint("Open the contact list without connecting")
-                        }
-                    }
-            }
-        } else {
-            messagesNavigation
-        }
-        #else
         messagesNavigation
         #endif
     }
-
-    #if os(iOS) && !targetEnvironment(macCatalyst)
-    private var showsDisconnectedWelcome: Bool {
-        horizontalSizeClass == .compact
-            && connectionManager.connectionState == .disconnected
-            && navigationStore.sidebarSelection == nil
-    }
-    #endif
 
     private var messagesNavigation: some View {
         NavigationSplitView {
@@ -524,7 +502,7 @@ struct ContentView: View {
         } detail: {
             switch navigationStore.sidebarSelection {
             case .publicChannel:
-                ChannelChatView(channelIndex: 0, channelName: "Public Channel")
+                ChannelChatView(channelIndex: 0, channelName: channelStore.channels.first { $0.index == 0 }?.name ?? "Public Channel")
                     .id(0)
             case .channel(let chIdx):
                 if let channel = channelStore.channels.first(where: { $0.index == chIdx }) {

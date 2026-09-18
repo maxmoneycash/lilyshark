@@ -6,12 +6,13 @@ import {
 	useSyncExternalStore,
 } from "react";
 import { activityGrid } from "../activityGrid";
+import { useDeviceLink } from "../../lib/deviceLink";
 import { loadActivity, loadAllTraceroutes, loadNeighbors } from "../db";
-import { demoNeighbors } from "../demo";
+import { demoNeighbors, isDemo } from "../demo";
 import { ago, dateTime } from "../fmt";
 import { t } from "../i18n";
 import { buildEdges, type Edge, edgeKey as key, summarize } from "../mesh";
-import { getSnapshot, subscribe } from "../store";
+import { DeviceStatus, getSnapshot, subscribe } from "../store";
 import { accent, fg, useThemeTick } from "../theme";
 import "./radio-analysis.css";
 
@@ -134,6 +135,9 @@ const H = 800;
 
 export default function Mesh() {
 	const s = useSyncExternalStore(subscribe, getSnapshot);
+	const link = useDeviceLink();
+	const connected = link.status === "linked" || (s.status ?? DeviceStatus.Disconnected) >= DeviceStatus.Connected;
+	const demo = isDemo();
 	// the SVG uses fg()/accent(), which no CSS var repaints
 	useThemeTick();
 	const [neighbors, setNeighbors] = useState<
@@ -271,7 +275,8 @@ export default function Mesh() {
 	return (
 		<main className="mesh-screen" style={{ flexDirection: "column" }}>
 			<div className="panel mesh-summary" style={{ flexShrink: 0 }}>
-				<div className="panel-title">{t("SUMMARY // MESH")}</div>
+				<div className="panel-title">{t("SUMMARY // MESH")}{demo && " · DEMO"}</div>
+				{demo && <p className="mesh-source-note">Sample nodes and links. Connect a radio to see your mesh. Activity shows only locally recorded sightings.</p>}
 				<div
 					className="mesh-summary-values"
 					style={{
@@ -355,7 +360,7 @@ export default function Mesh() {
 				</div>
 			</div>
 
-			<div className="panel mesh-topology" style={{ flex: 1, minWidth: 0 }}>
+			<div className="panel mesh-topology" data-empty={view === "activity" ? grid.rows.length === 0 : ids.length === 0}>
 				<div className="panel-title mesh-topology-toolbar">
 					<span className="mesh-toolbar-cluster">
 						<button
@@ -412,11 +417,13 @@ export default function Mesh() {
 						<div className="mesh-empty" role="status">
 							<h2>{t("No sightings in this range.")}</h2>
 							<p>
-								{t(
-									"Connect a radio to record activity by node and hour. Each cell is one hour; a darker cell is a node that was heard more often.",
-								)}
+								{demo
+									? "The sample mesh has no recorded activity history. Connect a radio to start collecting sightings, or explore the sample links in Graph."
+									: connected
+										? "No sightings were saved in this time range. Keep the radio connected to collect activity, or choose a wider range."
+										: "Connect a radio to record activity by node and hour. Each cell shows how often a node was heard."}
 							</p>
-							{link.status !== "linked" && (
+							{!connected && (
 								<button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))}>
 									{t("CONNECT")}
 								</button>
@@ -471,7 +478,7 @@ export default function Mesh() {
 								"Connect a T-Deck to hear neighbors. Neighbor Info draws the solid links; a traceroute from Nodes fills the dashed hops.",
 							)}
 						</p>
-						{link.status !== "linked" && (
+						{!connected && (
 							<button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))}>
 								{t("CONNECT")}
 							</button>
@@ -642,7 +649,7 @@ export default function Mesh() {
 					</div>
 				)}
 
-				<div className="panel-foot mesh-legend">
+				{(view === "graph" ? ids.length > 0 : grid.rows.length > 0) && <div className="panel-foot mesh-legend">
 					{view === "graph" ? (
 						<>
 							{ids.length > 0 && edges.length === 0 && (
@@ -657,7 +664,7 @@ export default function Mesh() {
 					) : (
 						<span>{t("ONE CELL = ONE HOUR")}</span>
 					)}
-				</div>
+				</div>}
 			</div>
 		</main>
 	);

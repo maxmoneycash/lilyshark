@@ -3,7 +3,9 @@ import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 import { mountTDeck, preloadTDeck, type TDeckViewer } from './tdeck-scene';
 import './tdeck-model.css';
 
-preloadTDeck();
+// The mounted viewer reports load failures; preloading alone must not reject
+// unhandled when a different tab is open.
+preloadTDeck().catch(() => undefined);
 
 /** A single persistent scene: scrolling changes the LCD, never the model. */
 export function TDeckModel({ screen }: { screen: string }) {
@@ -50,6 +52,8 @@ export function TDeckModel({ screen }: { screen: string }) {
         tabIndex={status === 'ready' ? 0 : -1}
         aria-hidden={status !== 'ready'}
       />
+      {status === 'loading' && <span className="tdeck-model-loading" role="status">Loading 3D device…</span>}
+      {status === 'fallback' && <span className="tdeck-model-fallback" role="status">3D preview unavailable.</span>}
     </div>
   );
 }

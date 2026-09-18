@@ -18,8 +18,9 @@ struct NativeCoverageView: View {
     @State private var selectionCamera: MapCameraPosition?
     @State private var pendingSearchSelection: CoverageRepeaterPoint?
     @State private var showRadio = false
-    @State private var directory: [InternetMapNode] = []
-    @State private var directoryError: String?
+    @State private var directoryService = MeshMapService.shared
+    private var directory: [InternetMapNode] { directoryService.nodes }
+    private var directoryError: String? { directoryService.lastFetchError }
     @State private var loadingDirectory = true
     @State private var selectedGroup: CoverageRepeaterGroup?
     @State private var showCells = false
@@ -60,26 +61,67 @@ struct NativeCoverageView: View {
     }
     private var areaName: String { area == "baus" ? "Bay Area" : area == "sfo" ? "San Francisco" : "Oakland" }
     private var directoryRepeaters: [InternetMapNode] {
-        directory.filter { $0.type == 2 || $0.type == 3 }
+        directory.filter { (1...4).contains($0.type) }
     }
-    private var searchableDirectory: [InternetMapNode] {
-        let origin = region?.center ?? CLLocationCoordinate2D(latitude: 37.8044, longitude: -122.2712)
-        return directoryRepeaters.filter {
-            search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.publicKey.localizedCaseInsensitiveContains(search)
-        }.sorted {
-            let a = MKMapPoint(CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude))
-            let b = MKMapPoint(CLLocationCoordinate2D(latitude: $1.latitude, longitude: $1.longitude))
-            return a.distance(to: MKMapPoint(origin)) < b.distance(to: MKMapPoint(origin))
-        }
+    @State private var searchableDirectory: [InternetMapNode] = []
+    @State private var searchingDirectory = false
+    private struct SearchRequest: Equatable, Sendable {
+        let presented: Bool
+        let query: String
+        let latitude: Double
+        let longitude: Double
+        let downloaded: Date
+    }
+    private var directorySearchRequest: SearchRequest {
+        SearchRequest(presented: showRepeaters, query: search.trimmingCharacters(in: .whitespacesAndNewlines),
+            latitude: region?.center.latitude ?? 37.8044, longitude: region?.center.longitude ?? -122.2712,
+            downloaded: directoryService.lastFetch)
+    }
+    private func searchDirectory() async {
+        let request = directorySearchRequest
+        guard request.presented else { return }
+        searchingDirectory = true
+        do {
+            try await Task.sleep(for: .milliseconds(150))
+            let records = directoryRepeaters
+            let results: [InternetMapNode] = await Task.detached(priority: .userInitiated) { () -> [InternetMapNode] in
+                let origin = MKMapPoint(CLLocationCoordinate2D(latitude: request.latitude, longitude: request.longitude))
+                var ranked: [(node: InternetMapNode, distance: Double)] = []
+                for node in records {
+                    guard request.query.isEmpty || node.name.localizedCaseInsensitiveContains(request.query)
+                        || node.publicKey.localizedCaseInsensitiveContains(request.query) else { continue }
+                    let point = MKMapPoint(CLLocationCoordinate2D(latitude: node.latitude, longitude: node.longitude))
+                    ranked.append((node, point.distance(to: origin)))
+                }
+                ranked.sort { left, right in
+                    if left.distance == right.distance { return left.node.publicKey < right.node.publicKey }
+                    return left.distance < right.distance
+                }
+                return ranked.prefix(100).map { $0.node }
+            }.value
+            try Task.checkCancellation()
+            searchableDirectory = results
+            searchingDirectory = false
+        } catch { /* A newer search owns the results and loading state. */ }
     }
     /// Every visible repeater is represented. Dense areas collapse into tappable groups;
     /// there is no arbitrary first-150 cut-off that makes radios disappear.
-    private func repeaterGroups(_ points: [CoverageRepeaterPoint], in proxy: MapProxy) -> [CoverageRepeaterGroup] {
-        guard showRepeaterPins, let region else { return [] }
+    private func repeaterGroups(_ points: [CoverageRepeaterPoint], size: CGSize) -> [CoverageRepeaterGroup] {
+        guard showRepeaterPins, let region, size.width > 0, size.height > 0 else { return [] }
+        func longitudeOffset(_ longitude: Double) -> Double {
+            (longitude - region.center.longitude + 540).truncatingRemainder(dividingBy: 360) - 180
+        }
+        let north = MKMapPoint(CLLocationCoordinate2D(latitude: min(85, region.center.latitude + region.span.latitudeDelta / 2), longitude: region.center.longitude)).y
+        let south = MKMapPoint(CLLocationCoordinate2D(latitude: max(-85, region.center.latitude - region.span.latitudeDelta / 2), longitude: region.center.longitude)).y
+        func screenPoint(_ coordinate: CLLocationCoordinate2D) -> CGPoint {
+            let y = MKMapPoint(coordinate).y
+            return CGPoint(x: longitudeOffset(coordinate.longitude) / max(region.span.longitudeDelta, 0.000001) * size.width,
+                           y: (y - north) / max(abs(south - north), 0.000001) * size.height)
+        }
         let cellSize = max(max(region.span.latitudeDelta, region.span.longitudeDelta) * 0.13, 0.00001)
         let visible = points.filter {
             abs($0.coordinate.latitude - region.center.latitude) <= region.span.latitudeDelta / 2 &&
-            abs($0.coordinate.longitude - region.center.longitude) <= region.span.longitudeDelta / 2
+            abs(longitudeOffset($0.coordinate.longitude)) <= region.span.longitudeDelta / 2
         }
         let grouped = Dictionary(grouping: visible) {
             "\(Int(floor($0.coordinate.latitude / cellSize))):\(Int(floor($0.coordinate.longitude / cellSize)))"
@@ -90,20 +132,18 @@ struct NativeCoverageView: View {
         }.sorted { $0.id < $1.id }
 
         // Bucket boundaries can leave neighboring centroids almost coincident.
-        // Merge in the map's actual screen projection, including camera rotation,
-        // until every marker has a full touch target and a little breathing room.
+        // Use the visible region and view size: MapProxy conversion can return
+        // coincident points while a newly created MapKit view is still laying out.
+        // A rotated region conservatively groups more nodes to keep targets apart.
         let spacing = Design.minimumTouchTarget + Design.Space.tight
         var changed = true
         while changed {
             changed = false
             var merged: [CoverageRepeaterGroup] = []
             for cluster in clusters {
-                guard let center = proxy.convert(cluster.coordinate, to: .local) else {
-                    merged.append(cluster)
-                    continue
-                }
+                let center = screenPoint(cluster.coordinate)
                 if let index = merged.firstIndex(where: { other in
-                    guard let point = proxy.convert(other.coordinate, to: .local) else { return false }
+                    let point = screenPoint(other.coordinate)
                     return hypot(point.x - center.x, point.y - center.y) < spacing
                 }) {
                     let members = (merged[index].points + cluster.points).sorted { $0.id < $1.id }
@@ -133,18 +173,19 @@ struct NativeCoverageView: View {
         let lineCoordinates = measurement
         let measuredPoints = measurementPoints
         let highlightedID = highlightedRepeaterID
-        let pins = (store.report?.repeaters).map { $0.compactMap(CoverageRepeaterPoint.init) }
-            ?? directoryRepeaters.map(CoverageRepeaterPoint.init)
+        let pins = directoryRepeaters.map(CoverageRepeaterPoint.init)
         ZStack {
             Group {
-                MapReader { proxy in
+                GeometryReader { geometry in
+                  MapReader { proxy in
+                    let groups = repeaterGroups(pins, size: geometry.size)
                     Map(position: $camera, scope: mapScope) {
                         ForEach(Array(cellsInView.prefix(cellLimit))) { cell in
                             MapPolygon(coordinates: corners(cell.bounds))
                                 .foregroundStyle(color(cell.fillColor).opacity(0.5))
                                 .stroke(color(cell.borderColor), lineWidth: 0.5)
                         }
-                        ForEach(repeaterGroups(pins, in: proxy)) { group in
+                        ForEach(groups) { group in
                             Annotation(group.points.count == 1 ? group.points[0].name : "", coordinate: group.coordinate) {
                                 Button {
                                     if measuring { addMeasurementPoint(group.coordinate) }
@@ -158,8 +199,8 @@ struct NativeCoverageView: View {
                                     CoverageRepeaterMarker(count: group.points.count, ambiguous: group.points.contains { $0.ambiguous }, selected: group.points.contains { $0.id == highlightedID })
                                 }
                                 .buttonStyle(.meshPlain)
-                                .accessibilityLabel(group.points.count == 1 ? "Repeater \(group.points[0].name)" : "\(group.points.count) repeaters in this area")
-                                .accessibilityHint(measuring ? "Adds this location to the measurement" : "Opens repeater details")
+                                .accessibilityLabel(group.points.count == 1 ? "Node \(group.points[0].name)" : "\(group.points.count) nodes in this area")
+                                .accessibilityHint(measuring ? "Adds this location to the measurement" : "Opens node details")
                             }.annotationTitles(.hidden)
                         }
                         if lineCoordinates.count == 2 {
@@ -193,7 +234,7 @@ struct NativeCoverageView: View {
                     // MapKit can retain removed or newly added annotation branches.
                     // Reconcile the map when the measurement structure changes; the
                     // camera binding preserves the user’s chosen view.
-                    .id(measurement.count)
+                    .id("\(measurement.count)-\(directoryService.lastFetch.timeIntervalSince1970)")
                     .onMapCameraChange(frequency: .onEnd) { region = $0.region }
                     .accessibilityIdentifier("coverage-native-map")
                     .onTapGesture { point in
@@ -236,6 +277,7 @@ struct NativeCoverageView: View {
                         }
                     }
                 }
+                  }
                 .ignoresSafeArea(.container, edges: .top)
             }
         }
@@ -254,11 +296,10 @@ struct NativeCoverageView: View {
             loadingDirectory = true
             async let refresh: Void = store.refresh()
             await MeshMapService.shared.fetchIfNeeded()
-            directory = MeshMapService.shared.nodes
-            directoryError = MeshMapService.shared.lastFetchError
             loadingDirectory = false
             await refresh
         }
+        .task(id: directorySearchRequest) { await searchDirectory() }
         .onChange(of: area) { centerOnArea() }
         .onChange(of: store.report?.generatedAt) { if store.report != nil { fitReport() } }
         .sheet(item: $selectedGroup, onDismiss: restoreSelectionCamera) { group in
@@ -270,7 +311,7 @@ struct NativeCoverageView: View {
                                 repeaterSummary(point)
                             } label: { repeaterRow(point) }
                         }
-                    } header: { Text("\(group.points.count) repeaters in this area") }
+                    } header: { Text("\(group.points.count) nodes in this area") }
                     Button("Zoom to this area", systemImage: "plus.magnifyingglass") {
                         selectionCamera = nil
                         zoom(to: group)
@@ -332,22 +373,6 @@ struct NativeCoverageView: View {
         .sheet(isPresented: $showRepeaters, onDismiss: openPendingSearchSelection) {
             NavigationStack {
                 List {
-                  ForEach(repeaters) { node in
-                    Button {
-                        guard let point = CoverageRepeaterPoint(node) else { return }
-                        chooseSearchResult(point)
-                    } label: {
-                        VStack(alignment: .leading) {
-                            Text(node.name ?? "Unnamed repeater").foregroundStyle(MeshTheme.textPrimary)
-                            Text("\(node.hex)\(node.isAmbiguous ? " · Ambiguous ID" : "")\(node.hasPosition ? "" : " · No position")")
-                                .font(.caption).foregroundStyle(MeshTheme.textSecondary)
-                        }
-                    }.disabled(!node.hasPosition)
-                  }
-                  if store.report?.repeaters != nil && repeaters.isEmpty {
-                    ContentUnavailableView.search(text: search)
-                  }
-                  if store.report?.repeaters == nil {
                     Section("Public directory") {
                       ForEach(Array(searchableDirectory.prefix(100))) { node in
                         Button { chooseSearchResult(CoverageRepeaterPoint(node)) } label: {
@@ -361,13 +386,13 @@ struct NativeCoverageView: View {
                             }
                         }
                       }
-                      if searchableDirectory.isEmpty { Text(search.isEmpty ? "No repeater records are available." : "No repeaters match this search.").foregroundStyle(MeshTheme.textSecondary) }
+                      if searchingDirectory { ProgressView("Finding nodes…") }
+                      else if searchableDirectory.isEmpty { Text(search.isEmpty ? "No published nodes are available yet." : "No nodes match this search.").foregroundStyle(MeshTheme.textSecondary) }
                       Text("Nearest to the map center first. Search to narrow the first 100 results.").font(.caption)
                     }
-                  }
                 }
                 .searchable(text: $search, prompt: "Name or ID prefix")
-                .navigationTitle("Find repeater")
+                .navigationTitle("Find node")
                 .lilysharkSheet { showRepeaters = false }
             }.meshTheme().coverageSheetSizing(accessibility: dynamicTypeSize.isAccessibilitySize)
         }
@@ -397,7 +422,7 @@ struct NativeCoverageView: View {
                             Text("Any, including unknown").tag(-100.0)
                             Text("−10 dB").tag(-10.0); Text("0 dB").tag(0.0); Text("10 dB").tag(10.0)
                         }.onChange(of: minimumSNR) { store.filter.minimumSNR = minimumSNR == -100 ? nil : minimumSNR }
-                        Toggle("Show repeaters", isOn: $showRepeaterPins)
+                        Toggle("Show public nodes", isOn: $showRepeaterPins)
                         Button("Reset filters") { resetFilters() }
                     }
                 }
@@ -414,15 +439,16 @@ struct NativeCoverageView: View {
     private var mapHeader: some View {
         HStack(spacing: Design.Space.tight) {
             Button { showRepeaters = true } label: {
-                Label("Find repeater", systemImage: "magnifyingglass")
+                Label("Find node", systemImage: "magnifyingglass")
                     .font(.subheadline)
                     .padding(.horizontal, Design.Space.snug)
                     .frame(minHeight: Design.minimumTouchTarget)
                     .background(.regularMaterial, in: Capsule())
                     .contentShape(.capsule)
             }
-            .accessibilityLabel("Search repeaters")
+            .accessibilityLabel("Search MeshCore nodes")
             .accessibilityIdentifier("coverage-search")
+            if store.report != nil {
             Button { showFilters = true } label: {
                 Image(systemName: filtersActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease")
                     .frame(width: Design.minimumTouchTarget, height: Design.minimumTouchTarget)
@@ -432,6 +458,7 @@ struct NativeCoverageView: View {
             .accessibilityLabel("Coverage filters")
             .accessibilityValue(filtersActive ? "Filters active" : "All observations")
             .accessibilityIdentifier("coverage-filters")
+            }
             Spacer(minLength: 0)
         }
         .foregroundStyle(MeshTheme.textPrimary)
@@ -462,7 +489,7 @@ struct NativeCoverageView: View {
                 HStack(spacing: 0) {
                     Menu {
                         Toggle("Satellite", isOn: $satellite)
-                        Toggle("Show repeaters", isOn: $showRepeaterPins)
+                        Toggle("Show public nodes", isOn: $showRepeaterPins)
                         Button("Fit coverage", systemImage: "arrow.up.left.and.arrow.down.right") { store.report == nil ? centerOnArea() : fitReport() }
                         if store.report != nil { Button("Browse cells in view", systemImage: "list.bullet.rectangle") { showCells = true } }
                     } label: {
@@ -501,26 +528,31 @@ struct NativeCoverageView: View {
         .buttonStyle(.meshPlain)
     }
 
+    private var directoryStatus: String {
+        if directory.isEmpty {
+            if loadingDirectory || directoryService.isLoading { return "Loading nodes…" }
+            return directoryError == nil ? "No public nodes" : "Retry directory"
+        }
+        return "\(directory.count.formatted()) \(directoryError == nil ? "public" : "saved") nodes"
+    }
     private var mapStatus: some View {
         Button {
-            if directoryError != nil && store.report == nil { Task { await refreshDirectory() } }
-            else if store.report != nil && store.filteredCells.isEmpty { resetFilters() }
+            if directoryError != nil && directory.isEmpty { Task { await refreshDirectory() } }
             else { openSources() }
         } label: {
             HStack(spacing: Design.Space.hairline) {
-                if loadingDirectory || store.isLoading { ProgressView().controlSize(.mini) }
+                if loadingDirectory || directoryService.isLoading { ProgressView().controlSize(.mini) }
                 else { Image(systemName: directoryError == nil ? "info.circle" : "arrow.clockwise") }
                 if !dynamicTypeSize.isAccessibilitySize {
-                    Text(directoryError != nil && store.report == nil ? "Retry directory" : store.report == nil ? "Coverage unmeasured" : store.filteredCells.isEmpty ? "Reset filters" : "\(store.filteredCells.count) cells")
-                        .font(.caption).lineLimit(1)
+                    Text(directoryStatus).font(.caption).lineLimit(1)
                 }
             }
             .padding(.horizontal, Design.Space.snug)
             .frame(minWidth: Design.minimumTouchTarget, minHeight: Design.minimumTouchTarget)
             .background(.regularMaterial, in: Capsule())
         }
-        .accessibilityLabel(store.report == nil ? "Coverage data, coverage unmeasured" : "Coverage data, \(store.filteredCells.count) cells")
-        .accessibilityHint(directoryError ?? store.errorMessage ?? "View data source, freshness and connection status")
+        .accessibilityLabel("MeshCore public map, \(directory.count.formatted()) published nodes")
+        .accessibilityHint(directoryError ?? "View data source, freshness and connection status")
         .accessibilityIdentifier("coverage-connect-data")
     }
 
@@ -562,8 +594,6 @@ struct NativeCoverageView: View {
     private func refreshDirectory() async {
         loadingDirectory = true
         await MeshMapService.shared.fetch()
-        directory = MeshMapService.shared.nodes
-        directoryError = MeshMapService.shared.lastFetchError
         loadingDirectory = false
     }
     private func select(_ point: CoverageRepeaterPoint) {
@@ -597,12 +627,29 @@ struct NativeCoverageView: View {
                     }.font(.subheadline).foregroundStyle(MeshTheme.textSecondary)
                 }
                 if point.ambiguous { Label("Ambiguous ID", systemImage: "questionmark.diamond").font(.subheadline) }
-                Button("Measure from this repeater", systemImage: "ruler") {
+                Button("Measure from this node", systemImage: "ruler") {
                     measurement = [point.coordinate]; measuring = true
                     selectedGroup = nil; selectedDirectory = nil; selectedRepeater = nil
                 }
             } footer: {
                 Text("Community record. Reception by your radio is unverified.")
+            }
+            if let node = point.directory {
+                Section("Source and freshness") {
+                    Text("Official MeshCore public map").font(.headline)
+                    Text(node.sourceDescription).foregroundStyle(MeshTheme.textSecondary)
+                    if let advertised = node.advertisementDate {
+                        LabeledContent("Advertisement", value: advertised.formatted(date: .abbreviated, time: .shortened))
+                    } else {
+                        LabeledContent("Advertisement", value: "Time unavailable")
+                    }
+                    if let updated = node.updateDate {
+                        LabeledContent("Record updated", value: updated.formatted(date: .abbreviated, time: .shortened))
+                    }
+                    Text("A public upload does not confirm the node’s current location or that your radio can reach it.")
+                        .font(.footnote).foregroundStyle(MeshTheme.textSecondary)
+                    Link("View official record", destination: URL(string: "https://map.meshcore.io/?public_key=\(node.publicKey)")!)
+                }
             }
             DisclosureGroup("Record details") {
                 LabeledContent("Position", value: coordinateText(point.coordinate))
@@ -615,7 +662,7 @@ struct NativeCoverageView: View {
                     if let heard = node.lastHeard { LabeledContent("Last heard", value: Date(timeIntervalSince1970: heard).formatted()) }
                 }
             }
-        }.navigationTitle("Repeater")
+        }.navigationTitle(point.directory?.typeName ?? "Repeater")
     }
     private func coverageCellDetails(_ cell: MeshMapperCell) -> some View {
         List {

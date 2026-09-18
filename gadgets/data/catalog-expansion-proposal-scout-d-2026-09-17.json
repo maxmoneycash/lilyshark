@@ -1,0 +1,868 @@
+{
+  "catalog": [
+    {
+      "slug": "lakeshark",
+      "name": "LakeShark",
+      "maker": "SAMS0N1TE",
+      "category": "radio",
+      "status": "development",
+      "description": "Open-source firmware that turns a LilyGO T-Display-P4 into a handheld SDR scanner with an onboard LoRa mesh radio and GPS.",
+      "tags": [
+        "SDR scanner",
+        "RTL-SDR",
+        "LoRa mesh",
+        "ADS-B",
+        "Open source"
+      ],
+      "specs": {
+        "processor": "Espressif ESP32-P4 on a LilyGO T-Display-P4, with an ESP32-C6 co-processor for Wi-Fi and Bluetooth",
+        "display": "4.1-inch 568x1232 AMOLED (RM69A10) with touch and a detachable keyboard",
+        "radio": "Onboard SX1262 LoRa (MeshCore); external RTL-SDR Blog V3/V4 over USB for P25, FM, POCSAG, ADS-B and sub-GHz; GPS; optional MIX-RF keyboard with CC1101, nRF24 and NFC",
+        "power": "USB-C; the maker warns against feeding the keyboard 5V output back into the P4 and says reliable on-battery RTL power is still unresolved"
+      },
+      "price": null,
+      "source": "https://github.com/SAMS0N1TE/LakeShark",
+      "sourceLabel": "Maker repository and firmware",
+      "buy": null,
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Specifications were read from the maker’s README, the T-Display-P4 first-flash guide and the MIX-RF keyboard document at commit ebdd980 (last pushed 2026-09-17). LakeShark is firmware you flash onto your own LilyGO T-Display-P4, not a product the maker sells, so status is development and price is null.",
+        "The onboard mesh radio runs MeshCore, not Meshtastic, so only the LoRa capability is claimed. Phase II trunking, HackRF IQ transport and the LoRa bearing plot are marked experimental in the README and are not treated as finished features."
+      ],
+      "extraSources": [
+        {
+          "label": "Current P4 release (v2.2.0)",
+          "url": "https://github.com/SAMS0N1TE/LakeShark/releases/tag/v2.2.0"
+        },
+        {
+          "label": "Flipper companion app",
+          "url": "https://github.com/SAMS0N1TE/LakeShark-Flipper"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "radio",
+          "wifi"
+        ],
+        "format": "handheld",
+        "goodFor": "Scan trunked and analog radio, follow aircraft and watch LoRa mesh traffic on one handheld with offline maps.",
+        "needs": "A supported LilyGO T-Display-P4, an RTL-SDR Blog V3 or V4 for most receivers, and matching ESP-Hosted firmware on the C6 for wireless.",
+        "tradeoff": "Several receivers and the dual-radio keyboard features are still marked experimental or await live-RF validation.",
+        "capabilities": [
+          "sdr",
+          "lora",
+          "gnss",
+          "ble"
+        ]
+      }
+    },
+    {
+      "slug": "kiisu-v4",
+      "name": "KIISU V4B",
+      "maker": "Rainwalker OÜ",
+      "category": "multitools",
+      "status": "preorder",
+      "description": "A credit-card-sized development board with sub-GHz, NFC, RFID, infrared and Bluetooth that runs most Flipper Zero firmware.",
+      "tags": [
+        "Flipper-compatible",
+        "Sub-GHz",
+        "NFC",
+        "RFID",
+        "Open hardware"
+      ],
+      "specs": {
+        "processor": "STM32WB55RGV6 main MCU (up to 80 MHz) with an STM32G431CBU6 auxiliary MCU (up to 170 MHz)",
+        "display": "128x64 OLED (SSD1306-compatible, SPI)",
+        "radio": "CC1101 sub-GHz transceiver, ST25R3916 NFC reader/emulator, 125 kHz RFID reader/emulator, Bluetooth LE and infrared",
+        "power": "LIR2032 rechargeable coin cell or USB Type-C; an external Li-ion battery can be wired by the user"
+      },
+      "price": "€330",
+      "source": "https://github.com/kiisu-io/kiisu4",
+      "sourceLabel": "Maker documentation and hardware files",
+      "buy": "https://store.rainwalker.ee/products/kiisu-v4b",
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Hardware was read from the maker’s V4b user manual (document version 1.1, 2025-10-10) and README at commit 340c8a0 (last pushed 2026-09-16). The €330 pre-order price and in-stock state come from the official Rainwalker store product page read on 2026-09-17.",
+        "The store returns prices in AED by default; its base-currency figure of 330 with an AED presentment rate of 4.30 matches EUR, so the price is recorded in euros. The board ships pre-flashed with Kiisu firmware and can run most Flipper Zero firmware, but the maker lists compatibility limits and is not affiliated with Flipper Devices."
+      ],
+      "extraSources": [
+        {
+          "label": "KIISU official site",
+          "url": "https://kiisu.io/kiisu-v4br/"
+        },
+        {
+          "label": "Field kit listing",
+          "url": "https://store.rainwalker.ee/products/kiisu-v4b-field-kit"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "rfid",
+          "radio"
+        ],
+        "format": "handheld",
+        "goodFor": "Carry a wallet-sized Flipper-firmware board for sub-GHz, NFC, RFID and infrared experiments.",
+        "needs": "A microSD card, an LIR2032 cell (not CR2032) or USB power, and Flipper-compatible firmware.",
+        "tradeoff": "It lacks Flipper’s secret keys, so some sub-GHz protocols and U2F may not work, and it is sold as a development board rather than a finished product.",
+        "capabilities": [
+          "subghz",
+          "hf",
+          "lf",
+          "ble"
+        ]
+      }
+    },
+    {
+      "slug": "subrabbit",
+      "name": "SubRabbit",
+      "maker": "wrait8",
+      "category": "radio",
+      "status": "development",
+      "description": "Open-source CC1101 sub-GHz RF tool with a serial CLI for scanning, recording, replaying, jamming and brute-forcing signals.",
+      "tags": [
+        "Sub-GHz",
+        "CC1101",
+        "RF tool",
+        "Open source"
+      ],
+      "specs": {
+        "processor": "Firmware in main targets an ESP32; the published PCB is built around an ATmega32u4 (Arduino Pro Micro)",
+        "display": "None; driven by a serial CLI, with an optional Web Serial flasher and UI",
+        "radio": "CC1101 sub-GHz transceiver (315/433/868/915 MHz)",
+        "power": "USB (USB-A on the published PCB); other power details are not stated"
+      },
+      "price": null,
+      "source": "https://github.com/wrait8/SubRabbit",
+      "sourceLabel": "Maker repository and hardware files",
+      "buy": null,
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Features were read from the README, the docs landing page and the PCB bill of materials at commit 7c464c1 (last pushed 2026-09-14), plus the project wiki. SubRabbit is open firmware and PCB files rather than a product for sale, so status is development and price is null.",
+        "The maker marks the project beta: the firmware in main targets an ESP32 while the published PCB is an ATmega32u4 Pro Micro design, and a Pro Micro firmware port is still in progress, so the two do not match yet."
+      ],
+      "extraSources": [
+        {
+          "label": "Web flasher",
+          "url": "https://wrait8.github.io/SubRabbit/"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "radio"
+        ],
+        "format": "board",
+        "goodFor": "Scan, capture, replay and brute-force fixed-code sub-GHz signals from a serial command line.",
+        "needs": "An ESP32 or the ATmega32u4 PCB with a CC1101 module and an SMA antenna, plus a serial terminal or the web flasher.",
+        "tradeoff": "It is beta: the shipped firmware and the published PCB target different microcontrollers, and it includes jamming which is illegal to transmit in most places.",
+        "capabilities": [
+          "subghz"
+        ]
+      }
+    },
+    {
+      "slug": "odiin",
+      "name": "Odiin",
+      "maker": "chris marc dailey (cmdwtf)",
+      "category": "rfid",
+      "status": "development",
+      "description": "An open-source NFC-A tag emulator on the Nordic nRF52840, built from a Pitaya Go board, a custom bridge PCB and an LCD.",
+      "tags": [
+        "NFC emulation",
+        "nRF52840",
+        "Open hardware",
+        "DIY build"
+      ],
+      "specs": {
+        "processor": "Nordic nRF52840 on a makerdiary Pitaya Go",
+        "display": "2.2-inch 320x240 LCD (ILI9341) with a microSD slot",
+        "radio": "13.56 MHz NFC-A tag emulation using the nRF52840 NFC peripheral; the nRF52840 also has a Bluetooth LE radio",
+        "power": "500 mAh LiPo battery; USB for the UF2 bootloader and file access"
+      },
+      "price": null,
+      "source": "https://github.com/cmdwtf/Odiin",
+      "sourceLabel": "Maker repository and hardware files",
+      "buy": null,
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Hardware and firmware status were read from the README and the prototype bill of materials at commit d6d8843 (last pushed 2023-07-31), with the bridge PCB in the linked Biifröst repository. Odiin is a hand-assembled learning build with published files, not a product for sale, so status is development and price is null.",
+        "The maker describes tag emulation as partial happy-path work: NFC Forum Type 2 and NTAG213/215/216 are marked partial while MIFARE and NDEF are planned. Bluetooth LE is a capability of the nRF52840 but the firmware focuses on NFC."
+      ],
+      "extraSources": [
+        {
+          "label": "Biifröst bridge PCB repository",
+          "url": "https://github.com/cmdwtf/Biifrost"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "rfid",
+          "build"
+        ],
+        "format": "handheld",
+        "goodFor": "Emulate NTAG21x-style NFC-A tags from files on an SD card to learn the nRF52840 NFC peripheral.",
+        "needs": "A makerdiary Pitaya Go, the custom Biifröst bridge PCB, an ILI9341 LCD, a debug probe and the ARM build toolchain.",
+        "tradeoff": "It is an early, hand-assembled learning project: emulation is partial, assembly instructions are unfinished and it needs several off-the-shelf parts.",
+        "capabilities": [
+          "hf",
+          "ble"
+        ]
+      }
+    }
+  ],
+  "details": {
+    "lakeshark": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Handheld hardware",
+          "rows": [
+            {
+              "label": "Host board",
+              "value": "LilyGO T-Display-P4 (ESP32-P4); this port targets the 568x1232 RM69A10 AMOLED with 16 MB flash",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Display and input",
+              "value": "4.1-inch AMOLED with touch, a detachable keyboard, and auto-rotation (F11 rotates by hand)",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Onboard radio and sensors",
+              "value": "SX1262 LoRa running MeshCore, GPS, and nine-axis motion sensing",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless co-processor",
+              "value": "ESP32-C6 for Wi-Fi and Bluetooth; needs matching ESP-Hosted 2.12.9 firmware, not factory ESP-AT",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/docs/TDP4_FIRST_FLASH.md",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Receivers and apps",
+          "rows": [
+            {
+              "label": "SDR source",
+              "value": "RTL-SDR Blog V3 or V4 over USB for P25 Phase 1 trunking, FM/AM, POCSAG, ADS-B and sub-GHz capture",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Decoder apps",
+              "value": "P25, FM, ADS-B, FALLS waterfall, MESH (MeshCore), LoRa Labs, Journal, NFC, REC, SUB-GHZ, MAP, GPS and LINK",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "MIX-RF keyboard",
+              "value": "Detachable keyboard adds a CC1101 energy monitor, an nRF24 2.4 GHz activity scan and NFC/ST25R3916 field detection",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/docs/MIX_RF.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Experimental features",
+              "value": "P25 Phase II, HackRF USB IQ transport and the LoRa bearing plot are marked experimental and await live-RF validation",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Other build targets",
+          "rows": [
+            {
+              "label": "Headless boards",
+              "value": "Waveshare ESP32-P4-NANO and ESP32-P4-WIFI6 run the same receivers with no screen, driven over serial or from the Flipper",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Flipper head",
+              "value": "A separate Flipper Zero app controls the radio over Bluetooth or the GPIO header, with no pairing code",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Legacy panel",
+              "value": "A 480x800 Waveshare Touch-LCD-4.3 image exists but is not where new work goes",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Flashing, release and licence",
+          "rows": [
+            {
+              "label": "Browser flasher",
+              "value": "Flashed from Chrome or Edge with no toolchain; the site also builds P25 profiles, GPS scan lists and offline map tiles",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Current release",
+              "value": "v2.2.0, published 2026-09-16, with T-Display-P4 app, source and Flipper companion packages and a SHA256SUMS file",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/releases/tag/v2.2.0",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Flash layout",
+              "value": "First install writes bootloader (0x2000), partition table (0x8000), lakeshark.bin (0x10000) and storage.bin (0x910000)",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/docs/TDP4_FIRST_FLASH.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Licence",
+              "value": "GPL-3.0; bundled third-party code keeps its own notices",
+              "source": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/LICENSE",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker repository",
+          "url": "https://github.com/SAMS0N1TE/LakeShark",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "README at the reviewed commit",
+          "url": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/README.md",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "T-Display-P4 first-flash guide",
+          "url": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/docs/TDP4_FIRST_FLASH.md",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "MIX-RF keyboard document",
+          "url": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/docs/MIX_RF.md",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Release v2.2.0",
+          "url": "https://github.com/SAMS0N1TE/LakeShark/releases/tag/v2.2.0",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Licence",
+          "url": "https://github.com/SAMS0N1TE/LakeShark/blob/ebdd98046e07839d00dff99fdf59ba29f21b9a9f/LICENSE",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Battery type, capacity and runtime are not stated; the maker says reliable on-battery RTL-SDR power is still being worked out.",
+        "Board dimensions, weight and enclosure details are not given in the sources read.",
+        "What you are allowed to receive is governed by local law, which the maker leaves to the user to check."
+      ],
+      "notes": [
+        "Reviewed at commit ebdd98046e07839d00dff99fdf59ba29f21b9a9f, last pushed 2026-09-17."
+      ]
+    },
+    "kiisu-v4": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Cores and interfaces",
+          "rows": [
+            {
+              "label": "Main and aux MCU",
+              "value": "STM32WB55RGV6 main MCU (up to 80 MHz) and STM32G431CBU6 auxiliary MCU (up to 170 MHz)",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Sub-GHz",
+              "value": "CC1101 transceiver with an internal 433 MHz antenna and a pad for an external SMA antenna",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "NFC",
+              "value": "ST25R3916 reader and emulator with a built-in antenna",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "RFID and iButton",
+              "value": "125 kHz RFID reader and emulator with a built-in antenna, plus iButton reader/emulator pins",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Infrared and Bluetooth",
+              "value": "Infrared receiver and transmitter, Bluetooth LE, and a Flipper-Zero-compatible GPIO header",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Display, sensors and power",
+          "rows": [
+            {
+              "label": "Display",
+              "value": "128x64 OLED, SSD1306-compatible in SPI mode",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Sensors",
+              "value": "GXHTC3C temperature/humidity fitted; LSM303AGR accelerometer/compass, BME680 gas sensor and a VL53xxx ranger are user-solderable",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "LIR2032 rechargeable cell (never CR2032), USB Type-C, or a user-wired external Li-ion with a MCP73831 charger",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Firmware and compatibility",
+          "rows": [
+            {
+              "label": "Firmware",
+              "value": "Ships pre-flashed with Kiisu firmware and can run most Flipper Zero firmware; a Kiisu fork and an aux-MCU companion firmware are published",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Limits",
+              "value": "It lacks Flipper Zero secret keys, so some sub-GHz protocols and U2F may not work; the maker is not affiliated with Flipper Devices",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Schematics",
+              "value": "V4b schematics are published as a PDF in the repository",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20schematics.pdf",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Buying and licence",
+          "rows": [
+            {
+              "label": "Price and stock",
+              "value": "€330 pre-order on the official Rainwalker store, estimated 3–5 week delivery; direct US shipping is disabled",
+              "source": "https://store.rainwalker.ee/products/kiisu-v4b",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Field kit",
+              "value": "A V4B(R) field kit with board, 433 MHz SMA antenna, SMA and LiPo interfaces and a keychain is listed at €469",
+              "source": "https://store.rainwalker.ee/products/kiisu-v4b-field-kit",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Hardware licence",
+              "value": "Hardware design files under CERN-OHL-S v2; documentation under CC BY-SA 4.0",
+              "source": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/LICENSE",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker documentation repository",
+          "url": "https://github.com/kiisu-io/kiisu4",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "README at the reviewed commit",
+          "url": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/README.md",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "V4b user manual and quick start (PDF)",
+          "url": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20manual%20and%20quick%20start.pdf",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "V4b schematics (PDF)",
+          "url": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/kiisu%20v4b%20schematics.pdf",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Licence",
+          "url": "https://github.com/kiisu-io/kiisu4/blob/340c8a0c78f4d86d2b8df69b8d3ea551057166c9/LICENSE",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Official store listing",
+          "url": "https://store.rainwalker.ee/products/kiisu-v4b",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Field kit listing",
+          "url": "https://store.rainwalker.ee/products/kiisu-v4b-field-kit",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "KIISU official site",
+          "url": "https://kiisu.io/kiisu-v4br/",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "The store shows prices in AED by default; the euro price is inferred from the base-currency figure and the AED presentment rate. Duties and taxes are the buyer’s responsibility.",
+        "Board dimensions, weight, battery capacity and antenna performance are not quantified in the sources read.",
+        "Radio emissions are the user’s responsibility to keep within local EMI rules; the maker calls it a development board for experienced users, not a consumer product."
+      ],
+      "notes": [
+        "Reviewed at commit 340c8a0c78f4d86d2b8df69b8d3ea551057166c9, last pushed 2026-09-16. Manual is document version 1.1 dated 2025-10-10."
+      ]
+    },
+    "subrabbit": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Radio and platform",
+          "rows": [
+            {
+              "label": "Radio",
+              "value": "CC1101 transceiver covering the 315, 433, 868 and 915 MHz sub-GHz bands",
+              "source": "https://github.com/wrait8/SubRabbit/wiki",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Controller",
+              "value": "Firmware in main targets an ESP32; the published PCB is designed around an ATmega32u4 (Arduino Pro Micro)",
+              "source": "https://github.com/wrait8/SubRabbit/wiki",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Control",
+              "value": "A full command-line interface over serial, with a Web Serial flasher and UI for the Mk.II",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/docs/index.html",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Display",
+              "value": "None; the tool is driven entirely from the serial CLI",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/docs/index.html",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "What it does",
+          "rows": [
+            {
+              "label": "Analyze and monitor",
+              "value": "Frequency analyzer to detect active channels, plus RSSI and link-quality monitoring",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Raw capture and replay",
+              "value": "Record raw RF samples (recraw) and replay them (playraw)",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Fixed-code capture and replay",
+              "value": "Capture and replay fixed-code remote signals (recsig, playsig) and buffer packets (rec, show, play)",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Modulations",
+              "value": "2-FSK, GFSK, ASK/OOK, 4-FSK and MSK with configurable radio parameters",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Jamming and brute force",
+              "value": "Continuous transmission on a selected band (jam) and timing-based brute forcing (brute)",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Flipper interchange",
+              "value": "Interrupt-driven edge capture with .sub file import and export for Flipper Zero compatibility",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/README.md",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Hardware files, status and licence",
+          "rows": [
+            {
+              "label": "PCB bill of materials",
+              "value": "Mk.I PCB uses an ATMEGA32U4-AU, a CC1101 module, an 8 MHz crystal, an SMA antenna connector and a USB-A connector",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/PCB/beta/Mk.I/BOM.xlsx",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Project status",
+              "value": "Marked beta; the firmware target is changing and a Pro Micro firmware port is still in progress",
+              "source": "https://github.com/wrait8/SubRabbit/wiki",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Licence",
+              "value": "MIT",
+              "source": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/LICENSE",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker repository",
+          "url": "https://github.com/wrait8/SubRabbit",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "README at the reviewed commit",
+          "url": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/README.md",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Docs landing page at the reviewed commit",
+          "url": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/docs/index.html",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Mk.I PCB bill of materials",
+          "url": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/PCB/beta/Mk.I/BOM.xlsx",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Project wiki",
+          "url": "https://github.com/wrait8/SubRabbit/wiki",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Licence",
+          "url": "https://github.com/wrait8/SubRabbit/blob/7c464c12d03e209e54cbca506016aad454010394/LICENSE",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "The firmware in main and the published PCB target different microcontrollers, so no single ready-to-flash hardware-plus-firmware combination is documented yet.",
+        "Antenna, enclosure, dimensions and power draw are not specified in the sources read.",
+        "Jamming and brute-force transmission are illegal in most jurisdictions; use is the operator’s responsibility."
+      ],
+      "notes": [
+        "Reviewed at commit 7c464c12d03e209e54cbca506016aad454010394, last pushed 2026-09-14. The wiki is not pinned to a commit."
+      ]
+    },
+    "odiin": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Hardware",
+          "rows": [
+            {
+              "label": "Controller",
+              "value": "Nordic nRF52840 on a makerdiary Pitaya Go, which also provides the NFC antenna",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Bridge PCB",
+              "value": "A custom Biifröst bridge PCB binds the dev board to the screen and input; KiCad files are a submodule",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/.hardware/Prototype/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Display and storage",
+              "value": "A 2.2-inch 320x240 ILI9341 LCD with a microSD slot used for tag files",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Input and feedback",
+              "value": "A JS1400 five-way navigation switch, two TL9100 buttons and an addressable RGB LED",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/.hardware/Prototype/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "A 500 mAh LiPo battery wedged between the dev board and the bridge",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/.hardware/Prototype/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Enclosure",
+              "value": "A three-part 3D-printable case (top, bottom and switch cap) with STL files in the repository",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/.hardware/Prototype/README.md",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "NFC emulation",
+          "rows": [
+            {
+              "label": "Tag types",
+              "value": "NFC Forum Type 2 tag emulation, marked partial (a happy path implemented as the maker goes)",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "NTAG support",
+              "value": "NTAG213, NTAG215 and NTAG216 emulation, each marked partial",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Planned",
+              "value": "MIFARE Classic, MIFARE Ultralight C and NDEF payload formatting are planned, not yet implemented",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/README.md",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "USB features",
+              "value": "A UF2-style bootloader for USB firmware updates and USB mass-storage access to edit files on the SD card",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/README.md",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Build and licence",
+          "rows": [
+            {
+              "label": "Toolchain and submodules",
+              "value": "Cross-compiled with the GNU Arm Embedded Toolchain and make; nRF5 SDK, littlefs, lvgl, TinyFSM and the bootloader are git submodules",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/.gitmodules",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Licence",
+              "value": "0BSD; bundled third-party components keep their own licences",
+              "source": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/LICENSE",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker repository",
+          "url": "https://github.com/cmdwtf/Odiin",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "README at the reviewed commit",
+          "url": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/README.md",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Prototype bill of materials",
+          "url": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/.hardware/Prototype/README.md",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Submodule list",
+          "url": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/.gitmodules",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Licence",
+          "url": "https://github.com/cmdwtf/Odiin/blob/d6d8843f28e78446d1966f21096d5ed8ab0671c2/LICENSE",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "Biifröst bridge PCB repository",
+          "url": "https://github.com/cmdwtf/Biifrost",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Tag emulation is partial: it loads tags of a specific size only, and MIFARE and NDEF are not implemented.",
+        "Assembly instructions are marked coming soon, and the bill of materials is described as in flux.",
+        "Board dimensions, exact battery model and a standalone (non-prototype) PCB are not provided; the current build is hand-assembled from several parts."
+      ],
+      "notes": [
+        "Reviewed at commit d6d8843f28e78446d1966f21096d5ed8ab0671c2, last pushed 2023-07-31."
+      ]
+    }
+  },
+  "images": {
+    "lakeshark": {
+      "source": "https://github.com/user-attachments/assets/bdd8069b-3c1a-4dd6-a821-1526e724c950",
+      "sourcePage": "https://github.com/SAMS0N1TE/LakeShark",
+      "caption": "Maker README photo: LakeShark on a T-Display-P4 showing a signal waterfall beside a Flipper Zero",
+      "path": "/assets/lakeshark.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 900,
+      "sha256": "cdc48b928b96d0ef3548fbc91b153b63884890abc54ac9e07e3685fd861e39f3",
+      "credit": "SAMS0N1TE",
+      "usage": "Local preview; resized from the maker’s GPL-3.0 repository. Confirm reuse terms before publication"
+    },
+    "kiisu-v4": {
+      "source": "https://cdn.shopify.com/s/files/1/0941/3417/3960/files/Kiisu-v4br_1x1_94141ccc-c804-4cd7-8be8-4ab9ec1fdacf.jpg?v=1785680354",
+      "sourcePage": "https://store.rainwalker.ee/products/kiisu-v4b",
+      "caption": "Maker store photo: the KIISU V4B(R) development board",
+      "path": "/assets/kiisu-v4.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 1600,
+      "sha256": "6d8ec4715028bb12b5341bffc3e55187647aad929b4dc2bdbef2660306624330",
+      "credit": "Rainwalker OÜ",
+      "usage": "Local preview; commercial reuse not cleared"
+    },
+    "subrabbit": {
+      "source": "https://github.com/user-attachments/assets/2d75b4aa-5771-415c-89cb-edb284a3dce2",
+      "sourcePage": "https://github.com/wrait8/SubRabbit",
+      "caption": "Maker README render of the SubRabbit PCB",
+      "path": "/assets/subrabbit.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 900,
+      "sha256": "d81f136b15693482c24e718976ff699429abf4e10614532289fdfdec505a6e04",
+      "credit": "wrait8",
+      "usage": "Local preview; resized from the maker’s MIT-licensed repository. Confirm reuse terms before publication"
+    },
+    "odiin": {
+      "source": "https://raw.githubusercontent.com/cmdwtf/Odiin/d6d8843f28e78446d1966f21096d5ed8ab0671c2/.hardware/Prototype/prototype.jpg",
+      "sourcePage": "https://github.com/cmdwtf/Odiin",
+      "caption": "Maker photo: the Odiin prototype showing its about screen on the LCD",
+      "path": "/assets/odiin.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 987,
+      "sha256": "81950653a1e58e2fa06611f291c203df92e59d19351196c5dc2b5d3c18097b3f",
+      "credit": "chris marc dailey (cmdwtf)",
+      "usage": "Local preview; resized from the maker’s 0BSD repository. Confirm reuse terms before publication"
+    }
+  }
+}

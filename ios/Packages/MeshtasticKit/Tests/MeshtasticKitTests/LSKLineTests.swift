@@ -262,9 +262,7 @@ final class LSKLineTests: XCTestCase {
     func testTruncatedCaptureIsFlagged() {
         // olen is the length on the air; the hex is what the capture buffer
         // held.
-        let line = #"LSK F {"src":1,"dst":2,"proto":"Meshtastic","port":1,"hops":0,"#
-            + #""rssi_x10":0,"snr_x10":0,"kind":"TEXT","sim":false,"#
-            + #""seq":1,"ts":0,"mflags":0,"olen":64,"hex":"0a0b"}"#
+        let line = heardFrameLine(hex: "0a0b").replacingOccurrences(of: "\"olen\":2", with: "\"olen\":64")
         guard case .line(.frame(let frame)) = LSKDecoder.decode(line),
               let raw = frame.raw
         else { return XCTFail("expected a frame with a record") }

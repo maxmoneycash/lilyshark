@@ -5,9 +5,11 @@ import MeshCoreKit
 /// One app-owned map workspace; external services supply data only.
 struct MeshMapView: View {
     @Environment(ConnectionManager.self) private var connection
+    @Environment(NavigationStore.self) private var navigation
     @State private var coverage = CommunityCoverageStore()
-    @State private var showLocalMesh = false
     @State private var openedLocalMesh = false
+    @State private var openedCoverage = false
+    private var showLocalMesh: Bool { navigation.mapShowsLocalMesh }
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showSources = false
     @State private var showRadio = false
@@ -15,10 +17,12 @@ struct MeshMapView: View {
 
     var body: some View {
         ZStack {
-            NativeCoverageView(store: coverage, area: area, openSources: { showSources = true })
-                .opacity(showLocalMesh ? 0 : 1)
-                .allowsHitTesting(!showLocalMesh)
-                .accessibilityHidden(showLocalMesh)
+            if openedCoverage {
+                NativeCoverageView(store: coverage, area: area, openSources: { showSources = true })
+                    .opacity(showLocalMesh ? 0 : 1)
+                    .allowsHitTesting(!showLocalMesh)
+                    .accessibilityHidden(showLocalMesh)
+            }
             if openedLocalMesh {
                 RadioMapView(topControlsInset: Design.minimumTouchTarget + Design.Space.regular)
                     .opacity(showLocalMesh ? 1 : 0)
@@ -26,9 +30,9 @@ struct MeshMapView: View {
                     .accessibilityHidden(!showLocalMesh)
             }
         }
-        .ignoresSafeArea(edges: .top)
         .overlay(alignment: .top) { floatingMapControls }
-        .onChange(of: showLocalMesh) { if showLocalMesh { openedLocalMesh = true } }
+        .onAppear { openSelectedSource() }
+        .onChange(of: showLocalMesh) { openSelectedSource() }
         .navigationTitle("Map")
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
@@ -44,17 +48,22 @@ struct MeshMapView: View {
         }
     }
 
+    private func openSelectedSource() {
+        if showLocalMesh { openedLocalMesh = true } else { openedCoverage = true }
+    }
+
     private var floatingMapControls: some View {
-        HStack(spacing: Design.Space.tight) {
+        @Bindable var navigation = navigation
+        return HStack(spacing: Design.Space.tight) {
             Group {
                 if dynamicTypeSize.isAccessibilitySize {
-                    Picker("Map source", selection: $showLocalMesh) {
-                        Text("Coverage").tag(false)
+                    Picker("Map source", selection: $navigation.mapShowsLocalMesh) {
+                        Text("MeshCore").tag(false)
                         Text("My mesh").tag(true)
                     }.pickerStyle(.menu)
                 } else {
-                    Picker("Map source", selection: $showLocalMesh) {
-                        Text("Coverage").tag(false)
+                    Picker("Map source", selection: $navigation.mapShowsLocalMesh) {
+                        Text("MeshCore").tag(false)
                         Text("My mesh").tag(true)
                     }.pickerStyle(.segmented)
                 }
@@ -77,6 +86,7 @@ struct MeshMapView: View {
             .accessibilityLabel("Map data")
             .accessibilityIdentifier("map-sources")
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .font(.subheadline.weight(.medium))
         .foregroundStyle(MeshTheme.textPrimary)
         .buttonStyle(.meshPlain)
@@ -90,8 +100,22 @@ private struct CoverageSourcesView: View {
     @Binding var area: String
     @State private var key = ""
     @State private var saved = false
+    @State private var directory = MeshMapService.shared
     var body: some View {
         Form {
+            Section("MeshCore public map") {
+                Text("Published MeshCore nodes. These records do not establish reception by your radio.")
+                LabeledContent("Saved nodes", value: directory.nodes.count.formatted())
+                if directory.lastFetch != .distantPast {
+                    LabeledContent("Downloaded", value: directory.lastFetch.formatted(date: .abbreviated, time: .shortened))
+                }
+                if let error = directory.lastFetchError { Text(error).foregroundStyle(MeshTheme.textSecondary) }
+                Button("Refresh node directory", systemImage: "arrow.clockwise") { Task { await directory.fetch() } }
+                    .disabled(directory.isLoading)
+                Link("Official MeshCore map", destination: MeshMapService.sourceURL)
+                Text("Downloaded node records remain available offline. Basemap tiles depend on internet or the system map cache.")
+                    .font(.footnote).foregroundStyle(MeshTheme.textSecondary)
+            }
             Section("Map area") {
                 Picker("Open on", selection: $area) {
                     Text("Oakland").tag("oak")

@@ -67,8 +67,27 @@ final class ConnectionManager {
 
     var isScanning = false
     var discoveredPeripherals: [DiscoveredPeripheral] = []
-    var connectionState: BLEConnectionState = .disconnected
+    var connectionState: BLEConnectionState = .disconnected {
+        didSet {
+            if connectionState != oldValue,
+               connectionState == .connecting || connectionState == .connected || connectionState == .ready {
+                onSessionStarting?()
+            }
+        }
+    }
+    /// Clears offline browsing state before a new transport can deliver frames.
+    var onSessionStarting: (() -> Void)?
     var connectedDeviceName: String?
+
+    #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && LILYSHARK_UI_MESH_FIXTURE && os(iOS)
+    /// Populate UI state without touching either Bluetooth central.
+    func setMeshFixtureConnected(_ connected: Bool, meshtastic: Bool = true) {
+        isMeshtasticLinkActive = meshtastic
+        isMeshtasticReady = meshtastic && connected
+        connectionState = connected ? .ready : .disconnected
+        connectedDeviceName = connected ? "Trail Deck" : nil
+    }
+    #endif
     var bleStatusMessage: String?
     var scanRetryCount: Int = 0
     var requestShowScanner = false
@@ -711,7 +730,14 @@ final class ConnectionManager {
     func startScanning() {
         #if targetEnvironment(simulator)
         scanRetryTask?.cancel()
-        startSimulatorDeckPreviewScan()
+        // A normal simulator must not manufacture a nearby radio. Keep the
+        // interactive deck demo available only when deliberately launched.
+        if ProcessInfo.processInfo.arguments.contains("--lilyshark-simulator-preview") {
+            startSimulatorDeckPreviewScan()
+        } else {
+            isScanning = false
+            bleStatusMessage = "Bluetooth radios require a physical device. You can browse the public MeshCore map here."
+        }
         return
         #endif
         guard bleManager.isPoweredOn else {

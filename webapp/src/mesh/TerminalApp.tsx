@@ -13,7 +13,7 @@ import {
   setConnectionLostHandler,
 } from "./radio";
 import { evalAlerts, evalRuntime, getAlertCfg } from "./alerts";
-import { clearDemo, seedDemo } from "./demo";
+import { canStartDemo, clearDemo, isDemo, seedDemo } from "./demo";
 import { startNetNodes } from "./netNodes";
 import { forecastBattery } from "./battery";
 import { addLog, DeviceStatus, fmtLog, getSnapshot, subscribe } from "./store";
@@ -329,13 +329,13 @@ function App() {
   // disconnect in a real session would otherwise re-seed invented nodes on top
   // of the capture.
   const everConnectedRef = useRef(false);
+  const [historyReady, setHistoryReady] = useState(false);
+  const demoActive = isDemo();
 
   const connected = s.status !== undefined && s.status >= DeviceStatus.Connected;
   const configuring = s.status === DeviceStatus.Configuring;
 
-  // Without a radio attached every screen is an empty panel, which shows
-  // nothing about what the instrument does. Seed a demo mesh instead, and drop
-  // it the instant real hardware appears so the two can never be confused.
+  // Bind real sources independently of the optional sample session.
   useEffect(() => {
     bindAnalyzerMesh();
     // The internet leg: frames the deck hears go to the shared room, and
@@ -379,8 +379,6 @@ function App() {
       // around it -- amber, labelled NET -- so the map answers both "what do
       // I hear" and "who is out there".
       startNetNodes();
-    } else if (!everConnectedRef.current) {
-      seedDemo();
     }
   }, [connected, lilyLinked]);
 
@@ -505,6 +503,7 @@ function App() {
       : Promise.resolve()
     ).then(() => openHistoryDb())
       .then(() => loadHistory())
+      .then(() => setHistoryReady(true))
       .catch((error) => {
         addLog("Saved history could not be loaded: {0}", String(error));
         setError("Saved history could not be loaded. Reload to try again.");
@@ -807,6 +806,13 @@ function App() {
         </button>
       </header>
 
+      {demoActive && (
+        <div className="demo-session-bar" role="status">
+          <span><strong>DEMO</strong> · Sample nodes and messages</span>
+          <button type="button" onClick={() => clearDemo()}>Exit demo</button>
+        </div>
+      )}
+
       {connectOpen && (
         <dialog ref={connectDialog} className="overlay-sheet" aria-labelledby="connect-sheet-title" onCancel={() => { setConnectOpen(false); setError(""); }}>
           <div className="sheet-bar">
@@ -825,15 +831,12 @@ function App() {
           </div>
           {!hasSerial && !hasBle && (
             <p className="sheet-note sheet-note-alert">
-              This browser can explore the demo, but can’t connect to a radio.
+              This browser can browse the public map and saved captures, but can’t connect to a radio.
               {onIos && " Use the Lilyshark iOS app to connect on this phone."}
             </p>
           )}
           {(hasSerial || hasBle) && <p className="sheet-note">Choose the firmware running on your radio.</p>}
           <div className="sheet-actions">
-            {!hasSerial && !hasBle && !connected && !lilyLinked && (
-              <button type="button" className="primary" onClick={() => { setConnectOpen(false); setTab("TRAFFIC"); }}>Explore demo</button>
-            )}
             {(connected || lilyLinked) && (
               <button
                 type="button"
@@ -911,6 +914,18 @@ function App() {
             </button>
             )}
           </div>
+          {!connected && !lilyLinked && !connecting && !lilyConnecting && (
+            <div className="sheet-actions">
+              <button type="button" onClick={() => { setConnectOpen(false); setTab("MAP"); }}>Browse public map</button>
+              {historyReady && !everConnectedRef.current && canStartDemo() && (
+                <button type="button" onClick={() => {
+                  if (!seedDemo()) return;
+                  setConnectOpen(false);
+                  setTab("TRAFFIC");
+                }}>Explore sample data</button>
+              )}
+            </div>
+          )}
           {error && <p className="error">{error}</p>}
           {(hasSerial || hasBle) && (
             <p className="sheet-note">
@@ -957,16 +972,10 @@ function App() {
         }
       >
       {tab === "TRAFFIC" && (
-        <TrafficTab demoActive={!connected && !lilyLinked && !everConnectedRef.current} />
+        <TrafficTab demoActive={demoActive && !connected && !lilyLinked} />
       )}
       {tab === "SHELBY" && <ShelbyScreen />}
-      {tab === "INTRO" && (
-        <IntroTab
-          onOpen={(next) => setTab(next as Tab)}
-          onConnect={openConnect}
-          connected={connected || lilyLinked}
-        />
-      )}
+      {tab === "INTRO" && <IntroTab />}
       {tab === "FLASH" && <FlashPage onOpen={setTab} />}
       {tab === "PAPER" && <WhitepaperTab />}
       {tab === "DOCS" && <Docs />}

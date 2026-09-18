@@ -249,6 +249,9 @@ public final class DeviceConfig {
 
     // MARK: - Loading State
 
+    /// True while showing the last radio’s saved records, with radio actions unavailable.
+    public var isSavedRadioData = false
+    public var savedRadioDataDate: Date?
     public var isLoading: Bool = false
     public var loadedSections: Set<String> = []
 
@@ -257,6 +260,8 @@ public final class DeviceConfig {
     /// Reset all properties to defaults. Keeps the same instance so environment
     /// references remain valid (important for @Environment injection).
     public func reset() {
+        isSavedRadioData = false
+        savedRadioDataDate = nil
         deviceName = ""
         selfType = 1
         firmwareVersion = ""

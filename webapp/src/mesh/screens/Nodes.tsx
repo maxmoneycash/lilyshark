@@ -376,6 +376,7 @@ function Detail(props: {
 			<Copy text={`!${n.num.toString(16)}`}>{`!${n.num.toString(16)}`}</Copy>,
 		],
 		[t("TYPE"), hwName(n.type)],
+		...(n.viaDemo || n.viaSim || n.viaNet ? [[t('SOURCE'), n.viaDemo ? 'Sample data' : n.viaSim ? 'Simulated frame' : 'Internet relay'] as [string, React.ReactNode]] : []),
 		...(n.publicKey
 			? ([
 					[
@@ -957,6 +958,8 @@ export default function Nodes({
 												<span className="nodes-id">!{n.num.toString(16)}</span>
 												{n.type !== undefined && n.type !== ContactType.None && n.type !== ContactType.Chat && <span>{hwName(n.type)}</span>}
 												{n.publicKey && <span>PKI</span>}
+												{(n.viaDemo || n.viaSim) && <span>{n.viaDemo ? 'SAMPLE' : 'SIMULATED'}</span>}
+												{n.viaNet && <span>NET</span>}
 												{n.fav && <span>{t("FAVORITE")}</span>}
 												{n.num === s.myNodeNum && <span>{isDemo() ? "DEMO" : t("ME")}</span>}
 												{n.ignored && <span>{t("IGNORED")}</span>}

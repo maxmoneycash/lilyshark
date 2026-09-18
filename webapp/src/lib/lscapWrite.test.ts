@@ -87,6 +87,18 @@ test("every written field survives a round trip", () => {
 	assert.equal(g.truncated, false);
 });
 
+test("browser exports use the pinned record header and still read earlier exports", () => {
+	const bytes = buildLscap([frame()]);
+	const view = new DataView(bytes.buffer);
+	assert.equal(view.getUint16(28, true), 80);
+	assert.equal(view.getUint16(30, true), 1);
+	view.setUint32(28, 0, true); // Earlier browser writer's reserved bytes.
+	const legacy = parseLscap(bytes.buffer as ArrayBuffer);
+	assert.equal(legacy.frames.length, 1);
+	assert.deepEqual(legacy.frames[0].bytes, frame().bytes);
+	assert.equal(legacy.trailingBytes, 0);
+});
+
 test("a truncated frame reports both lengths", () => {
 	const cap = parseLscap(
 		buildLscap([frame({ originalLength: 300 })]).buffer as ArrayBuffer,

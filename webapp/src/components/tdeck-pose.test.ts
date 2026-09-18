@@ -8,9 +8,12 @@ test('the rest pose is a three-quarter view, not face-on', () => {
   assert.ok(REST_ROLL < 0, 'a slight bank reads the chassis as a volume');
 });
 
-test('pitch stays short of flipping through the handset', () => {
+test('pitch supports full rotation and wraps without changing orientation', () => {
   assert.equal(clampPitch(0), 0);
-  assert.equal(clampPitch(PITCH_MAX + 1), PITCH_MAX);
-  assert.equal(clampPitch(PITCH_MIN - 1), PITCH_MIN);
-  assert.ok(PITCH_MAX > 1, 'enough pitch to see the top of the deck');
+  for (const angle of [PITCH_MAX + 1, PITCH_MIN - 1, 20 * Math.PI + 0.6, -20 * Math.PI - 0.6]) {
+    const wrapped = clampPitch(angle);
+    assert.ok(wrapped >= PITCH_MIN && wrapped <= PITCH_MAX);
+    assert.ok(Math.abs(Math.sin(wrapped) - Math.sin(angle)) < 1e-12);
+    assert.ok(Math.abs(Math.cos(wrapped) - Math.cos(angle)) < 1e-12);
+  }
 });

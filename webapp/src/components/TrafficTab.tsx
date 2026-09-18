@@ -215,7 +215,14 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   }, []);
 
   useEffect(() => {
-    if (!demoActive) setLive(false);
+    if (!demoActive) {
+      setLive(false);
+      for (const open of slotsRef.current.slots) {
+        if (open.key === 'demo-sample' || open.key === 'sim-live') {
+          dispatchSlots({ type: 'close', id: open.id });
+        }
+      }
+    }
   }, [demoActive]);
 
   /**
@@ -249,7 +256,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
           filterText: '',
           note:
             c.trailingBytes > 0
-              ? `${c.trailingBytes} trailing byte(s) were not a complete record`
+              ? `${c.recoveryMessage ?? 'Incomplete capture tail'}. ${c.trailingBytes} trailing byte(s) were not read`
               : null,
           containsSynthetic: c.frames.some((fr) => fr.synthetic),
           brush: null,
@@ -560,13 +567,15 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   }, [capture]);
 
   /** Bundled synthetic capture: 24 frames with a Shelby pointer at sequence 9. */
-  const openSample = async () => {
+  const openSample = async (forDemo = false) => {
     setBusy(true);
     setOpenError(null);
     try {
       const res = await fetch('/sample-mesh-traffic.lscap');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      load(await res.arrayBuffer(), 'sample-mesh-traffic.lscap', 'sample', 'sample');
+      const bytes = await res.arrayBuffer();
+      if (forDemo && !demoActiveRef.current) return;
+      load(bytes, 'sample-mesh-traffic.lscap', 'sample', forDemo ? 'demo-sample' : 'sample');
     } catch (e) {
       setOpenError(e instanceof Error ? e.message : 'sample unavailable');
     } finally {
@@ -574,13 +583,12 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
     }
   };
 
-  // The bundled capture opens itself: an analyzer that lands on an empty panel
-  // shows nothing about what it does, and the sample costs one small fetch.
-  // Anything the user opens afterwards replaces it as usual.
+  // Only an explicit demo choice (or its #resolve deep link) opens sample data.
   useEffect(() => {
-    void openSample();
+    if (demoActive) void openSample(true);
+    else if (autoResolveRef.current) void openSample();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [demoActive]);
 
   // Synthetic demo traffic: a frame lands every few seconds, appended to
   // whichever capture is on screen. Keeping the newest frame in view is the
@@ -835,7 +843,7 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             title={
               demoActive
                 ? 'synthetic LongFast demo, timed like the configured channel'
-                : 'synthetic Traffic demo is disabled while a device is connected'
+                : 'Start an optional sample session from Connect to explore simulated traffic'
             }
             disabled={!demoActive}
             onClick={() => setLive((v) => !v)}

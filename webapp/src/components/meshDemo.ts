@@ -101,10 +101,10 @@ export function meshDemoPulses(mode: MeshRoutingMode, progress: number): MeshDem
 export const MESH_DEMO_COPY: Record<MeshRoutingMode, { title: string; body: string }> = {
   flood: {
     title: 'Meshtastic · Flood',
-    body: 'Meshtastic floods: every node that hears a packet repeats it. Simple and resilient, but one message becomes many transmissions — about seven per delivered message in measured captures — and reach drops as the mesh grows.',
+    body: 'Meshtastic floods: nodes relay the packet across the mesh. One message becomes many radio transmissions.',
   },
   routed: {
     title: 'MeshCore · Routed',
-    body: 'MeshCore routes: the path is discovered up front, then packets follow only that route — up to 64 hops — and a delivery receipt travels back along it. Lilyshark decks speak Meshtastic; MeshCore radios also expose radio settings and remote management.',
+    body: 'MeshCore finds a route, then follows it. A delivery receipt returns along the same path.',
   },
 };

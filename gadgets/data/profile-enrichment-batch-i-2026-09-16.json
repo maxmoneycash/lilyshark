@@ -1,0 +1,1049 @@
+{
+  "interrupt": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Proposed hardware",
+        "rows": [
+          {
+            "label": "Computer",
+            "value": "Raspberry Pi Zero 2 W running Linux",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Screen & controls",
+            "value": "3.5-inch IPS touchscreen and QWERTY keyboard",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Sub-GHz",
+            "value": "CC1101; advertised 300–928 MHz coverage",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Other wireless",
+            "value": "Wi-Fi, Bluetooth and NFC/RFID",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Infrared",
+            "value": "Remote learning and transmission",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Expansion",
+            "value": "GPIO; SPI, UART and I²C interfaces",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Storage",
+            "value": "SD card",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Power connector",
+            "value": "USB-C charging; input rating unspecified",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Development & support",
+        "rows": [
+          {
+            "label": "Ordering page",
+            "value": "Maker still links a Kickstarter preorder",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Dated prototype milestone",
+            "value": "April 2026 update reports a powered prototype PCB with working Pi integration",
+            "source": "https://blog.interrupt-tech.com/interrupt-project-update-4-3-26/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Prototype charging",
+            "value": "Charger reported operational without firmware control",
+            "source": "https://blog.interrupt-tech.com/interrupt-project-update-4-3-26/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Work remaining in that update",
+            "value": "RF validation underway; GUI completion planned afterward",
+            "source": "https://blog.interrupt-tech.com/interrupt-project-update-4-3-26/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Business contact",
+            "value": "business@interrupt-tech.com",
+            "source": "https://www.interrupt-tech.com/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker specifications and preorder link",
+        "url": "https://www.interrupt-tech.com/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Maker development updates",
+        "url": "https://blog.interrupt-tech.com/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "April 2026 prototype update",
+        "url": "https://blog.interrupt-tech.com/interrupt-project-update-4-3-26/",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "Final production specification, delivery schedule, dimensions, battery capacity and package contents remain unconfirmed in the reviewed material.",
+      "No finished setup manual, operating-system image, GPIO pinout, charging input rating or supported NFC/RFID standards were established.",
+      "The April update is a historical milestone, not confirmation of September production readiness."
+    ],
+    "notes": [
+      "Hardware remains proposed. A preorder link and prototype update do not establish delivery."
+    ],
+    "coverage": "reviewed",
+    "testedByUs": false
+  },
+  "mesh-detect-v2": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "V2 hardware & package choice",
+        "rows": [
+          {
+            "label": "Detector socket",
+            "value": "Seeed XIAO ESP32-S3",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Mesh connector",
+            "value": "Heltec LoRa32 V3 connection",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Power",
+            "value": "USB-C with voltage regulation; battery operation advertised",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Mounting",
+            "value": "Four M3 holes",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Buying options",
+            "value": "Finished kits and bare PCBs are separate listings",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Radio roles",
+            "value": "Wi-Fi/BLE detection feeds a separate Meshtastic LoRa node",
+            "source": "https://github.com/colonelpanichacks/mesh-detect",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Other targets",
+            "value": "S3, C5 and C6 projects exist; these are different firmware/hardware targets",
+            "source": "https://github.com/colonelpanichacks/mesh-detect",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Choose a firmware role",
+        "rows": [
+          {
+            "label": "Standard Dualcore",
+            "value": "One S3 detector forwards Wi-Fi/BLE Remote ID over USB and UART",
+            "source": "https://colonelpanichacks.github.io/drone-mesh-mapper/flasher/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Remote role",
+            "value": "Field detector tags reports with its node identifier",
+            "source": "https://colonelpanichacks.github.io/drone-mesh-mapper/flasher/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Home role",
+            "value": "Base bridge filters duplicate reports and feeds USB to the mapper; it does not scan",
+            "source": "https://colonelpanichacks.github.io/drone-mesh-mapper/flasher/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Install requirements",
+            "value": "Desktop Chrome, Edge or Opera; Web Serial and a USB-C data cable",
+            "source": "https://colonelpanichacks.github.io/drone-mesh-mapper/flasher/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Serial receiver",
+            "value": "Heltec serial enabled; TEXTMSG, 115200 baud, RX19/TX20; matching mesh channel/key",
+            "source": "https://colonelpanichacks.github.io/drone-mesh-mapper/flasher/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Standard S3 UART",
+            "value": "Reviewed remoteid-mesh-dualcore source: GPIO5 TX, GPIO6 RX, 115200 baud",
+            "source": "https://raw.githubusercontent.com/colonelpanichacks/drone-mesh-mapper/3373e4e83da30f34af321a27815d74bc543ff5e0/remoteid-mesh-dualcore/src/main.cpp",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Node S3 UART",
+            "value": "Reviewed node-mode-dualcore source: GPIO5 TX, GPIO6 RX, 115200 baud",
+            "source": "https://raw.githubusercontent.com/colonelpanichacks/drone-mesh-mapper/3373e4e83da30f34af321a27815d74bc543ff5e0/node-mode-dualcore/src/main.cpp",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Region setting",
+            "value": "Configure the appropriate Meshtastic radio region",
+            "source": "https://github.com/colonelpanichacks/mesh-detect",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Host, maps & accessories",
+        "rows": [
+          {
+            "label": "Standalone path",
+            "value": "Detector-to-mesh operation does not require a laptop or Raspberry Pi",
+            "source": "https://github.com/colonelpanichacks/drone-mesh-mapper/blob/3373e4e83da30f34af321a27815d74bc543ff5e0/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Map host",
+            "value": "Optional Python Flask/Leaflet mapper runs on a computer; web interface defaults to port 5000",
+            "source": "https://github.com/colonelpanichacks/drone-mesh-mapper/blob/3373e4e83da30f34af321a27815d74bc543ff5e0/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Exports",
+            "value": "CSV, KML and GeoJSON detection/history outputs",
+            "source": "https://github.com/colonelpanichacks/drone-mesh-mapper/blob/3373e4e83da30f34af321a27815d74bc543ff5e0/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Offline map preparation",
+            "value": "Cache or import MBTiles first; a fresh clone has no basemap tiles",
+            "source": "https://github.com/colonelpanichacks/drone-mesh-mapper/blob/3373e4e83da30f34af321a27815d74bc543ff5e0/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Online extras",
+            "value": "Place search and network aircraft feeds require internet access",
+            "source": "https://github.com/colonelpanichacks/drone-mesh-mapper/blob/3373e4e83da30f34af321a27815d74bc543ff5e0/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Printable enclosures",
+            "value": "Hub links case, keychain and modular enclosure designs",
+            "source": "https://github.com/colonelpanichacks/mesh-detect",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Other firmware projects",
+            "value": "Hub links OUI detection and wireless-baseline projects",
+            "source": "https://github.com/colonelpanichacks/mesh-detect",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker hardware and firmware hub",
+        "url": "https://github.com/colonelpanichacks/mesh-detect",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Maker v2 hardware listing",
+        "url": "https://colonelpanic.tech/#products",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "S3 installer and role selection",
+        "url": "https://colonelpanichacks.github.io/drone-mesh-mapper/flasher/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Drone Mesh Mapper",
+        "url": "https://github.com/colonelpanichacks/drone-mesh-mapper",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "WiFi RemoteID to Mesh",
+        "url": "https://github.com/colonelpanichacks/WiFi-RemoteID",
+        "reviewed": "2026-09-15"
+      },
+      {
+        "label": "BLE/WiFi OUI Detection",
+        "url": "https://github.com/colonelpanichacks/Esp32-oui-sniffer",
+        "reviewed": "2026-09-15"
+      },
+      {
+        "label": "Mapper documentation at reviewed commit",
+        "url": "https://github.com/colonelpanichacks/drone-mesh-mapper/blob/3373e4e83da30f34af321a27815d74bc543ff5e0/README.md",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Standard S3 UART source at reviewed commit",
+        "url": "https://raw.githubusercontent.com/colonelpanichacks/drone-mesh-mapper/3373e4e83da30f34af321a27815d74bc543ff5e0/remoteid-mesh-dualcore/src/main.cpp",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Node S3 UART source at reviewed commit",
+        "url": "https://raw.githubusercontent.com/colonelpanichacks/drone-mesh-mapper/3373e4e83da30f34af321a27815d74bc543ff5e0/node-mode-dualcore/src/main.cpp",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "Confirm the exact kit BOM, radio band, installed build, antennas and accessories before ordering; the bare PCB is not the finished kit.",
+      "Battery capacity, battery connector/polarity, enclosure dimensions and any included GPS are not established.",
+      "Wiring documentation differs by build: the mapper README shows D4/D5 and mentions a GPIO6/7 variant. The two pinned S3 sources and current flasher specify GPIO5/6. Match the actual firmware and board before wiring.",
+      "Detection needs a supported Remote ID broadcast; neither detection range nor LoRa relay range was tested here.",
+      "The earlier profile reported an obsolete BLE RemoteID to Mesh link. That link was not restored; retained alternative project resources are not a promise of current maintenance."
+    ],
+    "notes": [
+      "The pinned source review is commit 3373e4e83da30f34af321a27815d74bc543ff5e0. Firmware roles and host features are not guaranteed contents of every retail kit."
+    ],
+    "coverage": "reviewed",
+    "testedByUs": false
+  },
+  "bleshark-nano": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Hardware & contents",
+        "rows": [
+          {
+            "label": "Processor",
+            "value": "ESP32-C3; RISC-V",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Wireless",
+            "value": "2.4 GHz Wi-Fi and Bluetooth LE 5.0",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Infrared",
+            "value": "Transmit and receive",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Display type",
+            "value": "Monochrome OLED",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Display size",
+            "value": "0.66-inch screen in developer documentation; resolution unspecified",
+            "source": "https://docs.infishark.com/docs/sdk",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Battery",
+            "value": "500 mAh; approximately seven hours average use claimed by maker",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Body",
+            "value": "65 × 42.5 × 15 mm; below 50 g",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Included",
+            "value": "Nano, USB-C data/charging cable, setup guide and stickers",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Optional case",
+            "value": "Silicone protective case sold separately",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Retail packs",
+            "value": "One, three, six or twelve devices",
+            "source": "https://infishark.com/products/bleshark-nano",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Power & first setup",
+        "rows": [
+          {
+            "label": "Charging switch",
+            "value": "Side switch must be ON to charge",
+            "source": "https://docs.infishark.com/docs/basics/charging",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Power input",
+            "value": "USB-C and a stable 5 V supply",
+            "source": "https://docs.infishark.com/docs/basics/charging",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Charge indicator",
+            "value": "Red LED indicates charging; off means complete when connected with switch ON",
+            "source": "https://docs.infishark.com/docs/basics/charging",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Current setup",
+            "value": "Choose Wi-Fi and enter its password on the device; setup then downloads firmware",
+            "source": "https://docs.infishark.com/docs/basics/getting-started",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Older shipped setup",
+            "value": "Some units use a phone/laptop captive portal instead; either flow is documented",
+            "source": "https://docs.infishark.com/docs/basics/getting-started",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Multiple-device setup",
+            "value": "Optional Bluetooth pairing shares Wi-Fi credentials and Shiver identities among selected Nanos",
+            "source": "https://docs.infishark.com/docs/basics/getting-started",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Firmware & recovery",
+        "rows": [
+          {
+            "label": "OTA behavior",
+            "value": "On-boot Wi-Fi check prompts before updating; checks are enabled by default and can be disabled",
+            "source": "https://docs.infishark.com/docs/basics/updating",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Web recovery",
+            "value": "Official web flasher installs setup firmware only; full releases arrive over Wi-Fi",
+            "source": "https://docs.infishark.com/docs/basics/updating",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Recovery browser",
+            "value": "Desktop Chrome or Edge with Web Serial; Safari, Firefox and mobile browsers unsupported",
+            "source": "https://docs.infishark.com/docs/basics/updating",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Documented SDK release",
+            "value": "v1.1.0, July 14, 2026, adds the USB host control plane",
+            "source": "https://infishark.com/blogs/firmware-releases/v1-1-0-changelog",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Infrared files",
+            "value": "v1.1.0 host tooling reads/writes Flipper-style .ir files and transfers remote slots",
+            "source": "https://infishark.com/blogs/firmware-releases/v1-1-0-changelog",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Shiver & computer use",
+        "rows": [
+          {
+            "label": "Shiver minimum",
+            "value": "Two or more paired Nanos share state, files and commands without a phone/computer",
+            "source": "https://docs.infishark.com/docs/shiver/overview",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Pairing",
+            "value": "Pair over Bluetooth, then switch to the mesh; current firmware is recommended on every node",
+            "source": "https://docs.infishark.com/docs/shiver/overview",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Shared-radio limit",
+            "value": "Turn Shiver off for Bad-BT, Mini Keypad or Scroller persistent-Bluetooth functions",
+            "source": "https://docs.infishark.com/docs/shiver/overview",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Host tools",
+            "value": "Open-source Rust SDK/CLI controls compatible firmware over USB serial; standalone menus remain available",
+            "source": "https://docs.infishark.com/docs/sdk",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Host requirement",
+            "value": "Computer with USB plus firmware containing the USB control plane",
+            "source": "https://docs.infishark.com/docs/sdk",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Linux-only features",
+            "value": "Wi-Fi adapter mode and BLE HID bridge currently require Linux; other serial features vary by host",
+            "source": "https://docs.infishark.com/docs/sdk",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker hardware and package details",
+        "url": "https://infishark.com/products/bleshark-nano",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "First setup and older firmware flow",
+        "url": "https://docs.infishark.com/docs/basics/getting-started",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Charging and indicator guide",
+        "url": "https://docs.infishark.com/docs/basics/charging",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Updates and recovery requirements",
+        "url": "https://docs.infishark.com/docs/basics/updating",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Shiver pairing and radio limits",
+        "url": "https://docs.infishark.com/docs/shiver/overview",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Host SDK and CLI requirements",
+        "url": "https://docs.infishark.com/docs/sdk",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "v1.1.0 release notes",
+        "url": "https://infishark.com/blogs/firmware-releases/v1-1-0-changelog",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "OLED pixel resolution, flash/RAM capacities and PCB revision details remain unconfirmed.",
+      "The 0.66-inch size comes from SDK/release documentation; no panel datasheet was established.",
+      "Installed firmware and regional release must be checked on a purchased unit; documented host features do not establish its shipped version.",
+      "Runtime, radio range and interoperability with unrelated mesh products were not tested."
+    ],
+    "notes": [
+      "Retail pack sizes and Shiver device requirements describe different things. No Meshtastic compatibility is asserted."
+    ],
+    "coverage": "reviewed",
+    "testedByUs": false
+  },
+  "oui-spy": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Standard board hardware",
+        "rows": [
+          {
+            "label": "Processor & flash",
+            "value": "ESP32-S3, dual-core Xtensa LX7; 8 MB flash",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Antenna",
+            "value": "Replaceable 2.4 GHz sticker antenna",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Feedback",
+            "value": "PWM buzzer",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Power & programming",
+            "value": "USB-C",
+            "source": "https://colonelpanic.tech/#products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Firmware board target",
+            "value": "Seeed Studio XIAO ESP32-S3",
+            "source": "https://github.com/colonelpanichacks/oui-spy",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Reviewed Unified Blue firmware",
+        "rows": [
+          {
+            "label": "Documented modes",
+            "value": "Six: Detector, Foxhunter, Flock-You WiFi, PCAP, Sky Spy and BLE Sniff",
+            "source": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Mode selection",
+            "value": "Browser boot menu remembers selection; hold BOOT approximately 1.5 seconds to return",
+            "source": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Detector configuration",
+            "value": "BLE identifier watchlists; holding BOOT during power-on clears the configuration lock",
+            "source": "https://github.com/colonelpanichacks/oui-spy-unified-blue/blob/d57600044d5cbde5562587ccd4829441fec1cb53/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Reflash caveat",
+            "value": "Ordinary reflashing does not clear the detector lock stored in NVS",
+            "source": "https://github.com/colonelpanichacks/oui-spy-unified-blue/blob/d57600044d5cbde5562587ccd4829441fec1cb53/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Wi-Fi PCAP",
+            "value": "Rolling 2 MB capture; download through browser dashboard",
+            "source": "https://github.com/colonelpanichacks/oui-spy-unified-blue/blob/d57600044d5cbde5562587ccd4829441fec1cb53/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "PCAP channel behavior",
+            "value": "Locked-channel mode provides an access point; hopping disables that access point",
+            "source": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "BLE Sniff limit",
+            "value": "Advertisements only; connected BLE data-channel traffic is outside this mode",
+            "source": "https://github.com/colonelpanichacks/oui-spy-unified-blue/blob/d57600044d5cbde5562587ccd4829441fec1cb53/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Capture transfer change",
+            "value": "Reviewed README removes binary PCAP-over-USB streaming; use browser download",
+            "source": "https://github.com/colonelpanichacks/oui-spy-unified-blue/blob/d57600044d5cbde5562587ccd4829441fec1cb53/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Sky Spy in this build",
+            "value": "Wi-Fi Remote ID; serial JSON output without a Wi-Fi access point",
+            "source": "https://github.com/colonelpanichacks/oui-spy-unified-blue/blob/d57600044d5cbde5562587ccd4829441fec1cb53/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Flock-You interface",
+            "value": "USB-CDC and Flask dashboard; this mode has no Wi-Fi access point",
+            "source": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Foxhunter feedback",
+            "value": "BLE target RSSI and buzzer feedback",
+            "source": "https://github.com/colonelpanichacks/oui-spy",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Preferences",
+            "value": "Selector provides buzzer control and configurable access-point credentials",
+            "source": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Installation & host workflow",
+        "rows": [
+          {
+            "label": "Browser flashing",
+            "value": "Desktop Chrome, Edge or Opera; USB-C data cable and Web Serial",
+            "source": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Download channel",
+            "value": "Web installer follows firmware committed to master",
+            "source": "https://github.com/colonelpanichacks/oui-spy-unified-blue/blob/d57600044d5cbde5562587ccd4829441fec1cb53/README.md",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "No serial port",
+            "value": "Maker suggests a data cable and BOOT held while connecting",
+            "source": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Wrong dashboard",
+            "value": "Check the joined Wi-Fi network after changing modes; saved networks can auto-reconnect",
+            "source": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Session tools",
+            "value": "Hub documents persisted sessions and host JSON, CSV and KML exports",
+            "source": "https://github.com/colonelpanichacks/oui-spy",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Maps & GPS",
+            "value": "Some host workflows use external GPS data; not an onboard GPS specification",
+            "source": "https://github.com/colonelpanichacks/oui-spy",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Identifier limits",
+            "value": "Wireless-signature matches are confidence indicators, not proof of operator or purpose",
+            "source": "https://github.com/colonelpanichacks/oui-spy",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Hardware and firmware project hub",
+        "url": "https://github.com/colonelpanichacks/oui-spy",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Maker standard-board listing",
+        "url": "https://colonelpanic.tech/#products",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Current installer and interface guide",
+        "url": "https://colonelpanichacks.github.io/oui-spy-unified-blue/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Unified Blue",
+        "url": "https://github.com/colonelpanichacks/oui-spy-unified-blue",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "OUI-SPY Foxhunter",
+        "url": "https://github.com/colonelpanichacks/ouispy-foxhunter",
+        "reviewed": "2026-09-15"
+      },
+      {
+        "label": "Flock-You",
+        "url": "https://github.com/colonelpanichacks/flock-you",
+        "reviewed": "2026-09-15"
+      },
+      {
+        "label": "Sky-Spy",
+        "url": "https://github.com/colonelpanichacks/Sky-Spy",
+        "reviewed": "2026-09-15"
+      },
+      {
+        "label": "Unified Blue README at reviewed commit",
+        "url": "https://github.com/colonelpanichacks/oui-spy-unified-blue/blob/d57600044d5cbde5562587ccd4829441fec1cb53/README.md",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "Shop and hub still describe four modes and a development capture branch; current installer and pinned README describe six. Confirm the installed build rather than assuming a retail unit has every current feature.",
+      "The installer text still mentions PCAP over USB, conflicting with the newer pinned README. Browser download is the documented path in that README; no capture path was tested here.",
+      "Standard-board battery capacity, complete package contents, enclosure dimensions and SKU-specific PCB revision are unconfirmed. Battery claims for wearable editions must not be applied to this board.",
+      "A blanket receive-only or no-transmission description would be misleading: several modes expose Wi-Fi access points."
+    ],
+    "notes": [
+      "Reviewed Unified Blue source: d57600044d5cbde5562587ccd4829441fec1cb53. Standalone project features and the combined firmware are not interchangeable."
+    ],
+    "coverage": "reviewed",
+    "testedByUs": false
+  },
+  "radiacode-110": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Radiacode 110 hardware",
+        "rows": [
+          {
+            "label": "Model",
+            "value": "Radiacode 110; SKU RC110",
+            "source": "https://www.radiacode.com/products/radiacode-110",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Scintillator",
+            "value": "CsI(Tl); 14 × 14 × 14 mm; 2.74 cm³ active volume",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Detector assembly",
+            "value": "3.15 cm³ including coating/structure; 6 × 6 mm photosensor",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Energy resolution",
+            "value": "8.4 ±0.3% FWHM, manufacturer specification",
+            "source": "https://www.radiacode.com/products/radiacode-110",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Sensitivity",
+            "value": "77 counts/s per 1 µSv/h for Cs-137, manufacturer specification",
+            "source": "https://www.radiacode.com/products/radiacode-110",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Energy range",
+            "value": "0.02–3 MeV",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Dose-rate specification",
+            "value": "0.01–400 µSv/h; ±15%",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Accumulated-dose range",
+            "value": "0–10 Sv",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Refresh & history",
+            "value": "0.5-second display refresh; last 1000 hours stored standalone",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Body",
+            "value": "127 × 34 × 21 mm; 85 g",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Environment specification",
+            "value": "IP64; −10 to 45 °C; maximum 85% relative humidity",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Power & included accessories",
+        "rows": [
+          {
+            "label": "Battery",
+            "value": "1500 mAh, 3.7 V LiPo",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Runtime",
+            "value": "Up to 290 hours, manufacturer claim",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Charging",
+            "value": "Typical 5 V input; approximately three hours",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Wired connection",
+            "value": "USB 2.0 or higher, Type-C; 500 mA maximum consumption",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Wireless interface",
+            "value": "Bluetooth 4.0 or higher",
+            "source": "https://www.radiacode.com/compare",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Included",
+            "value": "Radiacode 110 and USB 2.0-to-Type-C cable",
+            "source": "https://www.radiacode.com/products/radiacode-110",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Optional cases",
+            "value": "Maker lists silicone and leather cases specifically for 110/Zero",
+            "source": "https://www.radiacode.com/products/radiacode-110",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Charge indication",
+            "value": "Blue indicator remains lit while charging and turns off on completion",
+            "source": "https://radiacode.com/docs/en/100-series/quick-guide-manual",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Phones & computers",
+        "rows": [
+          {
+            "label": "Mobile requirements",
+            "value": "Android 6.0+; iPhone/iPad with iOS 17.0+",
+            "source": "https://radiacode.com/docs/en/100-series/devices/software-connectivity/app-connectivity",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Connect in the app",
+            "value": "Enable device Bluetooth; select it in Radiacode without OS-level pairing or a passcode",
+            "source": "https://radiacode.com/docs/en/100-series/devices/software-connectivity/app-connectivity",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Android cable option",
+            "value": "USB OTG connection supported; requires the appropriate cable/adapter",
+            "source": "https://radiacode.com/docs/en/100-series/devices/software-connectivity/app-connectivity",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Mac option",
+            "value": "iOS app on Apple Silicon with macOS 14.0+",
+            "source": "https://radiacode.com/docs/en/100-series/quick-guide-manual",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Windows requirement",
+            "value": "Official software documentation lists Windows 7 or later",
+            "source": "https://radiacode.com/docs/en/100-series/quick-guide-manual",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Windows connection limit",
+            "value": "Official Windows application is wired-only; third-party BecqMoni provides a separate Bluetooth path",
+            "source": "https://www.radiacode.com/knowledge/bluetooth-connection-requests-passcode?lang=en",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "On-device controls",
+            "value": "Round power/confirm button and up/down rocker; Device info shows serial and firmware version",
+            "source": "https://radiacode.com/docs/en/100-series/quick-guide-manual",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Firmware & support",
+        "rows": [
+          {
+            "label": "Firmware version",
+            "value": "Read the installed version in Device info",
+            "source": "https://radiacode.com/docs/en/100-series/devices/using-the-device/firmware-update",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Desktop update",
+            "value": "Official Windows app prompts for available firmware with device connected directly over USB",
+            "source": "https://radiacode.com/docs/en/100-series/devices/using-the-device/firmware-update",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Bluetooth updates",
+            "value": "Android/iOS update path requires bootloader 4.0 or later",
+            "source": "https://radiacode.com/docs/en/100-series/devices/using-the-device/firmware-update",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Older bootloaders",
+            "value": "Documented Android update path uses USB OTG below bootloader 4.0",
+            "source": "https://radiacode.com/docs/en/100-series/devices/using-the-device/firmware-update",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Update interruption",
+            "value": "Keep power and USB connected until an update finishes; maker support handles recovery problems",
+            "source": "https://radiacode.com/docs/en/100-series/devices/using-the-device/firmware-update",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Support",
+            "value": "support@radiacode.com",
+            "source": "https://www.radiacode.com/knowledge/bluetooth-connection-requests-passcode?lang=en",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Radiacode 110 model and box contents",
+        "url": "https://www.radiacode.com/products/radiacode-110",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Manufacturer comparison: 110 column",
+        "url": "https://www.radiacode.com/compare",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "100-series quick guide",
+        "url": "https://radiacode.com/docs/en/100-series/quick-guide-manual",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Phone connection and minimum OS versions",
+        "url": "https://radiacode.com/docs/en/100-series/devices/software-connectivity/app-connectivity",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Firmware and bootloader update paths",
+        "url": "https://radiacode.com/docs/en/100-series/devices/using-the-device/firmware-update",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Connection troubleshooting and Windows limitation",
+        "url": "https://www.radiacode.com/knowledge/bluetooth-connection-requests-passcode?lang=en",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Official software and manual downloads",
+        "url": "https://www.radiacode.com/downloads?lang=en",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "Installed firmware/bootloader version must be checked on the individual unit; no serial-specific revision was inspected.",
+      "Minimum operating-system versions come from maker documentation; individual host configurations and app feature parity were not tested.",
+      "Runtime, environmental ratings and detector performance are manufacturer specifications, not measurements made by gadgets.sh."
+    ],
+    "notes": [
+      "Technical values refer to the Radiacode 110 column, not Zero, 102, 103 or 103G. This profile covers hardware/software documentation and does not interpret readings or provide health guidance."
+    ],
+    "coverage": "reviewed",
+    "testedByUs": false
+  }
+}

@@ -57,8 +57,8 @@ export function mountTDeck(
   renderer.toneMappingExposure = 1.14;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, .02, 8);
-  const look = new THREE.Vector3(0, .018, 0);
-  camera.position.set(0, .018, .29);
+  const look = new THREE.Vector3();
+  camera.position.set(0, 0, .5);
   camera.lookAt(look);
   const rig = new THREE.Group();
   scene.add(rig);
@@ -116,6 +116,8 @@ export function mountTDeck(
   let yaw = REST_YAW;
   let pitch = REST_PITCH;
   let instanceRoot: THREE.Object3D | undefined;
+  const modelCorners: THREE.Vector3[] = [];
+  const fittedPoint = new THREE.Vector3();
   let velYaw = 0;
   let velPitch = 0;
   let screenUrl = '';
@@ -152,6 +154,7 @@ export function mountTDeck(
       'YXZ',
     );
     rig.position.set(0, Math.sin(time * .7) * .0015 * breathe, 0);
+    fitCamera();
     renderer.render(scene, camera);
     if (moving && ready) requestRender();
   }
@@ -171,26 +174,37 @@ export function mountTDeck(
     render(lastTime);
     callbacks.onReady();
   }
+  function fitCamera() {
+    const tune = getTDeckTune();
+    // Fit all eight rotated corners, including perspective depth. A sphere
+    // fit wastes most of a portrait canvas around the long, narrow antenna.
+    const verticalHalfAngle = THREE.MathUtils.degToRad(CAMERA_FOV) / 2;
+    const tanV = Math.tan(verticalHalfAngle);
+    const tanH = tanV * camera.aspect;
+    let distance = tune.halfHeight / tanV;
+    for (const corner of modelCorners) {
+      fittedPoint.copy(corner).applyEuler(rig.rotation).add(rig.position);
+      distance = Math.max(distance,
+        Math.abs(fittedPoint.x) * 1.04 / tanH + fittedPoint.z,
+        Math.abs(fittedPoint.y) * 1.04 / tanV + fittedPoint.z);
+    }
+    const halfHeight = distance * Math.tan(verticalHalfAngle);
+    const pan = -halfHeight * camera.aspect * THREE.MathUtils.clamp(tune.pan, -.08, .08);
+    look.set(pan, 0, 0);
+    camera.position.set(pan, 0, distance);
+    camera.lookAt(look);
+  }
+
   function resize() {
     const width = Math.max(canvas.clientWidth, 1);
     const height = Math.max(canvas.clientHeight, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(width, height, false);
-    const aspect = width / height;
     const tune = getTDeckTune();
-    // Use .065 so it's large enough without clipping the antenna
-    const halfHeight = Math.max(tune.halfHeight, .065 / aspect);
-    const isMobile = window.innerWidth <= 860;
-    const panOffset = isMobile ? 0 : -0.35;
-    const pan = -halfHeight * aspect * (tune.pan + panOffset);
     renderer.toneMappingExposure = tune.exposure;
     scene.environmentIntensity = tune.envIntensity;
-    camera.aspect = aspect;
+    camera.aspect = width / height;
     camera.fov = CAMERA_FOV;
-    const distance = halfHeight / Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV) / 2);
-    look.set(pan, .018, 0);
-    camera.position.set(pan, .018, distance);
-    camera.lookAt(look);
     camera.updateProjectionMatrix();
     requestRender();
   }
@@ -225,6 +239,20 @@ export function mountTDeck(
       object.material = Array.isArray(object.material) ? object.material.map(polish) : polish(object.material);
     });
     if (!hasScreen || !lcdContext) throw new Error('Model has no usable LCD');
+    // Frame the handset and metal antenna base. The rubber boot and long
+    // flexible whip may extend beyond the stage, keeping the LCD readable.
+    root.updateMatrixWorld(true);
+    const bounds = new THREE.Box3();
+    root.traverse(object => {
+      if (object instanceof THREE.Mesh && !['Antenna_Whip', 'Antenna_Tapered_Boot'].includes(object.name)) {
+        bounds.union(new THREE.Box3().setFromObject(object));
+      }
+    });
+    root.position.sub(bounds.getCenter(new THREE.Vector3()));
+    const halfSize = bounds.getSize(new THREE.Vector3()).multiplyScalar(.5);
+    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+      modelCorners.push(new THREE.Vector3(halfSize.x * x, halfSize.y * y, halfSize.z * z));
+    }
     instanceRoot = root;
     rig.add(root);
     modelLoaded = true;
@@ -301,13 +329,23 @@ export function mountTDeck(
     if (!ready || !event.isPrimary || event.button !== 0) return;
     velYaw = 0;
     velPitch = 0;
-    pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp, dragging: true };
-    canvas.setPointerCapture(event.pointerId);
+    const touch = event.pointerType === 'touch';
+    pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp, dragging: !touch };
+    // Let the browser choose a vertical pan before capturing a touch drag.
+    if (!touch) canvas.setPointerCapture(event.pointerId);
     requestRender();
   }
   function pointerMove(event: PointerEvent) {
     if (pointer?.id !== event.pointerId) return;
     if (!pointer.dragging) {
+      const dx = Math.abs(event.clientX - pointer.startX);
+      const dy = Math.abs(event.clientY - pointer.startY);
+      if (dy > 6 && dy > dx) {
+        pointer = undefined;
+        requestRender();
+        return;
+      }
+      if (dx < 8 || dx < dy * 1.25) return;
       pointer.dragging = true;
       if (!canvas.hasPointerCapture(event.pointerId)) canvas.setPointerCapture(event.pointerId);
     }
@@ -358,7 +396,7 @@ export function mountTDeck(
     else { cancelAnimationFrame(frame); frame = 0; }
   });
   intersection.observe(canvas);
-  canvas.style.touchAction = 'pan-y';
+  canvas.style.touchAction = 'pan-y pinch-zoom';
   canvas.addEventListener('pointerdown', pointerDown);
   canvas.addEventListener('pointermove', pointerMove);
   canvas.addEventListener('pointerup', release);

@@ -22,8 +22,8 @@ import os.log
 /// to finish before the first HELLO, keep asking, and treat the first dropped
 /// stream as the ESP32-S3 re-enumerating rather than as a failure.
 ///
-/// Threading: the file descriptor and every write live on `queue`; the read
-/// loop runs on a background thread and hands bytes back to `queue`; the
+/// Threading: the file descriptor and every write live on `queue`; a nonblocking read
+/// source also runs on `queue`; the
 /// `@Published` properties and `lines` are updated on the main thread, because
 /// they exist to drive a view.
 public final class LSKSerialLink: ObservableObject {
@@ -51,6 +51,8 @@ public final class LSKSerialLink: ObservableObject {
 
     /// Everything below is touched only on `queue`.
     private var fileDescriptor: Int32 = -1
+    private var readSource: DispatchSourceRead?
+    private var sessionGeneration: UInt64 = 0
     private var assembler = LSKLineAssembler()
     private var helloTimer: DispatchSourceTimer?
     private var timeoutTimer: DispatchSourceTimer?
@@ -65,8 +67,7 @@ public final class LSKSerialLink: ObservableObject {
     }
 
     deinit {
-        let fd = fileDescriptor
-        if fd >= 0 { close(fd) }
+        readSource?.cancel()
     }
 
     // MARK: - Discovery
@@ -131,7 +132,8 @@ public final class LSKSerialLink: ObservableObject {
     /// Open one port and hold the link until `disconnect()` or the cable goes.
     public func connect(to path: String) {
         queue.async { [self] in
-            if fileDescriptor >= 0 { teardownPort(sendingGoodbye: false) }
+            sessionGeneration &+= 1
+            teardownPort(sendingGoodbye: false)
             attempt = 0
             beginAttempt(path: path)
         }
@@ -159,10 +161,7 @@ public final class LSKSerialLink: ObservableObject {
     /// without it, it keeps printing to a port nobody is reading.
     public func disconnect() {
         queue.async { [self] in
-            guard fileDescriptor >= 0 else {
-                publishState(.off)
-                return
-            }
+            sessionGeneration &+= 1
             teardownPort(sendingGoodbye: true)
             publishState(.off)
         }
@@ -190,9 +189,8 @@ public final class LSKSerialLink: ObservableObject {
         identified = false
         assembler.reset()
 
-        // O_NONBLOCK for the open itself so a port with no carrier cannot
-        // block the queue forever, then cleared so the configured VMIN/VTIME
-        // decide how long a read waits.
+        // Both opening and reading must be nonblocking. The dispatch source
+        // serializes reads with writes and close; no thread observes a stale fd.
         let fd = open(path, O_RDWR | O_NOCTTY | O_NONBLOCK)
         guard fd >= 0 else {
             let reason = String(cString: strerror(errno))
@@ -203,16 +201,13 @@ public final class LSKSerialLink: ObservableObject {
             ))
             return
         }
-        _ = fcntl(fd, F_SETFL, 0)
 
         var options = termios()
         tcgetattr(fd, &options)
         cfmakeraw(&options)
         options.c_cflag |= UInt(CLOCAL | CREAD)
-        // VMIN 0 with VTIME 2 gives each read a 200 ms ceiling, which is what
-        // lets the read loop notice that the link was closed.
-        options.c_cc.16 = 0
-        options.c_cc.17 = 2
+        options.c_cc.16 = 1 // VMIN; O_NONBLOCK takes precedence.
+        options.c_cc.17 = 0 // VTIME
         cfsetispeed(&options, speed_t(B115200))
         cfsetospeed(&options, speed_t(B115200))
         tcsetattr(fd, TCSANOW, &options)
@@ -232,32 +227,33 @@ public final class LSKSerialLink: ObservableObject {
     }
 
     private func startReadLoop(fd: Int32) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
+        source.setEventHandler { [weak self] in
+            guard let self, self.fileDescriptor == fd else { return }
             var buffer = [UInt8](repeating: 0, count: 1024)
-            while true {
-                guard let self else { return }
-                // Reading `fileDescriptor` off-queue is a deliberate cheap
-                // check: it only ever changes to -1 or to a new descriptor, and
-                // either way this loop's job is to stop.
-                guard self.fileDescriptor == fd else { break }
+            // Bound each turn so commands and cancellation are never starved.
+            for _ in 0..<32 {
                 let count = read(fd, &buffer, buffer.count)
                 if count > 0 {
-                    let chunk = Data(buffer[0..<count])
-                    self.queue.async { self.ingest(chunk, from: fd) }
-                } else if count == 0 {
-                    // With VMIN 0 this is a 200 ms timeout on a live port, and
-                    // an end-of-file on a port whose other side has gone. The
-                    // two are indistinguishable here, so the loop keeps going
-                    // and the identify timeout is what eventually decides.
+                    self.ingest(Data(buffer[..<count]), from: fd)
+                    guard self.fileDescriptor == fd else { return }
+                } else if count < 0 && errno == EINTR {
                     continue
-                } else if errno == EAGAIN || errno == EINTR {
-                    continue
+                } else if count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    return
                 } else {
-                    break
+                    self.streamEnded(fd: fd)
+                    return
                 }
             }
-            self?.queue.async { self?.streamEnded(fd: fd) }
         }
+        // Once cancelled, no event handler can read this descriptor again.
+        // Leave a brief drain interval for BYE before releasing the port.
+        source.setCancelHandler {
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.3) { close(fd) }
+        }
+        readSource = source
+        source.resume()
     }
 
     private func ingest(_ chunk: Data, from fd: Int32) {
@@ -334,8 +330,10 @@ public final class LSKSerialLink: ObservableObject {
         case .retry:
             attempt += 1
             publishState(.connecting(port: path))
+            let generation = sessionGeneration
             queue.asyncAfter(deadline: .now() + timing.reenumerateWait) { [weak self] in
-                self?.beginAttempt(path: path)
+                guard let self, self.sessionGeneration == generation else { return }
+                self.beginAttempt(path: path)
             }
         case .giveUp:
             publishState(.failed(
@@ -380,6 +378,8 @@ public final class LSKSerialLink: ObservableObject {
         }
         if written != data.count {
             Self.logger.error("short write: \(written)/\(data.count) bytes, errno \(errno)")
+            teardownPort(sendingGoodbye: false)
+            publishState(.failed("The USB command could not be written completely. Check the cable and reconnect."))
         }
     }
 
@@ -395,19 +395,15 @@ public final class LSKSerialLink: ObservableObject {
         }
         if sendingGoodbye {
             closingDeliberately = true
-            // Written before the descriptor is dropped, and the descriptor is
-            // not actually closed for another 300 ms, which is what gives the
-            // goodbye time to leave. tcdrain would be the exact tool and is not
-            // used here: on a pty with a slow reader it blocks this queue.
+            // The read source's cancel handler leaves 300 ms for BYE to drain.
+            // tcdrain could block the serial queue on an unresponsive peer.
             writeLine(LSKCommand.goodbye.line + "\n")
         }
         fileDescriptor = -1
         identified = false
         assembler.reset()
-        // The read loop wakes at most 200 ms from now and sees the descriptor
-        // has changed; closing before then would let a reconnect reuse the
-        // number while that loop is still reading it.
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.3) { close(fd) }
+        readSource?.cancel()
+        readSource = nil
     }
 
     private var currentPath: String {

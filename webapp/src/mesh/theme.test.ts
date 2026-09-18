@@ -110,7 +110,7 @@ for (const [name, th] of Object.entries(THEMES)) {
 		// themeTick claro: no pasa por esta cadena, App.css le da la suya sin invert()
 		continue;
 	}
-	if (name === "bone") {
+	if (name === "bone" || name === "slate") {
 		// near-grey theme: the map must stay neutral, no hue to match
 		assert.ok(
 			salida.s < 0.2,

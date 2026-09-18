@@ -5,6 +5,8 @@ import { saveText, stamp } from "../export";
 import { getDeviceLinkState } from "../../lib/deviceLink";
 import { t } from "../i18n";
 import { dateTime, hhmm } from "../fmt";
+import { chatDraftKey, chatDrafts } from "../chatDrafts";
+import { isDemo } from "../demo";
 import "./chat-polish.css";
 
 // in search results the time alone isn't enough: they may be from another day
@@ -46,7 +48,21 @@ export default function Chat({
   onViewOnMap: (num: number) => void;
 }) {
   const s = useSyncExternalStore(subscribe, getSnapshot);
-  const [draft, setDraft] = useState("");
+  const selfKey = s.selfInfo?.publicKey;
+  const ownKey = selfKey && Number.parseInt(selfKey.slice(0, 8), 16) === s.myNodeNum ? selfKey : undefined;
+  const scope = isDemo() ? 'demo' : ownKey
+    ?? (s.myNodeNum === undefined ? 'unlinked' : `radio:${s.myNodeNum.toString(16)}`);
+  const draftKey = chatDraftKey(scope, convo);
+  const currentDraftKey = useRef(draftKey);
+  currentDraftKey.current = draftKey;
+  const savedDraft = useSyncExternalStore(chatDrafts.subscribe, () => chatDrafts.read(draftKey));
+  const draft = savedDraft.text;
+  const setDraft = (text: string) => chatDrafts.write(draftKey, { ...chatDrafts.read(draftKey), text });
+  const replyTo = s.messages.find(message => message.convo === convo && message.id === savedDraft.replyId && message.ts === savedDraft.replyTs);
+  const setReplyTo = (message: Message | undefined) => chatDrafts.write(draftKey, {
+    ...chatDrafts.read(draftKey), replyId: message?.id, replyTs: message?.ts,
+  });
+  const draftBytes = new TextEncoder().encode(draft).length;
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
@@ -61,7 +77,6 @@ export default function Chat({
   const menuTrigger = useRef<HTMLButtonElement | null>(null);
   // the 3 s disarm of the CLEAR confirmation
   const clearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [replyTo, setReplyTo] = useState<Message | undefined>();
   const followLatest = useRef(true);
   const previousView = useRef("");
   const previousLast = useRef("");
@@ -216,19 +231,22 @@ export default function Chat({
     clearUnread(convo);
   }, [convo, msgs.length]);
 
-  // Never carry an armed "clear" or a reply target across conversations
+  // Transient actions and errors belong to the conversation where they began.
   useEffect(() => {
     setConfirmClear(false);
-    setReplyTo(undefined);
-  }, [convo]);
+    setError('');
+    setSendShake(false);
+  }, [draftKey]);
 
-  const channelConvos = [...s.channels.values()].map((c) => ({
-    key: `ch:${c.index}`,
-    label: `#${c.name}`,
-  }));
-  if (channelConvos.length === 0) {
-    channelConvos.push({ key: "ch:0", label: t("LONGFAST") });
-  }
+  const channelKeys = new Set([...s.channels.keys()].map(index => `ch:${index}`));
+  for (const message of s.messages) if (message.convo.startsWith('ch:')) channelKeys.add(message.convo);
+  if (convo.startsWith('ch:')) channelKeys.add(convo);
+  if (!channelKeys.size) channelKeys.add('ch:0');
+  const channelConvos = [...channelKeys].sort((a, b) => Number(a.slice(3)) - Number(b.slice(3))).map(key => {
+    const index = Number(key.slice(3));
+    const channel = s.channels.get(index);
+    return { key, label: channel?.name ? `#${channel.name}` : t('Channel {0}', index) };
+  });
   const dmKeys = new Set(
     s.messages.filter((m) => m.convo.startsWith("dm:")).map((m) => m.convo),
   );
@@ -256,28 +274,33 @@ export default function Chat({
   };
 
   const onSend = async () => {
-    const text = draft.trim();
+    const originalDraft = chatDrafts.read(draftKey);
+    const text = originalDraft.text.trim();
     if (!text) return;
     const existing = new Set(getSnapshot().messages.map((m) => `${m.id}:${m.ts}`));
-    const reply = replyTo;
-    setDraft("");
+    const bytes = new TextEncoder().encode(originalDraft.text).length;
+    if (bytes > 200) {
+      setError(`Message is ${bytes} bytes. Shorten it to 200 bytes or less.`);
+      return;
+    }
+    if (!chatDrafts.take(draftKey)) return;
     setError("");
     setSendShake(false);
-    const rid = replyTo?.id;
-    setReplyTo(undefined);
+    const rid = s.messages.find(message => message.convo === convo && message.id === originalDraft.replyId && message.ts === originalDraft.replyTs)?.id;
     try {
       await sendText(text, convo, rid);
     } catch (e) {
-      setError(t("TX FAILED: {0}", String(e)));
-      setSendShake(true);
+      if (currentDraftKey.current === draftKey) {
+        setError(t("TX FAILED: {0}", String(e)));
+        setSendShake(true);
+      }
       // A disconnected link can reject before creating a retryable chat row.
       // Keep that draft available without duplicating messages already stored.
       const stored = getSnapshot().messages.some((m) =>
         m.mine && m.convo === convo && m.text === text && !existing.has(`${m.id}:${m.ts}`),
       );
       if (!stored) {
-        setDraft((current) => current || draft);
-        setReplyTo((current) => current ?? reply);
+        chatDrafts.restoreIfEmpty(draftKey, originalDraft);
       }
     }
   };
@@ -654,6 +677,7 @@ export default function Chat({
             </button>
           )}
           {error && <p className="error" role="status">{error}</p>}
+          {!savedDraft.persisted && draft && <p className="error" role="status">Browser storage is unavailable. This draft is kept only in the current tab.</p>}
           {replyTo && (
             <div className="reply-bar">
               <span className="dim">
@@ -682,17 +706,17 @@ export default function Chat({
             />
             <span
               className={
-                200 - new TextEncoder().encode(draft).length < 20
+                200 - draftBytes < 20
                   ? "chat-remain warn"
                   : "chat-remain dim"
               }
             >
-              {Math.max(0, 200 - new TextEncoder().encode(draft).length)}
+              {200 - draftBytes}
             </span>
             <button
               type="button"
               className={sendShake ? "primary chat-send is-shake" : "primary chat-send"}
-              disabled={!draft.trim()}
+              disabled={!draft.trim() || draftBytes > 200}
               onClick={() => void onSend()}
             >
               {t("SEND")}

@@ -137,3 +137,63 @@ test('keeps the synthetic bit unassigned in a version 1.0 capture', async () => 
     ),
   );
 });
+
+function fixture(records: Uint8Array[] = [], fileSize = 24, recordSize = 80): ArrayBuffer {
+  const data = new Uint8Array(fileSize + records.reduce((n, r) => n + r.length, 0));
+  data.set(Buffer.from('LSCP'));
+  const view = new DataView(data.buffer);
+  view.setUint16(4, 1, true);
+  view.setUint16(6, 1, true);
+  view.setUint16(8, fileSize, true);
+  view.setUint16(10, recordSize, true);
+  view.setUint32(16, 1_000_000, true);
+  let offset = fileSize;
+  for (const record of records) { data.set(record, offset); offset += record.length; }
+  return data.buffer;
+}
+
+function frameFixture(payload = 'abc', headerSize = 80): Uint8Array {
+  const data = new Uint8Array(headerSize + payload.length);
+  data.set(Buffer.from('LSFR'));
+  const view = new DataView(data.buffer);
+  view.setUint16(4, headerSize, true);
+  view.setUint16(6, 1, true);
+  view.setUint16(8, payload.length, true);
+  view.setUint16(10, payload.length, true);
+  data.set(Buffer.from(payload), headerSize);
+  return data;
+}
+
+test('invalid file sizes produce readable errors instead of invalid offsets', () => {
+  for (const [offset, value] of [[8, 0], [8, 23], [8, 65535], [10, 0], [10, 79]]) {
+    const data = fixture();
+    new DataView(data).setUint16(offset, value, true);
+    assert.throws(() => parseLscap(data), /header/i);
+  }
+});
+
+test('compatible extensions and payload record markers preserve frame boundaries', () => {
+  const capture = parseLscap(fixture([frameFixture('LSFR', 84), frameFixture('odd', 84)], 28, 84));
+  assert.equal(capture.frames.length, 2);
+  assert.equal(capture.trailingBytes, 0);
+  assert.equal(Buffer.from(capture.frames[1].bytes).toString(), 'odd');
+});
+
+test('corrupt layouts and lengths stop recovery before the bad record', () => {
+  for (const [offset, value] of [[4, 79], [4, 84], [6, 2], [8, 256], [10, 1]]) {
+    const bad = frameFixture();
+    new DataView(bad.buffer).setUint16(offset, value, true);
+    const capture = parseLscap(fixture([frameFixture(), bad, frameFixture()]));
+    assert.equal(capture.frames.length, 1);
+    assert.equal(capture.trailingBytes, bad.length + frameFixture().length);
+    assert.match(capture.recoveryMessage!, /byte 107/);
+  }
+});
+
+test('partial last record exposes the recovery reason and keeps preceding frames', () => {
+  const tail = frameFixture().subarray(0, 82);
+  const capture = parseLscap(fixture([frameFixture(), tail]));
+  assert.equal(capture.frames.length, 1);
+  assert.equal(capture.trailingBytes, tail.length);
+  assert.match(capture.recoveryMessage!, /Incomplete payload/);
+});

@@ -164,9 +164,6 @@ struct ChatView: View {
                     messageInput
                 }
             }
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        .toolbar(.hidden, for: .tabBar)
-        #endif
         .onReceive(refreshTimer) { refreshTick = $0 }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -248,6 +245,11 @@ struct ChatView: View {
                             Label("Contact Details", systemImage: "info.circle")
                         }
                         #if !os(watchOS)
+                        if contactStore.reportedPosition(for: contact) != nil {
+                            Button("Show on map", systemImage: "map") {
+                                navigationStore.showNodeOnMap(contact.publicKeyPrefix)
+                            }
+                        }
                         Button { sendLocationAsDM() } label: {
                             Label("Send Location", systemImage: "location.fill")
                         }
@@ -524,9 +526,6 @@ struct ChatView: View {
             // Quote preview bar
             if let quoted = quotedMessage {
                 HStack(spacing: 8) {
-                    Rectangle()
-                        .fill(MeshTheme.accent)
-                        .frame(width: 3)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(quoted.isOutgoing ? "You" : contactStore.displayName(for: contact))
                             .font(.caption2.weight(.semibold))
@@ -544,6 +543,10 @@ struct ChatView: View {
                     }
                     .buttonStyle(.meshPlain)
                     .accessibilityLabel("Remove quoted message")
+                }
+                .padding(.leading, 11)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(MeshTheme.accent).frame(width: 3)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)

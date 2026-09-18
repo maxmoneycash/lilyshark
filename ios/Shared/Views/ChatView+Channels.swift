@@ -57,15 +57,15 @@ struct ChannelChatView: View {
                     messageInput
                 }
             }
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        .toolbar(.hidden, for: .tabBar)
-        #endif
         .alert("Message not sent", isPresented: $showSendError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(messageStoreManager.lastSendError ?? "Your draft is still here. Try again when the deck is ready.")
         }
         .navigationTitle(channelName)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         #if !os(watchOS)
         .sheet(isPresented: $showChannelDetail) {
             ChannelDetailSheet(channelIndex: channelIndex, channelName: channelName, notifyMode: $notifyMode)
@@ -456,6 +456,9 @@ struct RoomChatView: View {
             Text(messageStoreManager.lastSendError ?? "Your draft is still here. Try again when the deck is ready.")
         }
         .navigationTitle(contactStore.displayName(for: contact))
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             #if !os(watchOS)
             ToolbarItem(placement: .automatic) {
@@ -501,7 +504,7 @@ struct RoomChatView: View {
         #endif
         .onAppear {
             isVisible = true
-            navigationStore.visibleConversationKey = contact.publicKeyPrefix
+            navigationStore.visibleConversationKey = isLoggedIn ? contact.publicKeyPrefix : nil
             DispatchQueue.main.async {
                 markAsReadIfVisible()
             }
@@ -529,6 +532,12 @@ struct RoomChatView: View {
         .onChange(of: isLoggedIn) { _, loggedIn in
             if !loggedIn {
                 showManagement = false
+            }
+            if isVisible && navigationStore.isMessagesSectionVisible {
+                navigationStore.visibleConversationKey = loggedIn ? contact.publicKeyPrefix : nil
+                if loggedIn {
+                    DispatchQueue.main.async { markAsReadIfVisible() }
+                }
             }
         }
     }
@@ -595,7 +604,7 @@ struct RoomChatView: View {
     }
 
     private func markAsReadIfVisible() {
-        guard isVisible, navigationStore.isMessagesSectionVisible,
+        guard isLoggedIn, isVisible, navigationStore.isMessagesSectionVisible,
               navigationStore.visibleConversationKey == contact.publicKeyPrefix else { return }
         #if os(macOS)
         guard NSApplication.shared.isUserViewing else { return }
@@ -630,6 +639,14 @@ struct RoomChatView: View {
     }
 
     private var roomLoginPrompt: some View {
+        ScrollView {
+            roomLoginContent
+                .padding(.vertical, Design.Space.section)
+                .padding(.horizontal, Design.Space.regular)
+        }
+    }
+
+    private var roomLoginContent: some View {
         VStack(spacing: 24) {
             Spacer()
 
@@ -640,7 +657,7 @@ struct RoomChatView: View {
                 Text("Login Required")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(MeshTheme.textPrimary)
-                Text("Enter the room server password to view and post messages.")
+                Text("Enter this room's password to join. Your access depends on the room's permissions.")
                     .font(.subheadline)
                     .foregroundStyle(MeshTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -718,16 +735,11 @@ struct RoomChatView: View {
                     }
                 } else {
                     Button(action: login) {
-                        HStack {
-                            Image(systemName: "arrow.right.circle")
-                            Text("Login")
-                        }
-                        .frame(maxWidth: 200)
-                        .padding(.vertical, 10)
-                        .background(MeshTheme.interactiveGreen)
-                        .foregroundStyle(MeshTheme.textOnAccent)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        Label("Log in", systemImage: "arrow.right.circle")
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.meshPrimary)
+                    .padding(.horizontal, 32)
                 }
 
                 if case .loginFailed(let msg) = session.loginState {
@@ -793,6 +805,7 @@ struct RoomChatView: View {
 /// Message bubble for room chat — shows sender name for incoming messages.
 struct RoomMessageBubble: View {
     let message: Message
+    @State private var messageDetails: MessageDetailsSelection?
     @Environment(ContactStore.self) private var contactStore
     @Environment(MessageStoreManager.self) private var messageStoreManager
 
@@ -819,6 +832,25 @@ struct RoomMessageBubble: View {
         return (nil, message.interfaceText)
     }
 
+    @ViewBuilder private var messageActions: some View {
+        Button {
+            messageDetails = MessageDetailsSelection(message: message, conversation: .room, store: messageStoreManager)
+        } label: {
+            Label("Message details", systemImage: "info.circle")
+        }
+        Button {
+            copyToClipboard(senderAndText.text)
+        } label: {
+            Label("Copy", systemImage: "doc.on.doc")
+        }
+        Divider()
+        Button(role: .destructive) {
+            messageStoreManager.deleteMessage(message, in: message.contactKeyHash)
+        } label: {
+            Label("Delete Message", systemImage: "trash")
+        }
+    }
+
     var body: some View {
         let parsed = senderAndText
         HStack {
@@ -841,50 +873,14 @@ struct RoomMessageBubble: View {
                     .foregroundStyle(MeshTheme.textOnAccent)
                     .clipShape(RoundedRectangle(cornerRadius: 18))
 
-                HStack(spacing: 4) {
+                MessageMetadataRow(isOutgoing: message.isOutgoing) {
                     Text(message.timestamp, style: .time)
                         .font(.caption2)
                         .foregroundStyle(MeshTheme.textSecondary)
 
                     if message.isOutgoing {
-                        switch message.status {
-                        case .failed:
-                            HStack(spacing: 2) {
-                                Image(systemName: "exclamationmark.circle")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.disconnected)
-                                Text("Not delivered")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.disconnected)
-                            }
-                        case .retrying:
-                            HStack(spacing: 2) {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                                Text("Retrying (attempt \(message.attempt + 1))...")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                            }
-                        case .flooding:
-                            HStack(spacing: 2) {
-                                Image(systemName: "dot.radiowaves.left.and.right")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                                Text("Flooding...")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                            }
-                        case .delivered:
-                            HStack(spacing: 2) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.accent)
-                            }
-                        default:
-                            Image(systemName: message.status == .sending ? "clock" : "checkmark")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
+                        MessageDeliveryButton(message: message, conversation: .room) {
+                            messageDetails = MessageDetailsSelection(message: message, conversation: .room, store: messageStoreManager)
                         }
                     }
 
@@ -912,45 +908,29 @@ struct RoomMessageBubble: View {
                                 .foregroundStyle(MeshTheme.textSecondary)
                         }
                     }
+
+                    Menu { messageActions } label: {
+                        Label("Message actions", systemImage: "ellipsis")
+                            .labelStyle(.iconOnly)
+                            .font(.caption)
+                            .touchable()
+                    }
+                    .buttonStyle(.meshPlain)
+                    .accessibilityLabel("Message actions")
                 }
                 .padding(.horizontal, 4)
 
-                if message.status == .failed {
-                    Button {
-                        messageStoreManager.retryMessage(message)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Tap to retry")
-                        }
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(MeshTheme.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(MeshTheme.surfaceLight)
-                        .clipShape(Capsule())
-                        .touchable()
-                    }
-                    .buttonStyle(.meshPlain)
+                if message.isOutgoing && message.status == .failed {
+                    MessageSendFailure(message: message)
                 }
             }
             .contentShape(Rectangle())
-            .contextMenu {
-                Button {
-                    copyToClipboard(parsed.text)
-                } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
-                }
-                Divider()
-                Button(role: .destructive) {
-                    messageStoreManager.deleteMessage(message, in: message.contactKeyHash)
-                } label: {
-                    Label("Delete Message", systemImage: "trash")
-                }
-            }
 
             if !message.isOutgoing { Spacer(minLength: 48) }
         }
+        .contentShape(Rectangle())
+        .contextMenu { messageActions }
+        .sheet(item: $messageDetails) { MessageDetailsView(selection: $0) }
     }
 }
 
@@ -982,106 +962,10 @@ struct RepeaterLoginView: View {
                 session: session
             )
         } else {
-            VStack(spacing: 24) {
-                Spacer()
-
-                VStack(spacing: 12) {
-                    let remoteAccent: Color = contact.type == .room ? MeshTheme.remoteRoom : MeshTheme.remoteRepeater
-                    let deviceLabel = contact.type == .room ? "Room Server" : contact.type == .sensor ? "Sensor" : "Repeater"
-                    let deviceIcon = contact.type == .room ? "server.rack" : "antenna.radiowaves.left.and.right"
-                    Image(systemName: deviceIcon)
-                        .font(.largeTitle)
-                        .foregroundStyle(remoteAccent)
-                    Text("\(deviceLabel) Login")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(remoteAccent)
-                    Text("Enter the admin password to manage this \(deviceLabel.lowercased()).")
-                        .font(.subheadline)
-                        .foregroundStyle(MeshTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                }
-
-                VStack(spacing: 12) {
-                    HStack {
-                        Image(systemName: "lock")
-                            .foregroundStyle(MeshTheme.accent)
-                            .frame(width: 24)
-                        #if os(watchOS)
-                        SecureField("Password", text: $password)
-                            .foregroundStyle(MeshTheme.textPrimary)
-                        #else
-                        SecureField("Password", text: $password)
-                            .foregroundStyle(MeshTheme.textPrimary)
-                            .textFieldStyle(MeshTextFieldStyle())
-                            .onSubmit { login() }
-                            .onChange(of: password) { _, new in
-                                if new.count > 15 { password = String(new.prefix(15)) }
-                            }
-                        #endif
-                    }
-                    .padding(.horizontal, 32)
-
-                    Text("Passwords are case-sensitive, max 15 characters.")
-                        .font(.caption2)
-                        .foregroundStyle(MeshTheme.textSecondary)
-
-                    #if !os(watchOS)
-                    Toggle("Remember Password", isOn: $rememberPassword)
-                        .font(.subheadline)
-                        .foregroundStyle(MeshTheme.accent)
-                        .padding(.horizontal, 32)
-                    #endif
-
-                    if isLoggingIn {
-                        HStack(spacing: 16) {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                                .tint(MeshTheme.textSecondary)
-                            Text("Logging in...")
-                                .foregroundStyle(MeshTheme.textSecondary)
-                            Button("Cancel") {
-                                remoteSessionManager.cancelLogin(for: contact)
-                            }
-                            .foregroundStyle(.red)
-                        }
-                    } else {
-                        Button(action: login) {
-                            HStack {
-                                Image(systemName: "arrow.right.circle")
-                                Text("Login")
-                            }
-                            .frame(maxWidth: 200)
-                            .padding(.vertical, 10)
-                            .background(MeshTheme.interactiveGreen)
-                            .foregroundStyle(MeshTheme.textOnAccent)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                    }
-
-                    if case .loginFailed(let msg) = session.loginState {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle")
-                                .foregroundStyle(.red)
-                            Text(msg)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
-
-                    if KeychainManager.hasPassword(forDevice: contact.publicKey) {
-                        Button(role: .destructive) {
-                            KeychainManager.deleteAllPasswords(forDevice: contact.publicKey)
-                            password = ""
-                        } label: {
-                            Label("Forget Saved Password", systemImage: "trash")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.meshPlain)
-                    }
-                }
-
-                Spacer()
+            ScrollView {
+                repeaterLoginContent
+                    .padding(.vertical, Design.Space.section)
+                    .padding(.horizontal, Design.Space.regular)
             }
             .background(MeshTheme.background)
             .navigationTitle(contactStore.displayName(for: contact))
@@ -1090,6 +974,105 @@ struct RepeaterLoginView: View {
                     password = saved
                 }
             }
+        }
+    }
+
+    private var repeaterLoginContent: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(spacing: 12) {
+                let remoteAccent: Color = contact.type == .room ? MeshTheme.remoteRoom : MeshTheme.remoteRepeater
+                let deviceLabel = contact.type == .room ? "Room Server" : contact.type == .sensor ? "Sensor" : "Repeater"
+                let deviceIcon = contact.type == .room ? "server.rack" : "antenna.radiowaves.left.and.right"
+                Image(systemName: deviceIcon)
+                    .font(.largeTitle)
+                    .foregroundStyle(remoteAccent)
+                Text("\(deviceLabel) Login")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(remoteAccent)
+                Text("Enter the admin password to manage this \(deviceLabel.lowercased()).")
+                    .font(.subheadline)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+
+            VStack(spacing: 12) {
+                HStack {
+                    Image(systemName: "lock")
+                        .foregroundStyle(MeshTheme.accent)
+                        .frame(width: 24)
+                    #if os(watchOS)
+                    SecureField("Password", text: $password)
+                        .foregroundStyle(MeshTheme.textPrimary)
+                    #else
+                    SecureField("Password", text: $password)
+                        .foregroundStyle(MeshTheme.textPrimary)
+                        .textFieldStyle(MeshTextFieldStyle())
+                        .onSubmit { login() }
+                        .onChange(of: password) { _, new in
+                            if new.count > 15 { password = String(new.prefix(15)) }
+                        }
+                    #endif
+                }
+                .padding(.horizontal, 32)
+
+                Text("Passwords are case-sensitive, max 15 characters.")
+                    .font(.caption2)
+                    .foregroundStyle(MeshTheme.textSecondary)
+
+                #if !os(watchOS)
+                Toggle("Remember Password", isOn: $rememberPassword)
+                    .font(.subheadline)
+                    .foregroundStyle(MeshTheme.accent)
+                    .padding(.horizontal, 32)
+                #endif
+
+                if isLoggingIn {
+                    HStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .tint(MeshTheme.textSecondary)
+                        Text("Logging in...")
+                            .foregroundStyle(MeshTheme.textSecondary)
+                        Button("Cancel") {
+                            remoteSessionManager.cancelLogin(for: contact)
+                        }
+                        .foregroundStyle(.red)
+                    }
+                } else {
+                    Button(action: login) {
+                        Label("Log in", systemImage: "arrow.right.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.meshPrimary)
+                    .padding(.horizontal, 32)
+                }
+
+                if case .loginFailed(let msg) = session.loginState {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                        Text(msg)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                if KeychainManager.hasPassword(forDevice: contact.publicKey) {
+                    Button(role: .destructive) {
+                        KeychainManager.deleteAllPasswords(forDevice: contact.publicKey)
+                        password = ""
+                    } label: {
+                        Label("Forget Saved Password", systemImage: "trash")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.meshPlain)
+                }
+            }
+
+            Spacer()
         }
     }
 

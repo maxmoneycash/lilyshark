@@ -31,7 +31,8 @@ struct SettingsView: View {
     #if !os(watchOS)
     @Environment(RFMonitorStore.self) var rfMonitorStore
     #endif
-    @AppStorage("appTheme") var appTheme: String = AppTheme.system.rawValue
+    @AppStorage("appTheme") var appTheme: String = AppTheme.light.rawValue
+    @AppStorage("batteryChemistry") var batteryChemistryRaw: String = BatteryChemistry.lipo.rawValue
     @AppStorage("maxMessagesPerContact") var maxMessagesPerContact: Int = 500
     @AppStorage("iCloudSyncEnabled") var iCloudSyncEnabled: Bool = true
     @State var statsExpanded = false

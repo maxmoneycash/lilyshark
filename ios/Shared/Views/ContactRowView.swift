@@ -14,9 +14,11 @@ import MeshCoreKit
 /// A single contact row in the sidebar — displays name, status, path, last message, unread badge.
 struct ContactRowView: View {
     let contact: Contact
+    var isConversation = false
     @Environment(ContactStore.self) private var contactStore
     @Environment(MessageStoreManager.self) private var messageStoreManager
     @Environment(RemoteSessionManager.self) private var remoteSessionManager
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     /// Passed from parent list — ticks every 30s to refresh relative time text.
     var refreshTick: Date = Date()
@@ -24,16 +26,20 @@ struct ContactRowView: View {
     private var latestMessage: Message? {
         messageStoreManager.messages(for: contact).last
     }
+    private var draft: String { messageStoreManager.loadDraft(for: contact.publicKeyPrefix) }
 
     var body: some View {
-        HStack(spacing: 12) {
-            contactIcon
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Design.Space.tight))
+            : AnyLayout(HStackLayout(spacing: Design.Space.snug))
+        return layout {
+            if !typeSize.isAccessibilitySize { contactIcon }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(contactStore.displayName(for: contact))
                         .font(.headline)
                         .foregroundStyle(MeshTheme.textPrimary)
-                        .lineLimit(1)
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                     loginBadge
                 }
                 if contactStore.nickname(for: contact) != nil, !contact.name.isEmpty {
@@ -41,7 +47,12 @@ struct ContactRowView: View {
                         .font(.caption2)
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
-                if let latestMessage {
+                if !draft.isEmpty {
+                    Text(draft)
+                        .font(.subheadline)
+                        .foregroundStyle(MeshTheme.textSecondary)
+                        .lineLimit(2)
+                } else if let latestMessage {
                     Text(latestMessage.isOutgoing ? "You: \(latestMessage.interfaceText)" : latestMessage.interfaceText)
                         .font(.subheadline)
                         .foregroundStyle(MeshTheme.textSecondary)
@@ -55,10 +66,12 @@ struct ContactRowView: View {
                     lastSeenLine
                 }
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
+            if !typeSize.isAccessibilitySize { Spacer(minLength: Design.Space.tight) }
+            VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 6) {
                 if let latestMessage {
-                    Text(latestMessage.timestamp, format: .dateTime.hour().minute())
+                    Text(Calendar.current.isDateInToday(latestMessage.timestamp)
+                         ? latestMessage.timestamp.formatted(date: .omitted, time: .shortened)
+                         : latestMessage.timestamp.formatted(date: .abbreviated, time: .omitted))
                         .font(.caption)
                         .foregroundStyle(MeshTheme.textSecondary)
                         .accessibilityLabel(latestMessage.timestamp.formatted(date: .abbreviated, time: .shortened))
@@ -109,8 +122,8 @@ struct ContactRowView: View {
         }()
 
         let liveContact = contactStore.contacts.first(where: { $0.publicKeyPrefix == contact.publicKeyPrefix }) ?? contact
-        let statusColor = contactStore.contactStatusColor(for: liveContact)
-        let statusLabel = contactStore.contactStatusLabel(for: liveContact)
+        let statusColor = isConversation ? MeshTheme.accent : contactStore.contactStatusColor(for: liveContact)
+        let statusLabel = isConversation ? "Conversation" : contactStore.contactStatusLabel(for: liveContact)
         ZStack {
             Circle()
                 .fill(statusColor.opacity(0.15))

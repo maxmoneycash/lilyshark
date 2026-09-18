@@ -5,6 +5,7 @@ import MeshCoreKit
 /// and room messages. Input stays intact until the store accepts a send.
 struct MessageComposer: View {
     @Binding var text: String
+    @Environment(\.dynamicTypeSize) private var typeSize
     let budget: MessageTextBudget
     let isConnected: Bool
     var sendLabel = "Send message"
@@ -16,8 +17,8 @@ struct MessageComposer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Design.Space.tight) {
             HStack(alignment: .bottom, spacing: Design.Space.snug) {
-                TextField("Type a message…", text: $text, axis: .vertical)
-                    .lineLimit(1...5)
+                TextField("Message", text: $text, axis: .vertical)
+                    .lineLimit(1...(typeSize.isAccessibilitySize ? 3 : 5))
                     .font(Design.Text.message)
                     .submitLabel(.send)
                     .padding(.horizontal, Design.Space.regular)
@@ -53,8 +54,15 @@ struct MessageComposer: View {
                     .foregroundStyle(MeshTheme.textSecondary)
             }
             if !isConnected {
-                Button("Connect a deck to send", systemImage: "antenna.radiowaves.left.and.right", action: connect)
+                Button(action: connect) {
+                    if typeSize.isAccessibilitySize {
+                        Text("Connect radio")
+                    } else {
+                        Label("Connect a deck to send", systemImage: "antenna.radiowaves.left.and.right")
+                    }
+                }
                     .buttonStyle(.meshSecondary)
+                    .accessibilityLabel("Connect a radio to send messages")
             }
         }
         .padding(.horizontal, Design.Space.snug)

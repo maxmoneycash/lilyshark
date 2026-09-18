@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "strategy": "preserve-captured-runtime",
+  "entries": [
+    "react.D20wc1Tc.mjs",
+    "motion.B09WepHq.mjs"
+  ],
+  "files": [
+    {
+      "path": "motion.B09WepHq.mjs",
+      "sha256": "3e821e8b46494bd9f718d1b7ddce95257983e221f8c7744fc7fe8d59b0f5adc5",
+      "bytes": 149903
+    },
+    {
+      "path": "react.D20wc1Tc.mjs",
+      "sha256": "a930de88ebf5a956d682951f1ad00deb1d1860738f0cf51877b95368e5fc059e",
+      "bytes": 144643
+    },
+    {
+      "path": "rolldown-runtime.Dh6celcD.mjs",
+      "sha256": "4cf74e844dce3bc61a15b3687b05aceff75f4da99181156d04f8ef181283f429",
+      "bytes": 629
+    }
+  ]
+}

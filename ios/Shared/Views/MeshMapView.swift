@@ -20,32 +20,7 @@ import MeshtasticKit
 // MARK: - InternetMapNode
 
 /// A node fetched from the MeshCore internet map (map.meshcore.dev).
-struct InternetMapNode: Identifiable, Sendable {
-    /// Stable identity derived from public key (falls back to coordinates + name).
-    var id: String { publicKey.isEmpty ? "\(latitude),\(longitude),\(name)" : publicKey }
-    let name: String
-    let latitude: Double
-    let longitude: Double
-    /// Node type matching MeshCore contact types: 1=chat, 2=repeater, 3=room, 4=sensor.
-    let type: Int
-    let publicKey: String
-    let lastAdvert: String
-    let radioFreq: Double
-    let radioBW: Double
-    let radioSF: Int
-    let radioCR: Int
-
-    /// Human-readable node type label.
-    var typeName: String {
-        switch type {
-        case 1: return "Chat"
-        case 2: return "Repeater"
-        case 3: return "Room"
-        case 4: return "Sensor"
-        default: return "Unknown"
-        }
-    }
-}
+typealias InternetMapNode = PublicMeshNode
 
 // MARK: - NodeCluster
 
@@ -75,7 +50,7 @@ struct NodeCluster: Identifiable {
 ///
 /// **Fetch:** Downloads the JSON node list for display on the in-app map alongside
 /// local mesh contacts.
-@MainActor
+@MainActor @Observable
 final class MeshMapService {
 
     static let shared = MeshMapService()
@@ -85,7 +60,19 @@ final class MeshMapService {
 
     private(set) var nodes: [InternetMapNode] = []
     private(set) var lastFetchError: String?
-    private var lastFetch: Date = .distantPast
+    private(set) var lastFetch: Date = .distantPast
+    private(set) var isLoading = false
+    private var restoredCache = false
+    private struct DirectoryCache: Codable, Sendable {
+        let source: String
+        let fetchedAt: Date
+        let nodes: [PublicMeshNode]
+    }
+    static let sourceURL = URL(string: "https://map.meshcore.io/")!
+    private static var cacheURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Lilyshark/Maps/meshcore-directory.json")
+    }
     private let fetchInterval: TimeInterval = 300  // 5 minutes
 
     private init() {}
@@ -157,12 +144,30 @@ final class MeshMapService {
     /// Fetch internet nodes if the cached data is older than 5 minutes.
     /// Async so callers can await completion before reading `nodes`.
     func fetchIfNeeded() async {
+        await restoreDirectory()
         guard Date().timeIntervalSince(lastFetch) > fetchInterval else { return }
         await fetch()
     }
 
+    private func restoreDirectory() async {
+        guard !restoredCache else { return }
+        restoredCache = true
+        let url = Self.cacheURL
+        let cached = await Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: url) else { return Optional<DirectoryCache>.none }
+            return try? JSONDecoder().decode(DirectoryCache.self, from: data)
+        }.value
+        guard let cached, lastFetch == .distantPast, cached.source == Self.sourceURL.absoluteString,
+              cached.fetchedAt <= Date().addingTimeInterval(300) else { return }
+        nodes = cached.nodes
+        lastFetch = cached.fetchedAt
+    }
+
     /// Force-refresh the internet node list from map.meshcore.dev.
     func fetch() async {
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
         do {
             var request = URLRequest(url: Self.nodesURL)
             request.timeoutInterval = 15
@@ -170,10 +175,23 @@ final class MeshMapService {
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 throw URLError(.badServerResponse)
             }
-            let decoded = try Self.decodeJSONNodes(from: data)
+            let decoded = try await Task.detached(priority: .userInitiated) {
+                try PublicMeshNode.decodeDirectory(data)
+            }.value
+            try Task.checkCancellation()
             nodes = decoded
             lastFetch = Date()
             lastFetchError = nil
+            let cache = DirectoryCache(source: Self.sourceURL.absoluteString, fetchedAt: lastFetch, nodes: decoded)
+            let url = Self.cacheURL
+            let saved = await Task.detached(priority: .utility) {
+                do {
+                    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try JSONEncoder().encode(cache).write(to: url, options: .atomic)
+                    return true
+                } catch { return false }
+            }.value
+            if !saved { lastFetchError = "The map loaded, but its offline copy could not be saved." }
             DebugLogger.shared.log("MAP FETCH: \(decoded.count) internet nodes", level: .info)
         } catch {
             guard !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
@@ -182,31 +200,6 @@ final class MeshMapService {
         }
     }
 
-    /// Decode JSON array of node objects from the map API.
-    private static func decodeJSONNodes(from data: Data) throws -> [InternetMapNode] {
-        guard let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw URLError(.cannotParseResponse)
-        }
-        return array.compactMap { dict -> InternetMapNode? in
-            guard let lat = dict["adv_lat"] as? Double,
-                  let lon = dict["adv_lon"] as? Double,
-                  lat != 0 || lon != 0,
-                  abs(lat) <= 90, abs(lon) <= 180 else { return nil }
-            let name = dict["adv_name"] as? String ?? "Unknown"
-            let type = dict["type"] as? Int ?? 0
-            let publicKey = dict["public_key"] as? String ?? ""
-            let lastAdvert = dict["last_advert"] as? String ?? ""
-            let params = dict["params"] as? [String: Any] ?? [:]
-            return InternetMapNode(
-                name: name, latitude: lat, longitude: lon, type: type,
-                publicKey: publicKey, lastAdvert: lastAdvert,
-                radioFreq: params["freq"] as? Double ?? 0,
-                radioBW: params["bw"] as? Double ?? 0,
-                radioSF: params["sf"] as? Int ?? 0,
-                radioCR: params["cr"] as? Int ?? 0
-            )
-        }
-    }
 }
 
 // MARK: - MeshMapMessagePackDecoder
@@ -467,12 +460,21 @@ struct RadioMapView: View {
     @State private var visibleRegion: MKCoordinateRegion? = nil
     /// Once positioned, live updates never interrupt a user panning the map.
     @State private var hasSetInitialCamera = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// The selected cluster for the detail sheet/popover.
     @State private var selectedCluster: NodeCluster? = nil
     private enum MapOverlay { case none, linkQuality, coverage }
     /// Which overlay (if any) is active on the map.
     @State private var mapOverlay: MapOverlay = .none
-    @State private var showCoverageInfo = false
+    @State private var showNodes = false
+    @State private var pendingMapNodeKey: Data?
+    @State private var mapFocusGeneration = 0
+    @State private var detailContact: Contact?
+    @State private var pendingConversation: Data?
+    @State private var showInternetNodes = false
+    @State private var requestedPhoneLocation = false
+    @State private var showLocationHelp = false
+    @Environment(\.openURL) private var openURL
     /// Internet map nodes fetched from map.meshcore.dev.
     @State private var internetMapNodes: [InternetMapNode] = []
     @State private var isLoadingInternetNodes = false
@@ -491,44 +493,75 @@ struct RadioMapView: View {
     }
 
     private func centerOnAvailablePosition() {
-        let center = radioCoordinate ?? locationManager.currentLocation?.coordinate ?? mappableContacts.first.flatMap(reportedCoordinate) ?? CLLocationCoordinate2D(latitude: 37.8044, longitude: -122.2712)
-        let region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: Self.initialSpanDegrees, longitudeDelta: Self.initialSpanDegrees))
-        cameraPosition = .region(region)
-        visibleRegion = region
+        guard let coordinate = radioCoordinate ?? mappableContacts.first.flatMap(reportedCoordinate) else { return }
+        center(on: coordinate)
     }
 
-    private var mappableContacts: [Contact] {
-        contactStore.contacts.filter {
-            guard !contactStore.isBlocked($0), reportedCoordinate(for: $0) != nil else { return false }
-            guard radioCoordinate != nil else { return true }
+    private func center(on coordinate: CLLocationCoordinate2D) {
+        let region = MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: Self.initialSpanDegrees, longitudeDelta: Self.initialSpanDegrees))
+        cameraPosition = .region(region)
+        visibleRegion = region
+        navigationStore.mapCamera = cameraPosition
+        navigationStore.mapRegion = region
+        hasSetInitialCamera = true
+    }
+
+    private var selectedNode: Contact? {
+        mapNodes.first { $0.publicKeyPrefix == navigationStore.selectedMapNodeKey }
+    }
+
+    private func focusSelectedNode() {
+        navigationStore.mapNeedsFocus = false
+        guard let node = selectedNode, let coordinate = reportedCoordinate(for: node) else { return }
+        center(on: coordinate)
+        // Recreate only for an explicit focus request. MapKit can otherwise
+        // retain the search keyboard's viewport when the requested coordinate
+        // equals its previous camera binding.
+        mapFocusGeneration += 1
+    }
+
+    private var mapNodes: [Contact] {
+        contactStore.contacts.filter { contact in
+            guard !contactStore.isBlocked(contact) else { return false }
             #if canImport(MeshtasticKit)
-            if connection.isMeshtasticLinkActive,
-               let num = MeshtasticIdentity.nodeNum(forSyntheticKey: $0.publicKey) {
+            if let num = MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) {
                 return num != UInt32(deviceConfig.publicKeyHex, radix: 16)
             }
             #endif
-            return $0.publicKey.hexCompact.lowercased() != deviceConfig.publicKeyHex.lowercased()
+            return contact.publicKey.hexCompact.lowercased() != deviceConfig.publicKeyHex.lowercased()
         }
     }
 
-    private func reportedCoordinate(for contact: Contact) -> CLLocationCoordinate2D? {
-        let latitude: Double
-        let longitude: Double
-        if let position = contactStore.nodePositions[contact.publicKeyPrefix] {
-            latitude = position.latitude
-            longitude = position.longitude
-        } else {
-            #if canImport(MeshtasticKit)
-            // Meshtastic has explicit field presence, including a real 0,0.
-            guard MeshtasticIdentity.nodeNum(forSyntheticKey: contact.publicKey) == nil else { return nil }
-            #endif
-            // MeshCore uses 0,0 for an absent position.
-            guard contact.latitude != 0 || contact.longitude != 0 else { return nil }
-            latitude = contact.latitude
-            longitude = contact.longitude
+    private func restoreMap() {
+        let identity = deviceConfig.publicKeyHex.lowercased()
+        if !identity.isEmpty, navigationStore.mapRadioIdentity != identity {
+            // Keep a request made from node details; discard the previous
+            // radio's camera when switching to another radio.
+            if !navigationStore.mapRadioIdentity.isEmpty && !navigationStore.mapNeedsFocus {
+                navigationStore.selectedMapNodeKey = nil
+            }
+            navigationStore.mapRadioIdentity = identity
+            navigationStore.mapCamera = .automatic
+            navigationStore.mapRegion = nil
         }
-        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-        return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
+        cameraPosition = navigationStore.mapCamera
+        visibleRegion = navigationStore.mapRegion
+        hasSetInitialCamera = visibleRegion != nil
+        if navigationStore.mapNeedsFocus {
+            focusSelectedNode()
+        } else if !hasSetInitialCamera {
+            if selectedNode != nil { focusSelectedNode() }
+            else { centerOnAvailablePosition() }
+        }
+    }
+
+    private var mappableContacts: [Contact] {
+        mapNodes.filter { reportedCoordinate(for: $0) != nil }
+    }
+
+    private func reportedCoordinate(for contact: Contact) -> CLLocationCoordinate2D? {
+        guard let position = contactStore.reportedPosition(for: contact) else { return nil }
+        return CLLocationCoordinate2D(latitude: position.latitude, longitude: position.longitude)
     }
 
     private var linkQualityEntries: [(contact: Contact, snr: Int8)] {
@@ -559,7 +592,7 @@ struct RadioMapView: View {
 
     /// Internet nodes clustered by geographic grid cell at the current zoom level.
     private var clusteredNodes: [NodeCluster] {
-        guard let region = visibleRegion else { return [] }
+        guard showInternetNodes, let region = visibleRegion else { return [] }
         let all = internetMapNodes
         guard !all.isEmpty else { return [] }
 
@@ -649,9 +682,15 @@ struct RadioMapView: View {
 
                 UserAnnotation()
             }
+            .id(mapFocusGeneration)
             .onMapCameraChange(frequency: .onEnd) { context in
+                // A sheet's keyboard can resize the map underneath it. Those
+                // layout changes must not replace the user's saved camera.
+                guard !showNodes, detailContact == nil, selectedCluster == nil else { return }
                 DispatchQueue.main.async {
                     visibleRegion = context.region
+                    navigationStore.mapRegion = context.region
+                    navigationStore.mapCamera = .camera(context.camera)
                     if cameraPosition.positionedByUser { hasSetInitialCamera = true }
                 }
             }
@@ -661,8 +700,24 @@ struct RadioMapView: View {
             .overlay(alignment: .bottomTrailing) {
                 VStack(spacing: Design.Space.tight) {
                     MapCompass(scope: mapScope)
-                    MapUserLocationButton(scope: mapScope).tint(MeshTheme.textPrimary)
+                    Button("Center on my phone", systemImage: "location") {
+                        if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
+                            showLocationHelp = true
+                        } else {
+                            requestedPhoneLocation = true
+                            locationManager.requestPermission()
+                            if let location = locationManager.currentLocation,
+                               location.horizontalAccuracy >= 0, abs(location.timestamp.timeIntervalSinceNow) < 60 {
+                                center(on: location.coordinate)
+                                requestedPhoneLocation = false
+                            }
+                        }
+                    }
+                    .labelStyle(.iconOnly)
+                    .frame(width: Design.minimumTouchTarget, height: Design.minimumTouchTarget)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Design.Radius.control))
                 }
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .padding(.trailing, Design.Space.snug)
                 .padding(.bottom, Design.minimumTouchTarget + Design.Space.loose)
             }
@@ -727,7 +782,7 @@ struct RadioMapView: View {
                         .padding(.vertical, 5)
                         .background(.thinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else if !internetMapNodes.isEmpty {
+                    } else if showInternetNodes && !internetMapNodes.isEmpty {
                         HStack(spacing: 8) {
                             HStack(spacing: 4) {
                                 Circle().fill(MeshTheme.accent).frame(width: 8, height: 8)
@@ -755,7 +810,7 @@ struct RadioMapView: View {
 
                 Spacer()
 
-                if let internetMapError {
+                if showInternetNodes, let internetMapError {
                     VStack(alignment: .leading, spacing: Design.Space.tight) {
                         Label(internetMapError, systemImage: "wifi.exclamationmark")
                             .font(.subheadline)
@@ -777,21 +832,11 @@ struct RadioMapView: View {
                     .padding(.horizontal)
                 }
 
-                if locationManager.authorizationStatus == .denied ||
-                   locationManager.authorizationStatus == .restricted {
-                    Text("Location access denied. Enable in Settings → Privacy → Location Services.")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .padding(8)
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding()
-                }
-                if mappableContacts.isEmpty && internetMapNodes.isEmpty && !isLoadingInternetNodes && internetMapError == nil {
+                if mappableContacts.isEmpty && (!showInternetNodes || internetMapNodes.isEmpty) && !isLoadingInternetNodes && selectedNode == nil && radioCoordinate == nil {
                     ContentUnavailableView(
                         "No shared positions to show",
                         systemImage: "mappin.slash",
-                        description: Text("Contacts appear on the map when a usable position is shared. Nodes without a reported position remain in Messages.")
+                        description: Text("Positions shared by your mesh appear here. Open Nodes to find someone, including nodes without a position.")
                     )
                     .padding(8)
                     .background(.thinMaterial)
@@ -801,22 +846,43 @@ struct RadioMapView: View {
 
                 HStack {
                     Button("Center on my mesh", systemImage: "scope") { centerOnAvailablePosition() }
+                        .disabled(radioCoordinate == nil && mappableContacts.isEmpty)
                         .labelStyle(.iconOnly)
                         .frame(minWidth: Design.minimumTouchTarget, minHeight: Design.minimumTouchTarget)
                         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: Design.Radius.control))
+                    Button { showNodes = true } label: {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            Image(systemName: "list.bullet").accessibilityLabel("Nodes")
+                        } else {
+                            Label("Nodes", systemImage: "list.bullet")
+                        }
+                    }
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, Design.Space.snug)
+                        .frame(minHeight: Design.minimumTouchTarget)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: Design.Radius.control))
                     Spacer()
                     Menu {
+                        Toggle("Internet nodes", isOn: $showInternetNodes)
+                        Divider()
                         Button("No signal overlay") { mapOverlay = .none }
                         Button("Received message SNR") { mapOverlay = .linkQuality }
                         Button("Local reception samples") { mapOverlay = .coverage }
                     } label: {
-                        Label(mapOverlay == .coverage ? "Local reception" : mapOverlay == .linkQuality ? "Message SNR" : "Layers", systemImage: overlayButtonIcon)
+                        Group {
+                            if dynamicTypeSize.isAccessibilitySize {
+                                Image(systemName: overlayButtonIcon).accessibilityLabel("Layers")
+                            } else {
+                                Label(mapOverlay == .coverage ? "Local reception" : mapOverlay == .linkQuality ? "Message SNR" : "Layers", systemImage: overlayButtonIcon)
+                            }
+                        }
                             .font(.subheadline.weight(.medium))
                             .padding(.horizontal, Design.Space.snug)
                             .frame(minHeight: Design.minimumTouchTarget)
                             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: Design.Radius.control))
                     }
                 }
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
                 if mapOverlay != .none {
@@ -829,29 +895,83 @@ struct RadioMapView: View {
                 }
             }
         }
+        .ignoresSafeArea(.keyboard)
         .navigationTitle("Map")
-        .task {
-            // Defer past the current view-update pass to avoid
-            // "Publishing changes from within view updates" warnings.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let node = selectedNode {
+                MapNodeCard(contact: node,
+                    openConversation: { navigationStore.sidebarSelection = .contact(node.publicKeyPrefix) },
+                    openDetails: { detailContact = node },
+                    close: { navigationStore.selectedMapNodeKey = nil })
+            }
+        }
+        .task(id: deviceConfig.publicKeyHex) {
             await Task.yield()
             guard !Task.isCancelled else { return }
-            centerOnAvailablePosition()
-            locationManager.requestPermission()
+            restoreMap()
+        }
+        .task(id: showInternetNodes) {
+            guard showInternetNodes else { return }
             await fetchInternetMapNodes()
         }
         .onDisappear { internetRefreshTask?.cancel() }
+        .onChange(of: showInternetNodes) {
+            if !showInternetNodes { internetRefreshTask?.cancel() }
+        }
+        .onChange(of: navigationStore.mapFocusRequest) { focusSelectedNode() }
+        .onChange(of: mappableContacts.map(\.publicKeyPrefix)) {
+            guard !hasSetInitialCamera else { return }
+            centerOnAvailablePosition()
+        }
         .onChange(of: radioCoordinate?.latitude) {
-            guard !hasSetInitialCamera, radioCoordinate != nil else { return }
+            guard !hasSetInitialCamera else { return }
             centerOnAvailablePosition()
         }
         .onChange(of: radioCoordinate?.longitude) {
-            guard !hasSetInitialCamera, radioCoordinate != nil else { return }
+            guard !hasSetInitialCamera else { return }
             centerOnAvailablePosition()
         }
         .onChange(of: locationManager.currentLocation) { _, location in
-            guard location != nil, !hasSetInitialCamera else { return }
-            hasSetInitialCamera = true
-            centerOnAvailablePosition()
+            guard requestedPhoneLocation, let location, location.horizontalAccuracy >= 0,
+                  abs(location.timestamp.timeIntervalSinceNow) < 60 else { return }
+            requestedPhoneLocation = false
+            center(on: location.coordinate)
+        }
+        .onChange(of: locationManager.authorizationStatus) {
+            if requestedPhoneLocation && (locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted) {
+                requestedPhoneLocation = false
+                showLocationHelp = true
+            }
+        }
+        .alert("Phone location is unavailable", isPresented: $showLocationHelp) {
+            #if os(iOS)
+            Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
+            #endif
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You can browse reported node positions without phone location. To center on your phone, allow location access in Settings.")
+        }
+        .sheet(isPresented: $showNodes, onDismiss: {
+            cameraPosition = navigationStore.mapCamera
+            visibleRegion = navigationStore.mapRegion
+            // Restore the native viewport even when search is cancelled or
+            // the selected node has no coordinate to focus.
+            mapFocusGeneration += 1
+            if let key = pendingMapNodeKey {
+                pendingMapNodeKey = nil
+                navigationStore.selectedMapNodeKey = key
+                focusSelectedNode()
+            }
+        }) {
+            MapNodeList(nodes: mapNodes) { pendingMapNodeKey = $0.publicKeyPrefix }
+        }
+        .sheet(item: $detailContact, onDismiss: {
+            if let key = pendingConversation {
+                pendingConversation = nil
+                navigationStore.sidebarSelection = .contact(key)
+            }
+        }) { contact in
+            ContactDetailSheet(contact: contact) { pendingConversation = $0.publicKeyPrefix }
         }
         .sheet(item: $selectedCluster) { cluster in
             ClusterDetailView(cluster: cluster)
@@ -860,25 +980,25 @@ struct RadioMapView: View {
 
     @MapContentBuilder
     private var localAnnotations: some MapContent {
-                // Local mesh contacts — custom annotations with tap-to-navigate
+                // Selecting a local pin opens its summary without leaving the map.
                 ForEach(mappableContacts) { contact in
                     if let coordinate = reportedCoordinate(for: contact) {
                     Annotation(contactStore.displayName(for: contact),
                                coordinate: coordinate) {
                         Button {
-                            navigationStore.sidebarSelection = .contact(contact.publicKeyPrefix)
+                            navigationStore.selectedMapNodeKey = contact.publicKeyPrefix
                         } label: {
                             Circle()
                                 .fill(contactTypeColor(contact))
-                                .frame(width: 14, height: 14)
+                                .frame(width: selectedNode?.publicKeyPrefix == contact.publicKeyPrefix ? 24 : 14, height: selectedNode?.publicKeyPrefix == contact.publicKeyPrefix ? 24 : 14)
                                 .overlay(Circle().strokeBorder(MeshTheme.surface, lineWidth: 2))
                                 .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
                                 .frame(minWidth: Design.minimumTouchTarget, minHeight: Design.minimumTouchTarget)
                                 .contentShape(Circle())
                         }
                         .buttonStyle(.meshPlain)
-                        .accessibilityLabel("Open \(contactStore.displayName(for: contact))")
-                        .accessibilityHint("Opens this contact in Messages")
+                        .accessibilityLabel("Show \(contactStore.displayName(for: contact)) on map")
+                        .accessibilityHint("Shows the reported position and node actions")
                     }
                     }
                 }

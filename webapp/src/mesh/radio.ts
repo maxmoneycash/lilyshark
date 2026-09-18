@@ -5,9 +5,11 @@ import Constants from "@liamcottle/meshcore.js/src/constants.js";
 import CayenneLpp from "@liamcottle/meshcore.js/src/cayenne_lpp.js";
 import { COOLDOWN_MS, getAlertCfg } from "./alerts";
 import { getDeviceLinkState, sendDeviceLine } from "../lib/deviceLink";
-import { DEMO_NODE_FLOOR, demoSendText, isDemo } from "./demo";
+import { clearDemo, demoSendText, isDemo } from "./demo";
 import { meshtasticBleActive, meshtasticBleRetry, meshtasticBleSendText } from "./meshtasticBle";
 import { t } from "./i18n";
+import { mergeLoadedHistory } from "./historyRecords";
+import { mergeNodeUpdate } from "./nodeUpdates";
 import {
   addLog,
   ContactType,
@@ -97,30 +99,21 @@ function numFromHash(hash: number): number {
 // ── history ─────────────────────────────────────────────────────────────────
 
 export async function loadHistory(): Promise<void> {
-  const msgs = await loadMessages();
-  const nodes = await loadNodes();
-  const wps = await loadWaypoints();
-  for (const n of nodes) {
-    if (n.publicKey) registerKey(bytesOfHex(n.publicKey));
-  }
+  const [msgs, nodes, wps] = await Promise.all([loadMessages(), loadNodes(), loadWaypoints()]);
+  // Saved real history takes priority over an optional sample session.
+  if (nodes.length || msgs.length || wps.length) clearDemo();
   mutate((s) => {
-    s.waypoints = new Map(wps.map((w) => [w.id, w]));
-    // DB first; the radio's dump overwrites field by field what it brings
-    // (upsertNode keeps the previous value when the patch says undefined).
-    // While the demo mesh is up it was seeded before this ran, and a plain
-    // replace would silently wipe it — the seeded entries ride on top of the
-    // DB load and are removed by clearDemo like everywhere else.
-    if (isDemo()) {
-      const merged = new Map(nodes.map((n) => [n.num, n]));
-      for (const [num, n] of s.nodes) if (num >= DEMO_NODE_FLOOR) merged.set(num, n);
-      s.nodes = merged;
-      const demoMsgs = s.messages.filter((m) => m.from >= DEMO_NODE_FLOOR);
-      s.messages = [...msgs, ...demoMsgs].sort((a, b) => a.ts - b.ts);
-    } else {
-      s.messages = msgs;
-      s.nodes = new Map(nodes.map((n) => [n.num, n]));
-    }
+    const merged = mergeLoadedHistory({ messages: msgs,
+      nodes: new Map(nodes.map(n => [n.num, n])),
+      waypoints: new Map(wps.map(w => [w.id, w])),
+    }, s);
+    s.messages = merged.messages;
+    s.nodes = merged.nodes;
+    s.waypoints = merged.waypoints;
   });
+  for (const n of getSnapshot().nodes.values()) {
+    if (n.publicKey && !n.viaDemo) registerKey(bytesOfHex(n.publicKey));
+  }
 }
 
 // A failed IndexedDB write must not take down packet reception, but it can't
@@ -174,7 +167,7 @@ function beep(): void {
 
 // ── store upserts ───────────────────────────────────────────────────────────
 
-function upsertNode(num: number, patch: Partial<NodeEntry>): void {
+function upsertNode(num: number, patch: Partial<NodeEntry>, fromRadio = false): void {
   mutate((s) => {
     const prev = s.nodes.get(num) ?? {
       num,
@@ -182,12 +175,7 @@ function upsertNode(num: number, patch: Partial<NodeEntry>): void {
       shortName: num.toString(16).slice(-4),
       lastHeard: 0,
     };
-    // ponytail: a patch with undefined must NOT overwrite the default/previous
-    // value (e.g. a contact without position must keep the stored one)
-    for (const k of Object.keys(patch) as (keyof NodeEntry)[]) {
-      if (patch[k] === undefined) delete patch[k];
-    }
-    const merged = { ...prev, ...patch };
+    const merged = mergeNodeUpdate(prev, patch, fromRadio);
     s.nodes = new Map(s.nodes).set(num, merged);
     // ponytail: one write per event; IndexedDB handles this rate easily
     saveNode(merged).catch(dbFail(t("node")));
@@ -283,12 +271,16 @@ function setStatus(st: DeviceStatus): void {
 
 // ── contact ingestion ───────────────────────────────────────────────────────
 
+function upsertRadioNode(num: number, patch: Partial<NodeEntry>): void {
+  upsertNode(num, patch, true);
+}
+
 function ingestContact(c: MeshCoreContact): number {
   const num = registerKey(c.publicKey);
   const outPath =
     c.outPathLen > 0 ? Array.from(c.outPath.slice(0, c.outPathLen)) : [];
   const prev = getSnapshot().nodes.get(num);
-  upsertNode(num, {
+  upsertRadioNode(num, {
     publicKey: hexOf(c.publicKey),
     type: c.type as ContactType,
     longName: c.advName || undefined,
@@ -385,7 +377,7 @@ function handleContactMessage(m: MeshCoreContactMessage): void {
   if (getSnapshot().nodes.get(from)?.ignored) return;
   const { myNodeNum } = getSnapshot();
   const nowS = Math.floor(Date.now() / 1000);
-  upsertNode(from, { lastHeard: nowS });
+  upsertRadioNode(from, { lastHeard: nowS });
   ingestMessage({
     id: nextMsgId(),
     convo: "",
@@ -417,7 +409,7 @@ function handleChannelMessage(m: MeshCoreChannelMessage): void {
     }
   }
   if (from !== 0 && getSnapshot().nodes.get(from)?.ignored) return;
-  if (from !== 0) upsertNode(from, { lastHeard: Math.floor(Date.now() / 1000) });
+  if (from !== 0) upsertRadioNode(from, { lastHeard: Math.floor(Date.now() / 1000) });
   ingestMessage({
     id: nextMsgId(),
     convo: "",
@@ -464,7 +456,7 @@ function setMsgState(id: number, ts: number, state: Message["state"], failureRea
       m.id === id && m.ts === ts ? { ...m, state, failureReason } : m,
     );
   });
-  updateMessageState(id, state, failureReason).catch(dbFail(t("message state")));
+  updateMessageState(id, ts, state, failureReason).catch(dbFail(t("message state")));
 }
 
 function onSendConfirmed(p: { ackCode: number; roundTrip: number }): void {
@@ -497,7 +489,7 @@ function wireEvents(c: Connection): void {
     const num = numFromKeyBytes(p.publicKey);
     const name = getSnapshot().nodes.get(num)?.longName ?? `!${num.toString(16)}`;
     addLog("ADVERT from {0}", name);
-    upsertNode(num, { lastHeard: Math.floor(Date.now() / 1000) });
+    upsertRadioNode(num, { lastHeard: Math.floor(Date.now() / 1000) });
     scheduleContactRefresh();
   });
 
@@ -601,7 +593,7 @@ function ingestLpp(from: number, lpp: Uint8Array): void {
       const metric = entry.channel <= 1 ? base : `${base}_ch${entry.channel}`;
       saveTelemetry(from, metric, entry.value, ts).catch(dbFail(t("telemetry")));
       if (metric === "voltage") {
-        upsertNode(from, {
+        upsertRadioNode(from, {
           voltage: entry.value,
           batteryLevel: liPoPercent(entry.value * 1000),
         });
@@ -646,7 +638,7 @@ async function pollSelfTelemetry(): Promise<void> {
     const pct = liPoPercent(bat.batteryMilliVolts);
     saveTelemetry(myNodeNum, "voltage", volts, ts).catch(dbFail(t("telemetry")));
     saveTelemetry(myNodeNum, "batteryLevel", pct, ts).catch(dbFail(t("telemetry")));
-    upsertNode(myNodeNum, {
+    upsertRadioNode(myNodeNum, {
       voltage: volts,
       batteryLevel: pct,
       lastHeard: Math.floor(ts / 1000),
@@ -767,6 +759,7 @@ function waitEvent(c: Connection, event: string, ms: number, what: string): Prom
 }
 
 async function connectWith(make: () => Promise<Connection | null | undefined>): Promise<void> {
+  clearDemo();
   // tear down whatever came before: one link at a time
   const prev = device;
   device = undefined;
@@ -825,7 +818,7 @@ async function configure(c: Connection): Promise<void> {
       manualAddContacts: info.manualAddContacts !== 0,
     };
   });
-  upsertNode(myNum, {
+  upsertRadioNode(myNum, {
     publicKey: hexOf(info.publicKey),
     type: ContactType.Chat,
     longName: info.name,

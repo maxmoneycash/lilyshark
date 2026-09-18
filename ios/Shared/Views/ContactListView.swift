@@ -84,22 +84,33 @@ struct ContactListView: View {
     @State var channelsExpanded = true
     @State var conversationSearch = ""
     @State var conversationFilter: ConversationFilter = .all
+    @State var showsContactBook = false
+    var usesConversationInbox: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        !showsContactBook
+        #else
+        false
+        #endif
+    }
     @AppStorage("contactSortByLastSeen") var sortByLastSeen = true
-    @AppStorage("channelsFirst") var channelsFirst = false
+    @AppStorage("channelsFirst") var channelsFirst = true
 
     /// A freshly paired deck has a public channel and no contacts. Put that
     /// conversation on screen instead of burying it under an empty-contacts block.
     var showsChannelsFirst: Bool {
-        channelsFirst || contactStore.contacts.isEmpty
+        usesConversationInbox || channelsFirst || contactStore.contacts.isEmpty
     }
     #if os(iOS)
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State var navigateToMap = false
     @State var navigateToTools = false
+    @State private var showNewMessage = false
+    @State private var newConversation: SidebarSelection?
     #endif
     /// Local selection state decoupled from ViewModel to avoid
     /// "Publishing changes from within view updates" when List writes to selection.
     @State var localSelection: SidebarSelection? = nil
+    @State private var initializedSelection = false
 
     /// Public Channel virtual contact key (channel 0).
     let publicChannelKey = Data([0x00 as UInt8])
@@ -129,15 +140,13 @@ struct ContactListView: View {
 
     private var contactListNavigation: some View {
         mainListWithGroupSheets
-        // The wordmark rather than the word. The web app's header and the
-        // deck's splash both draw this same SVG, so a system-font "Lilyshark"
-        // here was the one place the three surfaces disagreed about what the
-        // product looks like.
-        //
-        // The accessibility label carries the name, because a screen reader
-        // must still hear "Lilyshark" and not silence -- the image is the
-        // brand, the text is the meaning, and both have to be present.
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        .navigationTitle(showsContactBook ? "Contacts" : conversationFilter == .all ? "Messages" : conversationFilter.rawValue)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .tabBar)
+        #else
         .lilysharkNavigationTitle()
+        #endif
         .searchable(text: $conversationSearch, prompt: "Contacts, channels, or node ID")
         .onChange(of: conversationSearch) { _, _ in revealFilteredConversations() }
         .onChange(of: conversationFilter) { _, _ in revealFilteredConversations() }
@@ -170,9 +179,16 @@ struct ContactListView: View {
         }
         // Sync ViewModel → local selection (for programmatic navigation from other code)
         .onChange(of: navigationStore.sidebarSelection) { _, newValue in
+            revealSelectedInfrastructure(newValue)
             if localSelection != newValue {
                 localSelection = newValue
             }
+        }
+        .onAppear {
+            guard !initializedSelection else { return }
+            initializedSelection = true
+            revealSelectedInfrastructure(navigationStore.sidebarSelection)
+            localSelection = navigationStore.sidebarSelection
         }
         #if os(watchOS)
         .toolbar {
@@ -203,23 +219,50 @@ struct ContactListView: View {
         }
         #else
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    connectionManager.sendAdvertise(type: 1)
-                    showAdvertSent?.wrappedValue = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        showAdvertSent?.wrappedValue = false
+            if showsContactBook {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Messages", systemImage: "chevron.left") {
+                        showsContactBook = false
+                        conversationSearch = ""
+                        conversationFilter = .all
                     }
-                } label: {
-                    Image(systemName: showAdvertSent?.wrappedValue == true
-                          ? "checkmark.circle.fill" : "antenna.radiowaves.left.and.right")
-                        .foregroundStyle(showAdvertSent?.wrappedValue == true ? .green : MeshTheme.accent)
                 }
-                .accessibilityLabel("Advertise")
-                .disabled(connectionManager.connectionState != .ready)
+            } else {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Picker("Conversations", selection: $conversationFilter) {
+                            ForEach(ConversationFilter.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                    } label: {
+                        Label(conversationFilter == .all ? "Filters" : conversationFilter.rawValue,
+                              systemImage: "line.3.horizontal.decrease")
+                    }
+                    .accessibilityIdentifier("conversation-filter")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("New message", systemImage: "square.and.pencil") { showNewMessage = true }
+                    .accessibilityIdentifier("new-message")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Button {
+                        showsContactBook.toggle()
+                        conversationSearch = ""
+                        conversationFilter = .all
+                    } label: {
+                        Label(showsContactBook ? "Show conversations" : "Manage contacts", systemImage: "person.crop.rectangle.stack")
+                    }
+                    Divider()
+                    if !connectionManager.isMeshtasticLinkActive {
+                        Button {
+                            connectionManager.sendAdvertise(type: 1)
+                            showAdvertSent?.wrappedValue = true
+                        } label: {
+                            Label("Announce presence", systemImage: "antenna.radiowaves.left.and.right")
+                        }
+                        .disabled(connectionManager.connectionState != .ready)
+                    }
                     Button {
                         connectionManager.refreshAll(contactStore: contactStore)
                     } label: {
@@ -227,10 +270,12 @@ struct ContactListView: View {
                     }
                     .disabled(connectionManager.connectionState != .ready)
                     Divider()
-                    Button {
-                        showDiscover?.wrappedValue = true
-                    } label: {
-                        Label("Discover Nodes", systemImage: "binoculars.fill")
+                    if !connectionManager.isMeshtasticLinkActive {
+                        Button {
+                            showDiscover?.wrappedValue = true
+                        } label: {
+                            Label("Discover Nodes", systemImage: "binoculars.fill")
+                        }
                     }
                     Button {
                         navigationStore.section = .map
@@ -255,6 +300,22 @@ struct ContactListView: View {
                 }
                 .accessibilityLabel("More")
             }
+        }
+        .sheet(isPresented: $showNewMessage, onDismiss: {
+            if let newConversation {
+                showsContactBook = false
+                navigationStore.sidebarSelection = newConversation
+                self.newConversation = nil
+            }
+        }) {
+            NavigationStack {
+                NewMessageView { selection in
+                    newConversation = selection
+                    showNewMessage = false
+                }
+                .lilysharkSheet { showNewMessage = false }
+            }
+            .meshTheme()
         }
         #endif
     }
@@ -489,7 +550,12 @@ private extension ContactListView {
 
     @ViewBuilder
     var conversationSections: some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if connectionManager.connectionState != .ready { connectionSection }
+        #else
         connectionSection
+        #endif
+        #if os(macOS) || os(watchOS) || targetEnvironment(macCatalyst)
         if !contactStore.contacts.isEmpty || isFilteringConversations {
             Section {
                 Picker("Show", selection: $conversationFilter) {
@@ -502,21 +568,22 @@ private extension ContactListView {
                 .listRowBackground(MeshTheme.surface)
             }
         }
+        #endif
         if isFilteringConversations && matchingContacts.isEmpty && !hasMatchingChannels {
             conversationSearchEmptyState
         }
         if showsChannelsFirst && (!isFilteringConversations || hasMatchingChannels) {
             channelsSection
         }
-        if !isFilteringConversations && !contactStore.pendingNewContacts.isEmpty {
+        if !usesConversationInbox && !isFilteringConversations && !contactStore.pendingNewContacts.isEmpty {
             pendingContactsSection
         }
-        if !isFilteringConversations && !contactStore.contactGroups.isEmpty {
+        if !usesConversationInbox && !isFilteringConversations && !contactStore.contactGroups.isEmpty {
             groupsSection
         }
         if isFilteringConversations {
             if !matchingContacts.isEmpty { contactsSection }
-        } else if !contactStore.contacts.isEmpty {
+        } else if usesConversationInbox || !contactStore.contacts.isEmpty {
             contactsSection
         }
         if !showsChannelsFirst && (!isFilteringConversations || hasMatchingChannels) {

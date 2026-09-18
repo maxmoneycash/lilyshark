@@ -1,0 +1,26 @@
+{
+  "platformFeeBps": 500,
+  "makers": [
+    {
+      "id": "example-maker",
+      "name": "Example Maker",
+      "email": "orders@example.com",
+      "account": null,
+      "note": "Placeholder used by tests and Stripe test mode. Replace with the first pilot maker; `account` is filled in by /connect/start."
+    }
+  ],
+  "listings": [
+    {
+      "slug": "flipper-zero",
+      "name": "Flipper Zero",
+      "maker": "example-maker",
+      "active": false,
+      "priceCents": 16900,
+      "currency": "usd",
+      "stock": 5,
+      "shipping": { "US": 800, "CA": 1500, "GB": 1800, "DE": 1800, "FR": 1800, "NL": 1800 },
+      "leadTime": "Ships within 3 business days",
+      "note": "Inactive placeholder. Nothing is shown on the site until active is true and the maker has a connected account."
+    }
+  ]
+}

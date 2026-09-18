@@ -961,7 +961,7 @@ final class MessageStoreManager {
         return message
     }
 
-    // MARK: - Echo Detection (0x88)
+    // MARK: - Follow-up Radio Activity (0x88)
 
     func handleLogRxData(snr: Int8) {
         if let pending = pendingChannelEcho {
@@ -969,8 +969,11 @@ final class MessageStoreManager {
             if elapsed < 30 {
                 if var msgs = messagesByContact[pending.channelKey],
                    let msgIdx = msgs.firstIndex(where: { $0.id == pending.id }) {
-                    Self.logger.info("ECHO: 0x88 received \(String(format: "%.1f", elapsed))s after channel send — marking as repeated")
-                    DebugLogger.shared.log("ECHO: repeated after \(String(format: "%.1f", elapsed))s (snr=\(String(format: "%.1f", Float(snr)/4.0)))", level: .info)
+                    // LOG_RX_DATA alone does not correlate traffic to this
+                    // message. Keep the persisted enum compatible, but display
+                    // it as radio activity, never as a confirmed repeat.
+                    Self.logger.info("RX activity \(String(format: "%.1f", elapsed))s after channel send; not matched to message")
+                    DebugLogger.shared.log("RX activity after \(String(format: "%.1f", elapsed))s; repeat unconfirmed (snr=\(String(format: "%.1f", Float(snr)/4.0)))", level: .info)
                     msgs[msgIdx].status = .repeated
                     messagesByContact[pending.channelKey] = msgs
                     persistMessages(for: pending.channelKey)
@@ -1192,8 +1195,9 @@ final class MessageStoreManager {
         for (contactKey, messages) in messagesByContact {
             var updated = messages
             var changed = false
-            for i in updated.indices where updated[i].isOutgoing && updated[i].status == .sending {
+            for i in updated.indices where updated[i].isOutgoing && [.sending, .retrying, .flooding].contains(updated[i].status) {
                 updated[i].status = .failed
+                updated[i].failureReason = "The radio disconnected before delivery was confirmed."
                 changed = true
             }
             if changed {

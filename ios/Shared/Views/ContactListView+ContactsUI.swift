@@ -18,7 +18,7 @@ extension ContactListView {
 
     /// Contacts not assigned to any group — shown in the main Contacts section.
     var ungroupedContacts: [Contact] {
-        if isFilteringConversations { return matchingContacts }
+        if usesConversationInbox || isFilteringConversations { return matchingContacts }
         let grouped = Set(contactStore.contactGroups.flatMap(\.memberPubkeys))
         return contactStore.sortedContacts(byLastSeen: sortByLastSeen).filter {
             !grouped.contains($0.publicKey.hexCompact)
@@ -26,11 +26,13 @@ extension ContactListView {
     }
 
     private var emptyContactsTitle: String {
+        if usesConversationInbox { return "No conversations yet" }
         if !contactStore.contacts.isEmpty { return "Contacts are in groups" }
         return connectionManager.isActivelyConnected ? "No contacts yet" : "Waiting for contacts"
     }
 
     private var emptyContactsDescription: String {
+        if usesConversationInbox { return "Start a new message to a person or room. Your conversations and drafts will appear here." }
         if !contactStore.contacts.isEmpty {
             return "Open a group above to see its contacts. Ungrouped contacts will appear here."
         }
@@ -249,11 +251,40 @@ extension ContactListView {
     }
 
     private var contactsHeaderTitle: some View {
-        Text("Contacts")
+        Text(usesConversationInbox ? "Conversations" : "Contacts")
             .foregroundStyle(MeshTheme.textSecondary)
     }
 
     private var contactsHeaderActions: some View {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        Menu {
+            if !usesConversationInbox {
+                Button {
+                    sortByLastSeen.toggle()
+                } label: {
+                    Label(sortByLastSeen ? "Sort alphabetically" : "Sort by last seen",
+                          systemImage: sortByLastSeen ? "textformat.abc" : "clock")
+                }
+            }
+            Button {
+                isSelecting.toggle()
+                if !isSelecting { selectedContacts.removeAll() }
+            } label: {
+                Label(isSelecting ? "Finish selecting" : "Select contacts", systemImage: "checkmark.circle")
+            }
+            if !connectionManager.isMeshtasticLinkActive {
+                Button { showImportSheet = true } label: {
+                    Label("Paste contact link", systemImage: "doc.on.clipboard")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .foregroundStyle(MeshTheme.accent)
+                .touchable()
+        }
+        .accessibilityLabel("Contact options")
+        .menuIndicator(.hidden)
+        #else
         HStack(spacing: Design.Space.tight) {
             Button {
                 sortByLastSeen.toggle()
@@ -289,6 +320,7 @@ extension ContactListView {
             .buttonStyle(.meshPlain)
             .accessibilityLabel(isSelecting ? Text("Finish selecting contacts") : Text("Select contacts"))
         }
+        #endif
     }
 
     var contactsSection: some View {

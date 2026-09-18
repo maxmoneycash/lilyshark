@@ -13,6 +13,7 @@
  * app is the way to reach the deck.
  */
 
+import { mergeNodeUpdate } from "./nodeUpdates";
 import {
 	BROADCAST,
 	FROMNUM_CHARACTERISTIC,
@@ -100,18 +101,13 @@ function upsertNode(
 ): void {
 	mutate((s) => {
 		const prior = s.nodes.get(num);
-		const entry = prior ?? {
+		const base = prior ?? {
 			num,
 			longName: `!${num.toString(16).padStart(8, "0")}`,
 			shortName: num.toString(16).slice(-4).toUpperCase(),
 			lastHeard: nowS(),
 		};
-		if (patch.longName) entry.longName = patch.longName;
-		if (patch.shortName) entry.shortName = patch.shortName;
-		if (patch.snr !== undefined) entry.snr = patch.snr;
-		if (patch.lat !== undefined) entry.lat = patch.lat;
-		if (patch.lon !== undefined) entry.lon = patch.lon;
-		entry.lastHeard = nowS();
+		const entry = mergeNodeUpdate(base, { ...patch, lastHeard: nowS() }, true);
 		s.nodes = new Map(s.nodes).set(num, entry);
 		if (patch.lat !== undefined) {
 			s.posUpdates = new Map(s.posUpdates).set(num, Date.now());

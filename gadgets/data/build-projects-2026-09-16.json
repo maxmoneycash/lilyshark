@@ -1,0 +1,792 @@
+{
+  "schemaVersion": 1,
+  "sourceReviewedDate": "2026-09-16",
+  "scope": "Credited external build and application guides. Exact named catalog models only; no independent reproduction or compatibility certification.",
+  "projects": [
+    {
+      "id": "cardputer-adv-audio-generator",
+      "title": "Make a pocket audio signal generator",
+      "author": "Siczkoriz",
+      "guideURL": "https://github.com/Siczkoriz/Cardputer-ADV-Function-Generator",
+      "coreCatalogSlugs": [
+        "m5stack-cardputer-adv"
+      ],
+      "coreQuantities": {
+        "m5stack-cardputer-adv": 1
+      },
+      "otherRequired": [
+        "USB-C data cable and programming computer",
+        "3.5 mm audio cable"
+      ],
+      "software": [
+        "Arduino IDE 2.x",
+        "M5Stack board package and the author's listed M5 libraries",
+        "Author's v1.03 sketch"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The author explicitly requires Cardputer ADV and its audio output. The base Cardputer is not substituted.",
+      "gaps": [
+        "Output is not calibrated; true DC offset is not guaranteed. Measure levels before connecting a circuit."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Generate audio waveforms and noise through the Cardputer ADV's built-in headphone output.",
+      "sourceAnchors": [
+        {
+          "url": "https://github.com/Siczkoriz/Cardputer-ADV-Function-Generator",
+          "section": "Hardware Required; Installation; Known Limitations",
+          "supports": "Exact ADV requirement, cables, build instructions and output limitations."
+        },
+        {
+          "url": "https://www.hackster.io/Siczkoriz/cardputer-adv-function-generator-3b0cc3",
+          "section": "Project description",
+          "supports": "The creator's companion project write-up and attribution."
+        }
+      ]
+    },
+    {
+      "id": "pico-2-w-local-weather-station",
+      "title": "Read your local weather in a browser",
+      "author": "Matthew Smith / Micro Center",
+      "guideURL": "https://www.microcenter.com/site/mc-news/article/diy-weather-station.aspx",
+      "coreCatalogSlugs": [
+        "raspberry-pi-pico-2-w"
+      ],
+      "coreQuantities": {
+        "raspberry-pi-pico-2-w": 1
+      },
+      "otherRequired": [
+        "Adafruit BME280 breakout",
+        "Headers and jumper wires, or soldered connections",
+        "USB cable, power and programming computer",
+        "Wi-Fi network and a browser"
+      ],
+      "software": [
+        "Pico 2 W MicroPython firmware",
+        "Thonny and micropython-bme280"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The build and pin mapping explicitly use Pico 2 W with the Adafruit BME280 breakout.",
+      "gaps": [
+        "Other BME280 boards may use different addresses or wiring. Outdoor housing and historical logging require the guide's additional work."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Serve temperature, humidity and pressure readings from a Pico 2 W over your local Wi-Fi network.",
+      "sourceAnchors": [
+        {
+          "url": "https://www.microcenter.com/site/mc-news/article/diy-weather-station.aspx",
+          "section": "Goals and hardware; Preparing the Raspberry Pi Pico 2 W and Adafruit Bosch BME280 sensor; Making sensor data visible on your local network",
+          "supports": "Exact boards, wiring, programming and local browser output."
+        }
+      ]
+    },
+    {
+      "id": "pi-5-case-cyberdeck",
+      "title": "Build a computer inside a carry case",
+      "author": "Brian Corteil / Raspberry Pi",
+      "guideURL": "https://www.raspberrypi.com/news/create-your-own-cyberdeck/",
+      "coreCatalogSlugs": [
+        "raspberry-pi-5"
+      ],
+      "coreQuantities": {
+        "raspberry-pi-5": 1
+      },
+      "otherRequired": [
+        "Touch Display 2 (7-inch) and display cable",
+        "128 GB Raspberry Pi Flash Drive",
+        "Rii RK302 Bluetooth keyboard",
+        "Picade Max USB Audio, encoder and speakers",
+        "Case, mounting panels, wiring and fasteners",
+        "Power system and RTC battery described in the guide"
+      ],
+      "software": [
+        "Raspberry Pi Imager and a selected operating system",
+        "CAD tools for custom mounting parts"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The selected parts list names Raspberry Pi 5; it does not prescribe one RAM capacity.",
+      "gaps": [
+        "This is a fabrication guide, not a complete drop-in enclosure kit. Power design and custom mounting remain build-specific."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Assemble a Pi 5, touchscreen, keyboard and audio system into a custom portable workstation.",
+      "sourceAnchors": [
+        {
+          "url": "https://www.raspberrypi.com/news/create-your-own-cyberdeck/",
+          "section": "Collecting your parts; Building your cyberdeck",
+          "supports": "Named Pi 5 build, selected peripherals and construction process."
+        }
+      ]
+    },
+    {
+      "id": "pi-5-mirrored-home-server",
+      "title": "Build a mirrored home file server",
+      "author": "Ian Webster",
+      "guideURL": "https://www.ianwebster.ca/post/omv-rpi5-build-guide",
+      "coreCatalogSlugs": [
+        "raspberry-pi-5"
+      ],
+      "coreQuantities": {
+        "raspberry-pi-5": 1
+      },
+      "otherRequired": [
+        "Radxa Penta SATA HAT and connection hardware",
+        "Two SATA SSDs for the documented mirror",
+        "Pi 5 cooler and 32 GB microSD card",
+        "Network connection and a power supply suited to the actual drive load"
+      ],
+      "software": [
+        "Raspberry Pi OS Lite",
+        "OpenMediaVault and ZFS",
+        "Optional Docker applications documented by the author"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The guide names Pi 5 and recommends 8 GB RAM for ZFS; the catalog contains multiple memory options.",
+      "gaps": [
+        "The author's power arrangement is specific to his SSD build. Recheck requirements for different drives and current software releases."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Use a Pi 5 and SATA expansion board for mirrored storage managed through OpenMediaVault.",
+      "sourceAnchors": [
+        {
+          "url": "https://www.ianwebster.ca/post/omv-rpi5-build-guide",
+          "section": "1.1 Hardware List; 1.3 Hardware/Software Configuration Overview; 2. Ian's Guide",
+          "supports": "Pi 5, recommended memory, paired SSDs and server configuration."
+        }
+      ]
+    },
+    {
+      "id": "uno-r4-wifi-weather-display",
+      "title": "Put the weather on your board's LED display",
+      "author": "Visual Micro",
+      "guideURL": "https://projecthub.arduino.cc/visualmicro/uno-r4-wifi-weather-dashboard-30d5a0",
+      "coreCatalogSlugs": [
+        "arduino-uno-r4-wifi"
+      ],
+      "coreQuantities": {
+        "arduino-uno-r4-wifi": 1
+      },
+      "otherRequired": [
+        "USB data cable and programming computer",
+        "Wi-Fi internet access",
+        "WeatherAPI account and API key"
+      ],
+      "software": [
+        "Visual Studio with Visual Micro as documented",
+        "Renesas UNO R4 board package",
+        "ArduinoGraphics and ArduinoJson versions listed in the source sketch"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The author uses UNO R4 WiFi's integrated matrix; UNO R4 Minima and older UNO boards are not substitutes.",
+      "gaps": [
+        "The example requests weather over HTTP. Review credential handling and current service/tool terms before use."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Scroll remotely fetched weather conditions across UNO R4 WiFi's built-in LED matrix.",
+      "sourceAnchors": [
+        {
+          "url": "https://projecthub.arduino.cc/visualmicro/uno-r4-wifi-weather-dashboard-30d5a0",
+          "section": "Devices & Components; Software & Tools; WeatherDashboard.ino; Secrets.h",
+          "supports": "Exact board, documented toolchain, dependencies and API requirement."
+        }
+      ]
+    },
+    {
+      "id": "xiao-s3-temperature-color-light",
+      "title": "Make a light change color with temperature",
+      "author": "Seeed Studio / Carla",
+      "guideURL": "https://wiki.seeedstudio.com/led_driver_board/#temp-color-sync-leds",
+      "coreCatalogSlugs": [
+        "seeed-xiao-esp32s3"
+      ],
+      "coreQuantities": {
+        "seeed-xiao-esp32s3": 1
+      },
+      "otherRequired": [
+        "LED Driver Board for XIAO",
+        "Grove DHT11 temperature/humidity sensor",
+        "Addressable LED strip, wiring and matched power supply",
+        "Home Assistant host and Wi-Fi network",
+        "USB data cable and programming computer"
+      ],
+      "software": [
+        "Home Assistant",
+        "ESPHome"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The temperature-color section explicitly lists the base XIAO ESP32S3. Other sections use different XIAO boards.",
+      "gaps": [
+        "The parts table says WS2812 while sample YAML selects ws2813; match the LED type, count and power to your hardware. Current ESPHome compilation is untested."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Use an external temperature sensor to control a color-changing light through an ESPHome setup.",
+      "sourceAnchors": [
+        {
+          "url": "https://wiki.seeedstudio.com/led_driver_board/#temp-color-sync-leds",
+          "section": "Temp-Color Sync LEDs; Play with Home Assistant via ESPHome",
+          "supports": "Exact XIAO model, sensor, driver and temperature-to-color configuration."
+        }
+      ]
+    },
+    {
+      "id": "xiao-s3-wireless-light-meter",
+      "title": "Send light readings to a wireless display",
+      "author": "Seeed Studio / Citric",
+      "guideURL": "https://wiki.seeedstudio.com/xiao_esp32s3_bluetooth/#ble-sensor-data-exchange",
+      "coreCatalogSlugs": [
+        "seeed-xiao-esp32s3"
+      ],
+      "coreQuantities": {
+        "seeed-xiao-esp32s3": 2
+      },
+      "otherRequired": [
+        "Two XIAO Expansion Bases with Grove OLED",
+        "Grove TSL2561 digital light sensor and Grove cable",
+        "XIAO antennas, USB data/power cables and programming computer"
+      ],
+      "software": [
+        "Arduino IDE with XIAO ESP32S3 support",
+        "u8g2 and TSL2561 libraries linked by the guide"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The guide explicitly names two XIAO ESP32S3 boards and includes both base and Sense options; this record selects two base boards.",
+      "gaps": [
+        "One owned board is insufficient for the two-board display build. The older sample is not compiled against today's dependencies."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Link a light sensor and a separate OLED display using two XIAO boards communicating over Bluetooth LE.",
+      "sourceAnchors": [
+        {
+          "url": "https://wiki.seeedstudio.com/xiao_esp32s3_bluetooth/#ble-sensor-data-exchange",
+          "section": "BLE Sensor Data Exchange; Getting Started",
+          "supports": "Two exact boards, sensor, displays, antennas and server/client sketches."
+        }
+      ]
+    },
+    {
+      "id": "t1000-e-meshcore-companion",
+      "title": "Turn your tracker into a MeshCore companion",
+      "author": "Seeed Studio / Michelle Huang",
+      "guideURL": "https://wiki.seeedstudio.com/sensecap_t1000_e_meshcore/",
+      "coreCatalogSlugs": [
+        "sensecap-t1000-e"
+      ],
+      "coreQuantities": {
+        "sensecap-t1000-e": 1
+      },
+      "otherRequired": [
+        "T1000-E USB charging/data cable and computer",
+        "Phone with the MeshCore app",
+        "Another compatible configured node or reachable mesh for communication"
+      ],
+      "software": [
+        "MeshCore Bluetooth companion firmware for the correct T1000-E",
+        "MeshCore app"
+      ],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "Only the catalog's Meshtastic/MeshCore-capable T1000-E. Excludes T1000 A/B and the separate T1000-E for LoRaWAN version.",
+      "gaps": [
+        "Seeed warns not to flash MeshCore or Meshtastic onto the LoRaWAN version. Confirm the variant before following this guide."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Install the documented companion firmware and pair a compatible T1000-E with the MeshCore phone app.",
+      "sourceAnchors": [
+        {
+          "url": "https://wiki.seeedstudio.com/sensecap_t1000_e_meshcore/",
+          "section": "Firmware Flashing; Configuration",
+          "supports": "T1000-E firmware target, USB process, app pairing and radio configuration."
+        },
+        {
+          "url": "https://wiki.seeedstudio.com/t1000e_for_lorawan_introduction/",
+          "section": "Introduction note",
+          "supports": "Explicit prohibition on MeshCore/Meshtastic firmware for the LoRaWAN version."
+        }
+      ]
+    },
+    {
+      "id": "wio-l1-environment-node",
+      "title": "Add environmental readings to your mesh node",
+      "author": "Seeed Studio / Advent Jiang",
+      "guideURL": "https://wiki.seeedstudio.com/get_started_with_meshtastic_wio_tracker_l1/#sensor-connection",
+      "coreCatalogSlugs": [
+        "seeed-wio-tracker-l1"
+      ],
+      "coreQuantities": {
+        "seeed-wio-tracker-l1": 1
+      },
+      "otherRequired": [
+        "Grove BME280 environmental sensor and Grove cable",
+        "Suitable power and the node's band-matched antenna",
+        "USB data cable/computer and a phone for configuration",
+        "Another matching configured node if receiving telemetry remotely"
+      ],
+      "software": [
+        "Meshtastic firmware for Seeed Wio Tracker L1",
+        "Meshtastic app with environment telemetry enabled"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The guide explicitly includes base L1 and names its firmware target. This record selects its listed BME280 sensor option.",
+      "gaps": [
+        "Sensor matching is Seeed's documented claim, not our bench test. Use the correct device target and region; do not generalize to unlisted sensors."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Connect a Grove environmental sensor and enable telemetry and readings on the Wio Tracker L1's display.",
+      "sourceAnchors": [
+        {
+          "url": "https://wiki.seeedstudio.com/get_started_with_meshtastic_wio_tracker_l1/",
+          "section": "Video Tutorial note; Flash Firmware; Sensor connection",
+          "supports": "Explicit base-L1 coverage, firmware target, BME280 listing and telemetry controls."
+        }
+      ]
+    },
+    {
+      "id": "hackrf-one-fm-receiver",
+      "title": "Build an FM receiver in GNU Radio",
+      "author": "Michael Ossmann / Great Scott Gadgets",
+      "guideURL": "https://greatscottgadgets.com/sdr/1/",
+      "coreCatalogSlugs": [
+        "hackrf-one"
+      ],
+      "coreQuantities": {
+        "hackrf-one": 1
+      },
+      "otherRequired": [
+        "FM-band antenna such as ANT500",
+        "Micro-USB data cable and host computer",
+        "Speakers or headphones"
+      ],
+      "software": [
+        "GNU Radio with HackRF support",
+        "Lesson flowgraph matching your GNU Radio version"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The lesson directly lists HackRF One. HackRF Pro and third-party clones are not substituted.",
+      "gaps": [
+        "The original video uses an older GNU Radio interface. Updated flowgraphs and interface errata are linked on the lesson page."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Assemble a receive-only flowgraph to listen to broadcast FM, then add channel controls or a second station.",
+      "sourceAnchors": [
+        {
+          "url": "https://greatscottgadgets.com/sdr/1/",
+          "section": "In this Lesson; Homework; Resources; Errata",
+          "supports": "FM exercise, exact hardware resource and version-specific files."
+        },
+        {
+          "url": "https://greatscottgadgets.com/hackrf/one/",
+          "section": "Hardware description",
+          "supports": "USB host connection and separately required antenna."
+        }
+      ]
+    },
+    {
+      "id": "flipper-zero-personal-ir-remote",
+      "title": "Keep your remote's buttons on your Flipper",
+      "author": "Flipper Devices",
+      "guideURL": "https://docs.flipper.net/zero/infrared/read",
+      "coreCatalogSlugs": [
+        "flipper-zero"
+      ],
+      "coreQuantities": {
+        "flipper-zero": 1
+      },
+      "otherRequired": [
+        "Your original compatible infrared remote",
+        "The appliance you want to control",
+        "microSD card for saved remote files"
+      ],
+      "software": [
+        "Flipper Zero firmware with the Infrared app"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The guide describes Flipper Zero's built-in IR receiver and transmitter. No Wi-Fi board or Flipper One is substituted.",
+      "gaps": [
+        "This applies to compatible infrared remotes, not every RF or Bluetooth remote."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Learn your own infrared remote's buttons, save them as a virtual remote and send them from Flipper Zero.",
+      "sourceAnchors": [
+        {
+          "url": "https://docs.flipper.net/zero/infrared/read",
+          "section": "Capturing infrared signals; Emulating infrared signals",
+          "supports": "Named Flipper Zero workflow for learning, storing and sending IR buttons."
+        },
+        {
+          "url": "https://docs.flipper.net/zero/basics/sd-card",
+          "section": "SD card",
+          "supports": "Storage requirement for saved data; verify the current storage guide before starting."
+        }
+      ]
+    },
+    {
+      "id": "airspy-r2-lan-receiver",
+      "title": "Listen to an Airspy receiver across your local network",
+      "author": "Airspy",
+      "guideURL": "https://airspy.com/quickstart/",
+      "coreCatalogSlugs": [
+        "airspy-r2"
+      ],
+      "coreQuantities": {
+        "airspy-r2": 1
+      },
+      "otherRequired": [
+        "SMA receive antenna for the chosen band and USB data cable",
+        "Windows x86-64 server computer and an SDR# client computer on the same LAN"
+      ],
+      "software": [
+        "Current Windows SPY Server package and SDR#; Airspy USB driver"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "Airspy explicitly lists R2 support. This entry follows the Windows server path; no HF converter is assumed.",
+      "gaps": [
+        "The quickstart's older Linux commands differ from current downloads; Linux x86-64 now requires AVX2 and FMA.",
+        "Multiple clients share center frequency and RF gain. Network capacity limits full-spectrum streaming."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Run SPY Server beside the radio and receive its spectrum in SDR# elsewhere on your LAN.",
+      "sourceAnchors": [
+        {
+          "url": "https://airspy.com/quickstart/",
+          "section": "Using the SPY Server for Remote SDR Operation",
+          "supports": "Server configuration, Windows startup and client-sharing limits."
+        },
+        {
+          "url": "https://airspy.com/download/",
+          "section": "SPY Server — Windows and Linux x86_64",
+          "supports": "Explicit R2 support and current host requirements."
+        },
+        {
+          "url": "https://airspy.com/airspy-r2/",
+          "section": "Specifications",
+          "supports": "Receiver interfaces and native frequency coverage."
+        }
+      ]
+    },
+    {
+      "id": "bus-pirate-5-sht40-readings",
+      "title": "Read temperature and humidity from an I2C sensor",
+      "author": "Bus Pirate documentation team / Dangerous Prototypes",
+      "guideURL": "https://docs.buspirate.com/docs/devices/sht40-sht41-sht43-sht45/",
+      "coreCatalogSlugs": [
+        "bus-pirate-5"
+      ],
+      "coreQuantities": {
+        "bus-pirate-5": 1
+      },
+      "otherRequired": [
+        "One SHT40 breakout, four probe connections, USB-C data cable and host computer"
+      ],
+      "software": [
+        "Bus Pirate 5 Rev. 10 firmware and a serial terminal; the guide also demonstrates the sht4x helper"
+      ],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "The maker's shared guide covers Bus Pirate 5; use the Rev. 10 firmware target. No Bus Pirate 6-only logic-analyzer feature is required.",
+      "gaps": [
+        "Use the guide's 3.3 V supply and pull-ups: SHT4x is not 5 V tolerant.",
+        "A prose step says 0x81, while the demonstrated read uses 0x89. Check the sensor datasheet; no minimum helper-firmware version is given."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Query a sensor directly from the bench and convert its returned bytes into temperature and humidity.",
+      "sourceAnchors": [
+        {
+          "url": "https://docs.buspirate.com/docs/devices/sht40-sht41-sht43-sht45/",
+          "section": "Connections; Setup; Measure temperature and humidity; sht4x Command",
+          "supports": "Wiring, voltage, measurements and source inconsistency."
+        },
+        {
+          "url": "https://docs.buspirate.com/docs/overview/hardware/",
+          "section": "Version comparison; Get a Bus Pirate",
+          "supports": "Shared firmware features and explicit Bus Pirate 5 guide scope."
+        },
+        {
+          "url": "https://docs.buspirate.com/docs/tutorial-basics/quick-setup/",
+          "section": "Plug in the Bus Pirate; Connect with a terminal emulator",
+          "supports": "USB and terminal prerequisites."
+        },
+        {
+          "url": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+          "section": "Bus Pirate 5 Specs",
+          "supports": "Catalog revision identity."
+        }
+      ]
+    },
+    {
+      "id": "heltec-v4-enclosed-meshcore-companion",
+      "title": "Build an enclosed MeshCore handheld with an 18650",
+      "author": "AJ Quick",
+      "guideURL": "https://www.ajquick.com/guides/build-a-heltec-v4-meshcore-companion",
+      "coreCatalogSlugs": [
+        "heltec-lora32-v4"
+      ],
+      "coreQuantities": {
+        "heltec-lora32-v4": 1
+      },
+      "otherRequired": [
+        "One 18650 cell, 16 × 16 mm spring-contact pair, matching battery connector, wire and heat-shrink",
+        "Author's printed case and faceplate, four M2 × 8–10 mm screws, SMA bulkhead/pigtail and band-matched antenna",
+        "3D printer, soldering tools, USB-C data cable, flashing computer and MeshCore phone app"
+      ],
+      "software": [
+        "Revision-matched MeshCore BLE companion firmware; author's separate firmware article describes EasySkyMesh builds"
+      ],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "The build names V4 with OLED but omits its PCB subrevision. R8, display-free and touchscreen-expansion variants are not established by this guide.",
+      "gaps": [
+        "Check case fit, battery-contact polarity and the firmware target before assembly. Optional GNSS is omitted here.",
+        "No runtime or RF-range guarantee; a companion needs reachable MeshCore peers for messaging."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Assemble the author's screw-fastened case around a V4 OLED board and removable battery.",
+      "sourceAnchors": [
+        {
+          "url": "https://www.ajquick.com/guides/build-a-heltec-v4-meshcore-companion",
+          "section": "Files to print; Parts; Test before closing the case",
+          "supports": "Exact named board, parts, STL downloads and assembly checks."
+        },
+        {
+          "url": "https://www.ajquick.com/articles/meshcore-firmware-what-i-run-instead-of-stock",
+          "section": "The power-saving build I use; Do not copy an old firmware filename blindly",
+          "supports": "BLE role and revision-dependent firmware selection."
+        },
+        {
+          "url": "https://heltec.org/project/wifi-lora-32-v4/",
+          "section": "Before You Buy; Firmware for V4.3",
+          "supports": "Manufacturer distinguishes V4, V4-R8 and revision-specific firmware."
+        }
+      ]
+    },
+    {
+      "id": "greatfet-one-spi-led-strip",
+      "title": "Control a clocked LED strip from Python",
+      "author": "Great Scott Gadgets",
+      "guideURL": "https://greatscottgadgets.github.io/greatfet-tutorials/spi.html",
+      "coreCatalogSlugs": [
+        "greatfet-one"
+      ],
+      "coreQuantities": {
+        "greatfet-one": 1
+      },
+      "otherRequired": [
+        "APA102 RGB strip, jumper wires, USB data cable and host computer"
+      ],
+      "software": [
+        "GreatFET Python host package, matching device firmware, interactive shell and bitstring library"
+      ],
+      "hardwareMatch": "exact-model",
+      "variantNotes": "The tutorial explicitly uses GreatFET One. APA102 is clocked SPI hardware; generic single-wire LED strips are not established substitutes.",
+      "gaps": [
+        "The example powers its strip from the 3.3 V header but gives no strip-current budget; check your exact strip before connecting power.",
+        "Match host software and firmware; Linux USB permissions need setup."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Exercise SPI wiring by switching an LED and running the maker's Python color pattern.",
+      "sourceAnchors": [
+        {
+          "url": "https://greatscottgadgets.github.io/greatfet-tutorials/spi.html",
+          "section": "Serial Peripheral Interface (SPI)",
+          "supports": "GreatFET One, APA102 wiring and Python demonstration."
+        },
+        {
+          "url": "https://greatscottgadgets.github.io/greatfet-tutorials/getting-started.html",
+          "section": "Install or Update Software; Connect your GreatFET One; Update Firmware",
+          "supports": "USB0 connection, host permissions and matched firmware."
+        }
+      ]
+    },
+    {
+      "id": "pi-zero-2-w-usb-webcam",
+      "title": "Turn a Pi camera into a USB webcam",
+      "author": "elcalzado / Webcam Pi",
+      "guideURL": "https://github.com/elcalzado/webcampi",
+      "coreCatalogSlugs": [
+        "raspberry-pi-zero-2-w"
+      ],
+      "coreQuantities": {
+        "raspberry-pi-zero-2-w": 1
+      },
+      "otherRequired": [
+        "Raspberry Pi Camera Module 2 (IMX219) and Standard–Mini 15-to-22-pin camera cable",
+        "microSD card, card writer, micro-USB data cable and USB host computer"
+      ],
+      "software": [
+        "Webcam Pi v1.1.1 image, image-writing software and a UVC webcam application"
+      ],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "The maintainer names Zero 2 W and Camera Module 2 in v1.1.1 release notes. Original Zero W and arbitrary cameras are not established alternatives.",
+      "gaps": [
+        "The README still labels IMX219 untested; the later v1.1.1 notes report a maintainer test. That is not testing by gadgets.sh.",
+        "Connect through the USB data/OTG port, not only PWR IN. Flashing replaces the chosen card's contents; preserve existing data."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Install the maintainer's camera image so a USB host can select the Pi as a webcam.",
+      "sourceAnchors": [
+        {
+          "url": "https://github.com/elcalzado/webcampi",
+          "section": "Required Hardware; Installation; Setup; Usage",
+          "supports": "Exact board, image workflow and USB webcam outcome."
+        },
+        {
+          "url": "https://github.com/elcalzado/webcampi/releases/tag/v1.1.1",
+          "section": "v1.1.1 has been tested with",
+          "supports": "Maintainer's Camera Module 2 pairing and downloadable image."
+        },
+        {
+          "url": "https://www.raspberrypi.com/documentation/accessories/camera.html",
+          "section": "Install a Raspberry Pi camera — Step 1. Prepare",
+          "supports": "Standard–Mini cable required by Zero camera connector."
+        }
+      ]
+    },
+    {
+      "id": "nanorfe-plus4-pro-antenna-record",
+      "title": "Record an antenna's SWR sweep",
+      "author": "OwOTech and cho45 / NanoRFE",
+      "guideURL": "https://nanorfe.com/nanovna-v2-user-manual.html",
+      "coreCatalogSlugs": [
+        "nanorfe-nanovna-v2-plus4-pro"
+      ],
+      "coreQuantities": {
+        "nanorfe-nanovna-v2-plus4-pro": 1
+      },
+      "otherRequired": [
+        "Disconnected passive antenna, suitable SMA test cable/adapters and open/short/50-ohm-load calibration standards",
+        "USB data cable, suitable USB power and computer for saving measurements"
+      ],
+      "software": [
+        "NanoVNA-QT from NanoRFE's download page; firmware matching the genuine Plus4 Pro"
+      ],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "The manual explicitly includes Plus4 Pro. This record does not establish compatibility for unrelated NanoVNA-labelled hardware.",
+      "gaps": [
+        "Calibrate the chosen sweep at the antenna connection plane. Keep transmitters/powered RF outputs disconnected and follow the guide's static precautions.",
+        "Maker pages disagree on the upper frequency limit; no operation beyond the store's 4 GHz limit is assumed. SWR alone does not measure radio range.",
+        "Manual revision label is UG1101 2022/02; installed firmware/menu behavior and host compatibility remain to check."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Measure a passive antenna on port 1 and save its reflection data as a reference for later changes.",
+      "sourceAnchors": [
+        {
+          "url": "https://nanorfe.com/nanovna-v2-user-manual.html",
+          "section": "Specifications; Performing measurements; NanoVNA-QT Software",
+          "supports": "Plus4 Pro inclusion, one-port calibration and computer connection."
+        },
+        {
+          "url": "https://nanorfe.com/nanovna-antenna-tuning-swr.html",
+          "section": "What you will need; Steps 1–5",
+          "supports": "Antenna workflow, accessories and static precautions."
+        },
+        {
+          "url": "https://nanorfe.com/nanovna-software.html",
+          "section": "NanoVNA-QT",
+          "supports": "S11 export and host software."
+        },
+        {
+          "url": "https://www.nanorfe.com/shop",
+          "section": "NanoVNA V2 Plus4 Pro",
+          "supports": "Store frequency boundary."
+        }
+      ]
+    },
+    {
+      "id": "reterminal-e1001-weather-dashboard",
+      "title": "Put workshop weather on an e-paper display",
+      "author": "Seeed Studio Wiki",
+      "guideURL": "https://wiki.seeedstudio.com/reterminal_e10xx_with_esphome/",
+      "coreCatalogSlugs": [
+        "seeed-reterminal-e1001"
+      ],
+      "coreQuantities": {
+        "seeed-reterminal-e1001": 1
+      },
+      "otherRequired": [
+        "Home Assistant host with Supervisor, 2.4 GHz Wi-Fi and working Open-Meteo weather integration",
+        "USB-C data cable, power and computer for the initial firmware setup"
+      ],
+      "software": [
+        "ESPHome E1001 configuration, Home Assistant ESPHome integration and the example's Inter font"
+      ],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "Use the cookbook's E1001 weather-display tab and monochrome driver. E1002/E1003/E1004 configurations are different.",
+      "gaps": [
+        "Replace sample entity IDs, network credentials and API settings; the device must be added to Home Assistant before values arrive.",
+        "The E1001 example updates every five minutes; no live-monitor or battery-runtime claim. The guide does not pin an E1001 minimum ESPHome release."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Display Home Assistant weather conditions, temperature and wind bearing on the E1001's e-paper screen.",
+      "sourceAnchors": [
+        {
+          "url": "https://wiki.seeedstudio.com/reterminal_e10xx_with_esphome/",
+          "section": "Materials Required; Getting values from Home Assistant for display — For E1001",
+          "supports": "Exact-model configuration, host prerequisites and displayed weather values."
+        },
+        {
+          "url": "https://wiki.seeedstudio.com/getting_started_with_reterminal_e1001/",
+          "section": "Product Overview; Getting Started",
+          "supports": "E1001 identity, USB setup and 2.4 GHz Wi-Fi."
+        }
+      ]
+    },
+    {
+      "id": "huskylens-2-bench-object-classifier",
+      "title": "Teach a bench camera your own objects",
+      "author": "DFRobot Wiki",
+      "guideURL": "https://wiki.dfrobot.com/sen0638/docs/22617",
+      "coreCatalogSlugs": [
+        "dfrobot-huskylens-2"
+      ],
+      "coreQuantities": {
+        "dfrobot-huskylens-2": 1
+      },
+      "otherRequired": [
+        "Sample objects, suitable USB-C power/data cable and a computer to copy the exported model files"
+      ],
+      "software": [
+        "HUSKYLENS 2's built-in Self-Learning Classifier; computer file manager for backup"
+      ],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "This SEN0638 guide uses the device standalone. Original HUSKYLENS and external-controller compatibility are not assumed.",
+      "gaps": [
+        "Check recognition with your actual objects, lighting and viewpoints; displayed confidence is not measured accuracy.",
+        "Keep both exported .json and .bin files. Copying the setup to a second HUSKYLENS 2 needs another unit; this one-unit record covers learning and backup.",
+        "The guide does not state a minimum firmware version for this function."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Learn and name objects on the touchscreen, inspect recognition results and back up the learned setup over USB.",
+      "sourceAnchors": [
+        {
+          "url": "https://wiki.dfrobot.com/sen0638/docs/22617",
+          "section": "Self-Learning Classification Guide; Parameter Settings; Exporting the Model",
+          "supports": "Learning, naming, threshold adjustment and paired-file export."
+        },
+        {
+          "url": "https://wiki.dfrobot.com/sen0638/docs/22599",
+          "section": "Quick Usage — Power On; Explore Vision Functions",
+          "supports": "Standalone USB-powered operation."
+        },
+        {
+          "url": "https://www.dfrobot.com/product-2995.html",
+          "section": "SKU; Selection Guide",
+          "supports": "SEN0638 model identity and distinction from original HUSKYLENS."
+        }
+      ]
+    }
+  ]
+}

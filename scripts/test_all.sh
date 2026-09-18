@@ -370,6 +370,7 @@ build_and_run meshcore_advert \
 
 echo "Testing lscap_reader"
 python3 -m unittest discover -s test/lscap_reader -p 'test_*.py'
+python3 -m unittest discover -s test/lscap_native -p 'test_*.py'
 
 echo "Testing shelby_pointer_py"
 python3 -m unittest discover -s test/shelby_pointer_py -p 'test_*.py'

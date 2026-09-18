@@ -56,6 +56,12 @@ format or export path records a trustworthy clock anchor.
 Each record header is immediately followed by `captured_length` unmodified
 payload bytes.
 
+Compatibility: browser exports made before the September 2026 writer fix put
+four zero bytes at record offsets 4–7. The web and native app recovery readers
+accept this exact legacy case for version 1.1 files with 80-byte records, using
+the file-level size. New exports write the size and layout version below.
+The strict Python validator continues to require the documented wire format.
+
 | Offset | Size | Field | Unit or encoding |
 | ---: | ---: | --- | --- |
 | 0 | 4 | magic | ASCII `LSFR` |
@@ -86,7 +92,7 @@ payload bytes.
 | 73 | 1 | modulation | `Modulation` enum value |
 | 74 | 1 | direction | `FrameDirection` enum value |
 | 75 | 1 | CRC state | `CrcStatus` enum value |
-| 76 | 1 | metadata flags | bit 0 implicit header; bit 1 inverted IQ; bit 2 synthetic |
+| 76 | 1 | metadata flags | bit 0 implicit header; bit 1 inverted IQ; bit 2 synthetic; bit 3 network relayed |
 | 77 | 3 | reserved | zero |
 
 ### Version 1 enum values

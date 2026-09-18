@@ -22,6 +22,7 @@ struct MessageBubble: View {
     @Environment(MessageStoreManager.self) private var messageStoreManager
     @State private var linkMetadata: LinkPreviewService.LinkMetadata?
     @State private var showPathSheet = false
+    @State private var messageDetails: MessageDetailsSelection?
 
     /// Parse quoted text from message. Supports both formats:
     /// MeshCore One: @[name]\n>preview..\nreply
@@ -46,17 +47,11 @@ struct MessageBubble: View {
         parts.append(quotedText != nil ? replyText : message.interfaceText)
         let fmt = DateFormatter(); fmt.timeStyle = .short; fmt.dateStyle = .none
         parts.append(fmt.string(from: message.timestamp))
-        switch message.status {
-        case .sending: parts.append("Sending")
-        case .sent: parts.append("Sent")
-        case .repeated: parts.append("Sent, repeated by mesh")
-        case .retrying: parts.append("Retrying, attempt \(message.attempt + 1) of 3")
-        case .flooding: parts.append("Flooding mesh network")
-        case .delivered:
-            if let rtt = message.roundTripMs, rtt > 0 {
-                parts.append("Delivered, round trip \(String(format: "%.1f", Double(rtt) / 1000.0)) seconds")
-            } else { parts.append("Delivered") }
-        case .failed: parts.append(message.failureReason ?? "No delivery confirmation")
+        let evidence = MessageDeliveryEvidence(message: message,
+            transport: messageStoreManager.meshtasticNodeNum == 0 ? .meshCore : .meshtastic, conversation: .direct)
+        parts.append(evidence.shortTitle(conversation: .direct))
+        if let milliseconds = evidence.acknowledgedRoundTripMs {
+            parts.append("Acknowledgement round trip \(milliseconds) milliseconds")
         }
         if !message.reactions.isEmpty { parts.append("Reactions: \(message.reactions.map { MessageReaction.label(for: $0) }.joined(separator: ", "))") }
         if message.isSigned { parts.append("Verified") }
@@ -84,6 +79,56 @@ struct MessageBubble: View {
         return message.text
     }
 
+    @ViewBuilder private var messageActions: some View {
+        Button {
+            messageDetails = MessageDetailsSelection(message: message, conversation: .direct, store: messageStoreManager)
+        } label: {
+            Label("Message details", systemImage: "info.circle")
+        }
+        Button {
+            onQuote?(message)
+        } label: {
+            Label("Quote", systemImage: "text.quote")
+        }
+        // Quick reactions
+        Menu {
+            ForEach(MessageReaction.allCases) { reaction in
+                Button {
+                    onReact?(message, reaction.rawValue)
+                } label: {
+                    Label(reaction.label, systemImage: reaction.symbolName)
+                }
+            }
+        } label: {
+            Label("React", systemImage: "face.smiling")
+        }
+        .disabled(!messageStoreManager.canSendMessages)
+        Button {
+            copyToClipboard(message.text)
+        } label: {
+            Label("Copy Text", systemImage: "doc.on.doc")
+        }
+        Button {
+            onForward?(message)
+        } label: {
+            Label("Forward", systemImage: "arrowshape.turn.up.right")
+        }
+        if message.isOutgoing && message.status == .failed {
+            Button {
+                messageStoreManager.retryMessage(message)
+            } label: {
+                Label("Retry Send", systemImage: "arrow.clockwise")
+            }
+            .disabled(!messageStoreManager.canSendMessages)
+        }
+        Divider()
+        Button(role: .destructive) {
+            messageStoreManager.deleteMessage(message, in: message.contactKeyHash)
+        } label: {
+            Label("Delete Message", systemImage: "trash")
+        }
+    }
+
     var body: some View {
         HStack {
             if message.isOutgoing { Spacer(minLength: 48) }
@@ -93,15 +138,14 @@ struct MessageBubble: View {
                     VStack(alignment: .leading, spacing: 4) {
                         // Quoted text block
                         if let quoted = quotedText {
-                            HStack(spacing: 6) {
-                                Rectangle()
-                                    .fill(MeshTheme.accent.opacity(0.6))
-                                    .frame(width: 2)
-                                Text(quoted)
-                                    .font(.caption)
-                                    .foregroundStyle(MeshTheme.textOnAccent.opacity(0.7))
-                                    .lineLimit(2)
-                            }
+                            Text(quoted)
+                                .font(.caption)
+                                .foregroundStyle(MeshTheme.textOnAccent.opacity(0.7))
+                                .lineLimit(2)
+                                .padding(.leading, 8)
+                                .overlay(alignment: .leading) {
+                                    Rectangle().fill(MeshTheme.accent.opacity(0.6)).frame(width: 2)
+                                }
                             .padding(.bottom, 2)
                             .accessibilityLabel("Quoted: \(quoted)")
                         }
@@ -143,13 +187,15 @@ struct MessageBubble: View {
                     }
                 }
 
-                HStack(spacing: 4) {
+                MessageMetadataRow(isOutgoing: message.isOutgoing) {
                     Text(message.timestamp, style: .time)
                         .font(.caption2)
                         .foregroundStyle(MeshTheme.textSecondary)
 
                     if message.isOutgoing {
-                        deliveryIndicator
+                        MessageDeliveryButton(message: message, conversation: .direct) {
+                            messageDetails = MessageDetailsSelection(message: message, conversation: .direct, store: messageStoreManager)
+                        }
                     }
 
                     if !message.isOutgoing {
@@ -201,6 +247,15 @@ struct MessageBubble: View {
                         }
                         .foregroundStyle(MeshTheme.connected)
                     }
+
+                    Menu { messageActions } label: {
+                        Label("Message actions", systemImage: "ellipsis")
+                            .labelStyle(.iconOnly)
+                            .font(.caption)
+                            .touchable()
+                    }
+                    .buttonStyle(.meshPlain)
+                    .accessibilityLabel("Message actions")
                 }
                 .padding(.horizontal, 4)
                 .accessibilityElement(children: .contain)
@@ -210,53 +265,12 @@ struct MessageBubble: View {
                 }
             }
             .contentShape(Rectangle())
-            .contextMenu {
-                Button {
-                    onQuote?(message)
-                } label: {
-                    Label("Quote", systemImage: "text.quote")
-                }
-                // Quick reactions
-                Menu {
-                    ForEach(MessageReaction.allCases) { reaction in
-                        Button {
-                            onReact?(message, reaction.rawValue)
-                        } label: {
-                            Label(reaction.label, systemImage: reaction.symbolName)
-                        }
-                    }
-                } label: {
-                    Label("React", systemImage: "face.smiling")
-                }
-                .disabled(!messageStoreManager.canSendMessages)
-                Button {
-                    copyToClipboard(message.text)
-                } label: {
-                    Label("Copy Text", systemImage: "doc.on.doc")
-                }
-                Button {
-                    onForward?(message)
-                } label: {
-                    Label("Forward", systemImage: "arrowshape.turn.up.right")
-                }
-                if message.isOutgoing && message.status == .failed {
-                    Button {
-                        messageStoreManager.retryMessage(message)
-                    } label: {
-                        Label("Retry Send", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(!messageStoreManager.canSendMessages)
-                }
-                Divider()
-                Button(role: .destructive) {
-                    messageStoreManager.deleteMessage(message, in: message.contactKeyHash)
-                } label: {
-                    Label("Delete Message", systemImage: "trash")
-                }
-            }
 
             if !message.isOutgoing { Spacer(minLength: 48) }
         }
+        .contentShape(Rectangle())
+        .contextMenu { messageActions }
+        .sheet(item: $messageDetails) { MessageDetailsView(selection: $0) }
         .task(id: message.id) {
             guard linkMetadata == nil, let url = firstHTTPURL(in: message.text) else { return }
             linkMetadata = await LinkPreviewService.shared.fetchMetadata(for: url)
@@ -276,74 +290,11 @@ struct MessageBubble: View {
         return url
     }
 
-    @ViewBuilder
-    private var deliveryIndicator: some View {
-        switch message.status {
-        case .sending:
-            Image(systemName: "clock")
-                .font(.caption2)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .accessibilityLabel("Sending")
-        case .sent, .repeated:
-            Image(systemName: "checkmark")
-                .font(.caption2)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .accessibilityLabel(message.status == .repeated ? Text("Sent, repeated by mesh") : Text("Sent"))
-        case .retrying:
-            HStack(spacing: 2) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                Text("Retrying (\(message.attempt + 1)/3)...")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Retrying, attempt \(message.attempt + 1) of 3")
-        case .flooding:
-            HStack(spacing: 2) {
-                Image(systemName: "dot.radiowaves.left.and.right")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                Text("Flooding...")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Flooding mesh network")
-        case .delivered:
-            HStack(spacing: 2) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(MeshTheme.accent)
-                    .accessibilityLabel("Delivered")
-                if let rtt = message.roundTripMs, rtt > 0 {
-                    Text("\u{2022}")
-                        .font(.caption2)
-                        .foregroundStyle(MeshTheme.accent)
-                        .accessibilityHidden(true)
-                    Text(String(format: "%.1fs", Double(rtt) / 1000.0))
-                        .font(.caption2)
-                        .foregroundStyle(MeshTheme.accent)
-                        .accessibilityLabel("Round trip \(String(format: "%.1f", Double(rtt) / 1000.0)) seconds")
-                }
-            }
-        case .failed:
-            HStack(spacing: 2) {
-                Image(systemName: "exclamationmark.circle")
-                    .font(.caption2)
-                    .foregroundStyle(MeshTheme.disconnected)
-                Text("Not delivered")
-                    .font(.caption2)
-                    .foregroundStyle(MeshTheme.disconnected)
-            }
-            .accessibilityLabel("Not delivered")
-        }
-    }
 }
 
 struct ChannelMessageBubble: View {
     let message: Message
+    @State private var messageDetails: MessageDetailsSelection?
     @Environment(ContactStore.self) private var contactStore
     @Environment(DeviceConfig.self) private var deviceConfig
     @Environment(MessageStoreManager.self) private var messageStoreManager
@@ -353,6 +304,50 @@ struct ChannelMessageBubble: View {
             return linkifyMeshcoreURLs(message.text)
         }
         return highlightMentions(in: message.interfaceText, myName: deviceConfig.deviceName)
+    }
+
+    @ViewBuilder private var messageActions: some View {
+        Button {
+            messageDetails = MessageDetailsSelection(message: message, conversation: .channel, store: messageStoreManager)
+        } label: {
+            Label("Message details", systemImage: "info.circle")
+        }
+        Button {
+            copyToClipboard(message.text)
+        } label: {
+            Label("Copy Text", systemImage: "doc.on.doc")
+        }
+        if !message.isOutgoing, let sender = message.senderName, !sender.isEmpty {
+            // Channel reactions (MeshCore One format: emoji@[senderName]\nhash)
+            Menu {
+                ForEach(MessageReaction.allCases) { reaction in
+                    Button {
+                        let hash = messageStoreManager.reactionHash(for: message)
+                        let reactionText = "\(reaction.rawValue)@[\(sender)]\n\(hash)"
+                        guard let chIdx = message.channelIndex,
+                              messageStoreManager.sendChannelMessage(reactionText, channelIndex: chIdx),
+                              messageStoreManager.lastSendError == nil else { return }
+                        messageStoreManager.addReactionLocal(reaction.rawValue, to: message)
+                    } label: {
+                        Label(reaction.label, systemImage: reaction.symbolName)
+                    }
+                }
+            } label: {
+                Label("React", systemImage: "face.smiling")
+            }
+            .disabled(!messageStoreManager.canSendMessages)
+            Button {
+                NotificationCenter.default.post(name: .insertMention, object: sender)
+            } label: {
+                Label("@\(sender)", systemImage: "at")
+            }
+        }
+        Divider()
+        Button(role: .destructive) {
+            messageStoreManager.deleteMessage(message, in: message.contactKeyHash)
+        } label: {
+            Label("Delete Message", systemImage: "trash")
+        }
     }
 
     var body: some View {
@@ -399,34 +394,14 @@ struct ChannelMessageBubble: View {
                     }
                 }
 
-                HStack(spacing: 4) {
+                MessageMetadataRow(isOutgoing: message.isOutgoing) {
                     Text(message.timestamp, style: .time)
                         .font(.caption2)
                         .foregroundStyle(MeshTheme.textSecondary)
 
                     if message.isOutgoing {
-                        switch message.status {
-                        case .failed:
-                            Label("Unconfirmed", systemImage: "exclamationmark.circle.fill")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.disconnected)
-                        case .sending:
-                            Image(systemName: "clock")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                        case .repeated:
-                            HStack(spacing: 2) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.accent)
-                                Text("Repeated")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.accent)
-                            }
-                        default:
-                            Image(systemName: "checkmark")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
+                        MessageDeliveryButton(message: message, conversation: .channel) {
+                            messageDetails = MessageDetailsSelection(message: message, conversation: .channel, store: messageStoreManager)
                         }
                     }
 
@@ -466,6 +441,15 @@ struct ChannelMessageBubble: View {
                         }
                         .foregroundStyle(MeshTheme.connected)
                     }
+
+                    Menu { messageActions } label: {
+                        Label("Message actions", systemImage: "ellipsis")
+                            .labelStyle(.iconOnly)
+                            .font(.caption)
+                            .touchable()
+                    }
+                    .buttonStyle(.meshPlain)
+                    .accessibilityLabel("Message actions")
                 }
                 .padding(.horizontal, 4)
                 if message.isOutgoing && message.status == .failed {
@@ -474,47 +458,12 @@ struct ChannelMessageBubble: View {
             }
             .accessibilityElement(children: .contain)
             .contentShape(Rectangle())
-            .contextMenu {
-                Button {
-                    copyToClipboard(message.text)
-                } label: {
-                    Label("Copy Text", systemImage: "doc.on.doc")
-                }
-                if !message.isOutgoing, let sender = message.senderName, !sender.isEmpty {
-                    // Channel reactions (MeshCore One format: emoji@[senderName]\nhash)
-                    Menu {
-                        ForEach(MessageReaction.allCases) { reaction in
-                            Button {
-                                let hash = messageStoreManager.reactionHash(for: message)
-                                let reactionText = "\(reaction.rawValue)@[\(sender)]\n\(hash)"
-                                guard let chIdx = message.channelIndex,
-                                      messageStoreManager.sendChannelMessage(reactionText, channelIndex: chIdx),
-                                      messageStoreManager.lastSendError == nil else { return }
-                                messageStoreManager.addReactionLocal(reaction.rawValue, to: message)
-                            } label: {
-                                Label(reaction.label, systemImage: reaction.symbolName)
-                            }
-                        }
-                    } label: {
-                        Label("React", systemImage: "face.smiling")
-                    }
-                    .disabled(!messageStoreManager.canSendMessages)
-                    Button {
-                        NotificationCenter.default.post(name: .insertMention, object: sender)
-                    } label: {
-                        Label("@\(sender)", systemImage: "at")
-                    }
-                }
-                Divider()
-                Button(role: .destructive) {
-                    messageStoreManager.deleteMessage(message, in: message.contactKeyHash)
-                } label: {
-                    Label("Delete Message", systemImage: "trash")
-                }
-            }
 
             if !message.isOutgoing { Spacer(minLength: 48) }
         }
+        .contentShape(Rectangle())
+        .contextMenu { messageActions }
+        .sheet(item: $messageDetails) { MessageDetailsView(selection: $0) }
     }
 }
 
@@ -544,6 +493,21 @@ private struct ReactionBadge: View {
 
 // MARK: - Date Separator
 
+/// Keep a readable delivery action when accessibility text no longer fits
+/// alongside the timestamp. The message text keeps the user's chosen size.
+struct MessageMetadataRow<Content: View>: View {
+    let isOutgoing: Bool
+    @ViewBuilder var content: Content
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let layout = isOutgoing && typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .trailing, spacing: Design.Space.hairline))
+            : AnyLayout(HStackLayout(spacing: Design.Space.hairline))
+        layout { content }
+    }
+}
+
 struct DateSeparator: View {
     let date: Date
 
@@ -554,6 +518,8 @@ struct DateSeparator: View {
                 .font(.caption2)
                 .foregroundStyle(MeshTheme.textSecondary)
                 .padding(.horizontal, 8)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
             VStack { Divider() }
         }
         .padding(.vertical, 8)

@@ -64,8 +64,10 @@ assert.match(traffic, /SYNTHETIC · NOT OTA/);
 assert.match(traffic, /SIM DISABLED/);
 assert.match(
   terminal,
-  /demoActive=\{!connected && !lilyLinked && !everConnectedRef\.current\}/,
+  /demoActive=\{demoActive && !connected && !lilyLinked\}/,
 );
+const startup = readFileSync(new URL("../main.tsx", import.meta.url), "utf8");
+assert.doesNotMatch(startup, /seedDemo/);
 
 assert.doesNotMatch(shelby, /\bmeasured\b/i);
 assert.match(shelby, />DEMO RATE</);
@@ -78,7 +80,7 @@ assert.match(shelby, /shelby-hex/);
 assert.match(terminal, /disconnectDeviceLink/);
 assert.match(terminal, /lilyLinked/);
 assert.match(terminal, /T-DECK LINKED/);
-assert.match(terminal, /connect-act-label/);
+assert.match(terminal, /aria-haspopup="dialog"\s+aria-expanded=\{connectOpen\}\s+onClick=\{openConnect\}/);
 assert.match(terminal, /bindAnalyzerMesh/);
 assert.match(terminal, /void connectDeviceLink\(\)/);
 assert.match(nodes, /isDemo\(\) \? " · DEMO" : ""/);
@@ -104,11 +106,11 @@ assert.match(terminal, /setTab\("TELEMETRY"\)/);
 assert.match(telemetry, /ThisDevicePanel/);
 assert.match(telemetry, /telemetry-ranges/);
 assert.match(telemetry, /telemetry-stats/);
-assert.match(telemetry, /LEGEND_ROW_PX/);
+assert.match(telemetry, /setSize\(plotSize\(box, legendRef.current\)\)/);
 assert.doesNotMatch(telemetry, /clientHeight - 80/);
 assert.match(spectrum, /spectrum-toolbar/);
 assert.match(spectrum, /spectrum-panel/);
-assert.match(spectrum, /spectrum-water/);
+assert.match(spectrum, /aria-label="Spectrum waterfall, with the newest sweep at the top"/);
 assert.match(nodes, /ThisDeviceRow/);
 const thisDevice = readFileSync(new URL("./ThisDevice.tsx", import.meta.url), "utf8");
 assert.match(thisDevice, /viewBox/);
@@ -120,7 +122,7 @@ assert.match(chat, /chat-dock/);
 assert.match(chat, /chat-retry/);
 assert.match(chat, /sendShake/);
 assert.match(chat, /aria-haspopup="menu"/);
-assert.match(chat, /openNodeMenu/);
+assert.match(chat, /setMenu\(\{ num: m.from/);
 const meshtermCss = readFileSync(new URL("./meshterm.css", import.meta.url), "utf8");
 assert.match(meshtermCss, /input:focus-visible/);
 assert.match(meshtermCss, /select:focus-visible/);
@@ -134,8 +136,8 @@ assert.match(mapView, /THIS DEVICE/);
 assert.match(traffic, /sim-badge/);
 assert.match(traffic, /traffic-filter/);
 assert.match(traffic, /traffic-empty/);
-assert.match(traffic, /NO CAPTURE OPEN/);
-assert.match(traffic, /lilyshark-connect/);
+assert.match(traffic, /No capture open\./);
+assert.match(traffic, /useDeviceLink/);
 const trafficTable = readFileSync(
   new URL("../components/TrafficFrameTable.tsx", import.meta.url),
   "utf8",
@@ -145,20 +147,18 @@ assert.match(trafficTable, /traffic-scroll/);
 const dialkit = readFileSync(new URL("../components/DialKitDev.tsx", import.meta.url), "utf8");
 const tdeckTune = readFileSync(new URL("../components/tdeck-tune.ts", import.meta.url), "utf8");
 const tdeckScene = readFileSync(new URL("../components/tdeck-scene.ts", import.meta.url), "utf8");
-assert.match(dialkit, /halfHeight/);
-assert.match(dialkit, /TDECK_SCENE/);
-assert.doesNotMatch(dialkit, /exposure:/);
-assert.doesNotMatch(dialkit, /envIntensity:/);
-assert.match(tdeckTune, /TDECK_SCENE/);
-assert.match(tdeckScene, /TDECK_SCENE\.cameraY/);
-assert.match(tdeckScene, /lookAt\(0, camera\.position\.y, 0\)/);
+assert.match(dialkit, /TDECK_TUNE_DEFAULTS/);
+assert.match(tdeckTune, /subscribeTDeckTune/);
+assert.match(tdeckScene, /PerspectiveCamera/);
+assert.match(tdeckScene, /camera\.updateProjectionMatrix\(\)/);
+assert.match(tdeckScene, /camera\.lookAt\(look\)/);
 const mesh = readFileSync(new URL("./screens/Mesh.tsx", import.meta.url), "utf8");
 assert.match(mesh, /mesh-toolbar/);
 assert.match(mesh, /mesh-graph/);
-assert.match(mesh, /Math.max\(mark, 18\)/);
+assert.match(mesh, /r=\{26\}\s+fill="transparent"/);
 const sniffer = readFileSync(new URL("./screens/Sniffer.tsx", import.meta.url), "utf8");
 assert.match(sniffer, /sniffer-empty/);
-assert.match(sniffer, /lilyshark-connect/);
+assert.match(sniffer, /useDeviceLink/);
 assert.match(terminal, /lilyshark-connect/);
 
 console.log("web_truth.test.ts OK");

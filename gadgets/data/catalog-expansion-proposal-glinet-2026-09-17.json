@@ -1,0 +1,1151 @@
+{
+  "catalog": [
+    {
+      "slug": "gl-inet-slate-ax-gl-axt1800",
+      "name": "Slate AX (GL-AXT1800)",
+      "maker": "GL.iNet",
+      "category": "wifi",
+      "status": "listed",
+      "description": "A Wi-Fi 6 travel router with three gigabit ports, USB 3.0, a microSD slot and fast WireGuard on OpenWrt.",
+      "tags": [
+        "Wi-Fi 6",
+        "Travel router",
+        "WireGuard",
+        "OpenWrt"
+      ],
+      "specs": {
+        "processor": "IPQ6000 quad-core 1.2 GHz · 512 MB RAM · 128 MB NAND",
+        "display": "None",
+        "radio": "Wi-Fi 6 (802.11ax): 600 Mbps at 2.4 GHz + 1200 Mbps at 5 GHz · retractable antennas",
+        "power": "USB-C 5 V / 4 A"
+      },
+      "price": "US$119.99",
+      "source": "https://www.gl-inet.com/products/gl-axt1800/",
+      "sourceLabel": "Maker product page",
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Specifications were read from GL.iNet’s product page on 2026-09-17; price US$119.99 and availability are as shown that day.",
+        "GL.iNet sells regional plug variants of the same model; this entry covers the model."
+      ],
+      "extraSources": [
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "wifi"
+        ],
+        "format": "handheld",
+        "goodFor": "A fast, hackable travel router for VPN and repeater use.",
+        "needs": "A 5 V 4 A USB-C supply.",
+        "tradeoff": "No battery.",
+        "capabilities": [
+          "wifi5"
+        ]
+      }
+    },
+    {
+      "slug": "gl-inet-slate-plus-gl-a1300",
+      "name": "Slate Plus (GL-A1300)",
+      "maker": "GL.iNet",
+      "category": "wifi",
+      "status": "listed",
+      "description": "A dual-band travel router with gigabit ports, USB 3.0 and AdGuard Home on OpenWrt.",
+      "tags": [
+        "Wi-Fi 5",
+        "Travel router",
+        "OpenWrt",
+        "AdGuard"
+      ],
+      "specs": {
+        "processor": "IPQ4018 quad-core 717 MHz · 256 MB RAM · 4 MB NOR + 128 MB NAND",
+        "display": "None",
+        "radio": "Wi-Fi 5 (802.11ac): 400 Mbps at 2.4 GHz + 867 Mbps at 5 GHz · two external antennas",
+        "power": "USB-C 5 V / 3 A"
+      },
+      "price": "US$69.99",
+      "source": "https://www.gl-inet.com/products/gl-a1300/",
+      "sourceLabel": "Maker product page",
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Specifications were read from GL.iNet’s product page on 2026-09-17; price US$69.99 and availability are as shown that day.",
+        "GL.iNet sells regional plug variants of the same model; this entry covers the model."
+      ],
+      "extraSources": [
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "wifi"
+        ],
+        "format": "handheld",
+        "goodFor": "A cheaper Slate with gigabit ports for VPN travel.",
+        "needs": "A 5 V 3 A USB-C supply.",
+        "tradeoff": "Wi-Fi 5 only; slower VPN than the Slate AX.",
+        "capabilities": [
+          "wifi5"
+        ]
+      }
+    },
+    {
+      "slug": "gl-inet-opal-gl-sft1200",
+      "name": "Opal (GL-SFT1200)",
+      "maker": "GL.iNet",
+      "category": "wifi",
+      "status": "listed",
+      "description": "A budget dual-band travel router with three gigabit ports and encrypted DNS.",
+      "tags": [
+        "Wi-Fi 5",
+        "Travel router",
+        "Budget"
+      ],
+      "specs": {
+        "processor": "SF19A28 dual-core 1 GHz · 128 MB RAM · 128 MB NAND",
+        "display": "None",
+        "radio": "Wi-Fi 5 (802.11ac): 300 Mbps at 2.4 GHz + 867 Mbps at 5 GHz · two external antennas",
+        "power": "USB-C 5 V / 3 A · under 6 W"
+      },
+      "price": "US$39.99",
+      "source": "https://www.gl-inet.com/products/gl-sft1200/",
+      "sourceLabel": "Maker product page",
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Specifications were read from GL.iNet’s product page on 2026-09-17; price US$39.99 and availability are as shown that day.",
+        "GL.iNet sells regional plug variants of the same model; this entry covers the model."
+      ],
+      "extraSources": [
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "wifi"
+        ],
+        "format": "handheld",
+        "goodFor": "The cheapest GL.iNet travel router with gigabit ports.",
+        "needs": "Nothing beyond a USB-C supply.",
+        "tradeoff": "Old OpenWrt base and slow VPN.",
+        "capabilities": [
+          "wifi5"
+        ]
+      }
+    },
+    {
+      "slug": "gl-inet-shadow-gl-ar300m",
+      "name": "Shadow (GL-AR300M)",
+      "maker": "GL.iNet",
+      "category": "wifi",
+      "status": "listed",
+      "description": "A 58 mm mini router on OpenWrt with 2.4 GHz Wi-Fi, two Ethernet ports, USB and GPIO.",
+      "tags": [
+        "Mini router",
+        "OpenWrt",
+        "GPIO",
+        "2.4 GHz"
+      ],
+      "specs": {
+        "processor": "QCA9531 650 MHz · 128 MB RAM · 16 MB NOR (128 MB NAND on the AR300M variant)",
+        "display": "None",
+        "radio": "Wi-Fi 4 (802.11n): 300 Mbps at 2.4 GHz",
+        "power": "Micro-USB 5 V / 2 A · under 2 W"
+      },
+      "price": "US$36.99",
+      "source": "https://www.gl-inet.com/products/gl-ar300m/",
+      "sourceLabel": "Maker product page",
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Specifications were read from GL.iNet’s product page on 2026-09-17; price US$36.99 and availability are as shown that day.",
+        "GL.iNet sells regional plug variants of the same model; this entry covers the model."
+      ],
+      "extraSources": [
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "wifi",
+          "build"
+        ],
+        "format": "board",
+        "goodFor": "A pocket OpenWrt box for pentest labs and travel.",
+        "needs": "A micro-USB supply.",
+        "tradeoff": "2.4 GHz and 100 Mbps only.",
+        "capabilities": [
+          "wifi5"
+        ]
+      }
+    },
+    {
+      "slug": "gl-inet-puli-gl-xe300",
+      "name": "Puli (GL-XE300)",
+      "maker": "GL.iNet",
+      "category": "wifi",
+      "status": "listed",
+      "description": "A 4G LTE router with a 5000 mAh battery, swappable CAT4 or CAT6 modem and OpenWrt.",
+      "tags": [
+        "4G LTE",
+        "Battery",
+        "OpenWrt",
+        "Travel router"
+      ],
+      "specs": {
+        "processor": "QCA9531 650 MHz · 128 MB RAM · 16 MB NOR + 128 MB NAND",
+        "display": "None",
+        "radio": "Wi-Fi 4: 300 Mbps at 2.4 GHz · interchangeable CAT4/CAT6 4G module · two internal full-band antennas · optional BLE",
+        "power": "Built-in 5000 mAh battery, 6–7 hours on 4G · 5 V / 2 A"
+      },
+      "price": "US$125.99",
+      "source": "https://www.gl-inet.com/products/gl-xe300/",
+      "sourceLabel": "Maker product page",
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Specifications were read from GL.iNet’s product page on 2026-09-17; price US$125.99 and availability are as shown that day.",
+        "GL.iNet sells regional plug variants of the same model; this entry covers the model."
+      ],
+      "extraSources": [
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "wifi"
+        ],
+        "format": "handheld",
+        "goodFor": "Field internet with a battery for sensors and nodes.",
+        "needs": "A SIM and the right modem variant for your carrier.",
+        "tradeoff": "2.4 GHz Wi-Fi and 100 Mbps ports.",
+        "capabilities": [
+          "wifi5",
+          "ble"
+        ]
+      }
+    },
+    {
+      "slug": "gl-inet-spitz-gl-x750v2",
+      "name": "Spitz (GL-X750V2)",
+      "maker": "GL.iNet",
+      "category": "wifi",
+      "status": "listed",
+      "description": "A dual-band 4G LTE router with a mini-PCIe modem, SMA antennas and OpenWrt.",
+      "tags": [
+        "4G LTE",
+        "Dual-band",
+        "OpenWrt",
+        "SMA antennas"
+      ],
+      "specs": {
+        "processor": "QCA9531 650 MHz · 128 MB RAM · 16 MB NOR",
+        "display": "None",
+        "radio": "Wi-Fi 5: 300 Mbps at 2.4 GHz + 433 Mbps at 5 GHz · CAT4/CAT6 mini-PCIe 4G module · two detachable SMA antennas (700–2700 MHz)",
+        "power": "DC 12 V / 1.5 A (4.0 × 1.7 mm) · under 6 W"
+      },
+      "price": "US$125.99",
+      "source": "https://www.gl-inet.com/products/gl-x750/",
+      "sourceLabel": "Maker product page",
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Specifications were read from GL.iNet’s product page on 2026-09-17; price US$125.99 and availability are as shown that day.",
+        "GL.iNet sells regional plug variants of the same model; this entry covers the model."
+      ],
+      "extraSources": [
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "wifi"
+        ],
+        "format": "handheld",
+        "goodFor": "A swappable-modem 4G router you can put your own antennas on.",
+        "needs": "A 12 V supply and a SIM.",
+        "tradeoff": "No battery; slow Ethernet.",
+        "capabilities": [
+          "wifi5"
+        ]
+      }
+    },
+    {
+      "slug": "gl-inet-halowlink-2",
+      "name": "HaLowLink 2",
+      "maker": "GL.iNet",
+      "category": "wifi",
+      "status": "listed",
+      "description": "A Wi-Fi HaLow (802.11ah) sub-1 GHz router that reaches about 1 km and serves up to 1,000 IoT devices.",
+      "tags": [
+        "Wi-Fi HaLow",
+        "Sub-1 GHz",
+        "IoT",
+        "Long range"
+      ],
+      "specs": {
+        "processor": "MediaTek MT7621 dual-core 880 MHz · 256 MB RAM · 32 MB NAND",
+        "display": "None",
+        "radio": "802.11ah HaLow sub-1 GHz with an external antenna · 2.4 GHz 802.11n with two internal antennas",
+        "power": "5 V / 2 A"
+      },
+      "price": "US$129.90",
+      "source": "https://www.gl-inet.com/products/halowlink2/",
+      "sourceLabel": "Maker product page",
+      "checked": "2026-09-17",
+      "verified": true,
+      "reviewed": "2026-09-17",
+      "added": "2026-09-17",
+      "verificationNotes": [
+        "Specifications were read from GL.iNet’s product page on 2026-09-17; price US$129.90 and availability are as shown that day.",
+        "GL.iNet sells regional plug variants of the same model; this entry covers the model."
+      ],
+      "extraSources": [
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/"
+        }
+      ],
+      "usage": {
+        "tasks": [
+          "wifi",
+          "mesh"
+        ],
+        "format": "handheld",
+        "goodFor": "Long-range links to HaLow sensors and nodes without LoRa.",
+        "needs": "HaLow client devices; the 2.4 GHz side is standard Wi-Fi.",
+        "tradeoff": "Few HaLow clients exist yet.",
+        "capabilities": [
+          "wifi5",
+          "subghz"
+        ]
+      }
+    }
+  ],
+  "details": {
+    "gl-inet-slate-ax-gl-axt1800": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Core hardware",
+          "rows": [
+            {
+              "label": "Processor and memory",
+              "value": "IPQ6000 quad-core 1.2 GHz · 512 MB RAM · 128 MB NAND",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless",
+              "value": "Wi-Fi 6 (802.11ax): 600 Mbps at 2.4 GHz + 1200 Mbps at 5 GHz · retractable antennas",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "USB-C 5 V / 4 A",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Details from the product page",
+          "rows": [
+            {
+              "label": "Ethernet",
+              "value": "1 WAN + 2 LAN, gigabit",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "USB and storage",
+              "value": "USB 3.0; microSD up to 512 GB",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "VPN",
+              "value": "WireGuard up to 550 Mbps; OpenVPN up to 560 Mbps with DCO",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless features",
+              "value": "MU-MIMO, OFDMA, BSS colour, DFS, WPA3; up to 120 devices",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Size and weight",
+              "value": "125 × 82 × 36 mm · 245 g",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Software",
+              "value": "OpenWrt 23.05",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Buying",
+          "rows": [
+            {
+              "label": "Price",
+              "value": "US$119.99 on gl-inet.com",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Availability",
+              "value": "In stock on the day of review",
+              "source": "https://www.gl-inet.com/products/gl-axt1800/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker product page",
+          "url": "https://www.gl-inet.com/products/gl-axt1800/",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Firmware version and feature availability change with updates; check the docs before relying on a VPN speed.",
+        "Regional plug variants change what is in the box."
+      ],
+      "notes": [
+        "Written from the maker’s product page retrieved 2026-09-17; no hands-on testing."
+      ]
+    },
+    "gl-inet-slate-plus-gl-a1300": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Core hardware",
+          "rows": [
+            {
+              "label": "Processor and memory",
+              "value": "IPQ4018 quad-core 717 MHz · 256 MB RAM · 4 MB NOR + 128 MB NAND",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless",
+              "value": "Wi-Fi 5 (802.11ac): 400 Mbps at 2.4 GHz + 867 Mbps at 5 GHz · two external antennas",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "USB-C 5 V / 3 A",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Details from the product page",
+          "rows": [
+            {
+              "label": "Ethernet",
+              "value": "1 WAN + 2 LAN, gigabit",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "USB",
+              "value": "USB 3.0",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "VPN",
+              "value": "WireGuard up to 170 Mbps; OpenVPN up to 28 Mbps",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Size and weight",
+              "value": "118 × 85 × 30 mm · 181 g",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Software",
+              "value": "OpenWrt 21.02; AdGuard Home; 30+ VPN providers",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Buying",
+          "rows": [
+            {
+              "label": "Price",
+              "value": "US$69.99 on gl-inet.com",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Availability",
+              "value": "In stock on the day of review",
+              "source": "https://www.gl-inet.com/products/gl-a1300/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker product page",
+          "url": "https://www.gl-inet.com/products/gl-a1300/",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Firmware version and feature availability change with updates; check the docs before relying on a VPN speed.",
+        "Regional plug variants change what is in the box."
+      ],
+      "notes": [
+        "Written from the maker’s product page retrieved 2026-09-17; no hands-on testing."
+      ]
+    },
+    "gl-inet-opal-gl-sft1200": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Core hardware",
+          "rows": [
+            {
+              "label": "Processor and memory",
+              "value": "SF19A28 dual-core 1 GHz · 128 MB RAM · 128 MB NAND",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless",
+              "value": "Wi-Fi 5 (802.11ac): 300 Mbps at 2.4 GHz + 867 Mbps at 5 GHz · two external antennas",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "USB-C 5 V / 3 A · under 6 W",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Details from the product page",
+          "rows": [
+            {
+              "label": "Ethernet",
+              "value": "1 WAN + 2 LAN, gigabit",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "USB",
+              "value": "USB 2.0",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "VPN",
+              "value": "WireGuard up to 65 Mbps; OpenVPN up to 12 Mbps",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Size and weight",
+              "value": "118 × 85 × 30 mm · 145 g",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Software",
+              "value": "OpenWrt 18.06; Cloudflare DNS encryption; 52 wireless clients",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Buying",
+          "rows": [
+            {
+              "label": "Price",
+              "value": "US$39.99 on gl-inet.com",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Availability",
+              "value": "In stock on the day of review",
+              "source": "https://www.gl-inet.com/products/gl-sft1200/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker product page",
+          "url": "https://www.gl-inet.com/products/gl-sft1200/",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Firmware version and feature availability change with updates; check the docs before relying on a VPN speed.",
+        "Regional plug variants change what is in the box."
+      ],
+      "notes": [
+        "Written from the maker’s product page retrieved 2026-09-17; no hands-on testing."
+      ]
+    },
+    "gl-inet-shadow-gl-ar300m": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Core hardware",
+          "rows": [
+            {
+              "label": "Processor and memory",
+              "value": "QCA9531 650 MHz · 128 MB RAM · 16 MB NOR (128 MB NAND on the AR300M variant)",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless",
+              "value": "Wi-Fi 4 (802.11n): 300 Mbps at 2.4 GHz",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "Micro-USB 5 V / 2 A · under 2 W",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Details from the product page",
+          "rows": [
+            {
+              "label": "Ethernet",
+              "value": "1 WAN + 1 LAN, 100 Mbps",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "USB",
+              "value": "USB 2.0",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "VPN",
+              "value": "WireGuard up to 50 Mbps; OpenVPN up to 15 Mbps",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Size and weight",
+              "value": "58 × 58 × 25 mm · 40 g",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Extras",
+              "value": "GPIO header, repeater mode, DNS over TLS; 0–40 °C",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Buying",
+          "rows": [
+            {
+              "label": "Price",
+              "value": "US$36.99 on gl-inet.com",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Availability",
+              "value": "In stock on the day of review",
+              "source": "https://www.gl-inet.com/products/gl-ar300m/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker product page",
+          "url": "https://www.gl-inet.com/products/gl-ar300m/",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Firmware version and feature availability change with updates; check the docs before relying on a VPN speed.",
+        "Regional plug variants change what is in the box."
+      ],
+      "notes": [
+        "Written from the maker’s product page retrieved 2026-09-17; no hands-on testing."
+      ]
+    },
+    "gl-inet-puli-gl-xe300": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Core hardware",
+          "rows": [
+            {
+              "label": "Processor and memory",
+              "value": "QCA9531 650 MHz · 128 MB RAM · 16 MB NOR + 128 MB NAND",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless",
+              "value": "Wi-Fi 4: 300 Mbps at 2.4 GHz · interchangeable CAT4/CAT6 4G module · two internal full-band antennas · optional BLE",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "Built-in 5000 mAh battery, 6–7 hours on 4G · 5 V / 2 A",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Details from the product page",
+          "rows": [
+            {
+              "label": "Ethernet",
+              "value": "1 WAN + 1 LAN, 100 Mbps",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "USB and storage",
+              "value": "USB 2.0; microSD up to 512 GB",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "SIM",
+              "value": "Micro-SIM; eSIM compatible; SMS and AT commands",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Size and weight",
+              "value": "120 × 74 × 28 mm · 223.5 g",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Software",
+              "value": "OpenWrt; WireGuard, OpenVPN, IPv6, WPA3",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Buying",
+          "rows": [
+            {
+              "label": "Price",
+              "value": "US$125.99 on gl-inet.com",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Availability",
+              "value": "In stock on the day of review",
+              "source": "https://www.gl-inet.com/products/gl-xe300/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker product page",
+          "url": "https://www.gl-inet.com/products/gl-xe300/",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Firmware version and feature availability change with updates; check the docs before relying on a VPN speed.",
+        "Regional plug variants change what is in the box."
+      ],
+      "notes": [
+        "Written from the maker’s product page retrieved 2026-09-17; no hands-on testing."
+      ]
+    },
+    "gl-inet-spitz-gl-x750v2": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Core hardware",
+          "rows": [
+            {
+              "label": "Processor and memory",
+              "value": "QCA9531 650 MHz · 128 MB RAM · 16 MB NOR",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless",
+              "value": "Wi-Fi 5: 300 Mbps at 2.4 GHz + 433 Mbps at 5 GHz · CAT4/CAT6 mini-PCIe 4G module · two detachable SMA antennas (700–2700 MHz)",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "DC 12 V / 1.5 A (4.0 × 1.7 mm) · under 6 W",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Details from the product page",
+          "rows": [
+            {
+              "label": "Ethernet",
+              "value": "1 WAN + 1 LAN, 100 Mbps",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "USB and storage",
+              "value": "USB 2.0; microSD up to 128 GB",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "SIM",
+              "value": "One micro-SIM",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Size and weight",
+              "value": "115 × 74 × 22 mm · 86 g",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Software",
+              "value": "OpenWrt-based; 0–40 °C",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Buying",
+          "rows": [
+            {
+              "label": "Price",
+              "value": "US$125.99 on gl-inet.com",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Availability",
+              "value": "In stock on the day of review",
+              "source": "https://www.gl-inet.com/products/gl-x750/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker product page",
+          "url": "https://www.gl-inet.com/products/gl-x750/",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Firmware version and feature availability change with updates; check the docs before relying on a VPN speed.",
+        "Regional plug variants change what is in the box."
+      ],
+      "notes": [
+        "Written from the maker’s product page retrieved 2026-09-17; no hands-on testing."
+      ]
+    },
+    "gl-inet-halowlink-2": {
+      "reviewed": "2026-09-17",
+      "coverage": "reviewed",
+      "testedByUs": false,
+      "sections": [
+        {
+          "title": "Core hardware",
+          "rows": [
+            {
+              "label": "Processor and memory",
+              "value": "MediaTek MT7621 dual-core 880 MHz · 256 MB RAM · 32 MB NAND",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Wireless",
+              "value": "802.11ah HaLow sub-1 GHz with an external antenna · 2.4 GHz 802.11n with two internal antennas",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Power",
+              "value": "5 V / 2 A",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Details from the product page",
+          "rows": [
+            {
+              "label": "Range and capacity",
+              "value": "Up to 1 km; up to 1,000 end devices",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Ethernet",
+              "value": "1 WAN + 1 LAN",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Modes",
+              "value": "Router, access point or extender",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Size and weight",
+              "value": "88 × 68 × 24 mm · 102 g",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Operating temperature",
+              "value": "0–40 °C",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        },
+        {
+          "title": "Buying",
+          "rows": [
+            {
+              "label": "Price",
+              "value": "US$129.90 on gl-inet.com",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            },
+            {
+              "label": "Availability",
+              "value": "In stock on the day of review",
+              "source": "https://www.gl-inet.com/products/halowlink2/",
+              "reviewed": "2026-09-17"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "label": "Maker product page",
+          "url": "https://www.gl-inet.com/products/halowlink2/",
+          "reviewed": "2026-09-17"
+        },
+        {
+          "label": "GL.iNet documentation",
+          "url": "https://docs.gl-inet.com/",
+          "reviewed": "2026-09-17"
+        }
+      ],
+      "gaps": [
+        "Firmware version and feature availability change with updates; check the docs before relying on a VPN speed.",
+        "Regional plug variants change what is in the box."
+      ],
+      "notes": [
+        "Written from the maker’s product page retrieved 2026-09-17; no hands-on testing."
+      ]
+    }
+  },
+  "images": {
+    "gl-inet-slate-ax-gl-axt1800": {
+      "source": "https://cdn.shopify.com/s/files/1/0711/7733/9063/files/A45065C1-03D6-4E01-BC99-AAF7CB001621.png",
+      "sourcePage": "https://www.gl-inet.com/products/gl-axt1800/",
+      "caption": "Maker product photo of the Slate AX (GL-AXT1800)",
+      "path": "/assets/gl-inet-slate-ax-gl-axt1800.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 1600,
+      "sha256": "f0cbbee9613e7df6dc4fe4a03988190f288c03e70050cf91d64d657f370d42dd",
+      "credit": "GL.iNet",
+      "usage": "Local preview; commercial reuse not cleared"
+    },
+    "gl-inet-slate-plus-gl-a1300": {
+      "source": "https://cdn.shopify.com/s/files/1/0711/7733/9063/files/Slate_Plus_GL-A1300.png",
+      "sourcePage": "https://www.gl-inet.com/products/gl-a1300/",
+      "caption": "Maker product photo of the Slate Plus (GL-A1300)",
+      "path": "/assets/gl-inet-slate-plus-gl-a1300.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 1600,
+      "sha256": "4ec09a0c7ac15ec9a3280cfe26a240ff185dd3e532ff196d243f69a0abb52773",
+      "credit": "GL.iNet",
+      "usage": "Local preview; commercial reuse not cleared"
+    },
+    "gl-inet-opal-gl-sft1200": {
+      "source": "https://cdn.shopify.com/s/files/1/0711/7733/9063/files/travelrouter-sft1200.png",
+      "sourcePage": "https://www.gl-inet.com/products/gl-sft1200/",
+      "caption": "Maker product photo of the Opal (GL-SFT1200)",
+      "path": "/assets/gl-inet-opal-gl-sft1200.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 1600,
+      "sha256": "6bdcde38cb4370d71a2cb5fc956603bba2f6238c8e86a0ab7b5ede9a401539b6",
+      "credit": "GL.iNet",
+      "usage": "Local preview; commercial reuse not cleared"
+    },
+    "gl-inet-shadow-gl-ar300m": {
+      "source": "https://cdn.shopify.com/s/files/1/0711/7733/9063/files/minirouter-ar300m.png",
+      "sourcePage": "https://www.gl-inet.com/products/gl-ar300m/",
+      "caption": "Maker product photo of the Shadow (GL-AR300M)",
+      "path": "/assets/gl-inet-shadow-gl-ar300m.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 1600,
+      "sha256": "2d3fb5bcd676b1db1ad1158be004ad9f6b555b40464787cd361bd1b6fc953c56",
+      "credit": "GL.iNet",
+      "usage": "Local preview; commercial reuse not cleared"
+    },
+    "gl-inet-puli-gl-xe300": {
+      "source": "https://cdn.shopify.com/s/files/1/0711/7733/9063/files/cellularrouter-xe300.png",
+      "sourcePage": "https://www.gl-inet.com/products/gl-xe300/",
+      "caption": "Maker product photo of the Puli (GL-XE300)",
+      "path": "/assets/gl-inet-puli-gl-xe300.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 1600,
+      "sha256": "254455d31c4cbdf30328e415ffcc93ed32fd8ac451a6e685079536d9ddb0838b",
+      "credit": "GL.iNet",
+      "usage": "Local preview; commercial reuse not cleared"
+    },
+    "gl-inet-spitz-gl-x750v2": {
+      "source": "https://cdn.shopify.com/s/files/1/0711/7733/9063/files/cellularrouter-x750v2.png",
+      "sourcePage": "https://www.gl-inet.com/products/gl-x750/",
+      "caption": "Maker product photo of the Spitz (GL-X750V2)",
+      "path": "/assets/gl-inet-spitz-gl-x750v2.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 1600,
+      "sha256": "6ab7b5b423f3bf2ba84a5adccd2ad213fd6224224744562bd1073e52cee2b2f3",
+      "credit": "GL.iNet",
+      "usage": "Local preview; commercial reuse not cleared"
+    },
+    "gl-inet-halowlink-2": {
+      "source": "https://cdn.shopify.com/s/files/1/0711/7733/9063/files/iot-halowlink2_8d459bcc-d60a-4616-80a0-d4be0a7ad338.png",
+      "sourcePage": "https://www.gl-inet.com/products/halowlink2/",
+      "caption": "Maker product photo of the HaLowLink 2",
+      "path": "/assets/gl-inet-halowlink-2.jpg",
+      "retrieved": "2026-09-17",
+      "width": 1600,
+      "height": 1600,
+      "sha256": "3a6ee49aad31fc3e88df4872c6dc8978f7689a039735a99717977b4ae5e6c08c",
+      "credit": "GL.iNet",
+      "usage": "Local preview; commercial reuse not cleared"
+    }
+  }
+}

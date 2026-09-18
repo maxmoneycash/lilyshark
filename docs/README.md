@@ -73,6 +73,7 @@ The quantitative case, kept separate from the claims it supports.
 | [protocol/witness-graph-method.md](protocol/witness-graph-method.md) | The witness graph, and its method. |
 | [protocol/season-0.md](protocol/season-0.md) | Season 0, with its rules in `protocol/season-0-rules.json`. |
 | [verification/continuation-2026-09-06.md](verification/continuation-2026-09-06.md) | Recovered work, verification results, and remaining work from the September 6 continuation. |
+| [continuation-status.md](continuation-status.md) | Recovered chats, September 13 analyzer changes, validation, and remaining work. |
 
 ## Plans and direction
 
@@ -81,10 +82,19 @@ matters.
 
 | Read this | About |
 | --- | --- |
+| [strategy/lora-sniffing-market-analysis-2026-09.md](strategy/lora-sniffing-market-analysis-2026-09.md) | September 2026 research on LoRa inspection demand and its relationship to the whitepaper. |
 | [meshcore-participation-plan.md](meshcore-participation-plan.md) | Participating in MeshCore properly, rather than merely decoding it. |
 | [design-guidance.md](design-guidance.md) | Verified design skills and the shared iOS/web map direction. |
 | [strategy/2026-q3-direction.md](strategy/2026-q3-direction.md) | Where this is going. |
+| [strategy/meshcore-app-direction-2026-09-14.md](strategy/meshcore-app-direction-2026-09-14.md) | MeshCore app priorities, competitor baseline, and release criteria. |
+| [meshcore-ux-qa-2026-09-14.md](meshcore-ux-qa-2026-09-14.md) | Inbox, node roles, compose, and room/repeater UI changes with simulator evidence. |
+| [overnight-web-qa-2026-09-16.md](overnight-web-qa-2026-09-16.md) | Simple intro, real web map, explicit demo, draft/history fixes, and 654-test browser/build validation. |
+| [mobile-intro-qa-2026-09-15.md](mobile-intro-qa-2026-09-15.md) | Larger mobile T-Deck, scrolling over the model, rotation, and responsive browser checks. |
+| [real-mesh-map-qa-2026-09-15.md](real-mesh-map-qa-2026-09-15.md) | Real MeshCore directory, source/freshness evidence, cached nodes, and encrypted offline radio browsing. |
+| [node-map-qa-2026-09-15.md](node-map-qa-2026-09-15.md) | Node/map/conversation navigation, explicit layers, position evidence, and consistent text sizing. |
+| [message-delivery-qa-2026-09-15.md](message-delivery-qa-2026-09-15.md) | Message evidence, retry details, visible actions, quote sizing, and accessibility verification. |
 | [strategy/hardware-offering.md](strategy/hardware-offering.md) | What a hardware offering would be. |
+| [strategy/gadgets-sh-and-custom-hardware.md](strategy/gadgets-sh-and-custom-hardware.md) | Gadget gallery plans and the direction for an original hardware product. |
 | [strategy/premium-tier.md](strategy/premium-tier.md) | What, if anything, is worth charging for. |
 | [strategy/season-0-event.md](strategy/season-0-event.md) | The Season 0 event. |
 | [strategy/reticulum-announcement.md](strategy/reticulum-announcement.md) | Announcing Reticulum support. |

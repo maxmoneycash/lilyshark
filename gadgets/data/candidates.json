@@ -1,0 +1,104 @@
+[
+  {
+    "url": "https://xplora.phinalabs.com/",
+    "name": "Unda:Xplora",
+    "maker": "Phinalabs",
+    "decision": "skip",
+    "reason": "Beginner breadboard STEM kit for children. No radio, no networking, no security use. Outside the catalog scope.",
+    "worthCopying": "Video-first project cards with difficulty tags and a parts list on the card; a try-before-you-buy virtual breadboard.",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://github.com/alexbegoon/meshimi",
+    "name": "Meshimi",
+    "decision": "listed",
+    "slug": "meshimi",
+    "decided": "2026-09-16"
+  },
+  {
+    "url": "https://lectronz.com/products/antihunter-diginode-24ghz-wifible-pcb-only",
+    "name": "AntiHunter DIGI Node",
+    "decision": "listed",
+    "slug": "antihunter-diginode",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://click.uprajjwal.com.np/",
+    "name": "Click",
+    "decision": "listed",
+    "slug": "click",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://thehackbat.com/",
+    "name": "Hackbat",
+    "maker": "The Hackbat (Pablo Trujillo)",
+    "decision": "listed",
+    "slug": "hackbat",
+    "decided": "2026-09-17",
+    "note": "Not sellable: fab-it-yourself only. Watch for a shop appearing on thehackbat.com."
+  },
+  {
+    "url": "https://github.com/h-RAT/Willy_Firmware_V2_ESP32_Flipper_Zero_Alternative",
+    "name": "Willy Firmware",
+    "decision": "watch",
+    "reason": "ESP32 T-Display-S3 + CC1101 Flipper alternative; buildable reference hardware",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://github.com/0015/ESP32Berry",
+    "name": "ESP32Berry",
+    "decision": "watch",
+    "reason": "ESP32 + BlackBerry keyboard handheld",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://www.gl-inet.com/products/gl-mt3600be/",
+    "name": "GL.iNet Beryl 7",
+    "decision": "watch",
+    "reason": "Specs render in JavaScript; read in a browser, then add.",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://www.gl-inet.com/products/gl-be10000/",
+    "name": "GL.iNet Slate 7 Pro",
+    "decision": "watch",
+    "reason": "Specs render in JavaScript; read in a browser, then add.",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://www.gl-inet.com/products/gl-e5800/",
+    "name": "GL.iNet Mudi 7",
+    "decision": "watch",
+    "reason": "Specs render in JavaScript; read in a browser, then add.",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://www.gl-inet.com/products/gl-rmq1/",
+    "name": "GL.iNet Comet Q",
+    "decision": "watch",
+    "reason": "Specs render in JavaScript; read in a browser, then add.",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://m5stack.aliexpress.com/store/911661199",
+    "name": "M5Stack official AliExpress store",
+    "decision": "watch",
+    "reason": "Confirmed official. Once AliExpress Portals is approved, point the M5Stack devices’ buy links here to earn ~3-4%.",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://www.amazon.com/shops/m5stack",
+    "name": "M5Stack official Amazon store",
+    "decision": "watch",
+    "reason": "Confirmed official. Route M5Stack buy links here once Amazon Associates is approved.",
+    "decided": "2026-09-17"
+  },
+  {
+    "url": "https://rakwireless.kickbooster.me/boost",
+    "name": "RAKwireless affiliate (Kickbooster)",
+    "decision": "watch",
+    "reason": "Terms are live again (5%, 180-day cookie, $20 minimum) and the program page now promotes Kickbooster, but the signup page blocks scripts. Open it in a browser to see whether it accepts new affiliates.",
+    "decided": "2026-09-17"
+  }
+]

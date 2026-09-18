@@ -196,6 +196,69 @@ private final class FakeDeck: @unchecked Sendable {
 }
 
 final class LSKSerialLinkPtyTests: XCTestCase {
+    func testCancelDuringReenumerationDoesNotReopenThePort() throws {
+        let deck = try XCTUnwrap(FakeDeck())
+        defer { deck.shutDown() }
+        let link = LSKSerialLink(timing: .init(helloAfterOpen: 0.01, helloRepeat: 0.03,
+            identifyTimeout: 0.15, reenumerateWait: 0.5, maximumAttempts: 3))
+        var connectingStates = 0
+        let cancelled = expectation(description: "cancelled during retry gap")
+        link.$state.sink { state in
+            if case .connecting = state {
+                connectingStates += 1
+                if connectingStates == 2 { link.disconnect() }
+            }
+            if case .off = state, connectingStates == 2 { cancelled.fulfill() }
+        }.store(in: &cancellables)
+        link.connect(to: deck.slavePath)
+        wait(for: [cancelled], timeout: 3)
+        let count = deck.linesReceived.count
+        let pastRetry = expectation(description: "past scheduled retry")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { pastRetry.fulfill() }
+        wait(for: [pastRetry], timeout: 3)
+        XCTAssertEqual(link.state, .off)
+        XCTAssertEqual(deck.linesReceived.count, count)
+    }
+
+    func testSweepCommandAcknowledgementAndStopBeforeGoodbye() throws {
+        let deck = try XCTUnwrap(FakeDeck())
+        defer { deck.shutDown() }
+        let link = LSKSerialLink(timing: fastTiming)
+        deck.onLine = { line in
+            switch line {
+            case "LSK HELLO": deck.say(self.identityLine)
+            case "LSK SWEEP start":
+                deck.say(#"LSK OK {"kind":"sweep","state":"started"}"#)
+                deck.say(#"LSK S {"f0":868000000,"f1":870000000,"bins":2,"db":[-125,-83]}"#)
+            case "LSK SWEEP stop": deck.say(#"LSK OK {"kind":"sweep","state":"stopped"}"#)
+            default: break
+            }
+        }
+        let linked = expectation(description: "linked")
+        link.$state.sink { if $0.isLinked { linked.fulfill() } }.store(in: &cancellables)
+        var kinds: [String] = []
+        let measured = expectation(description: "measured band")
+        link.lines.sink { line in
+            kinds.append(line.kindTag)
+            if case .sweep(let sweep) = line {
+                XCTAssertEqual(sweep.powerDBm, [-125, -83])
+                XCTAssertEqual(sweep.binCenterHz(0), 868_500_000)
+                measured.fulfill()
+            }
+        }.store(in: &cancellables)
+        link.connect(to: deck.slavePath)
+        wait(for: [linked], timeout: 3)
+        try link.send(.sweepStart)
+        wait(for: [measured], timeout: 3)
+        XCTAssertEqual(kinds.suffix(2), ["OK", "S"])
+        try link.send(.sweepStop)
+        link.disconnect()
+        let drained = expectation(description: "stop and bye drained")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { drained.fulfill() }
+        wait(for: [drained], timeout: 3)
+        XCTAssertEqual(deck.linesReceived.suffix(2), ["LSK SWEEP stop", "LSK BYE"])
+    }
+
     /// Short enough that a suite is not waiting on a board that does not exist,
     /// long enough that a loaded machine still gets the HELLO out.
     private let fastTiming = LSKLinkTiming(

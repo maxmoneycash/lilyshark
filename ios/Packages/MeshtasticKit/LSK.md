@@ -350,8 +350,30 @@ picker behind it.
 **macOS: works.** `LSKSerialLink` is compiled under `#if os(macOS)`. It finds
 ports with IOKit (`kIOSerialBSDServiceValue`, filtered to `/dev/cu.*`, ranked
 Espressif `0x303A` first), opens with POSIX `open`/`termios` in raw mode at
-115200 with `VMIN 0` / `VTIME 2`, and clears DTR and RTS with `TIOCMBIC` so the
+115200 with `O_NONBLOCK`, `VMIN 1` / `VTIME 0`, and clears DTR and RTS with `TIOCMBIC` so the
 board does not land in the bootloader.
+
+Reads, writes, and cancellation share a serial dispatch queue. A read source
+closes its descriptor only after cancellation, so reconnects cannot race a
+background reader. Cancelling a connection also invalidates delayed handshake
+retries. Short writes fail the link visibly. The Mac Spectrum Analyzer now
+uses this transport for explicit single-pass scans; its preview remains separate
+from USB measurements.
+
+The Mac Traffic Analyzer also records the LSK frame stream with
+`LSKCaptureRecorder`. It writes `.lscap` 1.1 records with the same fixed-width
+layout as the firmware, bounded to 32 MiB / 100,000 frames. Stopping, dismissing
+the analyzer, or losing USB saves the completed frames atomically in the app's
+local capture directory; failed saves retain the buffer for retry. Recent files
+can be reopened in the analyzer or revealed in Finder.
+
+The raw-record decoder now requires every field printed by current firmware,
+checks integer widths, limits payloads to 255 bytes, and rejects impossible
+original/captured lengths. A missing field must not become a plausible zero in
+an exported capture. The decoded summary of an older or incomplete frame can
+still be delivered, but `raw` is nil and it is counted as skipped by recording.
+An explicit `sim: true` also sets the synthetic metadata bit, so inconsistent
+flags cannot turn simulated traffic into an apparent radio measurement.
 
 **iOS and iPadOS: not possible.** Not "hard", not "needs an entitlement" —
 there is no API. Checked against the iOS 26.5 SDK in Xcode 26.6:

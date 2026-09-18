@@ -10,7 +10,7 @@ import {
 import { saveText, stamp } from "../export";
 import { t, useLangTick } from "../i18n";
 import { useDeviceLink, type DeviceTelemetry } from "../../lib/deviceLink";
-import { getSnapshot, subscribe } from "../store";
+import { DeviceStatus, getSnapshot, subscribe } from "../store";
 import { ThisDevicePanel } from "../ThisDevice";
 import { accent, fg, isLight, useThemeTick } from "../theme";
 import {
@@ -730,7 +730,7 @@ export default function Telemetry() {
 										"Telemetry is saved as the connected radio reports it.",
 									)}
 								</p>
-								{link.status !== "linked" && (
+								{(s.status ?? DeviceStatus.Disconnected) < DeviceStatus.Connected && (
 									<button className="primary" onClick={() => window.dispatchEvent(new CustomEvent('lilyshark-connect'))}>
 										{t("CONNECT")}
 									</button>

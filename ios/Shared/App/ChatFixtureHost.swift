@@ -1,14 +1,58 @@
 #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
 import SwiftUI
+import UIKit
 import MeshCoreKit
 import MeshtasticKit
 
 /// A separate compile-time entry point. This never creates the production
 /// coordinator, activates a transport, or loads a radio's persisted messages.
+enum FixtureTextSize: String {
+    case standard, large, largest
+
+    static var defaultValue: Self {
+        #if LILYSHARK_UI_LARGE_TYPE
+        .large
+        #else
+        .standard
+        #endif
+    }
+
+    var contentSizeCategory: UIContentSizeCategory {
+        switch self {
+        case .standard: .large
+        case .large: .accessibilityExtraLarge
+        case .largest: .accessibilityExtraExtraExtraLarge
+        }
+    }
+}
+
 @main
 struct ChatFixtureApp: App {
+    @AppStorage("uiFixtureTextSize") private var textSize = FixtureTextSize.defaultValue.rawValue
+
     var body: some Scene {
-        WindowGroup { ChatFixtureHost() }
+        WindowGroup {
+            Group {
+                #if LILYSHARK_UI_MESH_FIXTURE
+                MeshFixtureHost()
+                #else
+                ChatFixtureHost()
+                #endif
+            }
+            .task { applyTextSize() }
+            .onChange(of: textSize) { applyTextSize() }
+        }
+    }
+
+    private func applyTextSize() {
+        // Window traits reach both the presenting view and native sheets.
+        // A SwiftUI-only override can enlarge one without sizing the other.
+        let category = (FixtureTextSize(rawValue: textSize) ?? .standard).contentSizeCategory
+        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+            for window in scene.windows {
+                window.traitOverrides.preferredContentSizeCategory = category
+            }
+        }
     }
 }
 
@@ -85,6 +129,7 @@ private final class ChatFixtureState {
     var retryCheckStatus = "Retry checks pending"
 
     init() {
+        navigation.section = .messages
         contacts = [
             Self.contact(node: 0x00F17A01, name: "Fixture A"),
             Self.contact(node: 0x00F17A02, name: "Fixture B"),

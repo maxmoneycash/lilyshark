@@ -6,6 +6,7 @@ import {
   type NoteScope,
 } from "../lib/annotations";
 import type { Message, NodeEntry, Traceroute, Waypoint } from "./store";
+import { messageFromRow, messageToRow, nodeFromRow, nodeToRow, type MessageRow, type NodeRow } from "./historyRecords";
 
 /** Same API as the original SQLite layer, on IndexedDB: the browser has no
  *  SQLite, and everything the app persists is key/range lookups anyway. */
@@ -175,44 +176,22 @@ function deleteRange(
 
 // ── messages ────────────────────────────────────────────────────────────────
 
-interface MessageRow {
-  id: number;
-  convo: string;
-  from: number;
-  to: number;
-  channel: number;
-  text: string;
-  ts: number;
-  mine: 0 | 1;
-  state: string;
-  replyId: number | null;
-}
-
 export async function saveMessage(m: Message): Promise<void> {
+  if (m.viaDemo) return;
   const { os, tx } = await store("messages", "readwrite");
-  os.put({
-    id: m.id,
-    convo: m.convo,
-    from: m.from,
-    to: m.to,
-    channel: m.channel,
-    text: m.text,
-    ts: m.ts,
-    mine: m.mine ? 1 : 0,
-    state: m.state,
-    replyId: m.replyId ?? null,
-  } satisfies MessageRow);
+  os.put(messageToRow(m));
   await txDone(tx);
 }
 
 export async function updateMessageState(
   id: number,
+  ts: number,
   stateVal: Message["state"],
   failureReason?: string,
 ): Promise<void> {
   const { os, tx } = await store("messages", "readwrite");
-  const rows = await collect<MessageRow>(os.index("id"), IDBKeyRange.only(id));
-  for (const r of rows) os.put({ ...r, state: stateVal, failureReason });
+  const row = await reqAsPromise<MessageRow | undefined>(os.get([id, ts]));
+  if (row) os.put({ ...row, state: stateVal, failureReason });
   await txDone(tx);
 }
 
@@ -229,18 +208,7 @@ export async function loadMessages(limit = 2000): Promise<Message[]> {
   // newest `limit` rows, then chronological like the SQL double-order did
   const rows = await collect<MessageRow>(os.index("ts"), undefined, "prev", limit);
   rows.reverse();
-  return rows.map((r) => ({
-    id: r.id,
-    convo: r.convo,
-    from: r.from,
-    to: r.to,
-    channel: r.channel,
-    text: r.text,
-    ts: r.ts,
-    mine: r.mine === 1,
-    state: r.state as Message["state"],
-    replyId: r.replyId ?? undefined,
-  }));
+  return rows.map(messageFromRow);
 }
 
 // ── nodes ───────────────────────────────────────────────────────────────────
@@ -248,20 +216,9 @@ export async function loadMessages(limit = 2000): Promise<Message[]> {
 // We persist what's stable about a node (identity + last known position).
 // snr/battery are volatile: they're worthless after reopening.
 export async function saveNode(n: NodeEntry): Promise<void> {
+  if (n.viaDemo) return;
   const { os, tx } = await store("nodes", "readwrite");
-  os.put({
-    num: n.num,
-    publicKey: n.publicKey ?? null,
-    type: n.type ?? null,
-    longName: n.longName,
-    shortName: n.shortName,
-    lastHeard: n.lastHeard,
-    lat: n.lat ?? null,
-    lon: n.lon ?? null,
-    hopsAway: n.hopsAway ?? null,
-    fav: n.fav ? 1 : 0,
-    ignored: n.ignored ? 1 : 0,
-  });
+  os.put(nodeToRow(n));
   await txDone(tx);
 }
 
@@ -273,32 +230,8 @@ export async function deleteNodeDb(num: number): Promise<void> {
 
 export async function loadNodes(): Promise<NodeEntry[]> {
   const { os } = await store("nodes");
-  const rows = await collect<{
-    num: number;
-    publicKey: string | null;
-    type: number | null;
-    longName: string;
-    shortName: string;
-    lastHeard: number;
-    lat: number | null;
-    lon: number | null;
-    hopsAway: number | null;
-    fav: number;
-    ignored: number;
-  }>(os);
-  return rows.map((r) => ({
-    num: r.num,
-    publicKey: r.publicKey ?? undefined,
-    type: r.type ?? undefined,
-    longName: r.longName,
-    shortName: r.shortName,
-    lastHeard: r.lastHeard,
-    lat: r.lat ?? undefined,
-    lon: r.lon ?? undefined,
-    hopsAway: r.hopsAway ?? undefined,
-    fav: !!r.fav,
-    ignored: !!r.ignored,
-  }));
+  const rows = await collect<NodeRow>(os);
+  return rows.map(nodeFromRow);
 }
 
 // ── traceroutes ─────────────────────────────────────────────────────────────

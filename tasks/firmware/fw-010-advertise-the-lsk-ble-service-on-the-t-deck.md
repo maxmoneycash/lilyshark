@@ -21,10 +21,10 @@ contract doc: the doc exists already, so checking it reported this task
 green while no firmware had been written. Same trap as PA-006.
 
 Why: UI-017 built the browser half of the Bluetooth link — the transport
-interface, the BLE transport, the framing, and the tests — but the
-T-Deck firmware has no BLE stack at all (no NimBLE, no BLEDevice, no
-Bluetooth entry in `platformio.ini`'s `lib_deps`; the LSK link is
-`Serial.printf` over USB CDC). The analyzer therefore shows the
+interface, the BLE transport, the framing, and the tests. The firmware now has
+a Meshtastic BLE service in `src/device/tdeck_ble.cpp`, using the ESP32
+`BLEDevice` stack, but it does not advertise the separate LSK analyzer service.
+The LSK command link still uses USB CDC. The analyzer therefore shows the
 Bluetooth option disabled and says the firmware does not advertise the
 service yet, rather than offering a button that always fails.
 

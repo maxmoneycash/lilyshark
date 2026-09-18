@@ -18,7 +18,7 @@ public enum DeliveryStatus: String, Codable, Sendable {
     case failed     // send timed out or errored
     case retrying   // automatic retry in progress (direct path)
     case flooding   // retrying via flood after path reset
-    case repeated   // channel message confirmed repeated by nearby repeater
+    case repeated   // legacy channel state inferred from nearby RX activity; not a matched repeat
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()

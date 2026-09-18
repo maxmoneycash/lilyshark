@@ -1,0 +1,305 @@
+{
+  "systemReduced": true,
+  "preference": "system",
+  "effective": "reduced",
+  "before": 0,
+  "frames": [
+    {
+      "t": 71.40000000596046,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 73.5,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 100.1000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 124.70000000298023,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 133.40000000596046,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 166.5,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 191.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 224.90000000596046,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 249.90000000596046,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 274.90000000596046,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 308.29999999701977,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 333.29999999701977,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 400.1000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 408.29999999701977,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 441.5,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 466.5,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 491.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 516.7999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 524.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 566.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 591.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 624.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 649.7000000029802,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 683.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 707.4000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 716.7999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 766.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 791.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 816.7000000029802,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 841.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 866.7000000029802,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 883.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 892.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 909.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 925.2000000029802,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 931,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 949.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 958.2000000029802,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 974.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 991.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1016.5,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1049.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1083.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1108.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1133.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1149.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1183.2000000029802,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1224.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1258.1000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1283.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1308.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1325,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1441.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1474.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1508.2000000029802,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1524.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1549.9000000059605,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1591.6000000089407,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    },
+    {
+      "t": 1608.2999999970198,
+      "progress": 1,
+      "transform": "translateX(-180px) translateY(-465px) scale(0.75)"
+    }
+  ],
+  "done": true,
+  "immediate": 1
+}

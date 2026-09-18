@@ -31,8 +31,11 @@ browser (Vite + React)
 - **`src/mesh/screens/`** — the rest of the terminal: a full MeshCore client
   (chat, nodes, map, mesh graph, telemetry, config, debug log) plus the
   SHELBY network screen and the WHITEPAPER reader.
-- **MAP** — Lilyshark's coverage and repeater map, with search, filters,
-  distance measurement, terrain planning and connected-radio diagnostics.
+- **MAP** — the official MeshCore public directory is the default view, with
+  published contacts, repeaters, rooms, and sensors. Full public keys identify
+  nodes; advertisement dates and directory update dates stay separate. Saved
+  positions remain available after a failed refresh or page reload. My mesh
+  shows radio contacts separately. Survey coverage remains an optional feed.
   [Map architecture and verification](../docs/coverage-map.md) covers the
   matching native implementation, authorized data feeds and remaining field checks.
 - **`api/[...path].ts`** — Vercel catch-all that proxies API calls to the
@@ -45,18 +48,36 @@ browser (Vite + React)
   files to and from Shelby. Wallet signing happens client-side via the
   Aptos wallet adapter; the service never custodies keys.
 
+## Data and sample sessions
+
+Normal startup creates no sample nodes, messages, unread counts, or captures.
+Connect → Explore sample data starts a visibly marked, removable demo. Sample
+records never persist as radio history. Public map browsing needs no radio and
+works with the optional internet relay off. The relay is off by default; enabling
+it shares received packet content with the public relay.
+
+Chat drafts stay with their conversation and radio identity, and survive reload
+when browser storage is available. After reload, radio-specific drafts return
+when that radio is identified again. Saved message history retains failure details
+and reception measurements. A pending send interrupted by reload is shown as
+unconfirmed and requires an explicit retry.
+
 ## 3D introduction
 
 [IntroTab.tsx](src/components/IntroTab.tsx) preserves the original twelve chapters
-and all 42 device screens deployed on `lilyshark.com`. The copy and screen order
+and 33 selected device screens. The original copy and screen assets
 were restored from `/assets/main-BwMualIR.js` on 2026-09-08, with the matching
 production PNGs in `public/intro/fw/`. The tour opens with Splash and Home, then
 visits traffic, radio measurements, packets, setup, controls, and storage.
 Every screen has a reachable scroll stop. The sequence and scroll calculations
 live in [intro-sequence.ts](src/components/intro-sequence.ts); tests cover the
 full order, asset presence, chapter positions, and reachable endpoints.
-The responsive layout, clear LCD rendering, and removal of the side dots and
-view-mode buttons remain independent of this restored content.
+Each chapter contains only a title, a short paragraph, and the device. Routing
+diagrams and chapter action rows have been removed. On portrait phones, a
+moderately sized device sits above the text; on desktop and landscape it sits
+beside the text. Vertical swipes over the canvas scroll the tour in both
+directions; horizontal drags rotate the handset. Short screens shrink the
+device to give the paragraph room.
 
 For a future firmware-image update, regenerate the web and iOS Deck images below.
 This replaces the restored production PNGs with current simulator output:

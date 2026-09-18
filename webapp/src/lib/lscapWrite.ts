@@ -56,7 +56,8 @@ export function buildLscap(frames: RawFrameFields[]): Uint8Array {
     const original = Math.max(f.originalLength, captured);
 
     writeMagic(view, off, LSCAP_RECORD_MAGIC);
-    view.setUint32(off + 4, 0, true); // reserved
+    view.setUint16(off + 4, LSCAP_RECORD_HEADER_SIZE, true);
+    view.setUint16(off + 6, 1, true); // metadata layout version
     view.setUint16(off + 8, captured, true);
     view.setUint16(off + 10, Math.min(original, 0xffff), true);
     view.setBigUint64(off + 12, BigInt(f.seq), true);

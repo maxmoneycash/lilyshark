@@ -192,10 +192,6 @@ struct MeshThemeModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            #if DEBUG && LILYSHARK_UI_LARGE_TYPE
-            // Presented screens have their own environment boundary during QA.
-            .dynamicTypeSize(.accessibility3)
-            #endif
             .tint(MeshTheme.accent)
             .preferredColorScheme(selectedTheme.colorScheme)
             .onAppear { applyToAllWindows() }

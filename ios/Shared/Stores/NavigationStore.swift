@@ -10,6 +10,9 @@
 
 import SwiftUI
 import MeshCoreKit
+#if !os(watchOS)
+import MapKit
+#endif
 
 /// Sidebar navigation selection — used by NavigationSplitView detail routing.
 /// On compact (iPhone), this drives the push navigation.
@@ -28,7 +31,7 @@ enum SidebarSelection: Hashable {
 }
 
 enum AppSection: Hashable {
-    case messages, map, radio, settings
+    case mesh, messages, map, radio, settings
 }
 
 /// Observable store for app-wide navigation state.
@@ -36,7 +39,30 @@ enum AppSection: Hashable {
 /// without going through the ViewModel.
 @MainActor @Observable
 final class NavigationStore {
-    var section: AppSection = .messages
+    var section: AppSection = .mesh
+    var radioSessionGeneration = UUID()
+    var mapShowsLocalMesh = false
+    #if !os(watchOS)
+    // Map navigation belongs to the workspace so switching tabs or opening a
+    // conversation does not discard the user's camera or selected node.
+    var mapCamera: MapCameraPosition = .automatic
+    var mapRegion: MKCoordinateRegion?
+    var mapRadioIdentity = ""
+    var selectedMapNodeKey: Data?
+    var mapFocusRequest = UUID()
+    var mapNeedsFocus = false
+
+    func showNodeOnMap(_ key: Data) {
+        selectedMapNodeKey = key
+        mapFocusRequest = UUID()
+        mapNeedsFocus = true
+        mapShowsLocalMesh = true
+        section = .map
+        #if os(macOS) || targetEnvironment(macCatalyst)
+        sidebarSelection = .map
+        #endif
+    }
+    #endif
     var visibleConversationKey: Data?
 
     var isMessagesSectionVisible: Bool {

@@ -1,10 +1,9 @@
 /**
- * Demo mesh — a plausible Palo Alto deployment, loaded when no radio is
- * attached.
+ * Optional demo mesh — invented nodes and messages, started explicitly.
  *
  * Every screen in this app is a view onto a live radio, which means that
- * without hardware the whole interface is a row of empty panels. That is a bad
- * way to show what the instrument does, so the app seeds a mesh that behaves
+ * without hardware the interface can show saved data or an empty state. The
+ * separate demo lets a visitor choose a sample mesh that behaves
  * like a real one: repeaters on the hills with good paths and mains power,
  * handhelds down in the flats on battery, a sensor cluster, and a few nodes
  * that are only ever heard through someone else.
@@ -32,7 +31,7 @@ import { DEMO_BLOB } from "../lib/shelby";
 import {
   ContactType,
   DeviceStatus,
-  markUnread,
+  getSnapshot,
   mutate,
   type Message,
   type NodeEntry,
@@ -149,6 +148,8 @@ function buildNodes(now: number): NodeEntry[] {
 
     return {
       num,
+      viaDemo: true,
+      viaSim: true,
       publicKey: (num >>> 0).toString(16).padStart(8, "0").repeat(8),
       type: s.type,
       longName: s.name,
@@ -416,6 +417,8 @@ export function demoTelemetry(
 function meNode(now: number): NodeEntry {
   return {
     num: DEMO_ME,
+    viaDemo: true,
+    viaSim: true,
     publicKey: (DEMO_ME >>> 0).toString(16).padStart(8, "0").repeat(8),
     type: ContactType.Chat,
     longName: "Demo-Palo-Alto",
@@ -453,6 +456,7 @@ function buildMessages(nodes: NodeEntry[], now: number): Message[] {
     const n = nodes[idx];
     return {
       id: 900_000 + i,
+      viaDemo: true,
       convo: "ch:0",
       from: n.num,
       to: 0xffffffff,
@@ -549,9 +553,10 @@ function liveTick(): void {
       const from = DEMO_NODE_FLOOR + idx + 1;
       const sender = nodes.get(from);
       s.messages = [
-        ...s.messages,
+        ...s.messages.slice(-499),
         {
           id: 920_000 + liveN,
+          viaDemo: true,
           convo: "ch:0",
           from,
           to: 0xffffffff,
@@ -567,7 +572,6 @@ function liveTick(): void {
       ];
     }
   });
-  if (liveN % 2 === 0) markUnread("ch:0");
 }
 
 function startDemoLive(): void {
@@ -582,8 +586,17 @@ function stopDemoLive(): void {
   }
 }
 
-export function seedDemo(): void {
-  if (seeded) return;
+export function canStartDemo(): boolean {
+  const s = getSnapshot();
+  return !seeded && (s.status === undefined || s.status === DeviceStatus.Disconnected)
+    && s.myNodeNum === undefined && s.selfInfo === undefined
+    && s.nodes.size === 0 && s.messages.length === 0 && s.channels.size === 0
+    && s.waypoints.size === 0;
+}
+
+export function seedDemo(): boolean {
+  if (seeded) return true;
+  if (!canStartDemo()) return false;
   const now = Date.now();
   const nodes = buildNodes(now);
   const me = meNode(now);
@@ -605,12 +618,13 @@ export function seedDemo(): void {
     s.messages = [...buildMessages(nodes, now), ...s.messages].sort((a, b) => a.ts - b.ts);
 
     if (!s.channels.has(0)) {
-      s.channels = new Map(s.channels).set(0, { index: 0, name: "LongFast" });
+      s.channels = new Map(s.channels).set(0, { index: 0, name: "LongFast", viaDemo: true });
       createdChannel0 = true;
     }
     s.posUpdates = new Map(nodes.map((n) => [n.num, now - Math.abs(jitter(n.num, 1)) * 900_000]));
   });
   if (seeded) startDemoLive();
+  return seeded;
 }
 
 /** Drop everything seeded, so a real radio never shares the screen with it.
@@ -620,38 +634,31 @@ export function clearDemo(): void {
   if (!seeded) return;
   seeded = false;
   stopDemoLive();
+  for (const timer of replyTimers) clearTimeout(timer);
+  replyTimers.clear();
   mutate((s) => {
+    const demoNums = new Set([...s.nodes.values()].filter(n => n.viaDemo).map(n => n.num));
     const keep = new Map<number, NodeEntry>();
-    for (const [num, n] of s.nodes) if (num < DEMO_NODE_FLOOR) keep.set(num, n);
+    for (const [num, n] of s.nodes) if (!n.viaDemo) keep.set(num, n);
     s.nodes = keep;
-    s.messages = s.messages.filter((m) => m.from < DEMO_NODE_FLOOR);
+    s.messages = s.messages.filter((m) => !m.viaDemo);
     const pos = new Map<number, number>();
-    for (const [num, ts] of s.posUpdates) if (num < DEMO_NODE_FLOOR) pos.set(num, ts);
+    for (const [num, ts] of s.posUpdates) if (!demoNums.has(num)) pos.set(num, ts);
     s.posUpdates = pos;
 
     if (setMyNode) {
-      if (s.myNodeNum === DEMO_ME) s.myNodeNum = undefined;
+      if (s.myNodeNum === DEMO_ME && demoNums.has(DEMO_ME)) s.myNodeNum = undefined;
       setMyNode = false;
     }
-    const droppedCh0 = createdChannel0;
     if (createdChannel0) {
       const ch = new Map(s.channels);
       // only if it is still the one we invented
-      if (ch.get(0)?.name === "LongFast") ch.delete(0);
+      if (ch.get(0)?.viaDemo) ch.delete(0);
       s.channels = ch;
       createdChannel0 = false;
     }
 
-    // Unread counters for conversations that only ever existed in the demo:
-    // channel 0 if we are the ones who created it, and any DM with an
-    // invented node. Everything else is a real conversation.
-    const unread = new Map<string, number>();
-    for (const [convo, n] of s.unread) {
-      if (convo === "ch:0" && droppedCh0) continue;
-      if (convo.startsWith("dm:") && Number(convo.slice(3)) >= DEMO_NODE_FLOOR) continue;
-      unread.set(convo, n);
-    }
-    s.unread = unread;
+    // Demo chatter never creates unread notifications. Preserve real counters.
   });
 }
 
@@ -674,14 +681,17 @@ const REPLY_POOL: [number, string][] = [
   [0, "copy from the ridge, you're readable through the fog"],
 ];
 let demoSendN = 0;
+const replyTimers = new Set<ReturnType<typeof setTimeout>>();
 
 export function demoSendText(text: string, convo: string, replyId?: number): void {
+  if (!seeded) return;
   const now = Date.now();
   mutate((s) => {
     s.messages = [
       ...s.messages,
       {
         id: 940_000 + demoSendN,
+        viaDemo: true,
         convo,
         from: 0,
         to: 0xffffffff,
@@ -697,7 +707,8 @@ export function demoSendText(text: string, convo: string, replyId?: number): voi
   const [idx, reply] = REPLY_POOL[demoSendN % REPLY_POOL.length];
   demoSendN += 1;
   const replyDelayMs = 3500 + (demoSendN % 3) * 1200;
-  setTimeout(() => {
+  const timer = setTimeout(() => {
+    replyTimers.delete(timer);
     if (!seeded) return;
     const from = DEMO_NODE_FLOOR + idx + 1;
     mutate((s) => {
@@ -706,6 +717,7 @@ export function demoSendText(text: string, convo: string, replyId?: number): voi
         ...s.messages,
         {
           id: 941_000 + demoSendN,
+          viaDemo: true,
           convo,
           from,
           to: 0xffffffff,
@@ -720,6 +732,6 @@ export function demoSendText(text: string, convo: string, replyId?: number): voi
         } satisfies Message,
       ];
     });
-    markUnread(convo);
   }, replyDelayMs);
+  replyTimers.add(timer);
 }

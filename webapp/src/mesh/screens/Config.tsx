@@ -421,8 +421,9 @@ export default function Config() {
 							</span>
 						</div>
 						<p className="cfg-help">
-							Share received packets over the internet with other Lilyshark
-							analyzers. Remote packets are marked NET. The default room is public.
+							Optional public relay. Turning this on shares received packet contents,
+							including reported positions and decoded text, with other Lilyshark
+							analyzers. Remote packets are marked NET. Public map browsing works with relay off.
 						</p>
 					</Section>
 					<Section title={t("CONFIG // APPLICATION")}>

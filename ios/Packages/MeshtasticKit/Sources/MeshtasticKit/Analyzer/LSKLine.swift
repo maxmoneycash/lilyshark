@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CoreFoundation
 
 /// One decoded line of the deck's analyzer link.
 ///
@@ -449,15 +450,37 @@ public enum LSKDecoder {
     /// above still lists the frame — nothing is hidden, it simply does not earn
     /// a capture record it cannot fill.
     private static func decodeRawFrame(_ o: [String: Any]) -> LSKRawFrame? {
-        guard let hex = string(o["hex"]),
-              let sequence = uint32(o["seq"]),
-              let bytes = bytesFromHex(hex)
+        // Every current firmware record prints all of these fields, even
+        // when the RF presence mask marks a measurement unknown. A missing or
+        // out-of-range value must not become a plausible zero in a saved file.
+        let widths: [(String, Int64, Int64)] = [
+            ("seq", 0, 0xffff_ffff), ("pf", 0, 0xffff_ffff),
+            ("freq", 0, 0xffff_ffff), ("bw", 0, 0xffff_ffff),
+            ("br", 0, 0xffff_ffff), ("fdev", 0, 0xffff_ffff), ("air", 0, 0xffff_ffff),
+            ("ferr", -0x8000_0000, 0x7fff_ffff),
+            ("rssi_x10", -32768, 32767), ("snr_x10", -32768, 32767),
+            ("pre", 0, 65535), ("sync", 0, 65535), ("prof", 0, 65535),
+            ("rstat", -32768, 32767), ("txp", -128, 127),
+            ("sf", 0, 255), ("cr", 0, 255), ("ch", 0, 255), ("ridx", 0, 255),
+            ("mod", 0, 255), ("dir", 0, 255), ("crc", 0, 255), ("mflags", 0, 255), ("olen", 0, 65535)
+        ]
+        func integerString(_ key: String) -> String? {
+            guard let n = o[key] as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID() else { return nil }
+            return n.stringValue
+        }
+        for (key, low, high) in widths {
+            guard let text = integerString(key), let value = Int64(text), value >= low, value <= high else { return nil }
+        }
+        guard let time = integerString("ts"), let timestamp = UInt64(time),
+              let hex = string(o["hex"]), hex.utf8.count <= 510,
+              let sequence = uint32(o["seq"]), let bytes = bytesFromHex(hex),
+              let original = uint32(o["olen"]), original >= bytes.count
         else { return nil }
         let u = { (key: String) -> UInt32 in uint32(o[key]) ?? 0 }
         let i = { (key: String) -> Int32 in int32(o[key]) ?? 0 }
         return LSKRawFrame(
             sequence: sequence,
-            timestampMicroseconds: uint64(o["ts"]) ?? 0,
+            timestampMicroseconds: timestamp,
             presentFields: u("pf"),
             centerFrequencyHz: u("freq"),
             bandwidthHz: u("bw"),
@@ -477,7 +500,7 @@ public enum LSKDecoder {
             modulation: u("mod"),
             direction: u("dir"),
             crcStatus: u("crc"),
-            metadataFlags: u("mflags"),
+            metadataFlags: u("mflags") | (bool(o["sim"]) ? 4 : 0),
             originalLength: u("olen"),
             bytes: bytes
         )

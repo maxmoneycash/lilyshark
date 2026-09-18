@@ -149,6 +149,7 @@ final class PommeCoreViewModel: ObservableObject {
     /// outstanding. Only ever set on a Meshtastic link.
     var meshtasticConfigNonce: UInt32 = 0
 
+    var radioBrowsingSaveTask: Task<Void, Never>?
     private let iCloudStore = NSUbiquitousKeyValueStore.default
     
     private func registerTerminationHandler() {
@@ -199,6 +200,7 @@ final class PommeCoreViewModel: ObservableObject {
     init() {
         wireStoreDependencies()
         wireConnectionCallbacks()
+        restoreLastRadioForBrowsing()
         wireAppIntentBridge()
         observeStores()
         observeiCloudChanges()
@@ -229,7 +231,10 @@ final class PommeCoreViewModel: ObservableObject {
         
         // MessageStoreManager dependencies
         messageStoreManager.canSendMessagesProvider = { [weak self] in
-            self?.connectionManager.connectionState == .ready
+            guard let self else { return false }
+            return self.connectionManager.connectionState == .ready
+                && !self.deviceConfig.isSavedRadioData
+                && self.deviceConfig.loadedSections.contains("selfInfo")
         }
         messageStoreManager.sendCommand = { [weak self] data, label in self?.connectionManager.sendCommand(data, label: label) }
         #if canImport(MeshtasticKit)
@@ -339,7 +344,9 @@ final class PommeCoreViewModel: ObservableObject {
     /// Wire ConnectionManager callbacks for frame dispatch and lifecycle events.
     private func wireConnectionCallbacks() {
         connectionManager.deviceConfig = deviceConfig
+        connectionManager.onSessionStarting = { [weak self] in self?.clearSavedRadioBeforeConnecting() }
         connectionManager.onFrameReceived = { [weak self] data in
+            self?.clearSavedRadioBeforeConnecting()
             self?.handleReceivedData(data)
         }
         connectionManager.onDeviceReady = { [weak self] in
@@ -347,6 +354,7 @@ final class PommeCoreViewModel: ObservableObject {
         }
         #if canImport(MeshtasticKit)
         connectionManager.onFromRadioFrameReceived = { [weak self] data in
+            self?.clearSavedRadioBeforeConnecting()
             self?.handleFromRadioFrame(data)
         }
         #endif
@@ -367,16 +375,22 @@ final class PommeCoreViewModel: ObservableObject {
     
     /// Handle disconnect cleanup — called by ConnectionManager when state → disconnected.
     private func handleDisconnect(previousState: BLEConnectionState) {
+        guard !deviceConfig.isSavedRadioData else { return }
+        radioBrowsingSaveTask?.cancel()
+        let savedRadio = makeRadioBrowsingSnapshot()
+        if let savedRadio { persistRadioBrowsingSnapshot(savedRadio) }
         meshtasticConfigNonce = 0
         remoteSessionManager.resetLoginSessions()
         remoteSessionManager.reset()
         connectionManager.stopAutoLocationUpdates()
+        self.messageStoreManager.markAllSendingAsFailed()
+        self.messageStoreManager.deactivate()
+        self.messageStoreManager.reset()
         self.deviceConfig.reset()
         self.contactStore.reset()
         self.channelStore.reset()
-        self.messageStoreManager.markAllSendingAsFailed()
-        self.messageStoreManager.reset()
-        self.messageStoreManager.deactivate()
+        if let savedRadio { applyRadioBrowsingSnapshot(savedRadio) }
+        else { restoreLastRadioForBrowsing() }
         #if os(iOS)
         syncWidget()
         #endif
@@ -407,6 +421,12 @@ final class PommeCoreViewModel: ObservableObject {
                 // All iOS/macOS views use @Environment(Store.self) directly.
                 _ = self.contactStore.contacts
                 _ = self.channelStore.channels
+                _ = self.channelStore.hasCompletedInitialChannelSync
+                _ = self.contactStore.isSyncingContacts
+                _ = self.contactStore.nodePositions
+                _ = self.contactStore.nodeObservations
+                _ = self.deviceConfig.loadedSections
+                _ = self.deviceConfig.deviceName
                 _ = self.connectionManager.connectionState
                 _ = self.connectionManager.requestShowScanner
             } onChange: {
@@ -416,6 +436,7 @@ final class PommeCoreViewModel: ObservableObject {
                         trackChanges()
                         return
                     }
+                    self.scheduleRadioBrowsingSave()
                     self.isSendingChange = true
                     self.objectWillChange.send()
                     self.isSendingChange = false

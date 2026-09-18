@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "projects": [
+    {
+      "id": "nanorfe-plus4-pro-antenna-record",
+      "title": "Record an antenna's SWR sweep",
+      "author": "OwOTech and cho45 / NanoRFE",
+      "guideURL": "https://nanorfe.com/nanovna-v2-user-manual.html",
+      "coreCatalogSlugs": ["nanorfe-nanovna-v2-plus4-pro"],
+      "coreQuantities": {"nanorfe-nanovna-v2-plus4-pro": 1},
+      "otherRequired": [
+        "Disconnected passive antenna, suitable SMA test cable/adapters and open/short/50-ohm-load calibration standards",
+        "USB data cable, suitable USB power and computer for saving measurements"
+      ],
+      "software": ["NanoVNA-QT from NanoRFE's download page; firmware matching the genuine Plus4 Pro"],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "The manual explicitly includes Plus4 Pro. This record does not establish compatibility for unrelated NanoVNA-labelled hardware.",
+      "gaps": [
+        "Calibrate the chosen sweep at the antenna connection plane. Keep transmitters/powered RF outputs disconnected and follow the guide's static precautions.",
+        "Maker pages disagree on the upper frequency limit; no operation beyond the store's 4 GHz limit is assumed. SWR alone does not measure radio range.",
+        "Manual revision label is UG1101 2022/02; installed firmware/menu behavior and host compatibility remain to check."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Measure a passive antenna on port 1 and save its reflection data as a reference for later changes.",
+      "sourceAnchors": [
+        {"url": "https://nanorfe.com/nanovna-v2-user-manual.html", "section": "Specifications; Performing measurements; NanoVNA-QT Software", "supports": "Plus4 Pro inclusion, one-port calibration and computer connection."},
+        {"url": "https://nanorfe.com/nanovna-antenna-tuning-swr.html", "section": "What you will need; Steps 1–5", "supports": "Antenna workflow, accessories and static precautions."},
+        {"url": "https://nanorfe.com/nanovna-software.html", "section": "NanoVNA-QT", "supports": "S11 export and host software."},
+        {"url": "https://www.nanorfe.com/shop", "section": "NanoVNA V2 Plus4 Pro", "supports": "Store frequency boundary."}
+      ]
+    },
+    {
+      "id": "reterminal-e1001-weather-dashboard",
+      "title": "Put workshop weather on an e-paper display",
+      "author": "Seeed Studio Wiki",
+      "guideURL": "https://wiki.seeedstudio.com/reterminal_e10xx_with_esphome/",
+      "coreCatalogSlugs": ["seeed-reterminal-e1001"],
+      "coreQuantities": {"seeed-reterminal-e1001": 1},
+      "otherRequired": [
+        "Home Assistant host with Supervisor, 2.4 GHz Wi-Fi and working Open-Meteo weather integration",
+        "USB-C data cable, power and computer for the initial firmware setup"
+      ],
+      "software": ["ESPHome E1001 configuration, Home Assistant ESPHome integration and the example's Inter font"],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "Use the cookbook's E1001 weather-display tab and monochrome driver. E1002/E1003/E1004 configurations are different.",
+      "gaps": [
+        "Replace sample entity IDs, network credentials and API settings; the device must be added to Home Assistant before values arrive.",
+        "The E1001 example updates every five minutes; no live-monitor or battery-runtime claim. The guide does not pin an E1001 minimum ESPHome release."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Display Home Assistant weather conditions, temperature and wind bearing on the E1001's e-paper screen.",
+      "sourceAnchors": [
+        {"url": "https://wiki.seeedstudio.com/reterminal_e10xx_with_esphome/", "section": "Materials Required; Getting values from Home Assistant for display — For E1001", "supports": "Exact-model configuration, host prerequisites and displayed weather values."},
+        {"url": "https://wiki.seeedstudio.com/getting_started_with_reterminal_e1001/", "section": "Product Overview; Getting Started", "supports": "E1001 identity, USB setup and 2.4 GHz Wi-Fi."}
+      ]
+    },
+    {
+      "id": "huskylens-2-bench-object-classifier",
+      "title": "Teach a bench camera your own objects",
+      "author": "DFRobot Wiki",
+      "guideURL": "https://wiki.dfrobot.com/sen0638/docs/22617",
+      "coreCatalogSlugs": ["dfrobot-huskylens-2"],
+      "coreQuantities": {"dfrobot-huskylens-2": 1},
+      "otherRequired": ["Sample objects, suitable USB-C power/data cable and a computer to copy the exported model files"],
+      "software": ["HUSKYLENS 2's built-in Self-Learning Classifier; computer file manager for backup"],
+      "hardwareMatch": "exact-model-with-variant-exclusion",
+      "variantNotes": "This SEN0638 guide uses the device standalone. Original HUSKYLENS and external-controller compatibility are not assumed.",
+      "gaps": [
+        "Check recognition with your actual objects, lighting and viewpoints; displayed confidence is not measured accuracy.",
+        "Keep both exported .json and .bin files. Copying the setup to a second HUSKYLENS 2 needs another unit; this one-unit record covers learning and backup.",
+        "The guide does not state a minimum firmware version for this function."
+      ],
+      "testedByUs": false,
+      "sourceReviewedDate": "2026-09-16",
+      "summary": "Learn and name objects on the touchscreen, inspect recognition results and back up the learned setup over USB.",
+      "sourceAnchors": [
+        {"url": "https://wiki.dfrobot.com/sen0638/docs/22617", "section": "Self-Learning Classification Guide; Parameter Settings; Exporting the Model", "supports": "Learning, naming, threshold adjustment and paired-file export."},
+        {"url": "https://wiki.dfrobot.com/sen0638/docs/22599", "section": "Quick Usage — Power On; Explore Vision Functions", "supports": "Standalone USB-powered operation."},
+        {"url": "https://www.dfrobot.com/product-2995.html", "section": "SKU; Selection Guide", "supports": "SEN0638 model identity and distinction from original HUSKYLENS."}
+      ]
+    }
+  ]
+}

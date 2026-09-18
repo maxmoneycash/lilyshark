@@ -1,0 +1,19 @@
+name = "gadgets-buy"
+main = "worker.mjs"
+compatibility_date = "2026-06-01"
+
+# Orders and maker accounts live in KV. Create with: npx wrangler kv namespace create ORDERS
+[[kv_namespaces]]
+binding = "ORDERS"
+id = "REPLACE_WITH_NAMESPACE_ID"
+
+[vars]
+SITE_ORIGIN = "http://127.0.0.1:54644"
+ORDERS_FROM = "gadgets.sh orders <orders@gadgets.sh>"
+
+# Secrets (set with: npx wrangler secret put NAME):
+#   STRIPE_SECRET_KEY      sk_test_... then sk_live_...
+#   STRIPE_WEBHOOK_SECRET  whsec_... from the Stripe dashboard webhook for /webhook
+#   ORDER_TOKEN_SECRET     any long random string; signs maker email links
+#   ADMIN_KEY              any long random string; protects /connect/start
+#   RESEND_API_KEY         re_... from resend.com

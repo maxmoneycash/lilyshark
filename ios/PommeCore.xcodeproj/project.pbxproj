@@ -97,6 +97,23 @@
 		8EF971496F064F1AD761B796 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21606E2B959E6496D3B0230D /* ContactListView.swift */; };
 		9144822AD9EB38340AF2317E /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFFE2BF3488F0C0647632CD /* ChatView.swift */; };
 		96059FF0363E830C376C23ED /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		D7FC5192647A41ECAFB6E1ED /* PommeCoreViewModel+SavedRadio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */; };
+		EFDC1F9606464307ACBB8EAF /* MapNodeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484BC111565E46B88FC48CC7 /* MapNodeViews.swift */; };
+		412FBCF2589A4D2ABBDFCA6D /* MessageDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */; };
+		F14B85C845634EFD91214203 /* MeshFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = D545B3F7264E4C0997B01B3D /* MeshFixtureHost.swift */; };
+		DCD930BA02114EC696C85B83 /* NewMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6895F9E012E34574AB7C3AD7 /* NewMessageView.swift */; };
+		FC2BF50EAB534EF68ABE3A1E /* MeshHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 040822D1F1E347D597E35A03 /* MeshHomeView.swift */; };
+		D7B9CFE03BDE4AC3972E085C /* CaptureLXMF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E7A85485B746B0BA92432E /* CaptureLXMF.swift */; };
+		01F63DE79B3040709BB770A0 /* USBCaptureControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CE596FB6FC401FA1A9176E /* USBCaptureControls.swift */; };
+		D3E14B1AC61D4392A01BF129 /* USBCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0749F9A27942329D25C861 /* USBCaptureSession.swift */; };
+		1C01DB25CF144B0AAA701014 /* SpectrumHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5653136D804F406393BBA595 /* SpectrumHistory.swift */; };
+		6EDCEADB680042378FF36849 /* CaptureDissection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD92192D757B42ADA895102B /* CaptureDissection.swift */; };
+		99DAA35CB48649BFBB47262A /* CaptureFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB0319D9FEC642158B506FA5 /* CaptureFilter.swift */; };
+		9843B744066C44159095EF2A /* TrafficAnalyzerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D35B13AEFA4BD0A0F3A977 /* TrafficAnalyzerView.swift */; };
+		435A2B3AB92744BDBB42768F /* SpectrumAnalyzerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C941D04D454CF9BE39411C /* SpectrumAnalyzerView.swift */; };
+		EE5EF970071D415484B3F859 /* PacketDissectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3D3D45B2A944D5BA30D240 /* PacketDissectorView.swift */; };
+		CD087E8DE3534905881BF7DA /* CaptureAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BD8FED87BD4E3FA9955C46 /* CaptureAnalysis.swift */; };
+		36E5A39909F744FA97EE6636 /* LSCapParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBC1FDE4E77848CB8AD67418 /* LSCapParser.swift */; };
 		2C9BEDC90EF743B5A696A78A /* WelcomeHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4560E316527A4470963AD0DA /* WelcomeHomeView.swift */; };
 		A4168C2761904C4B907349B0 /* RadioVisibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */; };
 		A1E0C58B1DDF4B29AC9D731B /* NativeCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */; };
@@ -119,6 +136,23 @@
 		A3B4C5D6E7F8A9B0C1D2E3F4 /* NavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */; };
 		A3C4EC30F51CEF0E73260DD5 /* RadioPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E616344CEDCD1ADC41548B7 /* RadioPreset.swift */; };
 		A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		BD421F7191324A26BA372D68 /* PommeCoreViewModel+SavedRadio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */; };
+		50D95B7C4E6F450FA327B959 /* MapNodeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484BC111565E46B88FC48CC7 /* MapNodeViews.swift */; };
+		394BE77F241D477E9243EA47 /* MessageDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */; };
+		D94161208A974CF49E3B82EB /* MeshFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = D545B3F7264E4C0997B01B3D /* MeshFixtureHost.swift */; };
+		BB948B9CC59B489E800B5C46 /* NewMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6895F9E012E34574AB7C3AD7 /* NewMessageView.swift */; };
+		6784D3DF8CBC49DD879A91CC /* MeshHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 040822D1F1E347D597E35A03 /* MeshHomeView.swift */; };
+		EC37591E3D8A461F905C564A /* CaptureLXMF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E7A85485B746B0BA92432E /* CaptureLXMF.swift */; };
+		32A710DCBC8E45F9ABDA1C9C /* USBCaptureControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CE596FB6FC401FA1A9176E /* USBCaptureControls.swift */; };
+		023C256E46F64F999856D842 /* USBCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0749F9A27942329D25C861 /* USBCaptureSession.swift */; };
+		FED84A3537BE42FAA55EBA2D /* SpectrumHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5653136D804F406393BBA595 /* SpectrumHistory.swift */; };
+		B67A8F5E1B8B4A06A8404D35 /* CaptureDissection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD92192D757B42ADA895102B /* CaptureDissection.swift */; };
+		41C3CA050AFF4565A0BA9647 /* CaptureFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB0319D9FEC642158B506FA5 /* CaptureFilter.swift */; };
+		B98AC179533344EDAAF40824 /* TrafficAnalyzerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D35B13AEFA4BD0A0F3A977 /* TrafficAnalyzerView.swift */; };
+		3C547F1D7B0E498D9180A37B /* SpectrumAnalyzerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C941D04D454CF9BE39411C /* SpectrumAnalyzerView.swift */; };
+		42024FF62B144C47A1053356 /* PacketDissectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3D3D45B2A944D5BA30D240 /* PacketDissectorView.swift */; };
+		2F046D76FA72472EB0B83ABA /* CaptureAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BD8FED87BD4E3FA9955C46 /* CaptureAnalysis.swift */; };
+		B8B47DA2DDD148DE92D58EF7 /* LSCapParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBC1FDE4E77848CB8AD67418 /* LSCapParser.swift */; };
 		5C4C97B438CE45579A36724C /* WelcomeHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4560E316527A4470963AD0DA /* WelcomeHomeView.swift */; };
 		D1E49AB3112343728A988FFA /* RadioVisibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */; };
 		E6A1D52B79F944758F60364C /* NativeCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */; };
@@ -177,6 +211,23 @@
 		TDKBLD0000000000000001 /* TDeck in Resources */ = {isa = PBXBuildFile; fileRef = TDKREF0000000000000001 /* TDeck */; };
 		TDKBLD0000000000000002 /* TDeck in Resources */ = {isa = PBXBuildFile; fileRef = TDKREF0000000000000001 /* TDeck */; };
 		FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		11C7B429BD364CB6AACE6AE3 /* PommeCoreViewModel+SavedRadio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */; };
+		BE27CC3474FC408DA4CFF16C /* MapNodeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484BC111565E46B88FC48CC7 /* MapNodeViews.swift */; };
+		D028BD3988DE4BE8819EEED6 /* MessageDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */; };
+		99A4EBEB24A64E19AB589835 /* MeshFixtureHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = D545B3F7264E4C0997B01B3D /* MeshFixtureHost.swift */; };
+		CF256CB51E89440A862AD9E0 /* NewMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6895F9E012E34574AB7C3AD7 /* NewMessageView.swift */; };
+		60AD887C0F9D4AFDB00C774A /* MeshHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 040822D1F1E347D597E35A03 /* MeshHomeView.swift */; };
+		D9C0A42EB40A43BB824CE3D7 /* CaptureLXMF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E7A85485B746B0BA92432E /* CaptureLXMF.swift */; };
+		A601AF84B4C0415DB1A98B9A /* USBCaptureControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99CE596FB6FC401FA1A9176E /* USBCaptureControls.swift */; };
+		6AAC35609D0948B19018D5CA /* USBCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0749F9A27942329D25C861 /* USBCaptureSession.swift */; };
+		48436349C2B64128BBB2149A /* SpectrumHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5653136D804F406393BBA595 /* SpectrumHistory.swift */; };
+		AA8DE52CFF724454BFFC3961 /* CaptureDissection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD92192D757B42ADA895102B /* CaptureDissection.swift */; };
+		C78F343D36B14D888B697962 /* CaptureFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB0319D9FEC642158B506FA5 /* CaptureFilter.swift */; };
+		2090670BE24C4EE093952C14 /* TrafficAnalyzerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D35B13AEFA4BD0A0F3A977 /* TrafficAnalyzerView.swift */; };
+		3FFF388E25E446D58C660B70 /* SpectrumAnalyzerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C941D04D454CF9BE39411C /* SpectrumAnalyzerView.swift */; };
+		299FCE9E418745C8A6548E1F /* PacketDissectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3D3D45B2A944D5BA30D240 /* PacketDissectorView.swift */; };
+		5A2956AD1A5B4E379D41D848 /* CaptureAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BD8FED87BD4E3FA9955C46 /* CaptureAnalysis.swift */; };
+		8C2708FD8D9B4226B111762E /* LSCapParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBC1FDE4E77848CB8AD67418 /* LSCapParser.swift */; };
 		3EBF818CD89546A59D213D09 /* WelcomeHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4560E316527A4470963AD0DA /* WelcomeHomeView.swift */; };
 		683A2B142E9943AFBB68ACB3 /* RadioVisibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */; };
 		E2D1AA19715E4451AF93565B /* NativeCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */; };
@@ -389,6 +440,23 @@
 		E09A1F63605E4CA4ACDE7634 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStore.swift; sourceTree = "<group>"; };
 		F6BA0593D517B1467DBC1C42 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/ViewModels/PommeCoreViewModel+SavedRadio.swift"; sourceTree = SOURCE_ROOT; };
+		484BC111565E46B88FC48CC7 /* MapNodeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MapNodeViews.swift"; sourceTree = SOURCE_ROOT; };
+		3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MessageDetailsView.swift"; sourceTree = SOURCE_ROOT; };
+		D545B3F7264E4C0997B01B3D /* MeshFixtureHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/App/MeshFixtureHost.swift"; sourceTree = SOURCE_ROOT; };
+		6895F9E012E34574AB7C3AD7 /* NewMessageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/NewMessageView.swift"; sourceTree = SOURCE_ROOT; };
+		040822D1F1E347D597E35A03 /* MeshHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MeshHomeView.swift"; sourceTree = SOURCE_ROOT; };
+		71E7A85485B746B0BA92432E /* CaptureLXMF.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Models/CaptureLXMF.swift"; sourceTree = SOURCE_ROOT; };
+		99CE596FB6FC401FA1A9176E /* USBCaptureControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/Tools/USBCaptureControls.swift"; sourceTree = SOURCE_ROOT; };
+		1C0749F9A27942329D25C861 /* USBCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Models/USBCaptureSession.swift"; sourceTree = SOURCE_ROOT; };
+		5653136D804F406393BBA595 /* SpectrumHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Models/SpectrumHistory.swift"; sourceTree = SOURCE_ROOT; };
+		CD92192D757B42ADA895102B /* CaptureDissection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Models/CaptureDissection.swift"; sourceTree = SOURCE_ROOT; };
+		CB0319D9FEC642158B506FA5 /* CaptureFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Models/CaptureFilter.swift"; sourceTree = SOURCE_ROOT; };
+		04D35B13AEFA4BD0A0F3A977 /* TrafficAnalyzerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/Tools/TrafficAnalyzerView.swift"; sourceTree = SOURCE_ROOT; };
+		C5C941D04D454CF9BE39411C /* SpectrumAnalyzerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/Tools/SpectrumAnalyzerView.swift"; sourceTree = SOURCE_ROOT; };
+		EF3D3D45B2A944D5BA30D240 /* PacketDissectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/Tools/PacketDissectorView.swift"; sourceTree = SOURCE_ROOT; };
+		13BD8FED87BD4E3FA9955C46 /* CaptureAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Models/CaptureAnalysis.swift"; sourceTree = SOURCE_ROOT; };
+		DBC1FDE4E77848CB8AD67418 /* LSCapParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Models/LSCapParser.swift"; sourceTree = SOURCE_ROOT; };
 		4560E316527A4470963AD0DA /* WelcomeHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/WelcomeHomeView.swift"; sourceTree = SOURCE_ROOT; };
 		6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/RadioVisibilityView.swift"; sourceTree = SOURCE_ROOT; };
 		CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/NativeCoverageView.swift"; sourceTree = SOURCE_ROOT; };
@@ -730,6 +798,23 @@
 			children = (
 				A259126AAB80661010C6A336 /* PommeCoreApp.swift */,
 				F6BA0593D517B1467DBC1C42 /* Theme.swift */,
+				88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */,
+				484BC111565E46B88FC48CC7 /* MapNodeViews.swift */,
+				3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */,
+				D545B3F7264E4C0997B01B3D /* MeshFixtureHost.swift */,
+				6895F9E012E34574AB7C3AD7 /* NewMessageView.swift */,
+				040822D1F1E347D597E35A03 /* MeshHomeView.swift */,
+				71E7A85485B746B0BA92432E /* CaptureLXMF.swift */,
+				99CE596FB6FC401FA1A9176E /* USBCaptureControls.swift */,
+				1C0749F9A27942329D25C861 /* USBCaptureSession.swift */,
+				5653136D804F406393BBA595 /* SpectrumHistory.swift */,
+				CD92192D757B42ADA895102B /* CaptureDissection.swift */,
+				CB0319D9FEC642158B506FA5 /* CaptureFilter.swift */,
+				04D35B13AEFA4BD0A0F3A977 /* TrafficAnalyzerView.swift */,
+				C5C941D04D454CF9BE39411C /* SpectrumAnalyzerView.swift */,
+				EF3D3D45B2A944D5BA30D240 /* PacketDissectorView.swift */,
+				13BD8FED87BD4E3FA9955C46 /* CaptureAnalysis.swift */,
+				DBC1FDE4E77848CB8AD67418 /* LSCapParser.swift */,
 				4560E316527A4470963AD0DA /* WelcomeHomeView.swift */,
 				6AFDF96341194E61BA7FAEDC /* RadioVisibilityView.swift */,
 				CDC6DF2D7A4C4C91964BBE76 /* NativeCoverageView.swift */,
@@ -1026,6 +1111,23 @@
 			files = (
 				894905739E99B7E425A27485 /* PommeCoreApp.swift in Sources */,
 				A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */,
+				BD421F7191324A26BA372D68 /* PommeCoreViewModel+SavedRadio.swift in Sources */,
+				50D95B7C4E6F450FA327B959 /* MapNodeViews.swift in Sources */,
+				394BE77F241D477E9243EA47 /* MessageDetailsView.swift in Sources */,
+				D94161208A974CF49E3B82EB /* MeshFixtureHost.swift in Sources */,
+				BB948B9CC59B489E800B5C46 /* NewMessageView.swift in Sources */,
+				6784D3DF8CBC49DD879A91CC /* MeshHomeView.swift in Sources */,
+				EC37591E3D8A461F905C564A /* CaptureLXMF.swift in Sources */,
+				32A710DCBC8E45F9ABDA1C9C /* USBCaptureControls.swift in Sources */,
+				023C256E46F64F999856D842 /* USBCaptureSession.swift in Sources */,
+				FED84A3537BE42FAA55EBA2D /* SpectrumHistory.swift in Sources */,
+				B67A8F5E1B8B4A06A8404D35 /* CaptureDissection.swift in Sources */,
+				41C3CA050AFF4565A0BA9647 /* CaptureFilter.swift in Sources */,
+				B98AC179533344EDAAF40824 /* TrafficAnalyzerView.swift in Sources */,
+				3C547F1D7B0E498D9180A37B /* SpectrumAnalyzerView.swift in Sources */,
+				42024FF62B144C47A1053356 /* PacketDissectorView.swift in Sources */,
+				2F046D76FA72472EB0B83ABA /* CaptureAnalysis.swift in Sources */,
+				B8B47DA2DDD148DE92D58EF7 /* LSCapParser.swift in Sources */,
 				5C4C97B438CE45579A36724C /* WelcomeHomeView.swift in Sources */,
 				D1E49AB3112343728A988FFA /* RadioVisibilityView.swift in Sources */,
 				E6A1D52B79F944758F60364C /* NativeCoverageView.swift in Sources */,
@@ -1084,6 +1186,23 @@
 				SVT10000000100000000002 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000002 /* SettingsView+Editors.swift in Sources */,
 				96059FF0363E830C376C23ED /* Theme.swift in Sources */,
+				D7FC5192647A41ECAFB6E1ED /* PommeCoreViewModel+SavedRadio.swift in Sources */,
+				EFDC1F9606464307ACBB8EAF /* MapNodeViews.swift in Sources */,
+				412FBCF2589A4D2ABBDFCA6D /* MessageDetailsView.swift in Sources */,
+				F14B85C845634EFD91214203 /* MeshFixtureHost.swift in Sources */,
+				DCD930BA02114EC696C85B83 /* NewMessageView.swift in Sources */,
+				FC2BF50EAB534EF68ABE3A1E /* MeshHomeView.swift in Sources */,
+				D7B9CFE03BDE4AC3972E085C /* CaptureLXMF.swift in Sources */,
+				01F63DE79B3040709BB770A0 /* USBCaptureControls.swift in Sources */,
+				D3E14B1AC61D4392A01BF129 /* USBCaptureSession.swift in Sources */,
+				1C01DB25CF144B0AAA701014 /* SpectrumHistory.swift in Sources */,
+				6EDCEADB680042378FF36849 /* CaptureDissection.swift in Sources */,
+				99DAA35CB48649BFBB47262A /* CaptureFilter.swift in Sources */,
+				9843B744066C44159095EF2A /* TrafficAnalyzerView.swift in Sources */,
+				435A2B3AB92744BDBB42768F /* SpectrumAnalyzerView.swift in Sources */,
+				EE5EF970071D415484B3F859 /* PacketDissectorView.swift in Sources */,
+				CD087E8DE3534905881BF7DA /* CaptureAnalysis.swift in Sources */,
+				36E5A39909F744FA97EE6636 /* LSCapParser.swift in Sources */,
 				2C9BEDC90EF743B5A696A78A /* WelcomeHomeView.swift in Sources */,
 				A4168C2761904C4B907349B0 /* RadioVisibilityView.swift in Sources */,
 				A1E0C58B1DDF4B29AC9D731B /* NativeCoverageView.swift in Sources */,
@@ -1192,6 +1311,23 @@
 				SVT10000000100000000003 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000003 /* SettingsView+Editors.swift in Sources */,
 				FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */,
+				11C7B429BD364CB6AACE6AE3 /* PommeCoreViewModel+SavedRadio.swift in Sources */,
+				BE27CC3474FC408DA4CFF16C /* MapNodeViews.swift in Sources */,
+				D028BD3988DE4BE8819EEED6 /* MessageDetailsView.swift in Sources */,
+				99A4EBEB24A64E19AB589835 /* MeshFixtureHost.swift in Sources */,
+				CF256CB51E89440A862AD9E0 /* NewMessageView.swift in Sources */,
+				60AD887C0F9D4AFDB00C774A /* MeshHomeView.swift in Sources */,
+				D9C0A42EB40A43BB824CE3D7 /* CaptureLXMF.swift in Sources */,
+				A601AF84B4C0415DB1A98B9A /* USBCaptureControls.swift in Sources */,
+				6AAC35609D0948B19018D5CA /* USBCaptureSession.swift in Sources */,
+				48436349C2B64128BBB2149A /* SpectrumHistory.swift in Sources */,
+				AA8DE52CFF724454BFFC3961 /* CaptureDissection.swift in Sources */,
+				C78F343D36B14D888B697962 /* CaptureFilter.swift in Sources */,
+				2090670BE24C4EE093952C14 /* TrafficAnalyzerView.swift in Sources */,
+				3FFF388E25E446D58C660B70 /* SpectrumAnalyzerView.swift in Sources */,
+				299FCE9E418745C8A6548E1F /* PacketDissectorView.swift in Sources */,
+				5A2956AD1A5B4E379D41D848 /* CaptureAnalysis.swift in Sources */,
+				8C2708FD8D9B4226B111762E /* LSCapParser.swift in Sources */,
 				3EBF818CD89546A59D213D09 /* WelcomeHomeView.swift in Sources */,
 				683A2B142E9943AFBB68ACB3 /* RadioVisibilityView.swift in Sources */,
 				E2D1AA19715E4451AF93565B /* NativeCoverageView.swift in Sources */,

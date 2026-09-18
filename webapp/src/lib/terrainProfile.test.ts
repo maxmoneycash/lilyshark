@@ -36,13 +36,13 @@ test('line of sight includes curvature and Fresnel radius and detects obstructio
   assert.throws(() => analyzeTerrain([0, 0], 0, 7, 7, 910));
   assert.throws(() => analyzeTerrain([0, 0], 1000, -1, 7, 910));
 });
-test('directory pins only include located repeaters/rooms and do not become coverage', () => {
+test('directory pins require a located full identity and do not become coverage', () => {
   const nodes = parseDirectory([
-    { type: 2, adv_lat: 37.8, adv_lon: -122.2, adv_name: '<script>name</script>', public_key: 'ab', last_advert: '2026-09-01T00:00:00Z', params: { freq: 910.525 } },
+    { type: 2, adv_lat: 37.8, adv_lon: -122.2, adv_name: '<script>name</script>', public_key: 'ab'.repeat(32), last_advert: '2026-09-01T00:00:00Z', params: { freq: 910.525 } },
     { type: 1, adv_lat: 37.8, adv_lon: -122.2 },
     { type: 2, adv_lat: 0, adv_lon: 0 },
     { type: 2, adv_lat: 91, adv_lon: 0 },
-    { type: 3, adv_lat: 37.9, adv_lon: -122.1 },
+    { type: 3, adv_lat: 37.9, adv_lon: -122.1, public_key: 'cd'.repeat(32) },
   ]);
   assert.equal(nodes.length, 2);
   assert.ok(nodes.every(n => n.directory));

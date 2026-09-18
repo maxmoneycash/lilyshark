@@ -1,5 +1,55 @@
 # Web polish preferences — 2026-09-08
 
+## Latest correction — 2026-09-16
+
+User explicitly rejects the routing diagrams on INTRO and says the device is
+now too large. INTRO must contain only a title, a few sentences, and the device.
+Removed MeshRoutingDemo and every chapter action row, including the ending CTAs.
+Header navigation/connect remains. Reduced desktop model maximum to 620px and
+mobile height to min(52dvh, 480px), centered with text below. Vertical swipes over
+the model still scroll; horizontal drags rotate. Keep all 12 chapters/33 screens.
+Do not restore diagrams or oversized edge-to-edge device framing.
+
+Overnight work requested September 16, /workflows. Existing Rhai web workflow
+contains stale branch/preview/42-screen and push instructions; current work uses
+main and local preview 5173, with the user's newer 33-screen/simple-intro scope.
+Audit, fix, browser QA, tests, and report are the working cycle. Work remains local.
+Normal web startup no longer seeds demo nodes/messages. Demo is explicit, marked,
+and removable; samples carry viaDemo and viaSim. Cleanup no longer treats real
+high-numbered identities as mock IDs. Sample sends and delayed replies are removed
+on exit; demo creates no unread badges. 654 tests pass after the current web changes. See docs/overnight-web-qa-2026-09-16.md for final checks and evidence.
+
+## Latest correction — 2026-09-15
+
+User's mobile screenshots show the model too small with excessive empty space.
+They want the model much larger and vertical swipes over it to scroll up/down.
+Implemented model-first portrait layout, compact copy below, near-full-width
+canvas, tighter corner fitting (1.04 margin), and pan-y/pinch-zoom on both wrapper
+and canvas. Touch rotation commits only after a sideways drag; mouse/keyboard
+rotation remains. Keep 12 chapters, 33 screens, full handset/metal antenna base,
+and the pink terminal styling. No model-size controls.
+
+621 tests, TypeScript, final production build pass. Arc session 28 verified
+320×568, 390×844, 540×960, landscape and desktop; touch scroll works forward/back
+on canvas, sideways touch rotates without changing chapter. Long copy scrolls
+to reveal routing diagram and final actions. No physical Safari check.
+Report: docs/mobile-intro-qa-2026-09-15.md. Preview: http://127.0.0.1:5173/.
+Run Node via /Users/maxmohammadi/.nvm/versions/node/v22.22.1/bin/node (ARM);
+default /usr/local/bin/node is x64 and cannot use the installed ARM Rollup.
+
+## Latest correction — 2026-09-13
+
+The user now explicitly wants a larger handset on crowded/narrow intro pages
+and fewer firmware screens about setup, controls, and settings. This supersedes
+the earlier requirement to feature all 42 screens. The tour now has 33 screens:
+setup welcome/profile, controls, and radio profile are the four retained setup
+and controls screens (previously 13). Keep all twelve chapter texts and the
+radio/capture screens. Retired images remain available to the firmware/docs.
+The handset gets more vertical space on phones, the routing-demo caption is
+shorter, and scrolling copy no longer fades the headline. Keep the full chassis
+and metal antenna base visible; the rubber boot and whip may extend past the
+device stage. No controls for changing model size.
+
 The user wants sustained mobile and desktop dogfooding across the web app. Keep
 the existing pink terminal identity. Fix actual clipping, wasted space, confusing
 flows, and rendering defects; do not add controls to compensate for weak defaults.
@@ -9,7 +59,7 @@ with a clear use or interesting observation, then give concrete radio details.
 Keep protocol names and useful measurements. Explain unfamiliar abbreviations in
 context. Avoid both generic marketing fluff and acronym-heavy specifications.
 
-Latest correction: the user rejected the rewritten intro and explicitly requested
+Earlier correction (superseded above for screen selection): the user rejected the rewritten intro and explicitly requested
 ALL copy and device screens currently deployed on lilyshark.com. This supersedes
 the previous six/ten-screen curation and omission of setup/settings. Restore the
 verbatim 12 chapters and 42 screens from main-BwMualIR.js (2026-09-08), with their

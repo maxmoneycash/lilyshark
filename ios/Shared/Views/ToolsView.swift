@@ -13,8 +13,15 @@ import SwiftUI
 import MeshCoreKit
 
 struct ToolsView: View {
+    #if os(macOS)
+    @State private var usbCaptureSession = USBCaptureSession()
+    #endif
+
     @Environment(ConnectionManager.self) private var connectionManager
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showLineOfSight = false
+    @State private var showSpectrumAnalyzer = false
+    @State private var showTrafficAnalyzer = false
     @State private var showNoiseFloor = false
     @State private var showRadioCalc = false
     @State private var showAirtime = false
@@ -29,56 +36,73 @@ struct ToolsView: View {
                 connectionRow
             }
 
-            Section {
-                toolRow(
-                    icon: "rotate.3d",
-                    title: "The Deck",
-                    detail: "Turn the handset. Walk the firmware.",
-                    featured: true
-                ) { showDeck = true }
+            if supportsMonitoring {
+                Section("Your radio") {
+                    toolRow(
+                        icon: "waveform.badge.magnifyingglass",
+                        title: "RF Monitor",
+                        detail: "Watch live signal and noise reports"
+                    ) { showNoiseFloor = true }
+                    toolRow(
+                        icon: "dot.radiowaves.left.and.right",
+                        title: "Frequency Scanner",
+                        detail: "Scan regional frequency presets"
+                    ) { showFreqScanner = true }
+                }
             }
 
-            Section("Planning") {
+            Section("Plan a link") {
                 toolRow(
                     icon: "eye.trianglebadge.exclamationmark",
                     title: "Line of Sight",
-                    detail: "Terrain and Fresnel zone"
+                    detail: "Check terrain between two locations"
                 ) { showLineOfSight = true }
                 toolRow(
                     icon: "function",
                     title: "Radio Calculator",
-                    detail: "Link budget and range"
+                    detail: "Estimate range and link budget"
                 ) { showRadioCalc = true }
                 toolRow(
                     icon: "timer",
                     title: "Airtime",
-                    detail: "Time-on-air and duty cycle"
+                    detail: "Calculate how long a packet takes to send"
                 ) { showAirtime = true }
                 toolRow(
                     icon: "chart.bar",
-                    title: "SF/BW",
-                    detail: "Sensitivity by spreading factor"
+                    title: "Sensitivity",
+                    detail: "Compare spreading factor and bandwidth"
                 ) { showSensitivity = true }
             }
 
-            Section {
+            Section("Explore") {
                 toolRow(
-                    icon: "waveform.badge.magnifyingglass",
-                    title: "RF Monitor",
-                    detail: "Live SNR and RSSI",
-                    available: supportsMonitoring
-                ) { showNoiseFloor = true }
+                    icon: "list.dash.header.rectangle",
+                    title: "Traffic Analyzer",
+                    detail: "Open a capture and inspect packets"
+                ) { showTrafficAnalyzer = true }
                 toolRow(
-                    icon: "dot.radiowaves.left.and.right",
-                    title: "Frequency Scanner",
-                    detail: "Regional presets",
-                    available: supportsMonitoring
-                ) { showFreqScanner = true }
-            } header: {
-                Text("Monitoring")
-            } footer: {
-                if !supportsMonitoring {
-                    Text("Needs a MeshCore radio. Deck traffic is in the web app over USB.")
+                    icon: "waveform.path",
+                    title: "Spectrum Analyzer",
+                    detail: spectrumDetail
+                ) { showSpectrumAnalyzer = true }
+                toolRow(
+                    icon: "rotate.3d",
+                    title: "The Deck",
+                    detail: "Turn the handset. Walk the firmware."
+                ) { showDeck = true }
+            }
+            if !supportsMonitoring {
+                Section {
+                    DisclosureGroup("Live radio tools") {
+                        Text("RF Monitor and Frequency Scanner use MeshCore radio reports and controls.")
+                            .font(.subheadline)
+                            .foregroundStyle(MeshTheme.textSecondary)
+                        #if os(macOS)
+                        Text("Connect a MeshCore radio to use them here. For a T-Deck over USB, open Traffic Analyzer or Spectrum Analyzer.")
+                        #else
+                        Text("Connect a MeshCore radio to use them here. Live T-Deck analysis uses USB in the Mac or web app. You can open saved captures in Traffic Analyzer on this phone.")
+                        #endif
+                    }
                 }
             }
         }
@@ -151,6 +175,38 @@ struct ToolsView: View {
             .frame(minWidth: 400, minHeight: 500)
             #endif
         }
+        .sheet(isPresented: $showTrafficAnalyzer, onDismiss: {
+            #if os(macOS)
+            usbCaptureSession.disconnect()
+            #endif
+        }) {
+            NavigationStack {
+                #if os(macOS)
+                TrafficAnalyzerView(usbSession: usbCaptureSession)
+                    .lilysharkSheet {
+                        usbCaptureSession.disconnect()
+                        showTrafficAnalyzer = false
+                    }
+                #else
+                TrafficAnalyzerView()
+                    .lilysharkSheet { showTrafficAnalyzer = false }
+                #endif
+            }
+            .meshTheme()
+            #if os(macOS) || targetEnvironment(macCatalyst)
+            .frame(minWidth: 800, minHeight: 600)
+            #endif
+        }
+        .sheet(isPresented: $showSpectrumAnalyzer) {
+            NavigationStack {
+                SpectrumAnalyzerView()
+                    .lilysharkSheet { showSpectrumAnalyzer = false }
+            }
+            .meshTheme()
+            #if os(macOS) || targetEnvironment(macCatalyst)
+            .frame(minWidth: 800, minHeight: 600)
+            #endif
+        }
         .sheet(isPresented: $showNoiseFloor, onDismiss: openScannerIfRequested) {
             NavigationStack {
                 ScrollView {
@@ -170,6 +226,14 @@ struct ToolsView: View {
             .frame(minWidth: 400, minHeight: 500)
             #endif
         }
+    }
+
+    private var spectrumDetail: LocalizedStringKey {
+        #if os(macOS)
+        "USB band scans and simulated preview"
+        #else
+        "Simulated band scan preview"
+        #endif
     }
 
     private var supportsMonitoring: Bool {
@@ -203,27 +267,18 @@ struct ToolsView: View {
     private var connectionRow: some View {
         switch connectionManager.connectionState {
         case .ready:
-            HStack(spacing: Design.Space.snug) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title3)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(MeshTheme.connected)
-                    .frame(width: 28)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Design.Space.hairline) {
-                    Text("Ready")
-                        .font(.headline)
-                        .foregroundStyle(MeshTheme.textPrimary)
-                    if let name = connectionManager.connectedDeviceName, !name.isEmpty {
-                        Text(name)
-                            .font(Design.Text.detail)
-                            .foregroundStyle(MeshTheme.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            NavigationLink {
+                RadioVisibilityView()
+            } label: {
+                rowLabel(
+                    icon: "checkmark.circle.fill",
+                    title: LocalizedStringKey(connectionManager.connectedDeviceName ?? "My radio"),
+                    detail: "View radio details",
+                    iconStyle: MeshTheme.connected,
+                    titleFont: .headline,
+                    showsChevron: false
+                )
             }
-            .accessibilityElement(children: .combine)
             .listRowBackground(MeshTheme.surface)
         case .connecting, .connected:
             HStack(spacing: Design.Space.snug) {
@@ -258,8 +313,6 @@ struct ToolsView: View {
         icon: String,
         title: LocalizedStringKey,
         detail: LocalizedStringKey,
-        featured: Bool = false,
-        available: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -267,16 +320,14 @@ struct ToolsView: View {
                 icon: icon,
                 title: title,
                 detail: detail,
-                iconStyle: available ? MeshTheme.textPrimary : MeshTheme.textSecondary,
-                titleFont: featured ? .headline : .body,
+                iconStyle: MeshTheme.textPrimary,
+                titleFont: .body,
                 showsChevron: true
             )
-            .padding(.vertical, featured ? Design.Space.tight : 0)
-            .opacity(available ? 1 : 0.55)
         }
         .buttonStyle(.meshPlain)
         .listRowBackground(MeshTheme.surface)
-        .accessibilityHint(available ? "Opens this tool" : "Needs a MeshCore radio")
+        .accessibilityHint("Opens this tool")
     }
 
     private func rowLabel(
@@ -288,24 +339,28 @@ struct ToolsView: View {
         showsChevron: Bool
     ) -> some View {
         HStack(spacing: Design.Space.snug) {
-            Image(systemName: icon)
-                .font(.title3)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(iconStyle)
-                .frame(width: 28)
-                .accessibilityHidden(true)
+            if !dynamicTypeSize.isAccessibilitySize {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(iconStyle)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: Design.Space.hairline) {
                 Text(title)
                     .font(titleFont)
                     .foregroundStyle(MeshTheme.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(detail)
                     .font(Design.Text.detail)
                     .foregroundStyle(MeshTheme.textSecondary)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if showsChevron {
+            if showsChevron && !dynamicTypeSize.isAccessibilitySize {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.tertiary)

@@ -6,14 +6,14 @@
   min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
-  touch-action: none;
+  touch-action: pan-y pinch-zoom;
 }
 .meshterm .tdeck-model-canvas {
   grid-area: 1 / 1;
   display: block;
   width: 100%;
   height: 100%;
-  touch-action: none;
+  touch-action: pan-y pinch-zoom;
   cursor: grab;
   opacity: 0;
   outline-offset: -3px;

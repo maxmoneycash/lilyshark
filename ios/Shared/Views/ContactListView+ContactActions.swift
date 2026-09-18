@@ -50,7 +50,26 @@ extension ContactListView {
     }
 
     var matchingContacts: [Contact] {
-        contactStore.sortedContacts(byLastSeen: sortByLastSeen).filter { contact in
+        let candidates: [Contact]
+        if usesConversationInbox {
+            let latest = messageStoreManager.messagesByContact.compactMapValues { history in
+                history.map(\.timestamp).max()
+            }
+            candidates = contactStore.contacts.filter { contact in
+                guard !contactStore.isBlocked(contact), contact.type == .chat || contact.type == .room else { return false }
+                let key = contact.publicKeyPrefix
+                return latest[key] != nil || messageStoreManager.hasDraft(for: key)
+                    || navigationStore.sidebarSelection == .contact(key)
+            }.sorted {
+                let lhs = latest[$0.publicKeyPrefix] ?? .distantPast
+                let rhs = latest[$1.publicKeyPrefix] ?? .distantPast
+                if lhs != rhs { return lhs > rhs }
+                return contactStore.displayName(for: $0).localizedStandardCompare(contactStore.displayName(for: $1)) == .orderedAscending
+            }
+        } else {
+            candidates = contactStore.sortedContacts(byLastSeen: sortByLastSeen)
+        }
+        return candidates.filter { contact in
             switch conversationFilter {
             case .unread:
                 guard messageStoreManager.unreadCount(for: contact) > 0 else { return false }
@@ -72,6 +91,23 @@ extension ContactListView {
         }
     }
 
+    /// A repeater opened from Nodes uses the existing management destination.
+    /// Keep its list selection in the contact book, outside the message inbox.
+    func revealSelectedInfrastructure(_ selection: SidebarSelection?) {
+        if case .contact(let key) = selection,
+           !matchingContacts.contains(where: { $0.publicKeyPrefix == key }) {
+            conversationSearch = ""
+            conversationFilter = .all
+            contactsExpanded = true
+        }
+        guard case .contact(let key) = selection,
+              let contact = contactStore.contacts.first(where: { $0.publicKeyPrefix == key }),
+              contact.type != .chat && contact.type != .room else { return }
+        showsContactBook = true
+        conversationSearch = ""
+        conversationFilter = .all
+    }
+
     func matchesChannel(index: UInt8, name: String) -> Bool {
         if conversationFilter == .favourites { return false }
         if conversationFilter == .unread,
@@ -80,7 +116,7 @@ extension ContactListView {
     }
 
     var hasMatchingChannels: Bool {
-        matchesChannel(index: 0, name: "Public Channel") || channelStore.channels.contains {
+        matchesChannel(index: 0, name: primaryChannelName) || channelStore.channels.contains {
             $0.index != 0 && matchesChannel(index: $0.index, name: $0.name)
         }
     }
@@ -290,7 +326,7 @@ extension ContactListView {
     }
 
     func contactRow(_ contact: Contact) -> some View {
-        ContactRowView(contact: contact, refreshTick: refreshTick)
+        ContactRowView(contact: contact, isConversation: usesConversationInbox, refreshTick: refreshTick)
     }
 
     /// Returns the appropriate detail view for a contact based on its type.
@@ -321,7 +357,7 @@ extension ContactListView {
     func sidebarDestinationView(for selection: SidebarSelection) -> some View {
         switch selection {
         case .publicChannel:
-            ChannelChatView(channelIndex: 0, channelName: "Public Channel")
+            ChannelChatView(channelIndex: 0, channelName: primaryChannelName)
                 .id(0)
         case .channel(let index):
             if let channel = channelStore.channels.first(where: { $0.index == index }) {

@@ -10,6 +10,7 @@ import type { DeviceTelemetry, HeardFrame } from "../lib/deviceLink";
 import { setAnalyzerMeshSink } from "../lib/deviceLink";
 import { RF_FIELD } from "../lib/lscap";
 import { clearDemo } from "./demo";
+import { mergeNodeUpdate } from './nodeUpdates';
 import { batteryUnavailable, telemetryBattery, telemetryVoltage } from "./deviceTelemetry";
 import type { NetEnvelope } from "./netProtocol";
 import { addLog, mutate, type Message, type NodeEntry } from "./store";
@@ -32,14 +33,8 @@ function upsertLive(num: number, patch: Partial<NodeEntry>, clear: readonly (key
       shortName: hexId(num).slice(-4),
       lastHeard: 0,
     };
-    const next = { ...prev };
+    const next = mergeNodeUpdate(prev, patch, patch.viaNet === false && patch.viaSim === false);
     for (const key of clear) Reflect.deleteProperty(next, key);
-    for (const key of Object.keys(patch) as (keyof NodeEntry)[]) {
-      const value = patch[key];
-      if (value !== undefined) {
-        (next as Record<string, unknown>)[key as string] = value;
-      }
-    }
     s.nodes = new Map(s.nodes).set(num, next);
     if (patch.lat !== undefined && patch.lon !== undefined) {
       s.posUpdates = new Map(s.posUpdates).set(num, Date.now());
@@ -107,6 +102,7 @@ export function applyAnalyzerTelemetry(sample: DeviceTelemetry): void {
     hopsAway: 0,
     // The deck says whether it is making this up; the node keeps saying so.
     viaSim: sample.sim,
+    viaNet: false,
   }, batteryUnavailable(sample) ? ["batteryLevel", "voltage"] : []);
 }
 
@@ -180,6 +176,7 @@ export function applyHeardFrame(frame: HeardFrame): void {
 export function applyNetFrame(env: NetEnvelope): void {
   const frame = env.frame;
   if (linkedNodeNum !== undefined && frame.src === linkedNodeNum) return;
+  clearDemo();
   upsertLive(frame.src, {
     longName: frame.name,
     shortName: frame.short,

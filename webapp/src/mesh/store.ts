@@ -57,6 +57,8 @@ export interface NodeEntry {
    * and this is where that statement is kept.
    */
   viaSim?: boolean;
+  /** Created by the optional in-browser demo; never a radio identity. */
+  viaDemo?: boolean;
   ignored?: boolean; // local: its messages are discarded
 }
 
@@ -78,12 +80,15 @@ export interface Message {
   replyId?: number; // kept for UI compatibility; MeshCore has no reply id
   snr?: number; // rx SNR of the last hop to us (dB); undefined = unknown
   rssi?: number; // rx RSSI of the last hop to us (dBm); undefined = unknown
+  /** Created by the optional in-browser demo; never received or transmitted. */
+  viaDemo?: boolean;
 }
 
 export interface ChannelEntry {
   index: number;
   name: string;
   secret?: Uint8Array; // 128-bit shared key
+  viaDemo?: boolean;
 }
 
 /** Local map marker. MeshCore has no waypoint packet: these live only in the

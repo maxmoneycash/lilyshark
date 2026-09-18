@@ -1,0 +1,15 @@
+{
+  "search": {
+    "battery": {
+      "visible": 1,
+      "open": true
+    },
+    "empty": true,
+    "restored": true
+  },
+  "shareCopied": "http://127.0.0.1:54644/devices/flipper-zero/",
+  "shareFallback": {
+    "open": true,
+    "url": "http://127.0.0.1:54644/devices/flipper-zero/"
+  }
+}

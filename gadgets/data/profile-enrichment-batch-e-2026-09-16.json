@@ -1,0 +1,1503 @@
+{
+  "hackrf-one": {
+    "reviewed": "2026-09-16",
+    "coverage": "reviewed",
+    "testedByUs": false,
+    "sections": [
+      {
+        "title": "RF and input limits",
+        "rows": [
+          {
+            "label": "Range",
+            "value": "1 MHz–6 GHz; half-duplex transmit or receive.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Samples",
+            "value": "2–20 MS/s; 8-bit I and 8-bit Q.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RF input maximum",
+            "value": "−5 dBm; exceeding this can permanently damage the receiver.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Attenuation",
+            "value": "Use external attenuation for stronger signals; disabling the RX amplifier is not reliable protection.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Transmit power",
+            "value": "Frequency-dependent; no single output-power value covers the whole tuning range.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RF controls",
+            "value": "Software-controlled RX/TX gain and baseband filtering.",
+            "source": "https://greatscottgadgets.com/hackrf/one/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Low sample rates",
+            "value": "Documentation recommends ≥8 MS/s acquisition, then filtered decimation for narrower streams.",
+            "source": "https://hackrf.readthedocs.io/en/latest/sampling_rate.html",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Connections and accessories",
+        "rows": [
+          {
+            "label": "Antenna port",
+            "value": "50 Ω SMA female.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Connector fit",
+            "value": "SMA and RP-SMA may screw together without a working center contact.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_connectors.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Antenna power",
+            "value": "Switchable 3.0–3.3 V, 50 mA maximum.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Clock ports",
+            "value": "10 MHz, 3.3 V square wave; CLKIN must remain between 0 and 3.3 V.",
+            "source": "https://hackrf.readthedocs.io/en/stable/external_clock_interface.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Host power",
+            "value": "Supply 5 V at 500 mA through USB.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_minimum_requirements.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "USB port",
+            "value": "Micro-B connector with high-speed USB data.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Included",
+            "value": "Enclosed HackRF One and micro-USB cable; antenna is separate.",
+            "source": "https://greatscottgadgets.com/hackrf/one/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Expansion",
+            "value": "Internal headers and programming buttons; custom standalone operation requires appropriate firmware.",
+            "source": "https://greatscottgadgets.com/hackrf/one/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Software and revisions",
+        "rows": [
+          {
+            "label": "Host throughput",
+            "value": "High-speed USB and sufficient CPU; shared USB traffic can restrict higher sample rates.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_minimum_requirements.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Install",
+            "value": "libhackrf and HackRF Tools; official guide covers Linux, macOS, FreeBSD and Windows.",
+            "source": "https://hackrf.readthedocs.io/en/latest/installing_hackrf_software.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Windows path",
+            "value": "Official guide points to radioconda binaries.",
+            "source": "https://hackrf.readthedocs.io/en/latest/installing_hackrf_software.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Version matching",
+            "value": "Firmware may need updating to match host tools.",
+            "source": "https://hackrf.readthedocs.io/en/latest/installing_hackrf_software.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Firmware image",
+            "value": "Use hackrf_one_usb.bin for SPI flash; model-specific .dfu is for recovery.",
+            "source": "https://hackrf.readthedocs.io/en/latest/updating_firmware.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Revision identification",
+            "value": "PCB silkscreen identifies revision; r6 onward also reports it through hackrf_info.",
+            "source": "https://hackrf.readthedocs.io/en/latest/list_of_hardware_revisions.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Revision differences",
+            "value": "r9 changed RF/clock components; r10 largely returned to r8 design. Maker states common factory performance specifications.",
+            "source": "https://hackrf.readthedocs.io/en/latest/list_of_hardware_revisions.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Design and downloads",
+            "value": "Firmware releases, host source and hardware designs are published by Great Scott Gadgets.",
+            "source": "https://greatscottgadgets.com/hackrf/one/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker product and package",
+        "url": "https://greatscottgadgets.com/hackrf/one/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "One RF specifications and input limit",
+        "url": "https://hackrf.readthedocs.io/en/latest/hackrf_one.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "USB host requirements",
+        "url": "https://hackrf.readthedocs.io/en/latest/hackrf_minimum_requirements.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Software installation",
+        "url": "https://hackrf.readthedocs.io/en/latest/installing_hackrf_software.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Firmware and recovery guide",
+        "url": "https://hackrf.readthedocs.io/en/latest/updating_firmware.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Revision identification",
+        "url": "https://hackrf.readthedocs.io/en/latest/list_of_hardware_revisions.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "SMA connector guidance",
+        "url": "https://hackrf.readthedocs.io/en/latest/hackrf_connectors.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "External clock interface",
+        "url": "https://hackrf.readthedocs.io/en/stable/external_clock_interface.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Sampling and decimation",
+        "url": "https://hackrf.readthedocs.io/en/latest/sampling_rate.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Release 2026.01.3",
+        "url": "https://github.com/greatscottgadgets/hackrf/releases/tag/v2026.01.3",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Hardware and software source",
+        "url": "https://github.com/greatscottgadgets/hackrf",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "Clone boards and PortaPack bundles require their own revision and accessory checks; this profile describes Great Scott Gadgets HackRF One."
+    ],
+    "notes": [
+      "Documentation reviewed; no RF measurements or firmware installation performed."
+    ]
+  },
+  "hackrf-pro": {
+    "reviewed": "2026-09-16",
+    "coverage": "reviewed",
+    "testedByUs": false,
+    "sections": [
+      {
+        "title": "RF and processing",
+        "rows": [
+          {
+            "label": "Operating range",
+            "value": "100 kHz–6 GHz; half-duplex transmit or receive.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_pro.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Tuning boundary",
+            "value": "Tunes 0 Hz–7.1 GHz; the wider tuning span is not its rated operating range.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_pro.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Standard samples",
+            "value": "8-bit I/Q at up to 20 MS/s.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_pro.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Half-precision mode",
+            "value": "4-bit I/Q at up to 40 MS/s; trades precision for throughput.",
+            "source": "https://hackrf.readthedocs.io/en/latest/gateware.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Extended precision",
+            "value": "16-bit I/Q; ≥16× decimation/interpolation; typical effective resolution 9–11 bits.",
+            "source": "https://hackrf.readthedocs.io/en/latest/gateware.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "FPGA",
+            "value": "Lattice iCE40UP5K; gateware is bundled with firmware.",
+            "source": "https://hackrf.readthedocs.io/en/latest/gateware.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "DC-offset removal",
+            "value": "FPGA signal paths offer an optional DC blocker.",
+            "source": "https://hackrf.readthedocs.io/en/latest/gateware.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RF controls",
+            "value": "Software-set gain/filter; switchable RF-port supply: 3.3 V, 50 mA.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_pro.html",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Ports and buying requirements",
+        "rows": [
+          {
+            "label": "USB",
+            "value": "USB-C connector with high-speed USB 2.0 data; USB-powered.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_pro.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Host supply",
+            "value": "Shared HackRF host guide specifies 5 V, 500 mA and high-speed USB.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_minimum_requirements.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RF connector",
+            "value": "SMA; an RP-SMA antenna needs an adapter.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_connectors.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Clock and trigger",
+            "value": "P1/P2 default to CLKIN/CLKOUT; default clock interface is 10 MHz, 0–3.3 V.",
+            "source": "https://hackrf.readthedocs.io/en/stable/external_clock_interface.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Timing and shielding",
+            "value": "TCXO, installed RF shielding and a hardware transmit-disable facility.",
+            "source": "https://hackrf.readthedocs.io/en/latest/hackrf_pro.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Package",
+            "value": "Plastic enclosure included; USB-C data cable and antenna are separate.",
+            "source": "https://greatscottgadgets.com/hackrf/pro/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Add-ons",
+            "value": "Maker names Opera Cake, most PortaPacks and some enclosures; verify the exact accessory.",
+            "source": "https://greatscottgadgets.com/hackrf/pro/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Software and model boundary",
+        "rows": [
+          {
+            "label": "Existing applications",
+            "value": "Designed to run HackRF One applications by default; new modes need application support.",
+            "source": "https://greatscottgadgets.com/hackrf/pro/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Install",
+            "value": "Official libhackrf/HackRF Tools guide provides Linux, macOS, FreeBSD and Windows paths.",
+            "source": "https://hackrf.readthedocs.io/en/latest/installing_hackrf_software.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Firmware image",
+            "value": "Use hackrf_pro_usb.bin; HackRF One uses a different image.",
+            "source": "https://hackrf.readthedocs.io/en/latest/updating_firmware.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Recovery",
+            "value": "Use the model-specific .dfu image for DFU recovery, then the .bin image for flash.",
+            "source": "https://hackrf.readthedocs.io/en/latest/updating_firmware.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Reviewed release",
+            "value": "2026.01.3 release notes include a mixer-lock fix and access to Pro’s larger flash.",
+            "source": "https://github.com/greatscottgadgets/hackrf/releases/tag/v2026.01.3",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Initial revision",
+            "value": "Official revision list identifies r1.2.1 as the first production Pro.",
+            "source": "https://hackrf.readthedocs.io/en/latest/list_of_hardware_revisions.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Design files",
+            "value": "Dedicated Pro repository publishes KiCad hardware files; software lives in the shared HackRF repository.",
+            "source": "https://github.com/greatscottgadgets/hackrf-pro",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker product, package and add-ons",
+        "url": "https://greatscottgadgets.com/hackrf/pro/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Pro-specific specifications",
+        "url": "https://hackrf.readthedocs.io/en/latest/hackrf_pro.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "FPGA modes and precision limits",
+        "url": "https://hackrf.readthedocs.io/en/latest/gateware.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Host power and USB",
+        "url": "https://hackrf.readthedocs.io/en/latest/hackrf_minimum_requirements.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Software installation",
+        "url": "https://hackrf.readthedocs.io/en/latest/installing_hackrf_software.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Firmware and recovery",
+        "url": "https://hackrf.readthedocs.io/en/latest/updating_firmware.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Revision list",
+        "url": "https://hackrf.readthedocs.io/en/latest/list_of_hardware_revisions.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "SMA connector guidance",
+        "url": "https://hackrf.readthedocs.io/en/latest/hackrf_connectors.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "External clock interface",
+        "url": "https://hackrf.readthedocs.io/en/stable/external_clock_interface.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Release 2026.01.3",
+        "url": "https://github.com/greatscottgadgets/hackrf/releases/tag/v2026.01.3",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Pro KiCad hardware designs",
+        "url": "https://github.com/greatscottgadgets/hackrf-pro",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Shared firmware and software",
+        "url": "https://github.com/greatscottgadgets/hackrf",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "A Pro-specific maximum RF-input power was not found in the reviewed official pages; HackRF One’s −5 dBm limit is not asserted for Pro.",
+      "Availability of each new FPGA mode in a particular application/release remains untested.",
+      "The product page still promises a forthcoming migration guide; do not promise a completed migration workflow."
+    ],
+    "notes": [
+      "The product page’s broad DC-spike claim is narrowed to the optional DC blocker documented in the gateware reference."
+    ]
+  },
+  "rtl-sdr-blog-v4": {
+    "reviewed": "2026-09-16",
+    "coverage": "reviewed",
+    "testedByUs": false,
+    "sections": [
+      {
+        "title": "Receiver",
+        "rows": [
+          {
+            "label": "Model",
+            "value": "R828D tuner and 8-bit RTL2832U ADC; receive only.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Coverage",
+            "value": "500 kHz–1.766 GHz.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Capture bandwidth",
+            "value": "2.56 MHz stable; 3.2 MHz may drop samples.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "HF path",
+            "value": "Built-in 28.8 MHz upconverter; compatible drivers handle the offset.",
+            "source": "https://www.rtl-sdr.com/rtl-sdr-blog-v4-dongle-initial-release/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Front end",
+            "value": "HF/VHF/UHF triplexer with automatic broadcast-band notch filtering.",
+            "source": "https://www.rtl-sdr.com/rtl-sdr-blog-v4-dongle-initial-release/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Filtering trade-off",
+            "value": "Launch measurements show reduced sensitivity on some bands; filters do not prevent all overload.",
+            "source": "https://www.rtl-sdr.com/rtl-sdr-blog-v4-dongle-initial-release/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Reference",
+            "value": "1 ppm TCXO.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RF port",
+            "value": "SMA input, typically 50 Ω.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Power and antenna",
+        "rows": [
+          {
+            "label": "USB",
+            "value": "USB-A male; typical draw 250–270 mA.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Bias tee",
+            "value": "Software-switched 4.5 V, up to 180 mA.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Bias-tee load",
+            "value": "Do not enable into a directly connected DC-short antenna; follow the maker’s bias-tee wiring guide.",
+            "source": "https://www.rtl-sdr.com/v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Cooling",
+            "value": "Aluminium enclosure and thermal pad dissipate heat.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Package choice",
+            "value": "V4 launched as dongle-only or antenna-set packages; confirm the exact seller bundle.",
+            "source": "https://www.rtl-sdr.com/rtl-sdr-blog-v4-dongle-initial-release/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Software and revisions",
+        "rows": [
+          {
+            "label": "Required drivers",
+            "value": "Use a V4-aware library; older applications may need their RTL-SDR DLL replaced.",
+            "source": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Windows driver",
+            "value": "Quickstart installs WinUSB for the RTL interface, normally Bulk-In Interface 0; verify USB ID 0BDA:2838:00.",
+            "source": "https://www.rtl-sdr.com/rtl-sdr-quick-start-guide/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Application selection",
+            "value": "Select RTL-SDR USB as the SDR# source after driver setup.",
+            "source": "https://www.rtl-sdr.com/rtl-sdr-quick-start-guide/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Linux and macOS",
+            "value": "V4 guide covers current librtlsdr installation; packaged old drivers can lack V4 support.",
+            "source": "https://www.rtl-sdr.com/v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Android",
+            "value": "Maker documents V4 support through updated SDR Driver and supported SDR applications.",
+            "source": "https://www.rtl-sdr.com/v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "HF settings",
+            "value": "Use the upconverter path; V3 direct-sampling setup is not the V4 workflow.",
+            "source": "https://www.rtl-sdr.com/rtl-sdr-blog-v4-dongle-initial-release/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "V4L is different",
+            "value": "V4L uses R828S and a diplexed front end; its software-support requirements differ.",
+            "source": "https://www.rtl-sdr.com/buy-rtl-sdr-dvb-t-dongles/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Stock boundary",
+            "value": "The 2023 launch page’s production forecast is historical, not a current V4 stock guarantee.",
+            "source": "https://www.rtl-sdr.com/rtl-sdr-blog-v4-dongle-initial-release/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "V4 datasheet v1.0",
+        "url": "https://www.rtl-sdr.com/wp-content/uploads/2024/12/RTLSDR_V4_Datasheet_V_1_0.pdf",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "V4 design and launch details",
+        "url": "https://www.rtl-sdr.com/rtl-sdr-blog-v4-dongle-initial-release/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "V4 platform and bias-tee guide",
+        "url": "https://www.rtl-sdr.com/v4/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Windows and SDR quickstart",
+        "url": "https://www.rtl-sdr.com/rtl-sdr-quick-start-guide/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Maker store and model distinction",
+        "url": "https://www.rtl-sdr.com/buy-rtl-sdr-dvb-t-dongles/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "V4L introduction",
+        "url": "https://www.rtl-sdr.com/rtl-sdr-blog-v4l-lite-now-available-for-purchase/",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "The reviewed V4 documents do not specify an absolute maximum RF-input power.",
+      "V4 listing availability and the precise antenna/cable contents need checking at purchase; V4L is a separate design."
+    ],
+    "notes": [
+      "This profile remains for the R828D V4. V4L support or hardware specifications are not substituted."
+    ]
+  },
+  "airspy-r2": {
+    "reviewed": "2026-09-16",
+    "coverage": "reviewed",
+    "testedByUs": false,
+    "sections": [
+      {
+        "title": "Receiver and signal path",
+        "rows": [
+          {
+            "label": "Native coverage",
+            "value": "24–1700 MHz receive; HF needs an optional SpyVerter.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Tuner",
+            "value": "R820T2 or R860 low-IF front end.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "ADC",
+            "value": "12-bit, 20 MS/s; maker figures: 10.4 ENOB, 70 dB SNR, 95 dB SFDR.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "I/Q output",
+            "value": "10 MS/s; 10 MHz view, up to 9 MHz alias/image-free.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Reduced-rate mode",
+            "value": "2.5 MS/s is experimental; use 10 MS/s plus decimation for dependable narrowband workflows.",
+            "source": "https://airspy.com/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RF input maximum",
+            "value": "+10 dBm.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Noise and linearity",
+            "value": "Maker figures: 3.5 dB NF at 42–1002 MHz; 35 dBm IIP3.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Output format",
+            "value": "I/Q or real; 16-bit integer or 32-bit float.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Processor",
+            "value": "Cortex-M4F up to 204 MHz with dual M0 cores.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Connections and accessories",
+        "rows": [
+          {
+            "label": "RF connectors",
+            "value": "SMA input; U.FL RF loopthrough.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Bias tee",
+            "value": "Switchable 4.5 V; 50 mA budget.",
+            "source": "https://airspy.com/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Clock",
+            "value": "0.5 ppm reference, timestamp RTC; external 10–100 MHz reference through MCX.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Expansion",
+            "value": "16 SGPIO, eight GPIO, two ADC inputs, clock outputs and JTAG; see maker port diagram.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "HF accessory",
+            "value": "Connect SpyVerter IF output to R2 RF input; compatible software can power it through the bias tee.",
+            "source": "https://airspy.com/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Temperature",
+            "value": "−10 to 40 °C; maintain ventilation.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Host and software",
+        "rows": [
+          {
+            "label": "Suggested computer",
+            "value": "Third-generation Core i3 2.4 GHz equivalent, 2 GB RAM, high-speed USB 2.0.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Host throughput",
+            "value": "Quickstart warns of dropped samples on slow hosts and discourages hubs at full rate.",
+            "source": "https://airspy.com/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Platforms",
+            "value": "Maker lists Windows 10/11, Linux, BSD and macOS; application support varies.",
+            "source": "https://airspy.com/airspy-r2/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Windows setup",
+            "value": "Normally automatic; maker provides a WinUSB compatibility driver if detection fails.",
+            "source": "https://airspy.com/download/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Linux/macOS API",
+            "value": "Open-source libairspy and host utilities are in airspyone_host.",
+            "source": "https://github.com/airspy/airspyone_host",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Firmware",
+            "value": "The Airspy One repository links build and flashing instructions in its wiki.",
+            "source": "https://github.com/airspy/airspyone_firmware",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Network receiver",
+            "value": "SPY Server has Windows and Linux builds; Linux x86-64 build requires AVX2 and FMA.",
+            "source": "https://airspy.com/download/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "ARM server choice",
+            "value": "Separate ARM64 and ARMHF downloads; select the host architecture.",
+            "source": "https://airspy.com/download/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Plugin boundary",
+            "value": "The download page cautions that older plugins may fail with SDR# x64.",
+            "source": "https://airspy.com/download/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "R2 specifications and port diagram",
+        "url": "https://airspy.com/airspy-r2/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "R2 quickstart, bias tee and throughput",
+        "url": "https://airspy.com/quickstart/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Software, server and driver downloads",
+        "url": "https://airspy.com/download/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Airspy One host tools and library",
+        "url": "https://github.com/airspy/airspyone_host",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Airspy One firmware source",
+        "url": "https://github.com/airspy/airspyone_firmware",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "Exact seller package contents and enclosure dimensions are not established by the reviewed product page.",
+      "The suggested host specification is not a benchmark for every decoder or network workload."
+    ],
+    "notes": [
+      "R2 ADC resolution and output format are separate quantities; decimation does not turn the physical ADC into a 16-bit ADC.",
+      "Older quickstart operating-system examples are not current OS support promises."
+    ]
+  },
+  "bus-pirate-5": {
+    "reviewed": "2026-09-16",
+    "coverage": "reviewed",
+    "testedByUs": false,
+    "sections": [
+      {
+        "title": "Bus Pirate 5 revision 10",
+        "rows": [
+          {
+            "label": "Processor and flash",
+            "value": "RP2040; 128 Mbit (16 MB) firmware flash.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Buffered I/O",
+            "value": "Eight tri-state pins; stated operating range 1.65–5 V.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Pin tools",
+            "value": "Voltage measurement per pin and switchable 10 kΩ pull-ups.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Connectors",
+            "value": "10-pin 2.54 mm main header; 9-pin 1 mm auxiliary header.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Storage",
+            "value": "1 Gbit (128 MB) NAND exposed as USB storage for settings/files.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Status display",
+            "value": "320 × 240 IPS; pin labels, voltages and supply current.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Controls",
+            "value": "One button and 18 RGB LEDs.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "USB",
+            "value": "USB-C; data speed is limited by RP2040 hardware.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Target wiring and power",
+        "rows": [
+          {
+            "label": "Target supply",
+            "value": "1–5 V output; rated maximum 300 mA.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/power-supply/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Protection setting",
+            "value": "0–500 mA current-limit range; extra headroom is for transients, not a 500 mA output rating.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/power-supply/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Supply behavior",
+            "value": "Disabled in HiZ mode; current-limit trips shut the supply off.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/power-supply/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Main-header map",
+            "value": "Pin 1: VOUT/VREF; pins 2–9: IO0–IO7; pin 10: target ground.",
+            "source": "https://docs.buspirate.com/docs/overview/io-pins/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "External reference",
+            "value": "VOUT/VREF can accept a target reference to power the I/O buffers.",
+            "source": "https://docs.buspirate.com/docs/overview/io-pins/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Accessory requirement",
+            "value": "Probe and auxiliary cable kits are separate listed products; verify the purchased bundle.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Firmware-controlled pins",
+            "value": "Protocol functions vary by mode; use the displayed pin labels and official pin map.",
+            "source": "https://docs.buspirate.com/docs/overview/io-pins/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Setup and model boundaries",
+        "rows": [
+          {
+            "label": "Terminal",
+            "value": "Use a serial terminal; quickstart specifies 115200 baud, 8-N-1 and VT100.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/quick-setup/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Two serial ports",
+            "value": "One is the terminal and one is binary access; numbering is not guaranteed.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/quick-setup/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Platforms",
+            "value": "Official quickstart provides Windows, Linux and macOS terminal paths.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/quick-setup/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Protocol reference",
+            "value": "SPI, I²C, UART and other modes have separate commands and limits.",
+            "source": "https://docs.buspirate.com/docs/command-reference/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Revision-specific image",
+            "value": "Production rev10 uses bus_pirate5_rev10.uf2; rev8 engineering samples use their own image.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/firmware-update/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Bootloader",
+            "value": "RP2040 hardware bootloader exposes RPI-RP2 for UF2 updates; recovery instructions are linked.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/firmware-update/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Newer boards",
+            "value": "Bus Pirate 6 uses a different RP2350 image; match board/revision before flashing.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/firmware-update/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Design files",
+            "value": "Rev10 hardware documentation links schematics, component placement and an interactive BOM.",
+            "source": "https://docs.buspirate.com/docs/hardware/bp5rev10/hardware/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Firmware channel",
+            "value": "Official downloads are automated builds from main; review the build and revision before updating.",
+            "source": "https://docs.buspirate.com/docs/tutorial-basics/firmware-update/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Bus Pirate 5 rev10 specifications",
+        "url": "https://docs.buspirate.com/docs/hardware/bp5rev10/introduction/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Supply rating and current-limit explanation",
+        "url": "https://docs.buspirate.com/docs/tutorial-basics/power-supply/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Main-header and RP2040 pin maps",
+        "url": "https://docs.buspirate.com/docs/overview/io-pins/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Terminal setup",
+        "url": "https://docs.buspirate.com/docs/tutorial-basics/quick-setup/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Revision-specific firmware and recovery",
+        "url": "https://docs.buspirate.com/docs/tutorial-basics/firmware-update/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Command reference",
+        "url": "https://docs.buspirate.com/docs/command-reference/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Rev10 hardware and BOM",
+        "url": "https://docs.buspirate.com/docs/hardware/bp5rev10/hardware/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Rev10a schematic PDF",
+        "url": "https://docs.buspirate.com/images/docs/hw/bp5rev10/buspirate-5-rev10a-schematic.pdf",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Official firmware source",
+        "url": "https://github.com/DangerousPrototypes/BusPirate5-firmware",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Official automatic firmware builds",
+        "url": "https://forum.buspirate.com/t/bus-pirate-firmware-auto-build-main-branch/20/999999",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "The reviewed pages do not establish an absolute maximum input voltage for every external pin; 1.65–5 V is the stated buffered operating range.",
+      "Probe kit contents depend on the order; no host-terminal or accessory bundle is implied."
+    ],
+    "notes": [
+      "Rated supply output is 300 mA. The broader 0–500 mA current-limit setting must not be advertised as continuous output capacity.",
+      "This profile targets Bus Pirate 5 rev10, not the older rev8 preview, 5XL or Bus Pirate 6."
+    ]
+  },
+  "saleae-logic-8": {
+    "reviewed": "2026-09-16",
+    "coverage": "reviewed",
+    "testedByUs": false,
+    "sections": [
+      {
+        "title": "Capture limits",
+        "rows": [
+          {
+            "label": "Channels",
+            "value": "Eight inputs; each records digital and analog.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Digital rates",
+            "value": "100 MS/s: ≤3 channels; 50: ≤6; 40: ≤7; 25: all eight.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Digital bandwidth",
+            "value": "25 MHz maximum.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Analog rates",
+            "value": "10 MS/s on two channels; 2.5 MS/s on eight.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Analog detail",
+            "value": "10-bit ADC; 1 MHz bandwidth at 10 MS/s.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Analog range",
+            "value": "0–5 V; readings saturate outside it.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Input impedance",
+            "value": "1 MΩ parallel with 10 pF.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Mixed capture",
+            "value": "Available rates depend on enabled digital/analog channels and USB bandwidth.",
+            "source": "https://www.saleae.com/support/logic-software/capturing-data/capture-settings",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Electrical and connection requirements",
+        "rows": [
+          {
+            "label": "Logic threshold",
+            "value": "Support docs specify fixed VIL 0.6 V / VIH 1.2 V; see the documentation conflict below.",
+            "source": "https://www.saleae.com/support/specifications-hardware/electrical-characteristics/supported-voltages",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Intermediate voltages",
+            "value": "Digital readings between 0.6 and 1.2 V are undefined.",
+            "source": "https://www.saleae.com/support/specifications-hardware/electrical-characteristics/supported-voltages",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Input protection",
+            "value": "±25 V protection is distinct from the 0–5 V analog measuring range.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Ground",
+            "value": "Inputs, enclosure, USB and host share ground; the inputs are single-ended.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Probe ports",
+            "value": "Two 2×4 headers; signal pins pair with common-ground pins.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "USB",
+            "value": "High-speed USB 2.0; Logic Pro USB 3 requirements are separate.",
+            "source": "https://www.saleae.com/support/specifications-hardware/datasheets-and-compliance/system-requirements-for-saleae-products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Temperature",
+            "value": "0–70 °C.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Software, package and revision",
+        "rows": [
+          {
+            "label": "Supported OS",
+            "value": "Windows 10/11 x64; macOS 12+ Intel/Apple silicon; Ubuntu 20.04+ 64-bit and related systems.",
+            "source": "https://www.saleae.com/support/logic-software/download-and-installation/supported-operating-systems",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Install",
+            "value": "Windows installer includes the hardware driver; macOS app and Linux AppImage have separate instructions.",
+            "source": "https://www.saleae.com/support/logic-software/download-and-installation/sw-installation",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Capture duration",
+            "value": "Host memory, signal activity and settings limit recording length.",
+            "source": "https://www.saleae.com/support/specifications-hardware/datasheets-and-compliance/system-requirements-for-saleae-products",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Analysis and export",
+            "value": "Protocol decoders, triggers, measurements; CSV, binary, VCD and MATLAB export.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Automation",
+            "value": "Automation API and custom decoder support; use Logic 2 documentation.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Included kit",
+            "value": "Two 4-channel harnesses, 16 clips, case, USB cable and starter guide.",
+            "source": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Model boundary",
+            "value": "Logic 8 is distinct from first-generation Logic, Logic Pro 8 and Logic Pro 16.",
+            "source": "https://www.saleae.com/support/specifications-hardware/electrical-characteristics/supported-voltages",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Logic 8 datasheet, May 2026",
+        "url": "https://downloads.saleae.com/specs/logic_8_data_sheet.pdf",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Model-specific voltage thresholds",
+        "url": "https://www.saleae.com/support/specifications-hardware/electrical-characteristics/supported-voltages",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Current supported operating systems",
+        "url": "https://www.saleae.com/support/logic-software/download-and-installation/supported-operating-systems",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Logic 2 installation",
+        "url": "https://www.saleae.com/support/logic-software/download-and-installation/sw-installation",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Host, USB and memory requirements",
+        "url": "https://www.saleae.com/support/specifications-hardware/datasheets-and-compliance/system-requirements-for-saleae-products",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Capture settings and threshold controls",
+        "url": "https://www.saleae.com/support/logic-software/capturing-data/capture-settings",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "Logic 2 downloads and documentation",
+        "url": "https://www.saleae.com/downloads",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "The May 2026 datasheet uses ‘selectable’ threshold wording, but current electrical-support and capture-setting pages explicitly call Logic 8 fixed-threshold. Confirm with Saleae before buying for adjustable thresholds.",
+      "No complete hardware schematic was found among the reviewed official documents."
+    ],
+    "notes": [
+      "Rates are maximum configurations, not all-channels simultaneous performance. Analog bandwidth is distinct from digital sampling rate."
+    ]
+  },
+  "digilent-analog-discovery-3": {
+    "reviewed": "2026-09-16",
+    "coverage": "reviewed",
+    "testedByUs": false,
+    "sections": [
+      {
+        "title": "Oscilloscope",
+        "rows": [
+          {
+            "label": "Inputs",
+            "value": "Two differential channels.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Resolution and rate",
+            "value": "14-bit; up to 125 MS/s per channel.",
+            "source": "https://digilent.com/shop/analog-discovery-3/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Measurement range",
+            "value": "±2.5 V or ±25 V relative to ground.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Analog bandwidth",
+            "value": "9 MHz direct; 30+ MHz with BNC adapter, at −3 dB.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Input impedance",
+            "value": "1 MΩ parallel with 24 pF.",
+            "source": "https://files.digilent.com/manuals/WaveForms/3.25.1/start10.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Protection",
+            "value": "±50 VDC / ±30 VRMS protection; not a larger measurement range.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Capture buffer",
+            "value": "Up to 32,768 samples/channel; 65,536 with one analog input, configuration-dependent.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Streaming",
+            "value": "Approximately 10 MS/s total to RAM or 5 MS/s to disk; host-dependent.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Generation and digital I/O",
+        "rows": [
+          {
+            "label": "Waveform outputs",
+            "value": "Two 14-bit channels, up to 125 MS/s; ±5 V.",
+            "source": "https://digilent.com/shop/analog-discovery-3/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "AWG bandwidth",
+            "value": "9 MHz direct; 12 MHz with BNC adapter, at −3 dB.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "AWG load",
+            "value": "Up to 30 mA DC drive.",
+            "source": "https://files.digilent.com/manuals/WaveForms/3.25.1/start10.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Digital channels",
+            "value": "16 individually programmable I/Os, up to 125 MS/s.",
+            "source": "https://digilent.com/shop/analog-discovery-3/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Digital levels",
+            "value": "3.3 V outputs; 5 V-tolerant inputs; threshold setting is shared.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Target supplies",
+            "value": "0.5–5 V and −0.5…−5 V; auxiliary-powered limit is 800 mA or 2.4 W per channel.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Power, accessories and pinout",
+        "rows": [
+          {
+            "label": "Host connection",
+            "value": "USB-C connector; USB 2.0 data rates.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "USB-A host",
+            "value": "USB 3.2-compatible power required unless auxiliary-powered.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Auxiliary input",
+            "value": "5 V; 4 A recommended, 3.1 A minimum; 5.5×2.1 mm center-positive barrel.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Base kit",
+            "value": "Device, project box, USB-C/C cable, 2×15 flywires, headers and labels.",
+            "source": "https://digilent.com/shop/analog-discovery-3/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Separate accessories",
+            "value": "BNC adapter, probes, auxiliary supply and measurement adapters are optional.",
+            "source": "https://digilent.com/shop/analog-discovery-3/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "BNC wiring",
+            "value": "Adapter grounds the scope’s negative inputs; use BNC output leads rather than oscilloscope probes on the AWG.",
+            "source": "https://digilent.com/shop/bnc-adapter-for-analog-discovery/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Pinout",
+            "value": "Official AD3 startup guide supplies the 30-pin map and per-function operating limits.",
+            "source": "https://files.digilent.com/manuals/WaveForms/3.25.1/start10.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "External clock",
+            "value": "Trigger 1 accepts a documented 10–50 MHz reference in the configured clock mode.",
+            "source": "https://files.digilent.com/manuals/WaveForms/3.25.1/start10.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Body",
+            "value": "100×100×20 mm; 128 g; operating ambient 0–40 °C.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Software and setup",
+        "rows": [
+          {
+            "label": "Application",
+            "value": "WaveForms supports Windows, macOS and Linux; demo mode works without hardware.",
+            "source": "https://digilent.com/shop/analog-discovery-3/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Windows runtime",
+            "value": "WaveForms installer includes Adept Runtime and USB support.",
+            "source": "https://files.digilent.com/manuals/WaveForms/3.25.1/main.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Apple silicon",
+            "value": "WaveForms 3.25.1 manual describes an Intel app using Rosetta; its runtime supports arm64.",
+            "source": "https://files.digilent.com/manuals/WaveForms/3.25.1/main.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Linux runtime",
+            "value": "Install the appropriate architecture’s WaveForms and separate Adept Runtime packages.",
+            "source": "https://files.digilent.com/manuals/WaveForms/3.25.1/main.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "SDK and instruments",
+            "value": "C/C++/Python control; LabVIEW/MATLAB support; scope, protocol and network/impedance tools.",
+            "source": "https://digilent.com/shop/analog-discovery-3/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Specification conditions",
+            "value": "Generally typical after 30-minute warm-up at 25 °C.",
+            "source": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker specifications and base-kit contents",
+        "url": "https://digilent.com/shop/analog-discovery-3/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "AD3 datasheet rev1, May 2025",
+        "url": "https://files.digilent.com/datasheets/Analog-Discovery-3-Datasheet.pdf",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "AD3 pinout, setup and troubleshooting",
+        "url": "https://files.digilent.com/manuals/WaveForms/3.25.1/start10.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "WaveForms 3.25.1 installation and runtime",
+        "url": "https://files.digilent.com/manuals/WaveForms/3.25.1/main.html",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "BNC adapter and coupling options",
+        "url": "https://digilent.com/shop/bnc-adapter-for-analog-discovery/",
+        "reviewed": "2026-09-16"
+      },
+      {
+        "label": "WaveForms instrument documentation",
+        "url": "https://files.digilent.com/manuals/WaveForms/3.25.1/toc.html",
+        "reviewed": "2026-09-16"
+      }
+    ],
+    "gaps": [
+      "A complete board schematic was not found in the reviewed resources.",
+      "The datasheet and WaveForms startup table give different waveform-output protection figures; neither is presented here as a guaranteed external back-drive tolerance.",
+      "WaveForms 3.25.1 installer architecture is documented as reviewed; check the selected release before purchase or deployment."
+    ],
+    "notes": [
+      "The base kit differs from Student/Pro bundles. BNC probes and adapter are not implied by the device photograph.",
+      "No isolation or mains-measurement rating is claimed."
+    ]
+  }
+}

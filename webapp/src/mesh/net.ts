@@ -53,7 +53,7 @@ function loadSetting(key: string): string | undefined {
 }
 
 let state: NetState = {
-  enabled: loadSetting('lilyshark-net-enabled') !== 'off',
+  enabled: loadSetting('lilyshark-net-enabled') === 'on',
   connected: false,
   room: loadSetting('lilyshark-net-room') ?? NET_ROOM_DEFAULT,
   via: '',

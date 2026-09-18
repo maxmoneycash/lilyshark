@@ -39,6 +39,13 @@ public final class MessageStore {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
+    /// Isolated directory/key injection for persistence tests.
+    init(directory: URL, encryptionKey: SymmetricKey?) {
+        self.directory = directory
+        self.encryptionKey = encryptionKey
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
     /// Migrate flat message files into a per-radio subdirectory.
     /// Only runs if the subdirectory is empty and the root has flat `.json` files.
     /// The first radio to connect after upgrade "claims" the existing messages.
@@ -168,6 +175,27 @@ public final class MessageStore {
         } catch {
             return nil // Not encrypted or wrong key — caller falls back to plaintext
         }
+    }
+
+    /// Keep the browsing index encrypted under the same per-radio key as messages.
+    /// Unlike legacy message migration, this format never accepts plaintext.
+    @discardableResult
+    public func saveBrowsingSnapshot(_ snapshot: RadioBrowsingSnapshot) -> Bool {
+        guard snapshot.hasValidIdentity, snapshot.storagePrefix == directory.lastPathComponent,
+              let data = try? JSONEncoder().encode(snapshot), let encrypted = encrypt(data) else { return false }
+        do {
+            try encrypted.write(to: directory.appendingPathComponent("radio-browsing.bin"), options: .atomic)
+            return true
+        } catch { return false }
+    }
+
+    public func loadBrowsingSnapshot(publicKey: String) -> RadioBrowsingSnapshot? {
+        guard String(publicKey.prefix(12)) == directory.lastPathComponent,
+              let data = try? Data(contentsOf: directory.appendingPathComponent("radio-browsing.bin")),
+              let decoded = decrypt(data),
+              let snapshot = try? JSONDecoder().decode(RadioBrowsingSnapshot.self, from: decoded),
+              snapshot.hasValidIdentity, snapshot.publicKey == publicKey else { return nil }
+        return snapshot
     }
 
     // MARK: - File Paths

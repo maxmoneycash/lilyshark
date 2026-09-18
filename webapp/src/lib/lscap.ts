@@ -101,6 +101,7 @@ export interface LscapCapture {
   frames: LscapFrame[];
   /** Bytes that could not be parsed as a complete record, if any. */
   trailingBytes: number;
+  recoveryMessage?: string;
 }
 
 function magicAt(view: DataView, offset: number): string {
@@ -141,22 +142,51 @@ export function parseLscap(buffer: ArrayBuffer): LscapCapture {
   if (header.majorVersion !== 1) {
     throw new LscapParseError(`Unsupported .lscap major version ${header.majorVersion}`);
   }
+  if (header.fileHeaderSize < LSCAP_FILE_HEADER_SIZE || header.recordHeaderSize < LSCAP_RECORD_HEADER_SIZE) {
+    throw new LscapParseError('Invalid .lscap header sizes (minimum 24 and 80 bytes)');
+  }
+  if (header.fileHeaderSize > buffer.byteLength) {
+    throw new LscapParseError('The declared .lscap file header is incomplete');
+  }
+  if (header.ticksPerSecond !== 1_000_000) {
+    throw new LscapParseError('Version 1 .lscap timestamps must use microseconds');
+  }
 
   const frames: LscapFrame[] = [];
   const syntheticSupported = header.minorVersion >= 1;
   // Honour the sizes declared in the file rather than the compile-time constants,
   // so a forward-compatible writer with a larger header still reads correctly.
-  let offset = header.fileHeaderSize || LSCAP_FILE_HEADER_SIZE;
-  const recordHeaderSize = header.recordHeaderSize || LSCAP_RECORD_HEADER_SIZE;
+  let offset = header.fileHeaderSize;
+  const recordHeaderSize = header.recordHeaderSize;
+  let recoveryMessage: string | undefined;
 
-  while (offset + recordHeaderSize <= buffer.byteLength) {
+  while (offset < buffer.byteLength) {
+    if (buffer.byteLength - offset < recordHeaderSize) {
+      recoveryMessage = `Incomplete record header at byte ${offset}`;
+      break;
+    }
     if (magicAt(view, offset) !== LSCAP_RECORD_MAGIC) {
+      recoveryMessage = `Invalid record marker at byte ${offset}`;
+      break;
+    }
+    const declaredSize = view.getUint16(offset + 4, true);
+    const layout = view.getUint16(offset + 6, true);
+    // Earlier browser exports wrote these four bytes as reserved zeros.
+    // Accept only that exact legacy layout; all length checks still apply.
+    const legacyBrowser = header.minorVersion === 1 && recordHeaderSize === 80 && declaredSize === 0 && layout === 0;
+    if (!legacyBrowser && (declaredSize !== recordHeaderSize || layout !== 1)) {
+      recoveryMessage = `Unsupported record layout or header size at byte ${offset}`;
       break;
     }
     const capturedLength = view.getUint16(offset + 8, true);
     const originalLength = view.getUint16(offset + 10, true);
+    if (capturedLength > 255 || originalLength < capturedLength) {
+      recoveryMessage = `Invalid payload lengths at byte ${offset}`;
+      break;
+    }
     const payloadStart = offset + recordHeaderSize;
     if (payloadStart + capturedLength > buffer.byteLength) {
+      recoveryMessage = `Incomplete payload at byte ${offset}`;
       break; // final record was cut off mid-flush
     }
     const metadataFlags = view.getUint8(offset + 76);
@@ -199,7 +229,7 @@ export function parseLscap(buffer: ArrayBuffer): LscapCapture {
     offset = payloadStart + capturedLength;
   }
 
-  return { header, frames, trailingBytes: buffer.byteLength - offset };
+  return { header, frames, trailingBytes: buffer.byteLength - offset, recoveryMessage };
 }
 
 export function hasField(frame: LscapFrame, field: number): boolean {

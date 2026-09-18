@@ -1,0 +1,1231 @@
+{
+  "thinknode-m1": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Hardware and radio",
+        "rows": [
+          {
+            "label": "Processor",
+            "value": "Nordic nRF52840; Cortex-M4F at 64 MHz",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Memory",
+            "value": "256 KB RAM; 1 MB internal flash plus 2 MB external QSPI flash",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Display",
+            "value": "Frontlit 1.54-inch monochrome e-paper; SSD1681, 200 × 200 pixels",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "LoRa",
+            "value": "SX1262; 868/915 MHz variants; maker specifies +22 dBm",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Phone connection",
+            "value": "Bluetooth LE; Meshtastic preinstalled",
+            "source": "https://static-cdn.elecrow.com/wiki/ThinkNode-M1_Transceiver_Device%28Meshtastic%29_Power_By_nRF52840.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Positioning",
+            "value": "Quectel L76K; GPS, GLONASS, BeiDou and QZSS",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Clock",
+            "value": "RTC supports interrupt wake-up",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "LoRa antenna",
+            "value": "RP-SMA connector",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Power and enclosure",
+        "rows": [
+          {
+            "label": "Battery",
+            "value": "Rechargeable lithium, nominal 3.7 V / 1200 mAh",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "USB input",
+            "value": "USB-C; 5 V / 1 A",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Manual current figures",
+            "value": "85 mA CPU+LoRa; 5.6 µA low-power claim",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Datasheet current figures",
+            "value": "At 4.2 V: 5.825 µA sleep/GPS off; 54.06 mA messaging/GPS on; 300 mA with all functions enabled",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Manual dimensions",
+            "value": "82 × 51.6 × 26.3 mm; 81 g cased",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Datasheet dimensions",
+            "value": "118.5 × 52.1 × 25 mm including antenna; 82.5 g cased; ABS+PC",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Manual environment",
+            "value": "Operating −10 to 50 °C; storage −20 to 60 °C; 10–95% RH non-condensing",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Datasheet environment",
+            "value": "Operating −20 to 70 °C; storage −40 to 80 °C",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Setup and firmware",
+        "rows": [
+          {
+            "label": "Controls",
+            "value": "Rotary power/frontlight, GPS switch, previous/next buttons, reset and buzzer",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "GPS use",
+            "value": "Enable its physical switch and acquire a fix outdoors",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "First configuration",
+            "value": "Pair through the Meshtastic app; set the LoRa region and matching channel configuration",
+            "source": "https://static-cdn.elecrow.com/wiki/ThinkNode-M1_Transceiver_Device%28Meshtastic%29_Power_By_nRF52840.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Upstream build target",
+            "value": "thinknode_m1; separate thinknode_m1-inkhud build also exists at the pinned commit",
+            "source": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/nrf52840/ELECROW-ThinkNode-M1/platformio.ini",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Firmware upload",
+            "value": "Connect USB, double-press reset, then copy the ThinkNode M1 UF2 to ELECROWBOOT",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Debug access",
+            "value": "SWD clock/data, ground and 3.3 V connections documented",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Included and source differences",
+        "rows": [
+          {
+            "label": "Manual package",
+            "value": "Device, LoRa antenna, USB-A–USB-C cable, belt clip, lanyard, four M2×2 screws and manual",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Display refresh",
+            "value": "Current manual specifies a 2-second full refresh",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Bluetooth version",
+            "value": "Current manual states Bluetooth 5.4",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Runtime claims",
+            "value": "Older wiki claims over 48 hours; maker estimate",
+            "source": "https://static-cdn.elecrow.com/wiki/ThinkNode-M1_Transceiver_Device%28Meshtastic%29_Power_By_nRF52840.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Manual runtime range",
+            "value": "6–100 hours; maker estimate varies by operating conditions",
+            "source": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker specifications and product details",
+        "url": "https://www.elecrow.com/thinknode-m1-meshtastic-lora-signal-transceiver-powered-by-nrf52840-with-154-screen-support-gps.html"
+      },
+      {
+        "label": "User Manual of ThinkNode M1 for Meshtastic",
+        "url": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode-M1_User_Manual.pdf"
+      },
+      {
+        "label": "IC Report of ThinkNode M1",
+        "url": "https://www.elecrow.com/download/product/CIL12901M/IC_Report_for_ThinkNode_M1.pdf"
+      },
+      {
+        "label": "UL Report of ThinkNode M1",
+        "url": "https://www.elecrow.com/download/product/CIL12901M/UL_Report.pdf"
+      },
+      {
+        "label": "ThinkNode M1 LoRa Meshtastic Communication Device DataSheet",
+        "url": "https://www.elecrow.com/download/product/CIL12901M/ThinkNode%20M1_LoRa_Meshtastic_Transceiver_DataSheet.pdf"
+      },
+      {
+        "label": "Elecrow M1 wiki",
+        "url": "https://static-cdn.elecrow.com/wiki/ThinkNode-M1_Transceiver_Device%28Meshtastic%29_Power_By_nRF52840.html"
+      },
+      {
+        "label": "Pinned Meshtastic M1 build definitions",
+        "url": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/nrf52840/ELECROW-ThinkNode-M1/platformio.ini"
+      },
+      {
+        "label": "Meshtastic firmware selector and web flasher",
+        "url": "https://flasher.meshtastic.org/"
+      },
+      {
+        "label": "Official Meshtastic apps and firmware downloads",
+        "url": "https://meshtastic.org/downloads/"
+      }
+    ],
+    "gaps": [
+      "Manual Bluetooth 5.4 conflicts with datasheet/wiki Bluetooth 5.0. Refresh timing, current conditions and enclosure figures also differ; confirm the exact revision. Antenna inclusion explains only part of the size difference.",
+      "Button actions changed between the older datasheet and current manual. Follow the manual matching the installed firmware.",
+      "Runtime and current figures are maker claims. The 85 mA number is not a whole-device maximum under every documented condition.",
+      "Battery connector pitch/polarity and a replacement battery part number were not established. Confirm before replacing the internal cell.",
+      "Confirm the selected 868/915 MHz SKU and antenna. MeshCore support was not verified in this review."
+    ],
+    "notes": [
+      "Primary-source review; no physical testing. Firmware source targets are pinned, not a claim about the firmware installed on a shipped unit."
+    ],
+    "coverage": "reviewed"
+  },
+  "thinknode-m2": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Hardware and radio",
+        "rows": [
+          {
+            "label": "Processor",
+            "value": "ESP32-S3-WROOM-1-N4R8; dual-core LX7 up to 240 MHz",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Memory",
+            "value": "512 KB SRAM, 8 MB PSRAM, 4 MB flash and 384 KB ROM",
+            "source": "https://static-cdn.elecrow.com/wiki/ThinkNode-M2_Transceiver_Device%28Meshtastic%29_Power_By_NRF52840.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Display",
+            "value": "1.3-inch blue OLED; 128 × 64, SH1106, I²C",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "LoRa",
+            "value": "SX1262; US915 / EU868 variants",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode-M2_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Wireless",
+            "value": "2.4 GHz Wi-Fi and Bluetooth LE 5",
+            "source": "https://static-cdn.elecrow.com/wiki/ThinkNode-M2_Transceiver_Device%28Meshtastic%29_Power_By_NRF52840.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Antenna and battery ports",
+            "value": "Internal IPEX1 antenna socket and BAT connector",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "GNSS firmware configuration",
+            "value": "Upstream ThinkNode M2 variant sets HAS_GPS to 0",
+            "source": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/esp32s3/ELECROW-ThinkNode-M2/variant.h",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Power and body",
+        "rows": [
+          {
+            "label": "Battery",
+            "value": "Nominal 3.7 V / 1000 mAh rechargeable cell in the documented model",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Power input",
+            "value": "USB-C 5 V / 1 A; lithium input 3.3–4.2 V",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Documented current conditions",
+            "value": "At 4.2 V: 136 mA screen off without battery; 217 mA transmitting; 260 mA with all functions/battery",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Manual size and weight",
+            "value": "88.4 × 46 × 23 mm; 50 g with case and antenna",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode-M2_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Datasheet size and weight",
+            "value": "88.5 × 46.3 × 23.8 mm with antenna/case; 45.3 g cased; ABS+PC",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Bare assembly dimensions",
+            "value": "Store lists 51.5 × 37 × 9.5 mm without case",
+            "source": "https://www.elecrow.com/thinknode-m2-meshtastic-lora-signal-transceiver-powered-by-esp32-s3-with-1-3-oled-display.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Store environment",
+            "value": "Operating −10 to 50 °C; storage −20 to 60 °C; 10–95% RH non-condensing",
+            "source": "https://www.elecrow.com/thinknode-m2-meshtastic-lora-signal-transceiver-powered-by-esp32-s3-with-1-3-oled-display.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Datasheet environment",
+            "value": "Operating −40 to 65 °C; storage −40 to 105 °C",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Setup and programming",
+        "rows": [
+          {
+            "label": "Factory firmware",
+            "value": "Meshtastic preinstalled; configure through the Meshtastic app",
+            "source": "https://static-cdn.elecrow.com/wiki/ThinkNode-M2_Transceiver_Device%28Meshtastic%29_Power_By_NRF52840.html",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Upstream build target",
+            "value": "thinknode_m2 at the pinned Meshtastic commit",
+            "source": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/esp32s3/ELECROW-ThinkNode-M2/platformio.ini",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Programming connection",
+            "value": "USB-C handles programming/debugging and charging",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Download mode",
+            "value": "BOOT is GPIO0; use BOOT with RESET to enter programming mode",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Controls",
+            "value": "Power, function, reset and BOOT buttons; buzzer and status LED",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode-M2_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Status LED",
+            "value": "Manual identifies steady power indication, rapid charging blink and slow low-battery blink",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode-M2_User_Manual.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Expansion reference",
+            "value": "Datasheet maps exposed GPIO and supply pads; accessory compatibility requires separate confirmation",
+            "source": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Package",
+            "value": "Device, USB-A–USB-C cable and manual",
+            "source": "https://www.elecrow.com/thinknode-m2-meshtastic-lora-signal-transceiver-powered-by-esp32-s3-with-1-3-oled-display.html",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker specifications and product details",
+        "url": "https://www.elecrow.com/thinknode-m2-meshtastic-lora-signal-transceiver-powered-by-esp32-s3-with-1-3-oled-display.html"
+      },
+      {
+        "label": "ThinkNode M2 for Meshtastic User Manual",
+        "url": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode-M2_User_Manual.pdf"
+      },
+      {
+        "label": "ThinkNode M2 LoRa Meshtastic Communication Device DataSheet",
+        "url": "https://www.elecrow.com/download/product/CIL13002M/ThinkNode_M2_Meshtastic_Signal_Transceiver_DataSheet.pdf"
+      },
+      {
+        "label": "FCC Report",
+        "url": "https://www.elecrow.com/download/product/CIL13002M/FCC_Report.pdf"
+      },
+      {
+        "label": "Elecrow M2 wiki (legacy URL names nRF52840; page describes ESP32-S3)",
+        "url": "https://static-cdn.elecrow.com/wiki/ThinkNode-M2_Transceiver_Device%28Meshtastic%29_Power_By_NRF52840.html"
+      },
+      {
+        "label": "Pinned Meshtastic M2 build definition",
+        "url": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/esp32s3/ELECROW-ThinkNode-M2/platformio.ini"
+      },
+      {
+        "label": "Pinned M2 display and GNSS configuration",
+        "url": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/esp32s3/ELECROW-ThinkNode-M2/variant.h"
+      },
+      {
+        "label": "Meshtastic firmware selector and web flasher",
+        "url": "https://flasher.meshtastic.org/"
+      },
+      {
+        "label": "Official Meshtastic apps and firmware downloads",
+        "url": "https://meshtastic.org/downloads/"
+      }
+    ],
+    "gaps": [
+      "The SH1106 driver is supported by the datasheet, wiki and upstream configuration; the store’s “SSH1106” spelling is inconsistent.",
+      "Do not interpret location sharing in app copy as an onboard GNSS receiver. The reviewed upstream target disables GPS; no built-in receiver was documented.",
+      "Store/manual and datasheet disagree on dimensions, mass, enclosure material and environmental limits. Battery/antenna measurement scope also differs; confirm the shipped revision.",
+      "The store’s 217 mA “maximum” conflicts with the datasheet’s 260 mA all-functions condition. These are maker figures, not measured runtime.",
+      "The maker Wi-Fi table includes 802.11a while specifying 2.4 GHz; no 5 GHz capability is claimed here.",
+      "Battery connector pitch/polarity and replacement-cell part number remain unverified. This profile describes the battery-equipped model; confirm the chosen package.",
+      "Power-button behavior differs across manual/datasheet; match instructions to installed firmware. MeshCore support was not verified."
+    ],
+    "notes": [
+      "Primary-source review; no physical testing. Firmware source targets are pinned, not a claim about the firmware installed on a shipped unit."
+    ],
+    "coverage": "reviewed"
+  },
+  "heltec-lora32-v4": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Hardware and variants",
+        "rows": [
+          {
+            "label": "R2 model",
+            "value": "ESP32-S3R2; 2 MB PSRAM and 16 MB flash",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "R8 model",
+            "value": "ESP32-S3R8; 8 MB PSRAM and 16 MB flash",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4_r8_board/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Internal memory",
+            "value": "512 KB SRAM, 384 KB ROM and 16 KB RTC SRAM in the R2 datasheet",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "R2 OLED",
+            "value": "0.96-inch SSD1315; 128 × 64 pixels",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "R8 OLED",
+            "value": "0.96-inch SSD1315; 128 × 64 pixels in the maker’s R8 datasheet",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4-R8/datasheet/WiFi_LoRa_32_V4R8.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Display selection",
+            "value": "Protected OLED and display-free variants listed",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "LoRa variants",
+            "value": "SX1262; high-band 863–928 MHz and low-band 433–510 MHz variants described",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Transmit power",
+            "value": "Store: 28 ±1 dBm high-power; 22 dBm low-power",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Wi-Fi and BLE",
+            "value": "802.11b/g/n up to 150 Mbps; Bluetooth LE 5",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Antennas",
+            "value": "LoRa IPEX; default 2.4 GHz FPC antenna; external path requires revision-specific resistor selection",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "GNSS expansion",
+            "value": "Eight-pin SH1.25 connector; GNSS receiver is an accessory",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Power and assembly",
+        "rows": [
+          {
+            "label": "USB connection",
+            "value": "Native USB-C; V4 removes the V3 CP2102 bridge",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Battery input",
+            "value": "V4.2 datasheet: 3.3–4.2 V, at least 250 mA supply; SH1.25 two-pin",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "R8 battery reference",
+            "value": "R8 datasheet also specifies 3.3–4.2 V lithium input; SH1.25 two-pin",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4-R8/datasheet/WiFi_LoRa_32_V4R8.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Solar input",
+            "value": "4.7–6 V; SH1.25 two-pin",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Power connection rule",
+            "value": "Use either USB or the 5 V header input; datasheet permits battery/solar alongside either",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Low-power conditions",
+            "value": "Datasheet: 20 µA asleep from battery/3.3 V; 2 mA asleep from USB",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Board dimensions",
+            "value": "51.7 × 25.4 × 10.7 mm",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Store temperature range",
+            "value": "−20 to 70 °C",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Base package",
+            "value": "Board, LoRa antenna, two battery/solar connectors and two 18-pin headers",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Peripherals",
+            "value": "ADC, touch, UART, I²C and SPI; consult the exact revision’s pin map",
+            "source": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Revision and firmware setup",
+        "rows": [
+          {
+            "label": "R2 Meshtastic target",
+            "value": "heltec-v4 for OLED; a separate heltec-v4-tft target exists",
+            "source": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/esp32s3/heltec_v4/platformio.ini",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "R8 Meshtastic target",
+            "value": "heltec-v4-r8-oled; TFT uses the distinct heltec-v4-r8-tft target",
+            "source": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/esp32s3/heltec_v4_r8/platformio.ini",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Maker firmware guidance",
+            "value": "V4.3: Meshtastic 2.7.20+ or MeshCore 1.15.0+; R8 guidance separately references later-than-2.7.25 firmware",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "USB download mode",
+            "value": "Connect USB, hold PRG, tap RST, release PRG; restart after flashing",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "R8 development board",
+            "value": "Select WiFi LoRa 32 (V4 R8) in the maker’s Arduino setup",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4_r8_board/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "R2 amplifier selection",
+            "value": "Maker distinguishes USE_GC1109_PA for V4.2 from USE_KCT8103L_PA for V4.3",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Current R2 hardware log",
+            "value": "V4.3.1 entry changes amplifier control, battery protection and ADC standby circuitry",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4/hardware-update-log",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "R8 pin changes",
+            "value": "Vext 36→40, GNSS power 34→42, LED 35→46; amplifier control on GPIO5",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4_r8_board/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Development options",
+            "value": "Arduino, PlatformIO, ESP-IDF and MicroPython advertised by maker",
+            "source": "https://heltec.org/project/wifi-lora-32-v4/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker specifications and documentation",
+        "url": "https://heltec.org/project/wifi-lora-32-v4/"
+      },
+      {
+        "label": "Meshtastic supported hardware",
+        "url": "https://meshtastic.org/docs/hardware/devices/"
+      },
+      {
+        "label": "V4 datasheet",
+        "url": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4/datasheet/WiFi_LoRa_32_V4.2.0.pdf"
+      },
+      {
+        "label": "R8 board documentation",
+        "url": "https://github.com/HelTecAutomation/HeltecWiKi/blob/main/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4_r8_board/wifi-lora-32-v4_r8_board.md"
+      },
+      {
+        "label": "Current V4 R2 setup guide",
+        "url": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4/"
+      },
+      {
+        "label": "Current V4 R8 setup guide and pin map",
+        "url": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4_r8_board/"
+      },
+      {
+        "label": "V4 revision history",
+        "url": "https://wiki.heltec.org/docs/devices/open-source-hardware/esp32-series/lora-32/wifi-lora-32-v4/hardware-update-log"
+      },
+      {
+        "label": "Pinned Meshtastic V4 R2 build definitions",
+        "url": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/esp32s3/heltec_v4/platformio.ini"
+      },
+      {
+        "label": "Pinned Meshtastic V4 R8 build definitions",
+        "url": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/esp32s3/heltec_v4_r8/platformio.ini"
+      },
+      {
+        "label": "V4 R8 datasheet (revision table marked internal beta)",
+        "url": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4-R8/datasheet/WiFi_LoRa_32_V4R8.pdf"
+      },
+      {
+        "label": "V4 R8 schematic downloads",
+        "url": "https://resource.heltec.cn/download/WiFi_LoRa_32_V4-R8/Schematic"
+      },
+      {
+        "label": "Meshtastic firmware selector and web flasher",
+        "url": "https://flasher.meshtastic.org/"
+      },
+      {
+        "label": "Official Meshtastic apps and firmware downloads",
+        "url": "https://meshtastic.org/downloads/"
+      }
+    ],
+    "gaps": [
+      "Match PCB revision, R2/R8 memory variant, radio band and display to firmware. A source target does not establish that every release includes its binary.",
+      "The store’s generic R8 filename omits the upstream OLED/TFT suffix. Use the exact supported target for the physical board; OLED builds do not imply touchscreen hardware.",
+      "Battery maximum differs: store 4.4 V, R2 and R8 datasheets 4.2 V. Confirm limits for the exact revision rather than applying the higher value universally.",
+      "The V4.2 datasheet and store use different temperature ranges and low-power conditions; these are not independent whole-device measurements.",
+      "R8 datasheet’s revision table is marked internal beta and contains mixed revision labels. Display-free contents and current production revision still require SKU confirmation.",
+      "Store package-size metadata differs from board dimensions. Battery, GNSS and enclosure inclusion depend on the chosen bundle.",
+      "R8 MeshCore release availability was not established; the maker page describes temporary firmware pending integration."
+    ],
+    "notes": [
+      "Primary-source review; no physical testing. Firmware source targets are pinned, not a claim about the firmware installed on a shipped unit."
+    ],
+    "coverage": "reviewed"
+  },
+  "heltec-mesh-node-t114": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Controller and radio",
+        "rows": [
+          {
+            "label": "Controller",
+            "value": "nRF52840; 1 MB program memory and 256 KB SRAM",
+            "source": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "LoRa",
+            "value": "SX1262; high-band 863–928 MHz and low-band 470–510 MHz models documented",
+            "source": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "433 MHz selection",
+            "value": "Store also lists a 433 MHz option; confirm the selected radio/antenna variant",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Radio performance claims",
+            "value": "21 ±1 dBm output; −135 dBm sensitivity at SF12 / 125 kHz",
+            "source": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Phone radio",
+            "value": "Bluetooth LE 5; onboard ceramic antenna",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Display, accessories and power",
+        "rows": [
+          {
+            "label": "Display option",
+            "value": "1.14-inch TFT, 135 × 240 pixels, up to 262k colors",
+            "source": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "GNSS option",
+            "value": "L76K accessory; eight-pin 1.25 mm connection",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Connections",
+            "value": "USB-C, LoRa IPEX and two 13-pin 2.54 mm headers",
+            "source": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Battery input",
+            "value": "3–4.2 V lithium; two-pin SH1.25 socket",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "USB and solar",
+            "value": "5 V USB; solar range 5–6.5 V, maker recommends about 5 V",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Solar socket",
+            "value": "Two-pin SH1.25",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Maker current examples",
+            "value": "11 µA deep sleep; 22 µA tracker sleep; 9/20/51 mA for GPS/display off, display on, both on",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Board size",
+            "value": "50.8 × 22.86 mm",
+            "source": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Environment",
+            "value": "Operating −20 to 70 °C; up to 90% RH non-condensing",
+            "source": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Case battery space",
+            "value": "Maker maximum: 42 × 28 × 11 mm",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Base package",
+            "value": "Board, LoRa antenna, two battery connectors and two 13-pin headers",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Bundle-dependent parts",
+            "value": "Display, L76K GNSS, case and antenna adapter vary by selection",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Revision and firmware setup",
+        "rows": [
+          {
+            "label": "V2 radio revision",
+            "value": "Six-layer redesign addresses long-packet transmission issues on early high-frequency boards",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/nrf52840-series/mesh-node-t114/hardware_update_log",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "V2.1 power revision",
+            "value": "Revises battery reverse-polarity protection and ADC standby circuitry",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/nrf52840-series/mesh-node-t114/hardware_update_log",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Upstream Meshtastic target",
+            "value": "heltec-mesh-node-t114 at the pinned commit",
+            "source": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/nrf52840/heltec_mesh_node_t114/platformio.ini",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Enter bootloader",
+            "value": "Connect USB-C and double-press RST; the HT-n5262 drive appears",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/nrf52840-series/mesh-node-t114/firmware_upload",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Firmware upload",
+            "value": "Copy the matching UF2 to HT-n5262; the board restarts automatically",
+            "source": "https://wiki.heltec.org/docs/devices/open-source-hardware/nrf52840-series/mesh-node-t114/firmware_upload",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Development",
+            "value": "Heltec nRF52 framework/libraries support Arduino and LoRa/LoRaWAN development",
+            "source": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Other software listings",
+            "value": "Maker also advertises PlatformIO and MeshCore",
+            "source": "https://heltec.org/project/mesh-node-t114/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker specifications and documentation",
+        "url": "https://heltec.org/project/mesh-node-t114/"
+      },
+      {
+        "label": "Meshtastic supported hardware",
+        "url": "https://meshtastic.org/docs/hardware/devices/"
+      },
+      {
+        "label": "Datasheet",
+        "url": "https://resource.heltec.cn/download/Mesh_Node_T114/Datasheet.pdf"
+      },
+      {
+        "label": "Schematics and downloads",
+        "url": "https://resource.heltec.cn/download/Mesh_Node_T114"
+      },
+      {
+        "label": "Maker report on early-board radio issue",
+        "url": "https://github.com/meshtastic/firmware/issues/4723#issuecomment-2404889735"
+      },
+      {
+        "label": "T114 maker setup overview",
+        "url": "https://wiki.heltec.org/docs/devices/open-source-hardware/nrf52840-series/mesh-node-t114/"
+      },
+      {
+        "label": "T114 hardware revision history",
+        "url": "https://wiki.heltec.org/docs/devices/open-source-hardware/nrf52840-series/mesh-node-t114/hardware_update_log"
+      },
+      {
+        "label": "T114 UF2 upload instructions",
+        "url": "https://wiki.heltec.org/docs/devices/open-source-hardware/nrf52840-series/mesh-node-t114/firmware_upload"
+      },
+      {
+        "label": "Pinned Meshtastic T114 build definition",
+        "url": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/nrf52840/heltec_mesh_node_t114/platformio.ini"
+      },
+      {
+        "label": "Meshtastic firmware selector and web flasher",
+        "url": "https://flasher.meshtastic.org/"
+      },
+      {
+        "label": "Official Meshtastic apps and firmware downloads",
+        "url": "https://meshtastic.org/downloads/"
+      }
+    ],
+    "gaps": [
+      "The store title says Rev.2.0 while its documentation includes V2.1. Check the actual PCB revision; this review does not identify the revision of current shipments.",
+      "Early-board long-packet trouble is revision/band-specific. The hardware log is more precise than treating every T114 as affected.",
+      "A GNSS socket does not establish that the receiver is included. Screen, GNSS, battery and case contents depend on the selected bundle.",
+      "Current figures use different modes and accessories; no assembled-node runtime or physical testing was performed.",
+      "Case and optional display/GNSS change the assembled dimensions; PCB size is not a complete enclosed-device size.",
+      "Selected battery/solar cable polarity and exact GNSS/firmware combination must match the maker’s revision-specific drawings. Separate MeshCore firmware targets were not verified."
+    ],
+    "notes": [
+      "Primary-source review; no physical testing. Firmware source targets are pinned, not a claim about the firmware installed on a shipped unit."
+    ],
+    "coverage": "reviewed"
+  },
+  "rak-wisblock-meshtastic-starter-kit": {
+    "reviewed": "2026-09-16",
+    "sections": [
+      {
+        "title": "Core and hardware selection",
+        "rows": [
+          {
+            "label": "Core module",
+            "value": "RAK4631: nRF52840 at 64 MHz, 1 MB flash, 256 KB RAM; SX1262 and Bluetooth LE 5",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak4631/overview/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Radio-band selection",
+            "value": "800 MHz: EU868/IN865/RU864; 900 MHz: US915/AU915/KR920/AS923",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit.js",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19003 base",
+            "value": "30 × 35 mm; two sensor slots, no I/O slot",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19007 base",
+            "value": "30 × 60 mm; four sensor slots, one I/O slot",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19001 base",
+            "value": "57 × 60 mm; six sensor slots, two I/O slots",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Display bundle",
+            "value": "Optional RAK1921 OLED; soldered or loose-header selection",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit.js",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Tracker bundle",
+            "value": "Optional RAK12501 GNSS plus RAK1904 accelerometer; combined display/tracker selections exist",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit.js",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Ethernet bundle",
+            "value": "Optional RAK13800 Ethernet plus RAK19018 PoE on RAK19007/RAK19001 selections",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit.js",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Loose OLED assembly",
+            "value": "Loose version needs header soldering; soldered version plugs in",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Power by base board",
+        "rows": [
+          {
+            "label": "RAK19003 battery",
+            "value": "3.7–4.2 V rechargeable LiPo; JST PHR-2, 2 mm female cable housing",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak19003/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19003 solar",
+            "value": "5 V only; JST ZHR-2, 1.5 mm female cable housing",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak19003/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19007 battery",
+            "value": "3.7–4.2 V rechargeable LiPo; JST PHR-2, 2 mm female cable housing",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak19007/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19007 solar",
+            "value": "5 V panel only; match marked polarity, with GND toward the board edge",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak19007/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19001 rechargeable input",
+            "value": "3.7–4.2 V LiPo; JST PHR-2, 2 mm female cable housing",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak19001/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19001 non-rechargeable input",
+            "value": "Separate 3.3–5.5 V connector; battery selector also disconnects power",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak19001/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK19001 solar",
+            "value": "5 V only; JST ZHR-2, 1.5 mm female cable housing",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak19001/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Polarity check",
+            "value": "RAK19003 battery/solar ground is toward the board edge; match wiring before connection",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak19003/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Charger type",
+            "value": "Maker describes TP4054 linear charging without MPPT",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Assembly and firmware",
+        "rows": [
+          {
+            "label": "Supplied assembly",
+            "value": "RAK4631 is installed on the selected base; Meshtastic is preflashed",
+            "source": "https://docs.rakwireless.com/product-categories/meshtastic/wismesh-starter-kit/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Module fastening",
+            "value": "Secure fitted modules with M1.2 × 3 mm screws; remove screws before detaching",
+            "source": "https://docs.rakwireless.com/product-categories/meshtastic/wismesh-starter-kit/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Before powering",
+            "value": "Attach LoRa and BLE antennas to their labeled connections",
+            "source": "https://docs.rakwireless.com/product-categories/meshtastic/wismesh-starter-kit/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "First configuration",
+            "value": "Use a Meshtastic Apple/Android app, web client or CLI to configure the node",
+            "source": "https://docs.rakwireless.com/product-categories/meshtastic/wismesh-starter-kit/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Upstream build target",
+            "value": "rak4631 at the pinned Meshtastic commit",
+            "source": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/nrf52840/rak4631/platformio.ini",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Base selection in firmware",
+            "value": "Maker guide uses the stock RAK4631 UF2 with automatic base detection",
+            "source": "https://docs.rakwireless.com/product-categories/meshtastic/wismesh-starter-kit/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "USB firmware upload",
+            "value": "Use a USB data cable, double-click reset, then copy the matching UF2 to the mounted drive",
+            "source": "https://meshtastic.org/docs/getting-started/flashing-firmware/nrf52/drag-n-drop/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "RAK4631-R distinction",
+            "value": "Same hardware, different RUI3 firmware/bootloader path; conversion may be needed before Meshtastic UF2 flashing",
+            "source": "https://meshtastic.org/docs/getting-started/flashing-firmware/nrf52/drag-n-drop/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Development options",
+            "value": "RAK4631 supports Arduino IDE and PlatformIO; base provides power/programming interfaces",
+            "source": "https://docs.rakwireless.com/product-categories/wisblock/rak4631/overview/",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      },
+      {
+        "title": "Package and accessory limits",
+        "rows": [
+          {
+            "label": "Included",
+            "value": "Selected base/core, 2 dBi LoRa antenna and pigtail, PCB LoRa/BLE antennas, USB cable",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Additional power parts",
+            "value": "Li-ion/LiPo battery and solar panel are optional",
+            "source": "https://docs.rakwireless.com/product-categories/meshtastic/wismesh-starter-kit/quickstart/",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Separate alternative cores",
+            "value": "RAK11200/RAK11310 require separate ordering/flashing; RAK11200 also needs RAK13300 LoRa hardware",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit",
+            "reviewed": "2026-09-16"
+          },
+          {
+            "label": "Enclosure",
+            "value": "Unify case sold separately",
+            "source": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit",
+            "reviewed": "2026-09-16"
+          }
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "label": "Maker specifications and documentation",
+        "url": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit"
+      },
+      {
+        "label": "Meshtastic supported hardware",
+        "url": "https://meshtastic.org/docs/hardware/devices/"
+      },
+      {
+        "label": "WisMesh RAK4631 Starter Kit First Steps",
+        "url": "https://downloads.rakwireless.com/Meshtastic/Quick%20Start%20Guide_WisMesh%20RAK4631%20Starter%20Kit.pdf"
+      },
+      {
+        "label": "RAK4631 3D Model",
+        "url": "https://downloads.rakwireless.com/3D_File/WisBlock/3D_RAK4631.stp"
+      },
+      {
+        "label": "RAK19003 3D Model",
+        "url": "https://downloads.rakwireless.com/3D_File/WisBlock/3D_RAK19003-VA-VB.stp"
+      },
+      {
+        "label": "RAK19007 3D Model",
+        "url": "https://downloads.rakwireless.com/3D_File/WisBlock/3D_RAK19007.stp"
+      },
+      {
+        "label": "RAK19001 3D Model",
+        "url": "https://downloads.rakwireless.com/3D_File/WisBlock/3D_RAK19001.stp"
+      },
+      {
+        "label": "Official current kit option data",
+        "url": "https://store.rakwireless.com/products/wisblock-meshtastic-starter-kit.js"
+      },
+      {
+        "label": "WisMesh starter kit assembly and setup",
+        "url": "https://docs.rakwireless.com/product-categories/meshtastic/wismesh-starter-kit/quickstart/"
+      },
+      {
+        "label": "RAK4631 core overview and development resources",
+        "url": "https://docs.rakwireless.com/product-categories/wisblock/rak4631/overview/"
+      },
+      {
+        "label": "RAK19003 power and setup guide",
+        "url": "https://docs.rakwireless.com/product-categories/wisblock/rak19003/quickstart/"
+      },
+      {
+        "label": "RAK19007 power and setup guide",
+        "url": "https://docs.rakwireless.com/product-categories/wisblock/rak19007/quickstart/"
+      },
+      {
+        "label": "RAK19001 power and battery-selector guide",
+        "url": "https://docs.rakwireless.com/product-categories/wisblock/rak19001/quickstart/"
+      },
+      {
+        "label": "Pinned Meshtastic RAK4631 build definition",
+        "url": "https://github.com/meshtastic/firmware/blob/6d41e279f1f51bd59f687b9d441c1bf47b1594fc/variants/nrf52840/rak4631/platformio.ini"
+      },
+      {
+        "label": "Meshtastic nRF52 UF2 upload and RAK4631-R distinction",
+        "url": "https://meshtastic.org/docs/getting-started/flashing-firmware/nrf52/drag-n-drop/"
+      },
+      {
+        "label": "Meshtastic firmware selector and web flasher",
+        "url": "https://flasher.meshtastic.org/"
+      },
+      {
+        "label": "Official Meshtastic apps and firmware downloads",
+        "url": "https://meshtastic.org/downloads/"
+      }
+    ],
+    "gaps": [
+      "Match radio/antenna band, base and accessory bundle. Do not infer module support solely from a free mechanical slot; verify the exact firmware and module combination.",
+      "Store/guide disagree on SMA versus RP-SMA wording for the antenna pigtail. Confirm the actual connector before buying adapters.",
+      "The starter guide links an older RAK12500 GNSS page; current store options name RAK12501. Do not silently substitute them.",
+      "RAK14000 e-paper requires a separate firmware selection. The maker guide’s old rak4631_eink filename is not a verified current release target.",
+      "Battery, solar panel and enclosure are not universal kit inclusions. Match connector housing and polarity to the selected base; RAK19001 has distinct rechargeable/non-rechargeable inputs.",
+      "No battery-life, antenna-range, price or stock claim was independently measured or refreshed."
+    ],
+    "notes": [
+      "The store contains an nRF52850 typo; the dedicated RAK4631 documentation identifies nRF52840.",
+      "Maker-listed LoRaWAN development features do not mean Meshtastic firmware runs a LoRaWAN network.",
+      "Primary-source review; no physical testing. Firmware source targets are pinned, not a claim about the firmware installed on a shipped unit."
+    ],
+    "coverage": "reviewed"
+  }
+}

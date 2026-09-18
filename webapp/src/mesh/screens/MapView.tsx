@@ -1,6 +1,7 @@
 import CommunityCoverageMap from "./CommunityCoverageMap";
 import { CoverageIcon } from "./CoverageControls";
 import { validCoordinates } from "../../lib/meshmapper";
+import { htmlText } from "../../lib/htmlText";
 import { mapPinMarkup } from "../../components/UiIcon";
 import L from "leaflet";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -385,7 +386,7 @@ function RadioMapView({
 
 		const nodeRows = (n: (typeof positioned)[number]) =>
 			`<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 2px;">` +
-			`<span style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("NODE")} // ${n.shortName}${n.viaNet ? " · NET" : ""}</span>` +
+			`<span style="font-size:10px;letter-spacing:2px;opacity:.85;">${t("NODE")} // ${htmlText(n.shortName)}${n.viaDemo ? " · SAMPLE" : n.viaSim ? " · SIMULATED" : n.viaNet ? " · NET" : ""}</span>` +
 			`<button data-num="${n.num}" style="font-size:10px;padding:0 6px;">[ +INFO ]</button>` +
 			`</div>` +
 			`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;">` +
@@ -408,6 +409,8 @@ function RadioMapView({
 				group.length > 1
 					? `${group[0].shortName} +${group.length - 1}`
 					: group[0].shortName;
+			const tooltip = document.createElement('span');
+			tooltip.textContent = label;
 			// Popup built in the DOM (not a string) so the [+INFO] onclick can be attached
 			const box = document.createElement("div");
 			box.innerHTML =
@@ -429,7 +432,7 @@ function RadioMapView({
 				}),
 			})
 				.bindPopup(box, { maxHeight: 260 })
-				.bindTooltip(label, { permanent: false, direction: "right" })
+				.bindTooltip(tooltip, { permanent: false, direction: "right" })
 				.addTo(layer);
 
 			// Arriving from a message "view on map": ring the node, center on it and
@@ -459,11 +462,11 @@ function RadioMapView({
 			const box = document.createElement("div");
 			box.innerHTML =
 				`<div style="font-size:10px;letter-spacing:2px;opacity:.85;">WAYPOINT · ${fmtHemisphere(w.lat, w.lon)}</div>` +
-				`<div style="font-weight:700;margin:4px 0;">${w.name || t("(unnamed)")}</div>` +
+				`<div style="font-weight:700;margin:4px 0;">${htmlText(w.name || t("(unnamed)"))}</div>` +
 				(w.description
-					? `<div style="margin-bottom:4px;">${w.description}</div>`
+					? `<div style="margin-bottom:4px;">${htmlText(w.description)}</div>`
 					: "") +
-				`<div style="opacity:.85;font-size:11px;">${t("from {0}", getSnapshot().nodes.get(w.from)?.shortName ?? w.from.toString(16))}` +
+				`<div style="opacity:.85;font-size:11px;">${htmlText(t("from {0}", getSnapshot().nodes.get(w.from)?.shortName ?? w.from.toString(16)))}` +
 				(w.expire
 					? ` · ${t("expires {0}", dateTime(w.expire * 1000))}`
 					: ` · ${t("no expiry")}`) +
@@ -494,6 +497,8 @@ function RadioMapView({
 			};
 			row.append(edit, del);
 			box.append(row);
+			const tooltip = document.createElement('span');
+			tooltip.textContent = w.name || 'waypoint';
 			L.marker([w.lat, w.lon], {
 				icon: L.divIcon({
 					className: "",
@@ -503,7 +508,7 @@ function RadioMapView({
 				}),
 			})
 				.bindPopup(box)
-				.bindTooltip(w.name || "waypoint", { direction: "top" })
+				.bindTooltip(tooltip, { direction: "top" })
 				.addTo(layer);
 		}
 
