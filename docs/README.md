@@ -88,6 +88,7 @@ matters.
 | [strategy/2026-q3-direction.md](strategy/2026-q3-direction.md) | Where this is going. |
 | [strategy/meshcore-app-direction-2026-09-14.md](strategy/meshcore-app-direction-2026-09-14.md) | MeshCore app priorities, competitor baseline, and release criteria. |
 | [meshcore-ux-qa-2026-09-14.md](meshcore-ux-qa-2026-09-14.md) | Inbox, node roles, compose, and room/repeater UI changes with simulator evidence. |
+| [overnight-web-qa-2026-09-18.md](overnight-web-qa-2026-09-18.md) | Intro sizing on phones, map footer, Mesh and Config labels, iOS CI fix, and the tunnel-plus-render-service verification loop. |
 | [overnight-web-qa-2026-09-16.md](overnight-web-qa-2026-09-16.md) | Simple intro, real web map, explicit demo, draft/history fixes, and 654-test browser/build validation. |
 | [mobile-intro-qa-2026-09-15.md](mobile-intro-qa-2026-09-15.md) | Larger mobile T-Deck, scrolling over the model, rotation, and responsive browser checks. |
 | [real-mesh-map-qa-2026-09-15.md](real-mesh-map-qa-2026-09-15.md) | Real MeshCore directory, source/freshness evidence, cached nodes, and encrypted offline radio browsing. |
