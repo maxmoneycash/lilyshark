@@ -292,7 +292,7 @@ export default function Mesh() {
 					{tile(t("ACTIVE 24 H"), sum.active24h)}
 					{tile(t("WITH POSITION"), sum.withPosition)}
 					{tile(t("REPEATERS"), sum.repeaters)}
-					{tile(t("WITH PKI"), sum.withPki)}
+					{tile(t("PUBLIC KEY"), sum.withPki)}
 					{tile(
 						t("LOW BATTERY"),
 						sum.lowBattery,
@@ -300,6 +300,7 @@ export default function Mesh() {
 					)}
 					{tile(t("NEVER HEARD"), sum.neverHeard, "dim")}
 
+					{hops.length > 0 && (
 					<div
 						className="panel mesh-hop-distribution"
 						style={{ padding: "8px 12px", minWidth: 190 }}
@@ -330,6 +331,7 @@ export default function Mesh() {
 							</div>
 						))}
 					</div>
+					)}
 
 					{sum.silent.length > 0 && (
 						<div

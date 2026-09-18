@@ -263,13 +263,16 @@
   .meshterm .coverage-map-error { top: 166px; max-width: calc(100% - 24px); width: max-content; }
   .meshterm .coverage-empty-filters { bottom: max(52px, calc(env(safe-area-inset-bottom, 0px) + 42px)); left: 12px; transform: none; max-width: calc(100% - 88px); }
   .meshterm .coverage-map-footer { left: max(12px, env(safe-area-inset-left, 0px)); right: 68px; max-width: none; }
+  /* The attribution rides above the source footer instead of behind it,
+     and clears the control column on the right. */
+  .meshterm .saved-coverage-canvas .leaflet-bottom { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px); }
   .meshterm .saved-coverage-canvas .leaflet-bottom.leaflet-right { right: 68px; }
   .meshterm .saved-coverage-canvas .leaflet-control-attribution { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meshterm .community-map-screen .map-main .map-hud-top { top: 54px; bottom: auto; left: 12px; right: 12px; }
   .meshterm .community-map-screen .radio-map-options { right: 74px; width: auto; max-width: none; top: 88px; }
   .meshterm .community-map-screen .map-wait { top: 144px; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); max-width: none; }
   .meshterm .community-map-screen .map-main .map-toolbar { flex-wrap: wrap; }
-  .meshterm .community-map-screen .map-coverage-legend { left: 12px; right: 12px; width: auto; bottom: max(36px, calc(env(safe-area-inset-bottom, 0px) + 26px)); max-height: 28%; }
+  .meshterm .community-map-screen .map-coverage-legend { left: 12px; right: 12px; width: auto; bottom: max(76px, calc(env(safe-area-inset-bottom, 0px) + 66px)); max-height: 28%; }
 }
 @media (prefers-reduced-motion: reduce) { .meshterm .community-map-screen button { transition: none; } }
 @media (prefers-reduced-transparency: reduce) { .meshterm .coverage-surface, .meshterm .coverage-tabs, .meshterm .coverage-actions, .meshterm .community-map-screen .radio-map-options { background: var(--panel); backdrop-filter: none; } }
