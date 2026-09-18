@@ -181,6 +181,19 @@ private final class FakeDeck: @unchecked Sendable {
         }
     }
 
+    /// The line count once no new line has arrived for `quiet` seconds.
+    func linesReceivedOnceQuiet(_ quiet: TimeInterval = 0.1, limit: TimeInterval = 1.0) -> Int {
+        let start = Date()
+        var count = linesReceived.count
+        var lastChange = start
+        while Date().timeIntervalSince(lastChange) < quiet, Date().timeIntervalSince(start) < limit {
+            usleep(10_000)
+            let now = linesReceived.count
+            if now != count { count = now; lastChange = Date() }
+        }
+        return count
+    }
+
     var linesReceived: [String] {
         lock.lock()
         defer { lock.unlock() }
@@ -212,7 +225,12 @@ final class LSKSerialLinkPtyTests: XCTestCase {
         }.store(in: &cancellables)
         link.connect(to: deck.slavePath)
         wait(for: [cancelled], timeout: 3)
-        let count = deck.linesReceived.count
+        // The fake deck reads the pseudo-terminal on its own thread, 5 ms at a
+        // time, so a HELLO written just before the identify timeout can still
+        // be in flight when the cancel lands. Let the reader drain before
+        // taking the baseline; a reopen would send a fresh HELLO 0.5 s later,
+        // well after this settles.
+        let count = deck.linesReceivedOnceQuiet()
         let pastRetry = expectation(description: "past scheduled retry")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { pastRetry.fulfill() }
         wait(for: [pastRetry], timeout: 3)

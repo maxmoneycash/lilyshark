@@ -6,6 +6,7 @@ import {
   INTRO_SCREEN_GROUPS,
   INTRO_SECTION_STARTS,
   INTRO_VIEWPORTS,
+  introChapterFromHash,
   introFrameIndex,
   introFrameProgress,
   introSectionProgress,
@@ -87,4 +88,14 @@ test('bounds include the final storage frame and clamp overscroll or invalid val
   assert.equal(introSectionProgress(12), introFrameProgress(INTRO_SECTION_STARTS.at(-1)!));
   assert.equal(introFrameProgress(-10), 0);
   assert.equal(introFrameProgress(100), 1);
+});
+
+test('a chapter deep link is 1-based, clamped, and otherwise absent', () => {
+  assert.equal(introChapterFromHash('#intro'), null);
+  assert.equal(introChapterFromHash(''), null);
+  assert.equal(introChapterFromHash('#intro?frame=3'), null);
+  assert.equal(introChapterFromHash('#intro?chapter=x'), null);
+  assert.equal(introChapterFromHash('#intro?chapter=4'), 4);
+  assert.equal(introChapterFromHash('#intro?chapter=0'), 1);
+  assert.equal(introChapterFromHash('#intro?chapter=99'), INTRO_SCREEN_GROUPS.length);
 });

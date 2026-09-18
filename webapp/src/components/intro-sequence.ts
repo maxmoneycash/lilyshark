@@ -48,3 +48,15 @@ export function introSectionProgress(sectionIndex: number): number {
 export function introSnapTop(frameIndex: number): number {
   return introFrameProgress(frameIndex) * (1 - 1 / INTRO_VIEWPORTS);
 }
+
+/**
+ * `#intro?chapter=4` opens on chapter 4 (1-based, clamped). Anything else,
+ * including no bag at all, is null and the intro starts at the top.
+ */
+export function introChapterFromHash(hash: string): number | null {
+  const q = hash.indexOf('?');
+  if (q < 0) return null;
+  const raw = new URLSearchParams(hash.slice(q + 1)).get('chapter');
+  if (raw === null || !/^\d+$/.test(raw)) return null;
+  return Math.min(INTRO_SCREEN_GROUPS.length, Math.max(1, Number(raw)));
+}

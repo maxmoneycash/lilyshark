@@ -6,7 +6,9 @@ import { TDeckModel } from './TDeckModel';
 import {
   INTRO_FRAMES,
   INTRO_VIEWPORTS,
+  introChapterFromHash,
   introFrameIndex,
+  introSectionProgress,
   introSnapTop,
 } from './intro-sequence';
 import { INTRO_SECTIONS as SECTIONS } from './intro-copy';
@@ -45,6 +47,11 @@ export function IntroTab() {
     const observer = new ResizeObserver(resize);
     resize();
     observer.observe(el);
+    // A `#intro?chapter=N` link lands on that chapter's first screen.
+    const chapter = introChapterFromHash(window.location.hash);
+    if (chapter !== null) {
+      el.scrollTop = introSectionProgress(chapter - 1) * (el.scrollHeight - el.clientHeight);
+    }
     return () => observer.disconnect();
   }, []);
 
