@@ -4,7 +4,34 @@ The recovered conversations cover the web intro and analyzer polish, plus the
 native home, onboarding, and coverage maps. The current branch is `main`, based
 on `b2b1d14` (September 10). This continuation's changes are local and uncommitted.
 
-## Latest: phone intro is an ordinary page — September 17
+## Overnight 2026-09-18: intro sizing on branch `intro-sizing`
+
+Max wants one design everywhere: the pinned 3D T-Deck whose screen changes
+as you scroll (restored on main, live). The phone-only page from earlier on
+2026-09-17 was a mistake and is gone. Only sizing of the text and model is open.
+
+On the branch (not on main, not deployed): the phone copy takes its natural
+height and never scrolls inside itself; the device box is sized from the
+stage height minus the measured copy height (`--intro-copy-height`, published
+by IntroTab) minus padding/gap, floored at 150px and capped at 60dvh;
+headline clamp(22px, 6.4vw, 30px), body 15px, a step down under 700px tall.
+`#intro?chapter=N` deep-links to a chapter. tdeck-scene repaints synchronously
+on resize (a resize clears the canvas and the queued frame could be dropped).
+Also on the branch: the CI-failing LSKSerialLinkPtyTests cancel test now waits
+for the fake deck's reader to go quiet before taking its baseline (11/11 pass
+locally).
+
+Verification path used tonight (no Playwriter extension connected in Arc or
+Polar): serve `webapp/dist` on 127.0.0.1:4173, expose it with a Cloudflare
+quick tunnel (`cloudflared tunnel --url`, binary in the session scratchpad),
+and render through api.microlink.io at exact viewports (WebGL renders there).
+Renders at 390x844 and 390x701 are right: device fills the space above larger
+text, no dead gap. At viewport heights <=700 the device box is correctly sized
+but painted blank in that renderer; production at 390x700 renders. Cause not
+yet established; Polar's agent was asked to measure the DOM at 390x700.
+Microlink's free daily quota ran out; a search for another renderer is running.
+
+## Superseded: phone intro as an ordinary page — September 17 (reverted)
 
 Max said the mobile intro was still bad after the September 16 sizing pass.
 Below 861px the pinned, scroll-snapped sequence no longer renders; `IntroPhone.tsx`
