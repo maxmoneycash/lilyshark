@@ -2508,9 +2508,16 @@ body:has(.meshterm .app.menu-open) {
    An ordinary page (IntroPhone.tsx): headline, device, then one section per
    chapter with its firmware screens in a sideways strip. The pinned,
    scroll-driven stage above never renders at phone widths (useIsPhone). */
+.meshterm main.intro-main {
+	display: block;
+	padding: 0;
+	gap: 0;
+	overflow: visible;
+}
 .meshterm .intro-page {
+	box-sizing: border-box;
 	width: 100%;
-	max-width: 640px;
+	max-width: 640px !important; /* the phone shell widens main's children */
 	margin-inline: auto;
 	padding: 28px max(20px, env(safe-area-inset-right)) 56px max(20px, env(safe-area-inset-left));
 	color: var(--ink, var(--fg));

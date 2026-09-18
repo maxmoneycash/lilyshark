@@ -28,8 +28,11 @@ export function IntroPhone() {
     return () => window.clearInterval(id);
   }, [reducedMotion, lead.screens.length]);
 
+  // Not `main.fill`: on phones that class pins the shell to the viewport with
+  // overflow hidden (for screens that scroll inside themselves), which made
+  // this page unscrollable. Plain `main` follows the document scroll.
   return (
-    <main className="fill">
+    <main className="intro-main">
       <article className="intro-page" aria-label="Lilyshark introduction">
         <header className="intro-page-hero">
           <h1 className="intro-page-title">{lead.head}</h1>
