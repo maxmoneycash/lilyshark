@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import {
   INTRO_FRAMES,
@@ -92,4 +93,17 @@ test('a chapter deep link is 1-based, clamped, and otherwise absent', () => {
   assert.equal(introChapterFromHash('#intro?chapter=4'), 4);
   assert.equal(introChapterFromHash('#intro?chapter=0'), 1);
   assert.equal(introChapterFromHash('#intro?chapter=99'), INTRO_SCREEN_GROUPS.length);
+});
+
+test('public/intro ships exactly the files the tour and the flash page ask for', () => {
+  const introDir = new URL('../../public/intro/', import.meta.url);
+  for (const screen of INTRO_FRAMES.map((frame) => frame.screen)) {
+    assert.ok(
+      existsSync(new URL(`../../public${screen}`, import.meta.url)),
+      `${screen} is in the tour but missing from public/`,
+    );
+  }
+  // fw/ is the live set and tdeck.webp is the photo on /flash/. Anything else
+  // here is a superseded screenshot that every deploy would still carry.
+  assert.deepEqual(readdirSync(introDir).sort(), ['fw', 'tdeck.webp']);
 });
