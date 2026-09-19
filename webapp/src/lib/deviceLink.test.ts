@@ -6,6 +6,7 @@ import {
   isLilysharkBanner,
   nextSerialAction,
   parseLskLine,
+  parseRawFrameFields,
   TELEMETRY_HISTORY_LIMIT,
   type DeviceTelemetry,
 } from './deviceLink';
@@ -220,4 +221,36 @@ test("older firmware without the drop counters still parses", () => {
 	assert.ok(parsed && parsed.kind === 'T' && parsed.telemetry);
 	assert.equal(parsed.telemetry.dropCrc, undefined);
 	assert.equal(parsed.telemetry.dropNoSource, undefined);
+});
+
+test('a frame record with unusable hex is rejected rather than half-decoded', () => {
+  // The bytes in a capture are the product's whole claim, so a payload that is
+  // not clean hex must not survive as if the radio really heard it. A stray
+  // character used to become byte 0x00 and an odd-length string used to lose
+  // its last nibble, both producing a record that reads back as complete.
+  assert.equal(
+    parseRawFrameFields({ seq: 5, ts: 1000, hex: 'c0ff?e11', olen: 4 }),
+    undefined,
+  );
+  assert.equal(
+    parseRawFrameFields({ seq: 5, ts: 1000, hex: 'c0ffee1', olen: 4 }),
+    undefined,
+  );
+});
+
+test('a clean frame record still decodes byte for byte', () => {
+  const raw = parseRawFrameFields({ seq: 5, ts: 1000, hex: 'c0ffee11', olen: 4 });
+  assert.ok(raw);
+  assert.deepEqual(Array.from(raw.bytes), [0xc0, 0xff, 0xee, 0x11]);
+  assert.equal(raw.timestampUs, 1000n);
+  assert.equal(raw.originalLength, 4);
+});
+
+test('a frame line with a non-numeric timestamp returns instead of throwing', () => {
+  // parseLskLine promises undefined for anything that is not LSK; it must not
+  // throw instead. A non-numeric ts used to raise RangeError out of BigInt(),
+  // which the serial read loop turned into a stalled link.
+  const parsed = parseLskLine('LSK F {"src":1,"dst":2,"seq":5,"ts":"x","hex":"c0ffee11"}');
+  assert.ok(parsed && parsed.kind === 'F' && parsed.frame);
+  assert.equal(parsed.frame.raw, undefined);
 });

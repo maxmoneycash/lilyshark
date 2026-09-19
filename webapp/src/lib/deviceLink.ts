@@ -173,11 +173,17 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 /** Undefined unless the device sent the whole record — a partial one would
- *  produce a capture that looks complete and is not. */
+ *  produce a capture that looks complete and is not. The payload must be an
+ *  even number of hex digits and nothing else: a stray character would decode
+ *  to byte 0x00 and an odd digit count would drop a nibble, either way saving
+ *  bytes the radio never heard. A timestamp that is not a finite number is
+ *  rejected here rather than raising RangeError out of BigInt(). */
 export function parseRawFrameFields(
   body: Record<string, unknown>,
 ): RawFrameFields | undefined {
   if (typeof body.hex !== 'string' || typeof body.seq !== 'number') return undefined;
+  if (!Number.isFinite(Number(body.ts ?? 0))) return undefined;
+  if (!/^(?:[0-9a-fA-F]{2})*$/.test(body.hex)) return undefined;
   const n = (k: string) => Number(body[k] ?? 0);
   return {
     seq: n('seq'),
@@ -601,9 +607,17 @@ async function readAvailable(candidate: SerialPort): Promise<void> {
       pending += decoder.decode(value, { stream: true });
       let nl = pending.indexOf('\n');
       while (nl >= 0) {
-        handleLine(pending.slice(0, nl).trim());
+        // Consume the line before handling it. Handled first, a line that threw
+        // stayed at the head of the buffer and was retried on every pass of the
+        // outer loop, wedging the link while the status still read as linked.
+        const line = pending.slice(0, nl).trim();
         pending = pending.slice(nl + 1);
         nl = pending.indexOf('\n');
+        try {
+          handleLine(line);
+        } catch {
+          /* one bad line is dropped, not replayed */
+        }
       }
     } catch {
       try {
