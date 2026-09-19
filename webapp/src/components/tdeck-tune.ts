@@ -1,10 +1,13 @@
+import { SPIN_RATE } from './tdeck-pose';
+
 /** Live T-Deck camera / light knobs. DialKit writes these in dev only. */
 export type TDeckTune = {
   halfHeight: number;
   pan: number;
   exposure: number;
   envIntensity: number;
-  breathe: number;
+  /** Radians per second of the idle turn; 0 holds the device still. */
+  spin: number;
 };
 
 export const TDECK_TUNE_DEFAULTS: TDeckTune = {
@@ -12,7 +15,7 @@ export const TDECK_TUNE_DEFAULTS: TDeckTune = {
   pan: 0,
   exposure: 1.14,
   envIntensity: 1.12,
-  breathe: 0.01,
+  spin: SPIN_RATE,
 };
 
 let tune: TDeckTune = { ...TDECK_TUNE_DEFAULTS };
@@ -29,7 +32,7 @@ export function setTDeckTune(next: Partial<TDeckTune>): void {
     merged.pan === tune.pan &&
     merged.exposure === tune.exposure &&
     merged.envIntensity === tune.envIntensity &&
-    merged.breathe === tune.breathe
+    merged.spin === tune.spin
   ) {
     return;
   }

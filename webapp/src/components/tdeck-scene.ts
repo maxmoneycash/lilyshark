@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { clampPitch, PITCH_DRAG, REST_PITCH, REST_ROLL, REST_YAW, YAW_DRAG } from './tdeck-pose';
+import { clampPitch, PITCH_DRAG, REST_PITCH, REST_ROLL, REST_YAW, spinYaw, YAW_DRAG } from './tdeck-pose';
+import { distanceAcrossTurn } from './tdeck-camera';
 import { getTDeckTune, subscribeTDeckTune } from './tdeck-tune';
 
 export interface TDeckViewer {
@@ -112,12 +113,19 @@ export function mountTDeck(
   let visible = true;
   let frame = 0;
   let lastTime = 0;
-  let time = 0;
   let yaw = REST_YAW;
   let pitch = REST_PITCH;
   let instanceRoot: THREE.Object3D | undefined;
   const modelCorners: THREE.Vector3[] = [];
-  const fittedPoint = new THREE.Vector3();
+  // One placement has to clear every angle of the turn: sample it every five
+  // degrees rather than refit the frame in front of us.
+  const TURN_SAMPLES = 72;
+  const sampleEuler = new THREE.Euler();
+  const sampled: THREE.Vector3[] = [];
+  let fitDistance = 0;
+  let fitPitch = Number.NaN;
+  let fitAspect = 0;
+  let fitHalfHeight = Number.NaN;
   let velYaw = 0;
   let velPitch = 0;
   let screenUrl = '';
@@ -139,22 +147,17 @@ export function mountTDeck(
         if (Math.abs(velPitch) < .02) velPitch = 0;
         yaw += velYaw * dt;
         pitch = clampPitch(pitch + velPitch * dt);
-        time += dt;
+        // The device turns on its own, so it reads as an object someone can
+        // pick up rather than a picture. A flick still spins it faster and
+        // decays back into this. Reduced motion holds it still.
+        yaw = spinYaw(yaw, dt, getTDeckTune().spin);
       } else {
         velYaw = 0;
         velPitch = 0;
       }
     }
-    const breathe = moving ? 1 : 0;
-    const amp = getTDeckTune().breathe;
-    rig.rotation.set(
-      pitch + Math.sin(time * .55) * amp * breathe,
-      yaw,
-      REST_ROLL + Math.sin(time * .4) * (amp * .67) * breathe,
-      'YXZ',
-    );
-    rig.position.set(0, Math.sin(time * .7) * .0015 * breathe, 0);
-    fitCamera();
+    rig.rotation.set(pitch, yaw, REST_ROLL, 'YXZ');
+    placeCamera();
     renderer.render(scene, camera);
     if (moving && ready) requestRender();
   }
@@ -174,24 +177,48 @@ export function mountTDeck(
     render(lastTime);
     callbacks.onReady();
   }
-  function fitCamera() {
-    const tune = getTDeckTune();
-    // Fit all eight rotated corners, including perspective depth. A sphere
-    // fit wastes most of a portrait canvas around the long, narrow antenna.
-    const verticalHalfAngle = THREE.MathUtils.degToRad(CAMERA_FOV) / 2;
-    const tanV = Math.tan(verticalHalfAngle);
-    const tanH = tanV * camera.aspect;
-    let distance = tune.halfHeight / tanV;
-    for (const corner of modelCorners) {
-      fittedPoint.copy(corner).applyEuler(rig.rotation).add(rig.position);
-      distance = Math.max(distance,
-        Math.abs(fittedPoint.x) * 1.04 / tanH + fittedPoint.z,
-        Math.abs(fittedPoint.y) * 1.04 / tanV + fittedPoint.z);
+  /** Corners of the model at one angle of the turn, at the current tilt. */
+  function cornersAtAngle(angle: number): THREE.Vector3[] {
+    sampleEuler.set(pitch, angle, REST_ROLL, 'YXZ');
+    while (sampled.length < modelCorners.length) sampled.push(new THREE.Vector3());
+    for (let i = 0; i < modelCorners.length; i += 1) {
+      sampled[i].copy(modelCorners[i]).applyEuler(sampleEuler);
     }
-    const halfHeight = distance * Math.tan(verticalHalfAngle);
+    return sampled.slice(0, modelCorners.length);
+  }
+
+  /**
+   * Place the camera once for the entire turn. Fitting the corners of the
+   * current frame — which this used to do — moved the camera as the device
+   * rotated, so the handset swelled and shrank while it turned and while the
+   * page scrolled. The distance now only changes when the canvas is resized,
+   * the tilt is dragged, or the knobs move.
+   */
+  function computeFit() {
+    if (modelCorners.length === 0) return;
+    const tune = getTDeckTune();
+    const tanV = Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV) / 2);
+    const tanH = tanV * camera.aspect;
+    fitDistance = distanceAcrossTurn(cornersAtAngle, TURN_SAMPLES, tanV, tanH, tune.halfHeight / tanV);
+    fitPitch = pitch;
+    fitAspect = camera.aspect;
+    fitHalfHeight = tune.halfHeight;
+  }
+
+  function placeCamera() {
+    const tune = getTDeckTune();
+    if (
+      fitDistance === 0 ||
+      fitAspect !== camera.aspect ||
+      fitHalfHeight !== tune.halfHeight ||
+      Math.abs(pitch - fitPitch) > 1e-4
+    ) {
+      computeFit();
+    }
+    const halfHeight = fitDistance * Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV) / 2);
     const pan = -halfHeight * camera.aspect * THREE.MathUtils.clamp(tune.pan, -.08, .08);
     look.set(pan, 0, 0);
-    camera.position.set(pan, 0, distance);
+    camera.position.set(pan, 0, fitDistance);
     camera.lookAt(look);
   }
 
@@ -206,6 +233,7 @@ export function mountTDeck(
     camera.aspect = width / height;
     camera.fov = CAMERA_FOV;
     camera.updateProjectionMatrix();
+    computeFit();
     // setSize clears the canvas, so a resize must paint a frame now, not
     // merely queue one that the visibility gate may drop: a layout that
     // settles after the first frame would otherwise stay blank.
@@ -370,7 +398,6 @@ export function mountTDeck(
     pitch = REST_PITCH;
     velYaw = 0;
     velPitch = 0;
-    time = 0;
     requestRender();
   }
   function keyDown(event: KeyboardEvent) {

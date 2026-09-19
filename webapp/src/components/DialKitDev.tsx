@@ -10,7 +10,7 @@ export function DialKitDev() {
     pan: [TDECK_TUNE_DEFAULTS.pan, 0, 0.6, 0.01],
     exposure: [TDECK_TUNE_DEFAULTS.exposure, 0.6, 1.6, 0.01],
     envIntensity: [TDECK_TUNE_DEFAULTS.envIntensity, 0.4, 2, 0.01],
-    breathe: [TDECK_TUNE_DEFAULTS.breathe, 0, 0.04, 0.001],
+    spin: [TDECK_TUNE_DEFAULTS.spin, 0, 0.8, 0.01],
   });
 
   useEffect(() => {
