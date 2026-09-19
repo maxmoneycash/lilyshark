@@ -257,18 +257,40 @@ export function summarize(frames: LscapFrame[]) {
       airtimeMs: 0, durationSec: 0, framesPerMinute: 0,
     };
   }
-  const rssi = frames.map((f) => f.rssiDbm).sort((a, b) => a - b);
+  // One pass, and no spread: a full capture holds CAPTURE_FRAME_LIMIT frames,
+  // far past the ~110k arguments a call can carry, so Math.max(...frames) threw
+  // and took the whole Traffic screen down with it.
+  let bytes = 0;
+  let crcValid = 0;
+  let crcInvalid = 0;
+  let airtimeUs = 0;
+  // A field the radio never reported is stored as 0. Folding those zeros in
+  // would print a measurement the radio never made — an FSK capture reports no
+  // SNR at all, and its best SNR is "not reported", not 0.0 dB.
+  let bestSnrDb: number | null = null;
+  const rssi: number[] = [];
+  for (const f of frames) {
+    bytes += f.capturedLength;
+    if (f.crc === 'valid') crcValid++;
+    else if (f.crc === 'invalid') crcInvalid++;
+    airtimeUs += f.airtimeUs;
+    if (hasField(f, RF_FIELD.snr) && (bestSnrDb === null || f.snrDb > bestSnrDb)) {
+      bestSnrDb = f.snrDb;
+    }
+    if (hasField(f, RF_FIELD.rssi)) rssi.push(f.rssiDbm);
+  }
+  rssi.sort((a, b) => a - b);
   const first = frames[0].timestampUs;
   const last = frames[frames.length - 1].timestampUs;
   const durationSec = Number(last - first) / 1_000_000;
   return {
     frames: frames.length,
-    bytes: frames.reduce((n, f) => n + f.capturedLength, 0),
-    crcValid: frames.filter((f) => f.crc === 'valid').length,
-    crcInvalid: frames.filter((f) => f.crc === 'invalid').length,
-    bestSnrDb: Math.max(...frames.map((f) => f.snrDb)),
-    medianRssiDbm: rssi[Math.floor(rssi.length / 2)],
-    airtimeMs: frames.reduce((n, f) => n + f.airtimeUs, 0) / 1000,
+    bytes,
+    crcValid,
+    crcInvalid,
+    bestSnrDb,
+    medianRssiDbm: rssi.length > 0 ? rssi[Math.floor(rssi.length / 2)] : null,
+    airtimeMs: airtimeUs / 1000,
     durationSec,
     framesPerMinute: durationSec > 0 ? (frames.length / durationSec) * 60 : 0,
   };

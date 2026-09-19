@@ -2,14 +2,19 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import type { RawFrameFields } from './deviceLink';
 import {
   decodeShelbyPointer,
   findShelbyPointer,
   LSCAP_METADATA_FLAG,
+  type LscapFrame,
   parseLscap,
+  RF_FIELD,
   SHELBY_FLAG,
   SHELBY_POINTER_SIZE,
+  summarize,
 } from './lscap';
+import { buildLscap } from './lscapWrite';
 
 // Byte-exact output of the firmware C++ encoder for the field values below,
 // pinned in docs/shelby-pointer-format.md as the format's test vector. The
@@ -196,4 +201,129 @@ test('partial last record exposes the recovery reason and keeps preceding frames
   assert.equal(capture.frames.length, 1);
   assert.equal(capture.trailingBytes, tail.length);
   assert.match(capture.recoveryMessage!, /Incomplete payload/);
+});
+
+// A frame the analyzer would hold in memory. Only the fields summarize() reads
+// are varied; the rest are plausible constants.
+function statsFrame(i: number): LscapFrame {
+  return {
+    sequence: BigInt(i),
+    timestampUs: BigInt(i) * 1_000n,
+    capturedLength: 16 + (i % 7),
+    originalLength: 16 + (i % 7),
+    truncated: false,
+    presentFields: RF_FIELD.rssi | RF_FIELD.snr | RF_FIELD.airtime,
+    centerFrequencyHz: 906_875_000,
+    bandwidthHz: 250_000,
+    bitRateBps: 0,
+    frequencyDeviationHz: 0,
+    airtimeUs: 1_000 + (i % 13),
+    frequencyErrorHz: 0,
+    rssiDbm: (((i * 37) % 900) - 1_300) / 10,
+    snrDb: (((i * 71) % 401) - 200) / 10,
+    preambleSymbols: 8,
+    syncWord: 0x2b,
+    profileId: 0,
+    radioStatus: 0,
+    txPowerDbm: 17,
+    spreadingFactor: 7,
+    codingRateDenominator: 5,
+    channelIndex: 0,
+    radioIndex: 0,
+    modulation: 'lora',
+    direction: 'rx',
+    crc: i % 5 === 0 ? 'invalid' : 'valid',
+    metadataFlags: 0,
+    synthetic: false,
+    bytes: new Uint8Array(0),
+  };
+}
+
+// CAPTURE_FRAME_LIMIT is 128,000, so a capture recorded to the app's own limit
+// is larger than the ~110,000 arguments a spread call can carry. summarize()
+// runs inside a render-time useMemo, so a throw here used to blank the whole
+// Traffic screen and reopening the saved capture could not recover it.
+test('summarizes a capture at the app frame limit without overflowing the stack', () => {
+  const frames = Array.from({ length: 128_000 }, (_, i) => statsFrame(i));
+
+  let bytes = 0;
+  let crcValid = 0;
+  let airtimeUs = 0;
+  let bestSnrDb = Number.NEGATIVE_INFINITY;
+  for (const frame of frames) {
+    bytes += frame.capturedLength;
+    if (frame.crc === 'valid') crcValid++;
+    airtimeUs += frame.airtimeUs;
+    if (frame.snrDb > bestSnrDb) bestSnrDb = frame.snrDb;
+  }
+
+  const stats = summarize(frames);
+  assert.equal(stats.frames, 128_000);
+  assert.equal(stats.bytes, bytes);
+  assert.equal(stats.crcValid, crcValid);
+  assert.equal(stats.crcInvalid, 128_000 - crcValid);
+  assert.equal(stats.bestSnrDb, bestSnrDb);
+  assert.equal(stats.airtimeMs, airtimeUs / 1000);
+  assert.ok(Number.isFinite(stats.bestSnrDb!));
+  assert.ok(Number.isFinite(stats.airtimeMs));
+});
+
+function rawStatsFrame(over: Partial<RawFrameFields>): RawFrameFields {
+  return {
+    seq: 0,
+    timestampUs: 0n,
+    rssiX10: 0,
+    snrX10: 0,
+    presentFields: 0,
+    centerFrequencyHz: 906_875_000,
+    bandwidthHz: 0,
+    bitRateBps: 4_800,
+    frequencyDeviationHz: 25_000,
+    airtimeUs: 1_000,
+    frequencyErrorHz: 0,
+    preambleSymbols: 8,
+    syncWord: 0x2b,
+    profileId: 0,
+    radioStatus: 0,
+    txPowerDbm: 17,
+    spreadingFactor: 0,
+    codingRateDenominator: 0,
+    channelIndex: 0,
+    radioIndex: 0,
+    modulation: 2, // fsk
+    direction: 1, // rx
+    crc: 2, // valid
+    metadataFlags: 0,
+    originalLength: 4,
+    bytes: Uint8Array.from([1, 2, 3, 4]),
+    ...over,
+  };
+}
+
+// An FSK radio reports no SNR at all, and the parser stores an unreported
+// field as 0. The frame table already prints those cells as an em dash; the
+// summary strip has to agree rather than show 0.0 dB as if it were measured.
+test('leaves a statistic no frame reported out of the summary', () => {
+  const capture = parseLscap(
+    buildLscap([
+      rawStatsFrame({
+        seq: 1,
+        presentFields: RF_FIELD.rssi | RF_FIELD.airtime,
+        rssiX10: -812,
+        snrX10: 65, // stale field, not reported: must not reach the summary
+      }),
+      rawStatsFrame({
+        seq: 2,
+        timestampUs: 1_000_000n,
+        presentFields: RF_FIELD.airtime,
+        rssiX10: -300,
+        snrX10: 120,
+      }),
+    ]).buffer as ArrayBuffer,
+  );
+
+  const stats = summarize(capture.frames);
+  assert.equal(stats.frames, 2);
+  assert.equal(stats.bestSnrDb, null);
+  assert.equal(stats.medianRssiDbm, -81.2);
 });
