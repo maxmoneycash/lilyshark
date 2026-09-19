@@ -105,5 +105,8 @@ test('public/intro ships exactly the files the tour and the flash page ask for',
   }
   // fw/ is the live set and tdeck.webp is the photo on /flash/. Anything else
   // here is a superseded screenshot that every deploy would still carry.
-  assert.deepEqual(readdirSync(introDir).sort(), ['fw', 'tdeck.webp']);
+  // Dotfiles are ignored: Finder drops .DS_Store into any folder it opens, and
+  // failing the whole suite for that would point at nothing real.
+  const shipped = readdirSync(introDir).filter((name) => !name.startsWith('.'));
+  assert.deepEqual(shipped.sort(), ['fw', 'tdeck.webp']);
 });

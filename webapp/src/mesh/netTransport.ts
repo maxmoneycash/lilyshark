@@ -69,7 +69,15 @@ export class MqttTransport implements NetTransport {
   readonly name = 'mqtt';
   readonly endpoint: string;
   private client: MqttClient | undefined;
-  private stopped = false;
+  /**
+   * Which attempt owns this transport. Every connect takes the next number and
+   * every disconnect burns one, so anything that arrives late — a module
+   * import, a close event from a client the ladder has already abandoned —
+   * can tell whether it still speaks for the rung. A boolean could not: the
+   * ladder can return to this same broker a full pass later, and two opens
+   * would then both proceed and leak the first client with its handlers live.
+   */
+  private attempt = 0;
 
   constructor(private readonly broker: string) {
     this.endpoint = broker;
@@ -81,46 +89,56 @@ export class MqttTransport implements NetTransport {
     onUp: () => void,
     onDown: () => void,
   ): void {
-    this.stopped = false;
-    void this.open(room, onMessage, onUp, onDown);
+    this.attempt += 1;
+    void this.open(this.attempt, room, onMessage, onUp, onDown);
   }
 
   private async open(
+    attempt: number,
     room: string,
     onMessage: (payload: string) => void,
     onUp: () => void,
     onDown: () => void,
   ): Promise<void> {
+    const startedAt = Date.now();
     let mqtt: typeof import('mqtt').default;
     try {
       ({ default: mqtt } = await import('mqtt'));
     } catch {
       // Offline, or the chunk never arrived. The rung is unusable; report it
       // down so the ladder climbs instead of waiting out the whole window.
-      if (!this.stopped) onDown();
+      if (attempt === this.attempt) onDown();
       return;
     }
     // The ladder may already have climbed past this rung while the module
     // was loading; a late arrival must not open a connection nobody owns.
-    if (this.stopped) return;
+    if (attempt !== this.attempt) return;
     const client = mqtt.connect(this.broker, {
       clientId: `lsk-${Math.random().toString(36).slice(2, 10)}`,
       clean: true,
       // The ladder owns retry policy; a rung that failed once is abandoned.
       reconnectPeriod: 0,
-      connectTimeout: CONNECT_WINDOW_MS - 1000,
+      // The ladder's window opened when connect() was called, not when the
+      // module landed. Give the handshake what is left of it, with a floor so
+      // a slow first load does not hand the broker an impossible deadline.
+      connectTimeout: Math.max(3000, CONNECT_WINDOW_MS - 1000 - (Date.now() - startedAt)),
     });
     this.client = client;
     client.on('connect', () => {
+      if (attempt !== this.attempt) return;
       client.subscribe(netTopic(room), { qos: 0 });
       onUp();
     });
-    client.on('close', onDown);
+    // A client the ladder has moved on from closes noisily; only the rung that
+    // still owns the transport may report itself down.
+    client.on('close', () => {
+      if (attempt === this.attempt) onDown();
+    });
     client.on('error', () => {
       /* 'close' follows and carries the ladder onward */
     });
     client.on('message', (_topic, payload) => {
-      onMessage(new TextDecoder().decode(payload));
+      if (attempt === this.attempt) onMessage(new TextDecoder().decode(payload));
     });
   }
 
@@ -129,7 +147,9 @@ export class MqttTransport implements NetTransport {
   }
 
   disconnect(): void {
-    this.stopped = true;
+    // Burn the attempt number: whatever is still in flight now speaks for
+    // nobody, including the close event this end() is about to fire.
+    this.attempt += 1;
     this.client?.end(true);
     this.client = undefined;
   }

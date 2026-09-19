@@ -146,6 +146,10 @@ test("the mqtt client stays out of the entry bundle until the bridge connects", 
 	assert.match(source, /^import type \{ MqttClient \} from 'mqtt';$/m);
 	assert.match(source, /await import\('mqtt'\)/);
 	// A rung the ladder already climbed past must not open a connection when
-	// its module finally lands.
-	assert.match(source, /if \(this\.stopped\) return;/);
+	// its module finally lands, must not report itself down, and must not
+	// speak for a later attempt on the same broker.
+	assert.match(source, /if \(attempt !== this\.attempt\) return;/);
+	assert.match(source, /if \(attempt === this\.attempt\) onDown\(\);/);
+	// The handshake gets what is left of the ladder's window, not a fresh one.
+	assert.match(source, /CONNECT_WINDOW_MS - 1000 - \(Date\.now\(\) - startedAt\)/);
 });
