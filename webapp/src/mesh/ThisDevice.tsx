@@ -170,7 +170,7 @@ export function ThisDevicePanel() {
 							</div>
 						</div>
 					</div>
-					<div className="device-counters" aria-label="Capture and attribution counters">
+					<div className="device-counters" role="group" aria-label="Capture and attribution counters">
 						<span>LATEST CAPTURE SEQUENCE <b>{count(telem.frames)}</b></span>
 						<span>RADIO CRC ERRORS <b>{count(telem.crc)}</b></span>
 						<span>CRC REJECTED <b>{count(telem.dropCrc)}</b></span>

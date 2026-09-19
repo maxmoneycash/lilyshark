@@ -301,6 +301,7 @@ export default function Spectrum() {
 					{latest && (
 						<div
 							className="dim spectrum-freq-ticks"
+							role="group"
 							aria-label="Frequency in megahertz"
 						>
 							{freqTicks(latest.f0Hz, latest.f1Hz).map((tk) => (

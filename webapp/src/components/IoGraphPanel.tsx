@@ -360,6 +360,7 @@ export function IoGraphPanel({
       <div
         ref={boxRef}
         className="traffic-io-plot"
+        role="img"
         aria-label="Capture IO graph, frames over time"
         style={{ width: '100%', height: PLOT_HEIGHT }}
       />

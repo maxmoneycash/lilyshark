@@ -1055,7 +1055,7 @@ function App() {
                 )}
               </div>
             ) : (
-              <pre className="debuglog" tabIndex={0} aria-label="Serial log">
+              <pre className="debuglog" tabIndex={0} role="log" aria-live="off" aria-label="Serial log">
                 {s.log.map(fmtLog).join("\n")}
                 {"\n"}
                 <span className="cursor" ref={debugCursorRef}>█</span>
