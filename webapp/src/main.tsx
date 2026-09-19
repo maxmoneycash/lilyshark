@@ -18,8 +18,40 @@ applyTheme()
 // from memory and a worker would mask edits.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // A browser that refuses the worker still gets the online app.
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        // An open tab is never told about a deploy on its own: the browser
+        // only looks for a new worker on navigation. Look whenever the tab
+        // comes back into view (a phone woken from the pocket, a tab
+        // switched back to) and every quarter hour while it stays open.
+        const check = () => {
+          registration.update().catch(() => {})
+        }
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) check()
+        })
+        window.setInterval(check, 15 * 60 * 1000)
+      })
+      .catch(() => {
+        // A browser that refuses the worker still gets the online app.
+      })
+
+    // When a new worker takes over (it calls skipWaiting + claim), this tab
+    // is still running the previous bundle. Reload once so the page matches
+    // the deploy, unless the person is typing: a half-written message is
+    // worth more than an early update, and the next check will catch it.
+    let reloading = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return
+      const active = document.activeElement
+      const typing =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      if (typing) return
+      reloading = true
+      window.location.reload()
     })
   })
 }
