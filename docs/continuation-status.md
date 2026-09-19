@@ -4,6 +4,32 @@ The recovered conversations cover the web intro and analyzer polish, plus the
 native home, onboarding, and coverage maps. The current branch is `main`, based
 on `b2b1d14` (September 10). This continuation's changes are local and uncommitted.
 
+## 2026-09-18 night: the device turns, and holds still
+
+Max: the model must not move or change size when the page scrolls, and it
+should turn slowly on its own so people see it move without touching it.
+
+One cause sat behind the drift: the camera refit the model's rotated corners
+every frame, so any movement of the device moved the camera with it. The
+device also breathed (a sine sway on tilt and bank, plus a vertical bob).
+Now `tdeck-camera.ts` samples the whole turn every five degrees and the
+camera is placed once at a distance that clears all of it; it moves only on
+resize, on a tilt drag, or when the dev knobs change. The sway and bob are
+gone, replaced by a steady turn of one revolution in twenty-eight seconds
+(`SPIN_RATE`/`spinYaw` in tdeck-pose.ts; the dial's idle-motion knob is now
+the turn rate). A flick still spins it faster and settles back; a drag stops
+it; reduced motion holds it still.
+
+Measured on the built site at 390x844 and 320x568: across chapters and two
+moments of the turn, the device's top edge, bottom edge and centre are
+identical to the pixel while the silhouette changes.
+
+Also: an open tab used to keep running whatever build it had loaded, because
+the service worker only looks for a new one on navigation. That is why fixes
+kept looking absent on Max's phone. The page now checks for a new build when
+the tab becomes visible and every fifteen minutes, and reloads once when one
+takes over, unless someone is typing.
+
 ## 2026-09-18 evening: intro cut to the best sixteen screens
 
 Max: "only show the best screens — the most interesting stuff, the best UI,
