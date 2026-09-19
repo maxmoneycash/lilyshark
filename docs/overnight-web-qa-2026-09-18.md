@@ -1,5 +1,17 @@
 # Overnight web QA — September 18, 2026
 
+## Evening follow-up
+
+- The tour is nine chapters and sixteen screens: splash, home; traffic,
+  protocols, nodes; map, node-detail; utilization, timeline; spectrum-live;
+  events; packet-detail, packet-rf, packet-dec; packet-hex; storage. The
+  setup, controls and settings chapters are gone. Max's rule: the most
+  interesting, best-looking, useful screens only.
+- The device no longer shifts or resizes between chapters on phones: the
+  tallest chapter's copy sets the copy block height for all of them.
+  Renders of chapters 1, 2 and 4 at 390x844 are pixel-identical in the device
+  area; chapter 4 still fits at 320x568.
+
 ## What shipped (all on `main`, all live on lilyshark.com)
 
 - **Intro on phones.** One design everywhere: the pinned 3D T-Deck whose

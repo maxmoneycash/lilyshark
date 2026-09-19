@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
 import test from 'node:test';
 import {
   INTRO_FRAMES,
@@ -13,29 +12,24 @@ import {
   introSnapTop,
 } from './intro-sequence.ts';
 
-test('the tour keeps twelve chapters with a concise setup and controls selection', () => {
-  assert.equal(INTRO_SCREEN_GROUPS.length, 12);
-  assert.equal(INTRO_FRAMES.length, 33);
-  assert.equal(INTRO_VIEWPORTS, 12);
+test('the tour keeps nine chapters of the best sixteen screens', () => {
+  assert.equal(INTRO_SCREEN_GROUPS.length, 9);
+  assert.equal(INTRO_FRAMES.length, 16);
+  assert.equal(INTRO_VIEWPORTS, 9);
   const screens = INTRO_FRAMES.map((frame) => frame.screen);
   assert.deepEqual(screens, [
     'splash', 'home',
-    'traffic', 'traffic-live', 'protocols', 'protocol-detail', 'nodes',
-    'map', 'node-detail', 'survey',
-    'utilization', 'timeline', 'timeline-live', 'traffic-filter',
-    'spectrum', 'spectrum-live', 'spectrum-warning',
-    'events', 'event-detail',
-    'packet-detail', 'packet-live', 'packet-pkt', 'packet-rf', 'packet-dec',
-    'packet-hex', 'packet-hex-2', 'packet-hex-3', 'packet-raw',
-    'setup-welcome', 'setup-profile',
-    'setup-controls',
-    'radio-profile',
+    'traffic', 'protocols', 'nodes',
+    'map', 'node-detail',
+    'utilization', 'timeline',
+    'spectrum-live',
+    'events',
+    'packet-detail', 'packet-rf', 'packet-dec',
+    'packet-hex',
     'storage',
-  ].map(name => `/intro/fw/${name}.png`));
-  for (const screen of screens) {
-    assert.equal(existsSync(new URL(`../../public${screen}`, import.meta.url)), true, screen);
-  }
-  assert.deepEqual(INTRO_SECTION_STARTS, [0, 2, 7, 10, 14, 17, 19, 24, 28, 30, 31, 32]);
+  ].map((name) => `/intro/fw/${name}.png`));
+  // No setup, controls or settings pages in the tour.
+  for (const screen of screens) assert.doesNotMatch(screen, /setup-|radio-profile|settings|display-input|reset-setup/);
 });
 
 test('every stop selects its intended frame at desktop and mobile viewport sizes', () => {

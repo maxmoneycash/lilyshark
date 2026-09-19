@@ -27,6 +27,7 @@ import { INTRO_SECTIONS as SECTIONS } from './intro-copy';
 export function IntroTab() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
   const [frameIndex, setFrameIndex] = useState(0);
   const reducedMotion = usePrefersReducedMotion();
 
@@ -50,13 +51,21 @@ export function IntroTab() {
     // On a phone the device box is sized explicitly from what the copy
     // leaves over (a flex-grown box gave the canvas no definite height and
     // it painted nothing), so the copy's height is published too.
-    const copy = textRef.current;
+    // The tallest chapter's copy sets the height for every chapter, so the
+    // device box (stage minus copy) never changes size or position as the
+    // chapters change under it.
+    const measure = measureRef.current;
     const copyResize = () => {
-      if (copy) el.style.setProperty('--intro-copy-height', `${copy.offsetHeight}px`);
+      if (!measure) return;
+      let tallest = 0;
+      for (const child of Array.from(measure.children)) {
+        tallest = Math.max(tallest, (child as HTMLElement).offsetHeight);
+      }
+      el.style.setProperty('--intro-copy-height', `${tallest}px`);
     };
     const copyObserver = new ResizeObserver(copyResize);
     copyResize();
-    if (copy) copyObserver.observe(copy);
+    if (measure) copyObserver.observe(measure);
     // A `#intro?chapter=N` link lands on that chapter's first screen.
     const chapter = introChapterFromHash(window.location.hash);
     if (chapter !== null) {
@@ -117,6 +126,16 @@ export function IntroTab() {
                 <h1 className="intro-head">{s.head}</h1>
                 <p className="intro-body">{s.body}</p>
               </motion.div>
+              {/* Every chapter's copy, laid out invisibly at the real width,
+                  so the tallest one can be measured. */}
+              <div className="intro-copy-measure" ref={measureRef} aria-hidden="true">
+                {SECTIONS.map((section) => (
+                  <div key={section.head}>
+                    <h1 className="intro-head">{section.head}</h1>
+                    <p className="intro-body">{section.body}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="intro-device">

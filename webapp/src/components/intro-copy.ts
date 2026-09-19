@@ -51,21 +51,6 @@ export const INTRO_SECTIONS: IntroSection[] = [
   },
   {
     screens: INTRO_SCREEN_GROUPS[8],
-    head: "A guided first run, not a config file.",
-    body: "The device explains its tools, checks what hardware it is running on, and walks a first-time user through network and radio-profile selection before the Home screen ever appears. No companion app, no serial console, no YAML.",
-  },
-  {
-    screens: INTRO_SCREEN_GROUPS[9],
-    head: "It teaches its own controls.",
-    body: "The trackball, keyboard and shortcuts are taught on the device, the hardware check reports radio, storage, GPS and battery, and Help stays one keypress away. A field tool has to work where the manual is whatever the screen says.",
-  },
-  {
-    screens: INTRO_SCREEN_GROUPS[10],
-    head: "Every control lives on the device.",
-    body: "Radio profiles, display and input, capture and storage, setup reset — all of it adjustable from the T-Deck itself. Change a spreading factor at the trailhead without opening a laptop.",
-  },
-  {
-    screens: INTRO_SCREEN_GROUPS[11],
     head: "Captures are stored on Shelby; the mesh carries an 82-byte pointer.",
     body: "Captures are evidence, so they live in Shelby's content-addressed storage on Aptos. A radio has no uplink — it broadcasts an 82-byte pointer instead, and any connected node resolves the bytes. Radio-frequency capture meets verifiable storage for the first time.",
   },

@@ -4,6 +4,19 @@ The recovered conversations cover the web intro and analyzer polish, plus the
 native home, onboarding, and coverage maps. The current branch is `main`, based
 on `b2b1d14` (September 10). This continuation's changes are local and uncommitted.
 
+## 2026-09-18 evening: intro cut to the best sixteen screens
+
+Max: "only show the best screens — the most interesting stuff, the best UI,
+the useful pages, not the settings pages." The tour is now nine chapters and
+sixteen screens (intro-sequence.ts); the setup, controls and settings chapters
+are gone with their screens. He also noticed the device shifting and resizing
+slightly between chapters on the phone: that was the device box being sized
+from the current chapter's copy. Every chapter's copy is now laid out invisibly
+and the tallest one sets the height (`--intro-copy-height`, `.intro-copy`
+min-height), so the device is pixel-stable. Verified with PhantomJsCloud
+through an ngrok tunnel (the Cloudflare tunnel port is blocked on this
+network; PhantomJsCloud's customHeaders carries ngrok-skip-browser-warning).
+
 ## Overnight 2026-09-18: intro sizing, shipped to main
 
 Max wants one design everywhere: the pinned 3D T-Deck whose screen changes

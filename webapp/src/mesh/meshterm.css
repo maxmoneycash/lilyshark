@@ -2491,6 +2491,16 @@ body:has(.meshterm .app.menu-open) {
 	align-self: center;
 	z-index: 10;
 }
+.meshterm .intro-copy-measure {
+	position: absolute;
+	inset: 0 auto auto 0;
+	width: 100%;
+	visibility: hidden;
+	pointer-events: none;
+}
+.meshterm .intro-copy-measure > div + div {
+	margin-top: 0;
+}
 .meshterm .intro-head {
 	margin: 0 0 18px;
 	font-size: clamp(28px, 2.8vw, 42px);
@@ -2540,6 +2550,7 @@ body:has(.meshterm .app.menu-open) {
 		width: 100%;
 		max-width: 560px;
 		max-height: none;
+		min-height: var(--intro-copy-height, 0px); /* same block height every chapter */
 		overflow: visible;
 	}
 	/* Explicit height: stage minus copy minus padding and gap (--intro-chrome).
