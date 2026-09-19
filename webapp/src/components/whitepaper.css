@@ -30,8 +30,13 @@
 		padding: 0 0 24px;
 	}
 
+	/* No `top` here on purpose. Below 860px the scroll container is
+	   `.pdf-scroll` itself (meshterm.css, "iOS paper window") and the header
+	   above it is laid out statically, so the sticky containing block already
+	   starts under the header. Any offset only pushes the bar down and lets a
+	   band of pages scroll live above it; the base rule's `top: 0` is right
+	   for both layout models. */
 	.meshterm main.paper-tab .pdf-toolbar {
-		top: calc(54px + env(safe-area-inset-top, 0px));
 		z-index: 3;
 		min-height: 44px;
 		padding: 4px max(12px, env(safe-area-inset-right)) 4px
