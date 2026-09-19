@@ -4,6 +4,20 @@ The recovered conversations cover the web intro and analyzer polish, plus the
 native home, onboarding, and coverage maps. The current branch is `main`, based
 on `b2b1d14` (September 10). This continuation's changes are local and uncommitted.
 
+## 2026-09-18 night: Wireshark for mesh radio
+
+Max on the headings: "it should simply be wireshark for mesh radio." Chosen
+of three framings: carry it through all nine. The opening line makes the
+claim and every heading after it answers "what am I looking at here?" about
+the screen beside it — every frame the radio hears, where each frame came
+from, how busy the channel really is, the band drawn as you watch,
+everything odd written down, one packet taken apart, the bytes with nothing
+hidden, captures you can open later. The market arguments that used to hold
+their own chapters (40,000 stars, 2 to 15 km per hop, 7.36 transmissions per
+delivered message) are now evidence inside the paragraph that needs them, so
+nothing is lost and every chapter matches its screens. Headings are 24-31
+characters and paragraphs 140-150, so the equal-block layout holds.
+
 ## 2026-09-18 night: the device is the page
 
 Max, on the turning device: the words take too much room, the device should
