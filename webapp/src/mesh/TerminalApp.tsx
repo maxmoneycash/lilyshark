@@ -23,7 +23,6 @@ import Nodes from "./screens/Nodes";
 import Mesh from "./screens/Mesh";
 import Config from "./screens/Config";
 import { IntroTab } from "../components/IntroTab";
-import { TrafficTab } from "../components/TrafficTab";
 import { WhitepaperTab } from "../components/WhitepaperTab";
 import { ShelbyScreen } from "./screens/Shelby";
 
@@ -38,6 +37,7 @@ const Docs = lazy(() => import("./screens/Docs"));
 // they load on first visit like the other heavy screens.
 const Spectrum = lazy(() => import("./screens/Spectrum"));
 const Sniffer = lazy(() => import("./screens/Sniffer"));
+const TrafficTab = lazy(() => import("../components/TrafficTab").then((m) => ({ default: m.TrafficTab })));
 const DialKitDev = import.meta.env.DEV && new URLSearchParams(window.location.search).has("tdeck-tune")
   ? lazy(() => import("../components/DialKitDev").then((m) => ({ default: m.DialKitDev })))
   : null;
