@@ -14,7 +14,10 @@
  * The ladder tries each rung for a bounded window and climbs on to the next;
  * once connected it stays put until the connection drops.
  */
-import mqtt, { type MqttClient } from 'mqtt';
+// Type-only: the mqtt client weighs about 100 kB gzipped and the bridge is
+// off unless the user turned it on, so the module itself is pulled in at
+// connect time rather than riding the entry chunk of every page load.
+import type { MqttClient } from 'mqtt';
 import { netTopic } from './netProtocol';
 
 export interface NetTransport {
@@ -66,6 +69,7 @@ export class MqttTransport implements NetTransport {
   readonly name = 'mqtt';
   readonly endpoint: string;
   private client: MqttClient | undefined;
+  private stopped = false;
 
   constructor(private readonly broker: string) {
     this.endpoint = broker;
@@ -77,6 +81,28 @@ export class MqttTransport implements NetTransport {
     onUp: () => void,
     onDown: () => void,
   ): void {
+    this.stopped = false;
+    void this.open(room, onMessage, onUp, onDown);
+  }
+
+  private async open(
+    room: string,
+    onMessage: (payload: string) => void,
+    onUp: () => void,
+    onDown: () => void,
+  ): Promise<void> {
+    let mqtt: typeof import('mqtt').default;
+    try {
+      ({ default: mqtt } = await import('mqtt'));
+    } catch {
+      // Offline, or the chunk never arrived. The rung is unusable; report it
+      // down so the ladder climbs instead of waiting out the whole window.
+      if (!this.stopped) onDown();
+      return;
+    }
+    // The ladder may already have climbed past this rung while the module
+    // was loading; a late arrival must not open a connection nobody owns.
+    if (this.stopped) return;
     const client = mqtt.connect(this.broker, {
       clientId: `lsk-${Math.random().toString(36).slice(2, 10)}`,
       clean: true,
@@ -103,6 +129,7 @@ export class MqttTransport implements NetTransport {
   }
 
   disconnect(): void {
+    this.stopped = true;
     this.client?.end(true);
     this.client = undefined;
   }

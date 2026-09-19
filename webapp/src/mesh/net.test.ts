@@ -8,6 +8,7 @@
  * three analyzers turn one beacon into a storm.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import type { HeardFrame, RawFrameFields } from "../lib/deviceLink";
@@ -133,4 +134,18 @@ test("only real ntfy message events yield a payload", () => {
 	assert.equal(payloadFromNtfyEvent(JSON.stringify({ event: "keepalive" })), undefined);
 	assert.equal(payloadFromNtfyEvent(JSON.stringify({ event: "open", topic: "x" })), undefined);
 	assert.equal(payloadFromNtfyEvent("not json"), undefined);
+});
+
+test("the mqtt client stays out of the entry bundle until the bridge connects", () => {
+	// The bridge is off unless the user turned it on, so about 100 kB gzipped
+	// of mqtt must not ride the chunk every visitor to the landing page and
+	// the flasher downloads. A static `import mqtt from 'mqtt'` here puts it
+	// back, silently, and nothing else would notice.
+	const source = readFileSync(new URL("./netTransport.ts", import.meta.url), "utf8");
+	assert.doesNotMatch(source, /^import\s+mqtt/m);
+	assert.match(source, /^import type \{ MqttClient \} from 'mqtt';$/m);
+	assert.match(source, /await import\('mqtt'\)/);
+	// A rung the ladder already climbed past must not open a connection when
+	// its module finally lands.
+	assert.match(source, /if \(this\.stopped\) return;/);
 });
