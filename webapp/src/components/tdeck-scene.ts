@@ -23,18 +23,22 @@ const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 // Parse once for the page. Intro mounts after this module, so a cached GLB
 // can attach on the first layout pass instead of flashing a 2D stand-in.
 let parsedModel: THREE.Group | undefined;
-const modelReady: Promise<THREE.Group> = fetch(MODEL_URL)
-  .then(response => {
-    if (!response.ok) throw new Error(`Model request failed: ${response.status}`);
-    return response.arrayBuffer();
-  })
-  .then(bytes => gltfLoader.parseAsync(bytes.slice(0), '/models/tdeck-plus/'))
-  .then(gltf => {
-    parsedModel = gltf.scene;
-    return gltf.scene;
-  });
+let modelReady: Promise<THREE.Group> | undefined;
 
-export function preloadTDeck(): Promise<unknown> {
+// The 4 MB model is requested on the first ask, never on import. The flasher
+// shares this entry chunk and never shows the device, and it is the one page
+// that has to work on whatever network a field has.
+export function preloadTDeck(): Promise<THREE.Group> {
+  modelReady ??= fetch(MODEL_URL)
+    .then(response => {
+      if (!response.ok) throw new Error(`Model request failed: ${response.status}`);
+      return response.arrayBuffer();
+    })
+    .then(bytes => gltfLoader.parseAsync(bytes.slice(0), '/models/tdeck-plus/'))
+    .then(gltf => {
+      parsedModel = gltf.scene;
+      return gltf.scene;
+    });
   return modelReady;
 }
 
@@ -323,7 +327,8 @@ export function mountTDeck(
   };
   if (parsedModel) attachWhenReady(parsedModel);
   else {
-    modelReady.then(attachWhenReady).catch(error => {
+    // A viewer that mounts without a preload starts the fetch here.
+    preloadTDeck().then(attachWhenReady).catch(error => {
       if (error.name !== 'AbortError') fail();
     });
   }

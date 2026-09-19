@@ -1,11 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
-import { mountTDeck, preloadTDeck, type TDeckViewer } from './tdeck-scene';
+import { mountTDeck, type TDeckViewer } from './tdeck-scene';
 import './tdeck-model.css';
-
-// The mounted viewer reports load failures; preloading alone must not reject
-// unhandled when a different tab is open.
-preloadTDeck().catch(() => undefined);
 
 /** A single persistent scene: scrolling changes the LCD, never the model. */
 export function TDeckModel({ screen }: { screen: string }) {

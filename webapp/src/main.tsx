@@ -3,10 +3,13 @@ import ReactDOM from 'react-dom/client'
 import App from './mesh/TerminalApp'
 import { applyTheme } from './mesh/theme'
 import { preloadTDeck } from './components/tdeck-scene'
+import { tabFromLocation } from './mesh/navigation'
 
 // Start the GLB + Three parse before React commits the intro, so the first
-// paint can be the chassis instead of a 2D photograph.
-preloadTDeck()
+// paint can be the chassis instead of a 2D photograph. The flasher never
+// shows the device, so it never spends four megabytes on one. The mounted
+// viewer reports load failures; this head start must not reject unhandled.
+if (tabFromLocation(window.location) !== 'FLASH') preloadTDeck().catch(() => undefined)
 
 // Before the first render, so there is no flash of the default theme.
 applyTheme()
