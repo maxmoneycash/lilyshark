@@ -1,9 +1,19 @@
-/** Rest pose: a three-quarter view so the chassis has volume before the first drag. */
+/**
+ * Rest pose: the device stands upright and turns on its own axis, like a
+ * piece on a turntable. A small tilt and bank keep it from reading as a flat
+ * picture; anything more and it looks like it is falling towards the reader.
+ */
 export const REST_YAW = 0.58;
-export const REST_PITCH = 0.36;
-export const REST_ROLL = -0.05;
-export const PITCH_MIN = -Math.PI;
-export const PITCH_MAX = Math.PI;
+export const REST_PITCH = 0.1;
+export const REST_ROLL = -0.02;
+
+/**
+ * How far a drag may tilt it. Free tilt let a stray diagonal swipe flip the
+ * handset onto its back, where a sideways drag turns it the wrong way and it
+ * feels stuck. Bounded, every drag does the obvious thing.
+ */
+export const PITCH_MIN = -0.42;
+export const PITCH_MAX = 0.42;
 export const YAW_DRAG = 0.016;
 
 /**
@@ -22,10 +32,5 @@ export function spinYaw(yaw: number, seconds: number, rate = SPIN_RATE): number 
 export const PITCH_DRAG = 0.011;
 
 export function clampPitch(pitch: number): number {
-  // Allow full 360 degree rotation, keep it bounded between -PI and PI
-  // for mathematical simplicity, but they can spin it forever if we wrap it.
-  let p = pitch % (2 * Math.PI);
-  if (p > Math.PI) p -= 2 * Math.PI;
-  if (p < -Math.PI) p += 2 * Math.PI;
-  return p;
+  return Math.min(PITCH_MAX, Math.max(PITCH_MIN, pitch));
 }

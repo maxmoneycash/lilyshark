@@ -2541,7 +2541,7 @@ body:has(.meshterm .app.menu-open) {
 		flex-direction: column;
 		justify-content: center;
 		padding: 12px max(20px, env(safe-area-inset-right)) 24px max(20px, env(safe-area-inset-left));
-		gap: 14px;
+		gap: 10px;
 	}
 	.meshterm .intro-copy {
 		order: 2;
@@ -2557,9 +2557,9 @@ body:has(.meshterm .app.menu-open) {
 	   A flex-grown box left the canvas with no definite height. */
 	.meshterm .intro-device {
 		flex: 0 0 auto;
-		--intro-chrome: 50px;
-		height: clamp(150px, calc(var(--intro-height, 100dvh) - var(--intro-copy-height, 0px) - var(--intro-chrome)), 60dvh);
-		max-height: 60dvh;
+		--intro-chrome: 36px;
+		height: clamp(150px, calc(var(--intro-height, 100dvh) - var(--intro-copy-height, 0px) - var(--intro-chrome)), 72dvh);
+		max-height: 72dvh;
 		width: 100%;
 		margin-inline: 0;
 	}
@@ -3268,7 +3268,7 @@ body:has(.meshterm .app.menu-open) {
 @media (max-width: 860px) {
 	.meshterm .overlay-sheet {
 		justify-content: flex-start;
-		gap: 14px;
+		gap: 10px;
 		padding: 20px;
 	}
 	.meshterm .overlay-sheet .flow {

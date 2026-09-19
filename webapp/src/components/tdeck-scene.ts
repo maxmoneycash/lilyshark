@@ -13,7 +13,11 @@ export interface TDeckViewer {
 }
 
 const MODEL_URL = '/models/tdeck-plus/tdeck-plus-v5.glb';
-const CAMERA_FOV = 32;
+// A longer lens. At 32 degrees the handset filled the frame with enough
+// perspective that its vertical edges converged and it read as leaning, even
+// standing upright. Pulling the camera back and narrowing the view keeps it
+// the same size on the page and straightens it.
+const CAMERA_FOV = 22;
 const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 
 // Parse once for the page. Intro mounts after this module, so a cached GLB
@@ -130,7 +134,7 @@ export function mountTDeck(
   let velPitch = 0;
   let screenUrl = '';
   let screenRequest = 0;
-  let pointer: { id: number; x: number; y: number; startX: number; startY: number; time: number; dragging: boolean } | undefined;
+  let pointer: { id: number; x: number; y: number; startX: number; startY: number; time: number; dragging: boolean; touch: boolean } | undefined;
   // Decoded frames are small (320×240); keep a bounded cache for reverse scrolling.
   const screens = new Map<string, HTMLImageElement>();
 
@@ -362,7 +366,7 @@ export function mountTDeck(
     velYaw = 0;
     velPitch = 0;
     const touch = event.pointerType === 'touch';
-    pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp, dragging: !touch };
+    pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp, dragging: !touch, touch };
     // Let the browser choose a vertical pan before capturing a touch drag.
     if (!touch) canvas.setPointerCapture(event.pointerId);
     requestRender();
@@ -383,7 +387,10 @@ export function mountTDeck(
     }
     const dt = Math.max((event.timeStamp - pointer.time) / 1000, .008);
     const dyaw = (event.clientX - pointer.x) * YAW_DRAG;
-    const dpitch = (event.clientY - pointer.y) * PITCH_DRAG;
+    // A thumb only turns it. Letting a touch tilt it as well meant a slightly
+    // diagonal swipe left the handset lying on its back, where turning it
+    // again felt like it was fighting back. A mouse still tilts.
+    const dpitch = pointer.touch ? 0 : (event.clientY - pointer.y) * PITCH_DRAG;
     yaw += dyaw;
     pitch = clampPitch(pitch + dpitch);
     velYaw = dyaw / dt;

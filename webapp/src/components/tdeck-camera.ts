@@ -14,7 +14,7 @@ export interface ScenePoint {
 }
 
 /** A little air around the silhouette so the chassis never touches the edge. */
-export const FIT_MARGIN = 1.04;
+export const FIT_MARGIN = 1.015;
 
 /**
  * The smallest camera distance (along +Z, looking at the origin) that keeps

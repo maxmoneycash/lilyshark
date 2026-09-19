@@ -4,6 +4,24 @@ The recovered conversations cover the web intro and analyzer polish, plus the
 native home, onboarding, and coverage maps. The current branch is `main`, based
 on `b2b1d14` (September 10). This continuation's changes are local and uncommitted.
 
+## 2026-09-18 night: the device is the page
+
+Max, on the turning device: the words take too much room, the device should
+be the main thing and bigger, every scroll section should carry roughly the
+same number of words and lines, the device should stand upright rather than
+lean, and a stray drag must not leave it in a pose that is hard to turn back.
+
+All nine chapters are rewritten to one length: headings 31-41 characters,
+paragraphs 141-149, so each stop is a two-line heading over a four-line
+paragraph and the block below the device never changes height. The device
+box takes the room that frees up (cap 60dvh to 72dvh, chrome 50px to 36px):
+497px tall on a 390x844 phone, up from 401. The rest pose stands it up
+(pitch 0.36 to 0.1, bank 0.05 to 0.02) and the lens is longer (32 to 22
+degrees) because at 32 the converging vertical edges read as a lean whatever
+the pose. A drag may tilt it no further than 0.42 rad and a touch does not
+tilt it at all, only turns it: free tilt let a slightly diagonal swipe leave
+the handset on its back, where a sideways drag turns it the wrong way.
+
 ## 2026-09-18 night: the device turns, and holds still
 
 Max: the model must not move or change size when the page scrolls, and it
