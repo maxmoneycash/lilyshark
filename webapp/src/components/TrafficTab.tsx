@@ -77,6 +77,8 @@ import { buildIoGraph, type IoSplit } from "../lib/ioGraph";
 import { applyBrush, type BrushRange, brushLabel } from "../lib/trafficView";
 import { AnnouncePathGraph } from "./AnnouncePathGraph";
 import { readAnnounce, summarizeAnnounces } from "../lib/announceView";
+import { MeshCoreHealthPanel } from "./MeshCoreHealthPanel";
+import { summarizeMeshCore } from "../lib/meshcoreView";
 import { CaptureDiffPanel } from "./CaptureDiffPanel";
 import { CaptureSlotBar, type SlotTab } from "./CaptureSlotBar";
 import { IoGraphPanel } from "./IoGraphPanel";
@@ -174,6 +176,10 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 	const [split, setSplit] = useState<IoSplit>("protocol");
 	const [diffOpen, setDiffOpen] = useState(false);
 	const [pathsOpen, setPathsOpen] = useState(false);
+	const [meshcoreOpen, setMeshcoreOpen] = useState(false);
+	const [selectedMeshcoreNode, setSelectedMeshcoreNode] = useState<
+		string | null
+	>(null);
 	const [selectedAnnounceDest, setSelectedAnnounceDest] = useState<
 		string | null
 	>(null);
@@ -739,6 +745,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		[frames, t0],
 	);
 
+	const meshcoreOverview = useMemo(
+		() => summarizeMeshCore(frames, t0),
+		[frames, t0],
+	);
+
 	const announceReading = useMemo(() => {
 		if (!f || protoOfProfile(f.profileId) !== "rnode") return null;
 		return readAnnounce(f.bytes, { truncated: f.truncated });
@@ -934,6 +945,23 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 						{announceOverview.destinations.length > 0
 							? ` · ${announceOverview.destinations.length}`
 							: ""}
+					</button>
+					<button
+						className={meshcoreOpen ? "primary" : ""}
+						disabled={!capture || meshcoreOverview.meshcoreFrameCount === 0}
+						title={
+							meshcoreOverview.meshcoreFrameCount > 0
+								? `View MeshCore network health & topology (${meshcoreOverview.meshcoreFrameCount} frames, ${meshcoreOverview.nodes.length} nodes)`
+								: "No MeshCore traffic in this capture"
+						}
+						onClick={() => setMeshcoreOpen((v) => !v)}
+					>
+						MESHCORE
+						{meshcoreOverview.nodes.length > 0
+							? ` · ${meshcoreOverview.nodes.length}`
+							: meshcoreOverview.meshcoreFrameCount > 0
+								? ` · ${meshcoreOverview.meshcoreFrameCount}`
+								: ""}
 					</button>
 					{/* Record what the linked radio hears, then open it right here. */}
 					{session.recording ? (
@@ -1583,6 +1611,16 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 									<span className="spacer" />
 									<button
 										type="button"
+										onClick={() => {
+											setSelectedMeshcoreNode(meshcoreAdvert.nodeIdHex);
+											setMeshcoreOpen(true);
+										}}
+										title="Open MeshCore network health and topology for this node"
+									>
+										TOPOLOGY
+									</button>
+									<button
+										type="button"
 										onClick={() =>
 											setFilterText(`src == ${meshcoreAdvert.nodeIdHex}`)
 										}
@@ -1745,6 +1783,22 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 					}}
 					onSelectFrame={onSelectFrame}
 					onClose={() => setPathsOpen(false)}
+				/>
+			)}
+
+			{meshcoreOpen && capture && (
+				<MeshCoreHealthPanel
+					overview={meshcoreOverview}
+					selectedNodeId={selectedMeshcoreNode}
+					onSelectNode={setSelectedMeshcoreNode}
+					onFilterNode={(nodeIdHex) => {
+						setFilterText(`src == ${nodeIdHex}`);
+					}}
+					onFilterHop={(hops) => {
+						setFilterText(`meshcore.hops == ${hops}`);
+					}}
+					onSelectFrame={onSelectFrame}
+					onClose={() => setMeshcoreOpen(false)}
 				/>
 			)}
 		</main>

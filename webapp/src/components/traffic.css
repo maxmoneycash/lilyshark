@@ -93,7 +93,8 @@
 
 .meshterm .traffic-detail,
 .meshterm .traffic-diff,
-.meshterm .traffic-paths {
+.meshterm .traffic-paths,
+.meshterm .traffic-meshcore {
 	min-width: 0;
 }
 .meshterm .traffic-detail {
@@ -101,7 +102,8 @@
 	width: 360px;
 }
 .meshterm .traffic-diff,
-.meshterm .traffic-paths {
+.meshterm .traffic-paths,
+.meshterm .traffic-meshcore {
 	flex: 0 1 420px;
 	width: 420px;
 }
@@ -111,7 +113,7 @@
 	overflow: auto;
 	overscroll-behavior: contain;
 }
-.meshterm .traffic-frames[data-empty='true'] {
+.meshterm .traffic-frames[data-empty="true"] {
 	flex: 0 0 auto;
 }
 .meshterm .traffic-frames-empty {
@@ -224,11 +226,15 @@
 		min-width: 0;
 	}
 	.meshterm .traffic-screen .traffic-list,
-	.meshterm .traffic-screen .traffic-diff {
+	.meshterm .traffic-screen .traffic-diff,
+	.meshterm .traffic-screen .traffic-paths,
+	.meshterm .traffic-screen .traffic-meshcore {
 		overflow-x: visible;
 	}
 	.meshterm .traffic-screen .traffic-frames,
-	.meshterm .traffic-screen .traffic-diff .scroll-y {
+	.meshterm .traffic-screen .traffic-diff .scroll-y,
+	.meshterm .traffic-screen .traffic-paths .scroll-y,
+	.meshterm .traffic-screen .traffic-meshcore .scroll-y {
 		max-height: min(46dvh, 420px) !important;
 		overflow: auto !important;
 	}
@@ -237,7 +243,9 @@
 		--traffic-col-time: 6.5rem;
 	}
 	.meshterm .traffic-detail,
-	.meshterm .traffic-diff {
+	.meshterm .traffic-diff,
+	.meshterm .traffic-paths,
+	.meshterm .traffic-meshcore {
 		width: 100%;
 		flex-basis: auto;
 		scroll-margin-top: calc(54px + env(safe-area-inset-top, 0px));

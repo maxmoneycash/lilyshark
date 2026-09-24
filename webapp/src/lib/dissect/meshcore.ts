@@ -119,6 +119,8 @@ export interface MeshCoreFields {
 	encodedPathLength: number | null;
 	pathHashCount: number | null;
 	pathHashSize: number | null;
+	/** Hop hashes extracted from the path bytes, lowercase hex without prefix. */
+	pathHopHashes: string[] | null;
 	payloadOffset: number;
 	payloadLength: number;
 	/** ACK only: the 4-byte checksum (CRC over message + sender). */
@@ -667,6 +669,7 @@ export function dissectMeshCore(
 		encodedPathLength: null,
 		pathHashCount: null,
 		pathHashSize: null,
+		pathHopHashes: null,
 		payloadOffset: 0,
 		payloadLength: n,
 		acknowledgementChecksum: null,
@@ -777,20 +780,19 @@ export function dissectMeshCore(
 
 	if (pathBytes > 0) {
 		const hashes: DissectNode[] = [];
+		const hopHashes: string[] = [];
 		for (let i = 0; i < pathHashCount; i++) {
 			const at = cursor + i * pathHashSize;
-			hashes.push(
-				node(
-					`Hop hash ${i}`,
-					at,
-					pathHashSize,
-					`0x${hexBytes(bytes, at, pathHashSize)}`,
-				),
-			);
+			const hashHex = hexBytes(bytes, at, pathHashSize);
+			hopHashes.push(hashHex);
+			hashes.push(node(`Hop hash ${i}`, at, pathHashSize, `0x${hashHex}`));
 		}
+		fields.pathHopHashes = hopHashes;
 		root.children.push(
 			node("Path", cursor, pathBytes, `${pathHashCount} hop hash(es)`, hashes),
 		);
+	} else {
+		fields.pathHopHashes = [];
 	}
 	cursor += pathBytes;
 
