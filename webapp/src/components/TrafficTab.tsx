@@ -86,6 +86,7 @@ import { TrafficFrameTable } from "./TrafficFrameTable";
 import { crcClass, fmtFreq } from "./trafficFormat";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { dissectMeshCore } from "../lib/dissect/meshcore";
+import { dissectMeshtastic } from "../lib/dissect/meshtastic";
 import { dissectRNode } from "../lib/dissect/rnode";
 import { reportedLabel, telemetrySignal } from "../mesh/deviceTelemetry";
 import "./traffic.css";
@@ -760,6 +761,14 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 		return (
 			dissectMeshCore(f.bytes, { truncated: f.truncated }).fields
 				?.advertisement ?? null
+		);
+	}, [f]);
+
+	const meshtasticPayload = useMemo(() => {
+		if (!f || protoOfProfile(f.profileId) !== "meshtastic") return null;
+		return (
+			dissectMeshtastic(f.bytes, { truncated: f.truncated }).fields?.payload ??
+			null
 		);
 	}, [f]);
 
@@ -1664,6 +1673,247 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
 									>
 										{meshcoreAdvert.publicKeyHex}
 									</dd>
+								</dl>
+							</section>
+						)}
+
+						{meshtasticPayload?.telemetry && (
+							<section aria-label="Meshtastic telemetry">
+								<div className="panel-title">MESHTASTIC TELEMETRY</div>
+								<dl className="kv" style={{ margin: 0 }}>
+									{meshtasticPayload.telemetry.time !== null &&
+										meshtasticPayload.telemetry.time > 0 && (
+											<>
+												<dt className="k">TIMESTAMP</dt>
+												<dd className="v">
+													{new Date(
+														meshtasticPayload.telemetry.time * 1000,
+													).toISOString()}
+												</dd>
+											</>
+										)}
+									{meshtasticPayload.telemetry.deviceMetrics && (
+										<>
+											{meshtasticPayload.telemetry.deviceMetrics
+												.batteryLevel !== null && (
+												<>
+													<dt className="k">BATTERY</dt>
+													<dd className="v">
+														{
+															meshtasticPayload.telemetry.deviceMetrics
+																.batteryLevel
+														}
+														%
+														{meshtasticPayload.telemetry.deviceMetrics
+															.batteryLevel > 100
+															? " (External)"
+															: ""}
+													</dd>
+												</>
+											)}
+											{meshtasticPayload.telemetry.deviceMetrics.voltage !==
+												null && (
+												<>
+													<dt className="k">VOLTAGE</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.deviceMetrics.voltage.toFixed(
+															2,
+														)}{" "}
+														V
+													</dd>
+												</>
+											)}
+											{meshtasticPayload.telemetry.deviceMetrics
+												.channelUtilization !== null && (
+												<>
+													<dt className="k">CH UTIL</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.deviceMetrics.channelUtilization.toFixed(
+															2,
+														)}
+														%
+													</dd>
+												</>
+											)}
+											{meshtasticPayload.telemetry.deviceMetrics.airUtilTx !==
+												null && (
+												<>
+													<dt className="k">AIR UTIL TX</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.deviceMetrics.airUtilTx.toFixed(
+															2,
+														)}
+														%
+													</dd>
+												</>
+											)}
+											{meshtasticPayload.telemetry.deviceMetrics
+												.uptimeSeconds !== null && (
+												<>
+													<dt className="k">UPTIME</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.deviceMetrics.uptimeSeconds.toLocaleString()}{" "}
+														s
+													</dd>
+												</>
+											)}
+										</>
+									)}
+									{meshtasticPayload.telemetry.environmentMetrics && (
+										<>
+											{meshtasticPayload.telemetry.environmentMetrics
+												.temperature !== null && (
+												<>
+													<dt className="k">TEMPERATURE</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.environmentMetrics.temperature.toFixed(
+															2,
+														)}{" "}
+														°C
+													</dd>
+												</>
+											)}
+											{meshtasticPayload.telemetry.environmentMetrics
+												.relativeHumidity !== null && (
+												<>
+													<dt className="k">HUMIDITY</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.environmentMetrics.relativeHumidity.toFixed(
+															2,
+														)}
+														%
+													</dd>
+												</>
+											)}
+											{meshtasticPayload.telemetry.environmentMetrics
+												.barometricPressure !== null && (
+												<>
+													<dt className="k">PRESSURE</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.environmentMetrics.barometricPressure.toFixed(
+															2,
+														)}{" "}
+														hPa
+													</dd>
+												</>
+											)}
+											{meshtasticPayload.telemetry.environmentMetrics
+												.gasResistance !== null && (
+												<>
+													<dt className="k">GAS RESISTANCE</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.environmentMetrics.gasResistance.toFixed(
+															2,
+														)}{" "}
+														MΩ
+													</dd>
+												</>
+											)}
+											{meshtasticPayload.telemetry.environmentMetrics.iaq !==
+												null && (
+												<>
+													<dt className="k">IAQ</dt>
+													<dd className="v">
+														{meshtasticPayload.telemetry.environmentMetrics.iaq}
+													</dd>
+												</>
+											)}
+										</>
+									)}
+								</dl>
+							</section>
+						)}
+
+						{meshtasticPayload?.routeDiscovery && (
+							<section aria-label="Meshtastic traceroute">
+								<div className="panel-title">MESHTASTIC TRACEROUTE</div>
+								<dl className="kv" style={{ margin: 0 }}>
+									<dt className="k">HOPS TOWARDS</dt>
+									<dd className="v" style={{ margin: 0 }}>
+										{meshtasticPayload.routeDiscovery.towardsHops.length ===
+										0 ? (
+											"Direct / 0 hops"
+										) : (
+											<div
+												style={{
+													display: "flex",
+													flexDirection: "column",
+													gap: "2px",
+												}}
+											>
+												{meshtasticPayload.routeDiscovery.towardsHops.map(
+													(h, i) => (
+														<span key={i}>
+															{i + 1}. {h.nodeHex}
+															{h.snrDb !== null
+																? ` (${h.snrDb > 0 ? "+" : ""}${h.snrDb.toFixed(1)} dB)`
+																: ""}
+														</span>
+													),
+												)}
+											</div>
+										)}
+									</dd>
+									{meshtasticPayload.routeDiscovery.backHops.length > 0 && (
+										<>
+											<dt className="k">HOPS BACK</dt>
+											<dd className="v" style={{ margin: 0 }}>
+												<div
+													style={{
+														display: "flex",
+														flexDirection: "column",
+														gap: "2px",
+													}}
+												>
+													{meshtasticPayload.routeDiscovery.backHops.map(
+														(h, i) => (
+															<span key={i}>
+																{i + 1}. {h.nodeHex}
+																{h.snrDb !== null
+																	? ` (${h.snrDb > 0 ? "+" : ""}${h.snrDb.toFixed(1)} dB)`
+																	: ""}
+															</span>
+														),
+													)}
+												</div>
+											</dd>
+										</>
+									)}
+								</dl>
+							</section>
+						)}
+
+						{meshtasticPayload?.routing && (
+							<section aria-label="Meshtastic routing">
+								<div className="panel-title">MESHTASTIC ROUTING</div>
+								<dl className="kv" style={{ margin: 0 }}>
+									{meshtasticPayload.routing.errorReason !== null && (
+										<>
+											<dt className="k">ERROR REASON</dt>
+											<dd
+												className={`v ${
+													meshtasticPayload.routing.errorReason > 0
+														? "warn"
+														: ""
+												}`}
+											>
+												{meshtasticPayload.routing.errorName ?? "UNKNOWN"} (
+												{meshtasticPayload.routing.errorReason})
+											</dd>
+										</>
+									)}
+									{meshtasticPayload.requestId !== undefined &&
+										meshtasticPayload.requestId !== null && (
+											<>
+												<dt className="k">REQUEST ID</dt>
+												<dd className="v">
+													0x
+													{meshtasticPayload.requestId
+														.toString(16)
+														.padStart(8, "0")}
+												</dd>
+											</>
+										)}
 								</dl>
 							</section>
 						)}

@@ -258,6 +258,74 @@ const WIRE_64 = 1;
 const WIRE_LENGTH_DELIMITED = 2;
 const WIRE_32 = 5;
 
+export interface MeshtasticDeviceMetrics {
+	batteryLevel: number | null;
+	voltage: number | null;
+	channelUtilization: number | null;
+	airUtilTx: number | null;
+	uptimeSeconds: number | null;
+}
+
+export interface MeshtasticEnvironmentMetrics {
+	temperature: number | null;
+	relativeHumidity: number | null;
+	barometricPressure: number | null;
+	gasResistance: number | null;
+	voltage: number | null;
+	current: number | null;
+	iaq: number | null;
+}
+
+export interface MeshtasticTelemetryFields {
+	time: number | null;
+	deviceMetrics: MeshtasticDeviceMetrics | null;
+	environmentMetrics: MeshtasticEnvironmentMetrics | null;
+}
+
+export interface MeshtasticRouteHop {
+	nodeNum: number;
+	nodeHex: string;
+	snrDb: number | null;
+	rawSnr: number | null;
+}
+
+export interface MeshtasticRouteDiscoveryFields {
+	route: number[];
+	snrTowards: number[];
+	routeBack: number[];
+	snrBack: number[];
+	towardsHops: MeshtasticRouteHop[];
+	backHops: MeshtasticRouteHop[];
+}
+
+export const MESHTASTIC_ROUTING_ERROR: Record<number, string> = {
+	0: "NONE",
+	1: "NO_ROUTE",
+	2: "GOT_NAK",
+	3: "TIMEOUT",
+	4: "NO_INTERFACE",
+	5: "MAX_RETRANSMIT",
+	6: "NO_CHANNEL",
+	7: "TOO_LARGE",
+	8: "NO_RESPONSE",
+	9: "DUTY_CYCLE_LIMIT",
+	32: "BAD_REQUEST",
+	33: "NOT_AUTHORIZED",
+	34: "PKI_FAILED",
+	35: "PKI_UNKNOWN_PUBKEY",
+	36: "ADMIN_BAD_SESSION_KEY",
+	37: "ADMIN_PUBLIC_KEY_UNAUTHORIZED",
+	38: "RATE_LIMIT_EXCEEDED",
+	39: "PKI_SEND_FAIL_PUBLIC_KEY",
+};
+
+export interface MeshtasticRoutingFields {
+	errorReason: number | null;
+	errorName: string | null;
+	routeRequest: MeshtasticRouteDiscoveryFields | null;
+	routeReply: MeshtasticRouteDiscoveryFields | null;
+}
+
 export interface MeshtasticPayloadFields {
 	portnum: number;
 	portLabel: string;
@@ -268,6 +336,10 @@ export interface MeshtasticPayloadFields {
 	longitudeDegrees: number | null;
 	longName: string | null;
 	shortName: string | null;
+	requestId?: number | null;
+	telemetry?: MeshtasticTelemetryFields | null;
+	routeDiscovery?: MeshtasticRouteDiscoveryFields | null;
+	routing?: MeshtasticRoutingFields | null;
 }
 
 /** A decoded region, tracked so tree nodes can point into the ciphertext. */
@@ -295,6 +367,10 @@ interface PayloadParse {
 	longitudeSpan: Span | null;
 	longNameSpan: Span | null;
 	shortNameSpan: Span | null;
+	requestIdSpan: Span | null;
+	telemetryNodes: DissectNode[] | null;
+	routeDiscoveryNodes: DissectNode[] | null;
+	routingNodes: DissectNode[] | null;
 }
 
 interface VarintResult {
@@ -302,7 +378,7 @@ interface VarintResult {
 	next: number;
 }
 
-/** Base-128 varint; null when it runs off the end or overruns 32 bits. */
+/** Base-128 varint; reads up to 10 bytes (standard protobuf max). */
 function readVarint(
 	bytes: Uint8Array,
 	length: number,
@@ -311,14 +387,57 @@ function readVarint(
 	let result = 0;
 	let shift = 0;
 	let at = cursor;
-	while (at < length) {
+	let count = 0;
+	while (at < length && count < 10) {
 		const byte = bytes[at++];
-		if (shift > 28) return null;
-		result = (result | ((byte & 0x7f) << shift)) >>> 0;
-		if ((byte & 0x80) === 0) return { value: result, next: at };
+		count++;
+		if (shift < 32) {
+			result = (result | ((byte & 0x7f) << shift)) >>> 0;
+		}
 		shift += 7;
+		if ((byte & 0x80) === 0) return { value: result, next: at };
 	}
 	return null;
+}
+
+/** Signed base-128 varint for protobuf int32 (e.g. SNR measurements). */
+function readSignedVarint(
+	bytes: Uint8Array,
+	length: number,
+	cursor: number,
+): VarintResult | null {
+	let result = 0;
+	let shift = 0;
+	let at = cursor;
+	let count = 0;
+	while (at < length && count < 10) {
+		const byte = bytes[at++];
+		count++;
+		if (shift < 32) {
+			result |= (byte & 0x7f) << shift;
+		}
+		shift += 7;
+		if ((byte & 0x80) === 0) {
+			return { value: result | 0, next: at };
+		}
+	}
+	return null;
+}
+
+/** Read a 32-bit IEEE 754 little-endian floating point value. */
+function readFloat32(bytes: Uint8Array, offset: number): number {
+	const buf = new Uint8Array(4);
+	buf.set(bytes.subarray(offset, offset + 4));
+	return new DataView(buf.buffer).getFloat32(0, true);
+}
+
+/** Recursively adjust all byte offsets in a dissection tree branch. */
+function offsetTree(n: DissectNode, delta: number): DissectNode {
+	return {
+		...n,
+		byteOffset: n.byteOffset + delta,
+		children: n.children.map((c) => offsetTree(c, delta)),
+	};
 }
 
 function skipField(
@@ -518,6 +637,555 @@ function decodeText(bytes: Uint8Array, offset: number, length: number): string {
 	return utf8.decode(bytes.subarray(offset, offset + length));
 }
 
+interface TelemetryParse {
+	fields: MeshtasticTelemetryFields;
+	nodes: DissectNode[];
+}
+
+function parseDeviceMetrics(
+	bytes: Uint8Array,
+	base: number,
+	length: number,
+): { fields: MeshtasticDeviceMetrics; nodes: DissectNode[] } | null {
+	let cursor = base;
+	const end = base + length;
+	const fields: MeshtasticDeviceMetrics = {
+		batteryLevel: null,
+		voltage: null,
+		channelUtilization: null,
+		airUtilTx: null,
+		uptimeSeconds: null,
+	};
+	const nodes: DissectNode[] = [];
+	while (cursor < end) {
+		const tagStart = cursor;
+		const tag = readVarint(bytes, end, cursor);
+		if (!tag) return null;
+		const field = tag.value >>> 3;
+		const wire = tag.value & 0x07;
+		if (field === 1 && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			fields.batteryLevel = val.value > 100 ? 100 : val.value;
+			nodes.push(
+				node(
+					"Battery level",
+					tagStart,
+					val.next - tagStart,
+					`${fields.batteryLevel}%${val.value > 100 ? " (externally powered)" : ""}`,
+				),
+			);
+			cursor = val.next;
+		} else if (field === 2 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.voltage = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Voltage",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.voltage.toFixed(2)} V`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 3 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.channelUtilization = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Channel utilization",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.channelUtilization.toFixed(2)}%`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 4 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.airUtilTx = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Air transmit utilization",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.airUtilTx.toFixed(2)}%`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 5 && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			fields.uptimeSeconds = val.value;
+			nodes.push(
+				node(
+					"Uptime",
+					tagStart,
+					val.next - tagStart,
+					`${fields.uptimeSeconds.toLocaleString()} s`,
+				),
+			);
+			cursor = val.next;
+		} else {
+			const next = skipField(bytes, end, tag.next, wire);
+			if (next === null) return null;
+			cursor = next;
+		}
+	}
+	return { fields, nodes };
+}
+
+function parseEnvironmentMetrics(
+	bytes: Uint8Array,
+	base: number,
+	length: number,
+): { fields: MeshtasticEnvironmentMetrics; nodes: DissectNode[] } | null {
+	let cursor = base;
+	const end = base + length;
+	const fields: MeshtasticEnvironmentMetrics = {
+		temperature: null,
+		relativeHumidity: null,
+		barometricPressure: null,
+		gasResistance: null,
+		voltage: null,
+		current: null,
+		iaq: null,
+	};
+	const nodes: DissectNode[] = [];
+	while (cursor < end) {
+		const tagStart = cursor;
+		const tag = readVarint(bytes, end, cursor);
+		if (!tag) return null;
+		const field = tag.value >>> 3;
+		const wire = tag.value & 0x07;
+		if (field === 1 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.temperature = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Temperature",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.temperature.toFixed(2)} °C`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 2 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.relativeHumidity = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Relative humidity",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.relativeHumidity.toFixed(2)}%`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 3 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.barometricPressure = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Barometric pressure",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.barometricPressure.toFixed(2)} hPa`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 4 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.gasResistance = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Gas resistance",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.gasResistance.toFixed(2)} MΩ`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 5 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.voltage = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Sensor voltage",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.voltage.toFixed(2)} V`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 6 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			fields.current = readFloat32(bytes, tag.next);
+			nodes.push(
+				node(
+					"Sensor current",
+					tagStart,
+					tag.next + 4 - tagStart,
+					`${fields.current.toFixed(2)} mA`,
+				),
+			);
+			cursor = tag.next + 4;
+		} else if (field === 7 && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			fields.iaq = val.value;
+			nodes.push(node("IAQ", tagStart, val.next - tagStart, `${fields.iaq}`));
+			cursor = val.next;
+		} else {
+			const next = skipField(bytes, end, tag.next, wire);
+			if (next === null) return null;
+			cursor = next;
+		}
+	}
+	return { fields, nodes };
+}
+
+function parseTelemetry(
+	bytes: Uint8Array,
+	base: number,
+	length: number,
+): TelemetryParse | null {
+	let cursor = base;
+	const end = base + length;
+	const fields: MeshtasticTelemetryFields = {
+		time: null,
+		deviceMetrics: null,
+		environmentMetrics: null,
+	};
+	const nodes: DissectNode[] = [];
+	while (cursor < end) {
+		const tagStart = cursor;
+		const tag = readVarint(bytes, end, cursor);
+		if (!tag) return null;
+		const field = tag.value >>> 3;
+		const wire = tag.value & 0x07;
+		if (field === 1 && (wire === WIRE_32 || wire === WIRE_VARINT)) {
+			let timeVal: number;
+			let fieldLen: number;
+			if (wire === WIRE_32) {
+				if (tag.next + 4 > end) return null;
+				timeVal = readLe32(bytes, tag.next);
+				fieldLen = tag.next + 4 - tagStart;
+				cursor = tag.next + 4;
+			} else {
+				const val = readVarint(bytes, end, tag.next);
+				if (!val) return null;
+				timeVal = val.value;
+				fieldLen = val.next - tagStart;
+				cursor = val.next;
+			}
+			fields.time = timeVal;
+			const dateStr =
+				timeVal > 0 ? new Date(timeVal * 1000).toISOString() : "unknown";
+			nodes.push(node("Time", tagStart, fieldLen, `${timeVal} (${dateStr})`));
+		} else if (field === 2 && wire === WIRE_LENGTH_DELIMITED) {
+			const size = readVarint(bytes, end, tag.next);
+			if (!size || size.value > end - size.next) return null;
+			const dev = parseDeviceMetrics(bytes, size.next, size.value);
+			if (dev) {
+				fields.deviceMetrics = dev.fields;
+				nodes.push(
+					node(
+						"Device metrics",
+						tagStart,
+						size.next + size.value - tagStart,
+						`${size.value} bytes`,
+						dev.nodes,
+					),
+				);
+			}
+			cursor = size.next + size.value;
+		} else if (field === 3 && wire === WIRE_LENGTH_DELIMITED) {
+			const size = readVarint(bytes, end, tag.next);
+			if (!size || size.value > end - size.next) return null;
+			const env = parseEnvironmentMetrics(bytes, size.next, size.value);
+			if (env) {
+				fields.environmentMetrics = env.fields;
+				nodes.push(
+					node(
+						"Environment metrics",
+						tagStart,
+						size.next + size.value - tagStart,
+						`${size.value} bytes`,
+						env.nodes,
+					),
+				);
+			}
+			cursor = size.next + size.value;
+		} else {
+			const next = skipField(bytes, end, tag.next, wire);
+			if (next === null) return null;
+			cursor = next;
+		}
+	}
+	return { fields, nodes };
+}
+
+interface RouteDiscoveryParse {
+	fields: MeshtasticRouteDiscoveryFields;
+	nodes: DissectNode[];
+}
+
+function parseRouteDiscovery(
+	bytes: Uint8Array,
+	base: number,
+	length: number,
+): RouteDiscoveryParse | null {
+	let cursor = base;
+	const end = base + length;
+	const route: number[] = [];
+	const snrTowards: number[] = [];
+	const routeBack: number[] = [];
+	const snrBack: number[] = [];
+	const towardsSpans: Span[] = [];
+	const backSpans: Span[] = [];
+
+	while (cursor < end) {
+		const tagStart = cursor;
+		const tag = readVarint(bytes, end, cursor);
+		if (!tag) return null;
+		const field = tag.value >>> 3;
+		const wire = tag.value & 0x07;
+
+		if (field === 1) {
+			if (wire === WIRE_32) {
+				if (tag.next + 4 > end) return null;
+				const val = readLe32(bytes, tag.next);
+				route.push(val);
+				towardsSpans.push({
+					offset: tagStart,
+					length: tag.next + 4 - tagStart,
+				});
+				cursor = tag.next + 4;
+			} else if (wire === WIRE_LENGTH_DELIMITED) {
+				const size = readVarint(bytes, end, tag.next);
+				if (!size || size.value > end - size.next) return null;
+				for (let off = size.next; off + 4 <= size.next + size.value; off += 4) {
+					route.push(readLe32(bytes, off));
+					towardsSpans.push({ offset: off, length: 4 });
+				}
+				cursor = size.next + size.value;
+			} else {
+				return null;
+			}
+		} else if (field === 2) {
+			if (wire === WIRE_VARINT) {
+				const val = readSignedVarint(bytes, end, tag.next);
+				if (!val) return null;
+				snrTowards.push(val.value);
+				cursor = val.next;
+			} else if (wire === WIRE_LENGTH_DELIMITED) {
+				const size = readVarint(bytes, end, tag.next);
+				if (!size || size.value > end - size.next) return null;
+				let at = size.next;
+				const packEnd = size.next + size.value;
+				while (at < packEnd) {
+					const val = readSignedVarint(bytes, packEnd, at);
+					if (!val) return null;
+					snrTowards.push(val.value);
+					at = val.next;
+				}
+				cursor = packEnd;
+			} else {
+				return null;
+			}
+		} else if (field === 3) {
+			if (wire === WIRE_32) {
+				if (tag.next + 4 > end) return null;
+				const val = readLe32(bytes, tag.next);
+				routeBack.push(val);
+				backSpans.push({ offset: tagStart, length: tag.next + 4 - tagStart });
+				cursor = tag.next + 4;
+			} else if (wire === WIRE_LENGTH_DELIMITED) {
+				const size = readVarint(bytes, end, tag.next);
+				if (!size || size.value > end - size.next) return null;
+				for (let off = size.next; off + 4 <= size.next + size.value; off += 4) {
+					routeBack.push(readLe32(bytes, off));
+					backSpans.push({ offset: off, length: 4 });
+				}
+				cursor = size.next + size.value;
+			} else {
+				return null;
+			}
+		} else if (field === 4) {
+			if (wire === WIRE_VARINT) {
+				const val = readSignedVarint(bytes, end, tag.next);
+				if (!val) return null;
+				snrBack.push(val.value);
+				cursor = val.next;
+			} else if (wire === WIRE_LENGTH_DELIMITED) {
+				const size = readVarint(bytes, end, tag.next);
+				if (!size || size.value > end - size.next) return null;
+				let at = size.next;
+				const packEnd = size.next + size.value;
+				while (at < packEnd) {
+					const val = readSignedVarint(bytes, packEnd, at);
+					if (!val) return null;
+					snrBack.push(val.value);
+					at = val.next;
+				}
+				cursor = packEnd;
+			} else {
+				return null;
+			}
+		} else {
+			const next = skipField(bytes, end, tag.next, wire);
+			if (next === null) return null;
+			cursor = next;
+		}
+	}
+
+	const towardsHops: MeshtasticRouteHop[] = route.map((nodeNum, i) => {
+		const rawSnr = snrTowards[i] !== undefined ? snrTowards[i] : null;
+		const snrDb = rawSnr !== null ? rawSnr / 4 : null;
+		const nodeHex = `!${nodeNum.toString(16).padStart(8, "0")}`;
+		return { nodeNum, nodeHex, snrDb, rawSnr };
+	});
+
+	const backHops: MeshtasticRouteHop[] = routeBack.map((nodeNum, i) => {
+		const rawSnr = snrBack[i] !== undefined ? snrBack[i] : null;
+		const snrDb = rawSnr !== null ? rawSnr / 4 : null;
+		const nodeHex = `!${nodeNum.toString(16).padStart(8, "0")}`;
+		return { nodeNum, nodeHex, snrDb, rawSnr };
+	});
+
+	const nodes: DissectNode[] = [];
+	towardsHops.forEach((hop, i) => {
+		const span = towardsSpans[i] ?? { offset: base, length };
+		const snrLabel =
+			hop.snrDb !== null
+				? ` (SNR: ${hop.snrDb > 0 ? "+" : ""}${hop.snrDb.toFixed(1)} dB)`
+				: "";
+		nodes.push(
+			node(
+				`Hop ${i + 1}`,
+				span.offset,
+				span.length,
+				`${hop.nodeHex}${snrLabel}`,
+			),
+		);
+	});
+	backHops.forEach((hop, i) => {
+		const span = backSpans[i] ?? { offset: base, length };
+		const snrLabel =
+			hop.snrDb !== null
+				? ` (SNR: ${hop.snrDb > 0 ? "+" : ""}${hop.snrDb.toFixed(1)} dB)`
+				: "";
+		nodes.push(
+			node(
+				`Return hop ${i + 1}`,
+				span.offset,
+				span.length,
+				`${hop.nodeHex}${snrLabel}`,
+			),
+		);
+	});
+
+	return {
+		fields: {
+			route,
+			snrTowards,
+			routeBack,
+			snrBack,
+			towardsHops,
+			backHops,
+		},
+		nodes,
+	};
+}
+
+interface RoutingParse {
+	fields: MeshtasticRoutingFields;
+	nodes: DissectNode[];
+}
+
+function parseRouting(
+	bytes: Uint8Array,
+	base: number,
+	length: number,
+): RoutingParse | null {
+	let cursor = base;
+	const end = base + length;
+	const fields: MeshtasticRoutingFields = {
+		errorReason: null,
+		errorName: null,
+		routeRequest: null,
+		routeReply: null,
+	};
+	const nodes: DissectNode[] = [];
+
+	while (cursor < end) {
+		const tagStart = cursor;
+		const tag = readVarint(bytes, end, cursor);
+		if (!tag) return null;
+		const field = tag.value >>> 3;
+		const wire = tag.value & 0x07;
+
+		if (field === 1 && wire === WIRE_LENGTH_DELIMITED) {
+			const size = readVarint(bytes, end, tag.next);
+			if (!size || size.value > end - size.next) return null;
+			const rd = parseRouteDiscovery(bytes, size.next, size.value);
+			if (rd) {
+				fields.routeRequest = rd.fields;
+				nodes.push(
+					node(
+						"Route request",
+						tagStart,
+						size.next + size.value - tagStart,
+						`${rd.fields.route.length} hops`,
+						rd.nodes,
+					),
+				);
+			}
+			cursor = size.next + size.value;
+		} else if (field === 2 && wire === WIRE_LENGTH_DELIMITED) {
+			const size = readVarint(bytes, end, tag.next);
+			if (!size || size.value > end - size.next) return null;
+			const rd = parseRouteDiscovery(bytes, size.next, size.value);
+			if (rd) {
+				fields.routeReply = rd.fields;
+				nodes.push(
+					node(
+						"Route reply",
+						tagStart,
+						size.next + size.value - tagStart,
+						`${rd.fields.route.length} hops`,
+						rd.nodes,
+					),
+				);
+			}
+			cursor = size.next + size.value;
+		} else if ((field === 3 || field === 1) && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			fields.errorReason = val.value;
+			fields.errorName =
+				MESHTASTIC_ROUTING_ERROR[val.value] ?? `ERROR_${val.value}`;
+			nodes.push(
+				node(
+					"Routing error",
+					tagStart,
+					val.next - tagStart,
+					`${fields.errorName} (${val.value})`,
+					[],
+					val.value === 0 ? undefined : "warn",
+				),
+			);
+			cursor = val.next;
+		} else {
+			const next = skipField(bytes, end, tag.next, wire);
+			if (next === null) return null;
+			cursor = next;
+		}
+	}
+
+	return { fields, nodes };
+}
+
 /**
  * CryptoEngine::initNonce — the packet id occupies a 64-bit little-endian
  * slot (so the upper four bytes are zero for every packet a radio actually
@@ -553,6 +1221,8 @@ function parseDataMessage(
 	let portnum: number | null = null;
 	let portnumSpan: Span | null = null;
 	let payloadSpan: Span | null = null;
+	let requestId: number | null = null;
+	let requestIdSpan: Span | null = null;
 
 	let cursor = 0;
 	while (cursor < length) {
@@ -570,6 +1240,9 @@ function parseDataMessage(
 				if (value.value > 0xffff) return null;
 				portnum = value.value;
 				portnumSpan = { offset: tagStart, length: value.next - tagStart };
+			} else if (field === 6) {
+				requestId = value.value;
+				requestIdSpan = { offset: tagStart, length: value.next - tagStart };
 			}
 			cursor = value.next;
 		} else if (wire === WIRE_LENGTH_DELIMITED) {
@@ -595,6 +1268,10 @@ function parseDataMessage(
 		longitudeDegrees: null,
 		longName: null,
 		shortName: null,
+		requestId,
+		telemetry: null,
+		routeDiscovery: null,
+		routing: null,
 	};
 	const parse: Omit<PayloadParse, "source"> = {
 		fields,
@@ -605,6 +1282,10 @@ function parseDataMessage(
 		longitudeSpan: null,
 		longNameSpan: null,
 		shortNameSpan: null,
+		requestIdSpan,
+		telemetryNodes: null,
+		routeDiscoveryNodes: null,
+		routingNodes: null,
 	};
 
 	if (payloadSpan && payloadSpan.length > 0) {
@@ -639,6 +1320,32 @@ function parseDataMessage(
 				fields.longitudeDegrees = info.position.longitude;
 				parse.latitudeSpan = info.position.latitudeSpan;
 				parse.longitudeSpan = info.position.longitudeSpan;
+			}
+		} else if (portnum === MESHTASTIC_PORT.telemetry) {
+			const telem = parseTelemetry(
+				plain,
+				payloadSpan.offset,
+				payloadSpan.length,
+			);
+			if (telem) {
+				fields.telemetry = telem.fields;
+				parse.telemetryNodes = telem.nodes;
+			}
+		} else if (portnum === MESHTASTIC_PORT.traceroute) {
+			const rd = parseRouteDiscovery(
+				plain,
+				payloadSpan.offset,
+				payloadSpan.length,
+			);
+			if (rd) {
+				fields.routeDiscovery = rd.fields;
+				parse.routeDiscoveryNodes = rd.nodes;
+			}
+		} else if (portnum === MESHTASTIC_PORT.routing) {
+			const rout = parseRouting(plain, payloadSpan.offset, payloadSpan.length);
+			if (rout) {
+				fields.routing = rout.fields;
+				parse.routingNodes = rout.nodes;
 			}
 		}
 	}
@@ -777,79 +1484,117 @@ function payloadNodes(
 			`${p.portnum} (${p.portLabel})`,
 		),
 	];
+	if (
+		parse.requestIdSpan &&
+		p.requestId !== undefined &&
+		p.requestId !== null
+	) {
+		children.push(
+			node(
+				"Request ID",
+				base + parse.requestIdSpan.offset,
+				parse.requestIdSpan.length,
+				`0x${p.requestId.toString(16).padStart(8, "0")}`,
+			),
+		);
+	}
 	if (parse.payloadSpan) {
-		const inner: DissectNode[] = [];
-		if (p.text !== null) {
-			inner.push(
+		if (parse.payloadSpan.length === 0) {
+			children.push(
 				node(
-					"Text",
+					"Application payload",
 					base + parse.payloadSpan.offset,
-					parse.payloadSpan.length,
-					JSON.stringify(p.text),
+					0,
+					p.requestId !== undefined && p.requestId !== null
+						? `ACK for request 0x${p.requestId.toString(16).padStart(8, "0")}`
+						: "0 bytes",
 				),
 			);
-		}
-		if (parse.latitudeSpan && p.latitudeDegrees !== null) {
-			inner.push(
-				node(
-					"Latitude",
-					base + parse.latitudeSpan.offset,
-					parse.latitudeSpan.length,
-					`${p.latitudeDegrees.toFixed(7)}°`,
-				),
-			);
-		}
-		if (parse.longitudeSpan && p.longitudeDegrees !== null) {
-			inner.push(
-				node(
-					"Longitude",
-					base + parse.longitudeSpan.offset,
-					parse.longitudeSpan.length,
-					`${p.longitudeDegrees.toFixed(7)}°`,
-				),
-			);
-		}
-		if (parse.longNameSpan && p.longName !== null) {
-			inner.push(
-				node(
-					"Long name",
-					base + parse.longNameSpan.offset,
-					parse.longNameSpan.length,
-					p.longName,
-				),
-			);
-		}
-		if (parse.shortNameSpan && p.shortName !== null) {
-			inner.push(
-				node(
-					"Short name",
-					base + parse.shortNameSpan.offset,
-					parse.shortNameSpan.length,
-					p.shortName,
-				),
-			);
-		}
-		if (inner.length === 0) {
-			inner.push(
+		} else {
+			const inner: DissectNode[] = [];
+			if (p.text !== null) {
+				inner.push(
+					node(
+						"Text",
+						base + parse.payloadSpan.offset,
+						parse.payloadSpan.length,
+						JSON.stringify(p.text),
+					),
+				);
+			}
+			if (parse.latitudeSpan && p.latitudeDegrees !== null) {
+				inner.push(
+					node(
+						"Latitude",
+						base + parse.latitudeSpan.offset,
+						parse.latitudeSpan.length,
+						`${p.latitudeDegrees.toFixed(7)}°`,
+					),
+				);
+			}
+			if (parse.longitudeSpan && p.longitudeDegrees !== null) {
+				inner.push(
+					node(
+						"Longitude",
+						base + parse.longitudeSpan.offset,
+						parse.longitudeSpan.length,
+						`${p.longitudeDegrees.toFixed(7)}°`,
+					),
+				);
+			}
+			if (parse.longNameSpan && p.longName !== null) {
+				inner.push(
+					node(
+						"Long name",
+						base + parse.longNameSpan.offset,
+						parse.longNameSpan.length,
+						p.longName,
+					),
+				);
+			}
+			if (parse.shortNameSpan && p.shortName !== null) {
+				inner.push(
+					node(
+						"Short name",
+						base + parse.shortNameSpan.offset,
+						parse.shortNameSpan.length,
+						p.shortName,
+					),
+				);
+			}
+			if (parse.telemetryNodes && parse.telemetryNodes.length > 0) {
+				inner.push(...parse.telemetryNodes.map((n) => offsetTree(n, base)));
+			}
+			if (parse.routeDiscoveryNodes && parse.routeDiscoveryNodes.length > 0) {
+				inner.push(
+					...parse.routeDiscoveryNodes.map((n) => offsetTree(n, base)),
+				);
+			}
+			if (parse.routingNodes && parse.routingNodes.length > 0) {
+				inner.push(...parse.routingNodes.map((n) => offsetTree(n, base)));
+			}
+			if (inner.length === 0) {
+				inner.push(
+					node(
+						"Application payload",
+						base + parse.payloadSpan.offset,
+						parse.payloadSpan.length,
+						`undecoded — ${parse.payloadSpan.length} raw bytes (port ${p.portnum})`,
+						[],
+						"raw",
+					),
+				);
+			}
+			children.push(
 				node(
 					"Application payload",
 					base + parse.payloadSpan.offset,
 					parse.payloadSpan.length,
-					`undecoded — ${parse.payloadSpan.length} raw bytes (port ${p.portnum})`,
-					[],
-					"raw",
+					`${parse.payloadSpan.length} bytes`,
+					inner,
 				),
 			);
 		}
-		children.push(
-			node(
-				"Application payload",
-				base + parse.payloadSpan.offset,
-				parse.payloadSpan.length,
-				`${parse.payloadSpan.length} bytes`,
-				inner,
-			),
-		);
 	}
 
 	return [

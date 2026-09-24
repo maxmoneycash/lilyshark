@@ -17,6 +17,12 @@ import type { AnyDissection, ProtocolHint } from "./registry";
 import { dissectFrame } from "./registry";
 import type { ReticulumFields } from "./rnode";
 import { reticulumDestinationHashHex } from "./rnode";
+import {
+	aesCtrXcrypt,
+	MESHTASTIC_DEFAULT_PSK,
+	MESHTASTIC_PORT,
+	meshtasticNonce,
+} from "./meshtastic";
 import type { DissectNode } from "./types";
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -847,4 +853,269 @@ test("MeshCore advertisement with app data parses node type, position, and name"
 	const posNode = findNode(primary.root, "Position");
 	assert.ok(posNode);
 	assert.match(posNode.value ?? "", /37\.774929/);
+});
+
+function float32Bytes(value: number): number[] {
+	const buf = new Uint8Array(4);
+	new DataView(buf.buffer).setFloat32(0, value, true);
+	return Array.from(buf);
+}
+
+function le32Bytes(value: number): number[] {
+	return [
+		value & 0xff,
+		(value >>> 8) & 0xff,
+		(value >>> 16) & 0xff,
+		(value >>> 24) & 0xff,
+	];
+}
+
+function varintBytes(value: number): number[] {
+	const out: number[] = [];
+	let v = value >>> 0;
+	while (v > 0x7f) {
+		out.push((v & 0x7f) | 0x80);
+		v >>>= 7;
+	}
+	out.push(v & 0x7f);
+	return out;
+}
+
+function signedVarintBytes(value: number): number[] {
+	if (value >= 0) return varintBytes(value);
+	let v = BigInt(value) & 0xffffffffffffffffn;
+	const out: number[] = [];
+	while (v > 0x7fn) {
+		out.push(Number((v & 0x7fn) | 0x80n));
+		v >>= 7n;
+	}
+	out.push(Number(v & 0x7fn));
+	return out;
+}
+
+function buildMeshtasticTestFrame(
+	fromNode: number,
+	toNode: number,
+	packetId: number,
+	dataPayload: Uint8Array,
+): Uint8Array {
+	const nonce = meshtasticNonce(fromNode, packetId);
+	const cipher = aesCtrXcrypt(MESHTASTIC_DEFAULT_PSK, nonce, dataPayload);
+	const frame = new Uint8Array(16 + cipher.length);
+	frame.set(le32Bytes(toNode), 0);
+	frame.set(le32Bytes(fromNode), 4);
+	frame.set(le32Bytes(packetId), 8);
+	frame[12] = 0x63;
+	frame[13] = 0x08;
+	frame[14] = 0x00;
+	frame[15] = 0x00;
+	frame.set(cipher, 16);
+	return frame;
+}
+
+test("Meshtastic telemetry payload unpacks device metrics, environmental metrics, and byte spans", () => {
+	// Construct Telemetry submessages:
+	// DeviceMetrics: battery 85%, voltage 4.12V, channel_utilization 14.5%, air_util_tx 1.2%, uptime 7200s
+	const devMetricsBytes = [
+		0x08,
+		...varintBytes(85), // field 1 varint battery
+		0x15,
+		...float32Bytes(4.12), // field 2 fixed32 voltage
+		0x1d,
+		...float32Bytes(14.5), // field 3 fixed32 channel_utilization
+		0x25,
+		...float32Bytes(1.2), // field 4 fixed32 air_util_tx
+		0x28,
+		...varintBytes(7200), // field 5 varint uptime
+	];
+
+	// EnvironmentMetrics: temp 23.5°C, humidity 54.0%, pressure 1013.25 hPa
+	const envMetricsBytes = [
+		0x0d,
+		...float32Bytes(23.5), // field 1 fixed32 temp
+		0x15,
+		...float32Bytes(54.0), // field 2 fixed32 humidity
+		0x1d,
+		...float32Bytes(1013.25), // field 3 fixed32 pressure
+	];
+
+	// Outer Telemetry message:
+	// field 1 fixed32 time = 1774390000 (0x69c84970)
+	// field 2 length-delimited DeviceMetrics
+	// field 3 length-delimited EnvironmentMetrics
+	const telemBytes = [
+		0x0d,
+		...le32Bytes(1774390000),
+		0x12,
+		...varintBytes(devMetricsBytes.length),
+		...devMetricsBytes,
+		0x1a,
+		...varintBytes(envMetricsBytes.length),
+		...envMetricsBytes,
+	];
+
+	// Wrap in Data protobuf (portnum = 67)
+	const dataBytes = new Uint8Array([
+		0x08,
+		MESHTASTIC_PORT.telemetry,
+		0x12,
+		...varintBytes(telemBytes.length),
+		...telemBytes,
+	]);
+
+	const frame = buildMeshtasticTestFrame(
+		0x11223344,
+		0xffffffff,
+		101,
+		dataBytes,
+	);
+	const { primary } = dissectFrame(frame, "meshtastic");
+
+	assert.equal(primary.protocol, "Meshtastic");
+	assert.equal(primary.result, "matched");
+	assert.equal(primary.state, "payload-decoded");
+	assertTreeInvariants(primary.root, frame.length, "meshtastic-telemetry");
+
+	const telem = primary.fields?.payload?.telemetry;
+	assert.ok(telem);
+	assert.equal(telem.time, 1774390000);
+
+	assert.ok(telem.deviceMetrics);
+	assert.equal(telem.deviceMetrics.batteryLevel, 85);
+	assert.ok(Math.abs((telem.deviceMetrics.voltage ?? 0) - 4.12) < 0.01);
+	assert.ok(
+		Math.abs((telem.deviceMetrics.channelUtilization ?? 0) - 14.5) < 0.01,
+	);
+	assert.ok(Math.abs((telem.deviceMetrics.airUtilTx ?? 0) - 1.2) < 0.01);
+	assert.equal(telem.deviceMetrics.uptimeSeconds, 7200);
+
+	assert.ok(telem.environmentMetrics);
+	assert.ok(
+		Math.abs((telem.environmentMetrics.temperature ?? 0) - 23.5) < 0.01,
+	);
+	assert.ok(
+		Math.abs((telem.environmentMetrics.relativeHumidity ?? 0) - 54.0) < 0.01,
+	);
+	assert.ok(
+		Math.abs((telem.environmentMetrics.barometricPressure ?? 0) - 1013.25) <
+			0.1,
+	);
+
+	// Verify tree nodes
+	const devNode = findNode(primary.root, "Device metrics");
+	assert.ok(devNode);
+	const batNode = findNode(primary.root, "Battery level");
+	assert.ok(batNode && batNode.value?.includes("85%"));
+	const voltNode = findNode(primary.root, "Voltage");
+	assert.ok(voltNode && voltNode.value?.includes("4.12 V"));
+
+	const envNode = findNode(primary.root, "Environment metrics");
+	assert.ok(envNode);
+	const tempNode = findNode(primary.root, "Temperature");
+	assert.ok(tempNode && tempNode.value?.includes("23.50 °C"));
+	const pressNode = findNode(primary.root, "Barometric pressure");
+	assert.ok(pressNode && pressNode.value?.includes("1013.25 hPa"));
+});
+
+test("Meshtastic traceroute payload unpacks route discovery hops and per-hop SNR measurements", () => {
+	// RouteDiscovery: route [0x11223344, 0x55667788], snr_towards [34, -48], route_back [0x55667788], snr_back [28]
+	// 34 / 4 = 8.5 dB, -48 / 4 = -12.0 dB, 28 / 4 = 7.0 dB
+	const rdBytes = [
+		0x0d,
+		...le32Bytes(0x11223344), // route 1
+		0x0d,
+		...le32Bytes(0x55667788), // route 2
+		0x10,
+		...signedVarintBytes(34), // snr_towards 1 (+8.5 dB)
+		0x10,
+		...signedVarintBytes(-48), // snr_towards 2 (-12.0 dB)
+		0x1d,
+		...le32Bytes(0x55667788), // route_back 1
+		0x20,
+		...signedVarintBytes(28), // snr_back 1 (+7.0 dB)
+	];
+
+	// Wrap in Data protobuf (portnum = 70: TRACEROUTE)
+	const dataBytes = new Uint8Array([
+		0x08,
+		MESHTASTIC_PORT.traceroute,
+		0x12,
+		...varintBytes(rdBytes.length),
+		...rdBytes,
+	]);
+
+	const frame = buildMeshtasticTestFrame(
+		0x11223344,
+		0x55667788,
+		202,
+		dataBytes,
+	);
+	const { primary } = dissectFrame(frame, "meshtastic");
+
+	assert.equal(primary.protocol, "Meshtastic");
+	assert.equal(primary.result, "matched");
+	assert.equal(primary.state, "payload-decoded");
+	assertTreeInvariants(primary.root, frame.length, "meshtastic-traceroute");
+
+	const rd = primary.fields?.payload?.routeDiscovery;
+	assert.ok(rd);
+	assert.equal(rd.towardsHops.length, 2);
+	assert.equal(rd.towardsHops[0].nodeHex, "!11223344");
+	assert.equal(rd.towardsHops[0].snrDb, 8.5);
+	assert.equal(rd.towardsHops[1].nodeHex, "!55667788");
+	assert.equal(rd.towardsHops[1].snrDb, -12.0);
+
+	assert.equal(rd.backHops.length, 1);
+	assert.equal(rd.backHops[0].nodeHex, "!55667788");
+	assert.equal(rd.backHops[0].snrDb, 7.0);
+
+	const hop1 = findNode(primary.root, "Hop 1");
+	assert.ok(hop1 && hop1.value?.includes("!11223344 (SNR: +8.5 dB)"));
+	const hop2 = findNode(primary.root, "Hop 2");
+	assert.ok(hop2 && hop2.value?.includes("!55667788 (SNR: -12.0 dB)"));
+	const back1 = findNode(primary.root, "Return hop 1");
+	assert.ok(back1 && back1.value?.includes("!55667788 (SNR: +7.0 dB)"));
+});
+
+test("Meshtastic routing payload unpacks routing error reason codes and request IDs", () => {
+	// Routing with error_reason = 1 (NO_ROUTE)
+	const routingBytes = [
+		0x18,
+		0x01, // field 3 varint = 1 (NO_ROUTE)
+	];
+
+	// Wrap in Data protobuf (portnum = 5: ROUTING, request_id = 0x12345678)
+	const dataBytes = new Uint8Array([
+		0x08,
+		MESHTASTIC_PORT.routing,
+		0x12,
+		...varintBytes(routingBytes.length),
+		...routingBytes,
+		0x30,
+		...varintBytes(0x12345678), // field 6 varint request_id
+	]);
+
+	const frame = buildMeshtasticTestFrame(
+		0x11223344,
+		0x55667788,
+		303,
+		dataBytes,
+	);
+	const { primary } = dissectFrame(frame, "meshtastic");
+
+	assert.equal(primary.protocol, "Meshtastic");
+	assert.equal(primary.result, "matched");
+	assert.equal(primary.state, "payload-decoded");
+	assertTreeInvariants(primary.root, frame.length, "meshtastic-routing");
+
+	assert.equal(primary.fields?.payload?.requestId, 0x12345678);
+	const routing = primary.fields?.payload?.routing;
+	assert.ok(routing);
+	assert.equal(routing.errorReason, 1);
+	assert.equal(routing.errorName, "NO_ROUTE");
+
+	const reqIdNode = findNode(primary.root, "Request ID");
+	assert.ok(reqIdNode && reqIdNode.value?.includes("0x12345678"));
+	const errNode = findNode(primary.root, "Routing error");
+	assert.ok(errNode && errNode.value?.includes("NO_ROUTE (1)"));
 });
