@@ -70,6 +70,7 @@ import { IoGraphPanel } from './IoGraphPanel';
 import { TrafficFrameTable } from './TrafficFrameTable';
 import { crcClass, fmtFreq } from './trafficFormat';
 import { AnimatedNumber } from './AnimatedNumber';
+import { dissectMeshCore } from '../lib/dissect/meshcore';
 import { dissectRNode } from '../lib/dissect/rnode';
 import { reportedLabel, telemetrySignal } from '../mesh/deviceTelemetry';
 import './traffic.css';
@@ -665,6 +666,11 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   const announceReading = useMemo(() => {
     if (!f || protoOfProfile(f.profileId) !== 'rnode') return null;
     return readAnnounce(f.bytes, { truncated: f.truncated });
+  }, [f]);
+
+  const meshcoreAdvert = useMemo(() => {
+    if (!f || protoOfProfile(f.profileId) !== 'meshcore') return null;
+    return dissectMeshCore(f.bytes, { truncated: f.truncated }).fields?.advertisement ?? null;
   }, [f]);
 
   // ── display filter ────────────────────────────────────────────────────
@@ -1350,6 +1356,44 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                   </dd>
                   <dt className="k">APP DATA</dt>
                   <dd className="v" style={{ margin: 0 }}>{announceReading.appDataLength} B</dd>
+                </dl>
+              </section>
+            )}
+
+            {meshcoreAdvert && (
+              <section aria-label="MeshCore advertisement">
+                <div className="panel-title">
+                  MESHCORE ADVERTISEMENT
+                  <span className="spacer" />
+                  <button
+                    type="button"
+                    onClick={() => setFilterText(`src == ${meshcoreAdvert.nodeIdHex}`)}
+                    title={`Filter traffic to frames from node ${meshcoreAdvert.nodeIdHex}`}
+                  >
+                    FILTER NODE
+                  </button>
+                </div>
+                <dl className="kv" style={{ margin: 0 }}>
+                  <dt className="k">NODE ID</dt>
+                  <dd className="v">{meshcoreAdvert.nodeIdHex}</dd>
+                  <dt className="k">NODE TYPE</dt>
+                  <dd className="v">{meshcoreAdvert.nodeTypeLabel.toUpperCase()}</dd>
+                  {meshcoreAdvert.name && (
+                    <>
+                      <dt className="k">NAME</dt>
+                      <dd className="v" style={{ overflowWrap: 'anywhere' }}>{meshcoreAdvert.name}</dd>
+                    </>
+                  )}
+                  {meshcoreAdvert.hasLocation && meshcoreAdvert.latitude !== undefined && meshcoreAdvert.longitude !== undefined && (
+                    <>
+                      <dt className="k">POSITION</dt>
+                      <dd className="v">{meshcoreAdvert.latitude.toFixed(6)}°, {meshcoreAdvert.longitude.toFixed(6)}°</dd>
+                    </>
+                  )}
+                  <dt className="k">TIMESTAMP</dt>
+                  <dd className="v">{meshcoreAdvert.timestamp}</dd>
+                  <dt className="k">PUBLIC KEY</dt>
+                  <dd className="v" style={{ overflowWrap: 'anywhere', fontSize: '11px' }}>{meshcoreAdvert.publicKeyHex}</dd>
                 </dl>
               </section>
             )}

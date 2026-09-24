@@ -751,3 +751,94 @@ test("Reticulum announce with MessagePack app_data dissects structured fields", 
 	assert.ok(fieldNode, "display_name key node exists");
 	assert.equal(fieldNode.value, '"Alice"');
 });
+
+test("MeshCore advertisement unpacks public key, node ID, timestamp, and signature", () => {
+	// Construct 100-byte advert
+	const header = [0x11]; // route: flood, type: advert, v0
+	const pathLen = [0x00]; // 0 hops
+	const pubKey = new Uint8Array(32).fill(0xaa);
+	pubKey[0] = 0x12;
+	pubKey[1] = 0x34;
+	pubKey[2] = 0x56;
+	pubKey[3] = 0x78;
+	const timestamp = [0x00, 0xf1, 0x53, 0x65]; // 1700000000
+	const signature = new Uint8Array(64).fill(0xbb);
+
+	const frame = new Uint8Array([
+		...header,
+		...pathLen,
+		...pubKey,
+		...timestamp,
+		...signature,
+	]);
+
+	const { primary } = dissectFrame(frame, "meshcore");
+	assert.equal(primary.protocol, "MeshCore");
+	assert.equal(primary.result, "matched");
+	assert.equal(primary.state, "header-only");
+	assertTreeInvariants(primary.root, frame.length, "meshcore-advert-100");
+
+	const advert = primary.fields?.advertisement;
+	assert.ok(advert);
+	assert.equal(advert.nodeIdHex, "78563412");
+	assert.equal(advert.timestamp, 1700000000);
+	assert.equal(advert.hasLocation, false);
+});
+
+test("MeshCore advertisement with app data parses node type, position, and name", () => {
+	const header = [0x11];
+	const pathLen = [0x00];
+	const pubKey = new Uint8Array(32).fill(0x01);
+	pubKey[0] = 0xef;
+	pubKey[1] = 0xbe;
+	pubKey[2] = 0xad;
+	pubKey[3] = 0xde;
+	const timestamp = [0x00, 0xf1, 0x53, 0x65];
+	const signature = new Uint8Array(64).fill(0x02);
+
+	// App data: flags = 1 (Chat) | 0x10 (Location) | 0x20 (Feature 1) | 0x80 (Name)
+	const flags = [0xb1];
+	// Lat: 37.774929 -> 37774929 = 0x02406651
+	const latBytes = [0x51, 0x66, 0x40, 0x02];
+	// Lon: -122.419416 -> -122419416 = 0xf8b40728
+	const lonBytes = [0x28, 0x07, 0xb4, 0xf8];
+	const feat1Bytes = [0x34, 0x12];
+	const nameBytes = new TextEncoder().encode("LilyDeck");
+
+	const frame = new Uint8Array([
+		...header,
+		...pathLen,
+		...pubKey,
+		...timestamp,
+		...signature,
+		...flags,
+		...latBytes,
+		...lonBytes,
+		...feat1Bytes,
+		...nameBytes,
+	]);
+
+	const { primary } = dissectFrame(frame, "meshcore");
+	assert.equal(primary.protocol, "MeshCore");
+	assert.equal(primary.result, "matched");
+	assert.equal(primary.state, "payload-decoded");
+	assertTreeInvariants(primary.root, frame.length, "meshcore-advert-appdata");
+
+	const advert = primary.fields?.advertisement;
+	assert.ok(advert);
+	assert.equal(advert.nodeIdHex, "deadbeef");
+	assert.equal(advert.nodeTypeLabel, "Chat");
+	assert.equal(advert.hasLocation, true);
+	assert.ok(advert.latitude !== undefined && Math.abs(advert.latitude - 37.774929) < 0.00001);
+	assert.ok(advert.longitude !== undefined && Math.abs(advert.longitude - (-122.419416)) < 0.00001);
+	assert.equal(advert.featureOne, 0x1234);
+	assert.equal(advert.name, "LilyDeck");
+
+	const nameNode = findNode(primary.root, "Name");
+	assert.ok(nameNode);
+	assert.equal(nameNode.value, "LilyDeck");
+
+	const posNode = findNode(primary.root, "Position");
+	assert.ok(posNode);
+	assert.match(posNode.value ?? "", /37\.774929/);
+});

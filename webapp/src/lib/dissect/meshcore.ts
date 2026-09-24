@@ -92,6 +92,21 @@ function routeHasTransportCodes(route: number): boolean {
 	);
 }
 
+export interface MeshCoreAdvertisementFields {
+	publicKeyHex: string;
+	nodeIdHex: string;
+	timestamp: number;
+	signatureHex: string;
+	nodeType: number;
+	nodeTypeLabel: string;
+	hasLocation: boolean;
+	latitude?: number;
+	longitude?: number;
+	featureOne?: number;
+	featureTwo?: number;
+	name?: string;
+}
+
 export interface MeshCoreFields {
 	header: number;
 	routeType: number;
@@ -111,6 +126,7 @@ export interface MeshCoreFields {
 	/** GroupText/GroupData only: the channel hash byte. */
 	channelHash: number | null;
 	encrypted: boolean;
+	advertisement?: MeshCoreAdvertisementFields;
 }
 
 export interface MeshCoreDissection extends Dissection {
@@ -213,17 +229,209 @@ function dissectPayload(
 			);
 			return MALFORMED;
 		}
+
+		const publicKeyHex = hexBytes(bytes, cursor, 32);
+		const nodeId = readLe32(bytes, cursor);
+		const nodeIdHex = nodeId.toString(16).padStart(8, "0");
+		const timestamp = readLe32(bytes, cursor + 32);
+		const signatureHex = hexBytes(bytes, cursor + 36, 64);
+
+		let formattedTimestamp = String(timestamp);
+		if (timestamp >= 1500000000 && timestamp <= 4200000000) {
+			try {
+				formattedTimestamp = `${timestamp} (${new Date(timestamp * 1000).toISOString()})`;
+			} catch {
+				// Keep numeric fallback
+			}
+		}
+
+		const advertChildren: DissectNode[] = [
+			node("Public key", cursor, 32, publicKeyHex, [
+				node("Node ID", cursor, 4, hex(nodeId, 4)),
+			]),
+			node("Timestamp", cursor + 32, 4, formattedTimestamp),
+			node("Signature", cursor + 36, 64, signatureHex),
+		];
+
+		let nodeType = 0;
+		let nodeTypeLabel = "None";
+		let hasLocation = false;
+		let latitude: number | undefined;
+		let longitude: number | undefined;
+		let featureOne: number | undefined;
+		let featureTwo: number | undefined;
+		let name: string | undefined;
+
+		if (payloadLength > MESHCORE_ADVERT_MINIMUM_PAYLOAD_BYTES) {
+			const appDataOffset = cursor + 100;
+			const appDataLength = payloadLength - 100;
+			const flags = bytes[appDataOffset];
+			nodeType = flags & 0x0f;
+			const NODE_TYPE_LABELS: Record<number, string> = {
+				0: "None",
+				1: "Chat",
+				2: "Repeater",
+				3: "Room",
+				4: "Sensor",
+			};
+			nodeTypeLabel = NODE_TYPE_LABELS[nodeType] ?? `Unknown (${nodeType})`;
+			hasLocation = (flags & 0x10) !== 0;
+			const hasFeatureOne = (flags & 0x20) !== 0;
+			const hasFeatureTwo = (flags & 0x40) !== 0;
+			const hasName = (flags & 0x80) !== 0;
+
+			const appDataChildren: DissectNode[] = [
+				node(
+					"Flags & node type",
+					appDataOffset,
+					1,
+					`${nodeTypeLabel} (flags: 0x${flags.toString(16).padStart(2, "0")})`,
+				),
+			];
+
+			let adCursor = appDataOffset + 1;
+			const adEnd = appDataOffset + appDataLength;
+
+			if (hasLocation) {
+				if (adCursor + 8 <= adEnd) {
+					const latMicros = readLe32(bytes, adCursor) | 0;
+					const lonMicros = readLe32(bytes, adCursor + 4) | 0;
+					latitude = latMicros / 1e6;
+					longitude = lonMicros / 1e6;
+					appDataChildren.push(
+						node(
+							"Position",
+							adCursor,
+							8,
+							`${latitude.toFixed(6)}°, ${longitude.toFixed(6)}°`,
+							[
+								node(
+									"Latitude",
+									adCursor,
+									4,
+									`${latitude.toFixed(6)}° (${latMicros} µ°)`,
+								),
+								node(
+									"Longitude",
+									adCursor + 4,
+									4,
+									`${longitude.toFixed(6)}° (${lonMicros} µ°)`,
+								),
+							],
+						),
+					);
+					adCursor += 8;
+				} else {
+					appDataChildren.push(
+						node(
+							"Position (truncated)",
+							adCursor,
+							adEnd - adCursor,
+							"truncated position field",
+							[],
+							"error",
+						),
+					);
+					adCursor = adEnd;
+				}
+			}
+
+			if (hasFeatureOne) {
+				if (adCursor + 2 <= adEnd) {
+					featureOne = readLe16(bytes, adCursor);
+					appDataChildren.push(
+						node("Feature 1", adCursor, 2, hex(featureOne, 2)),
+					);
+					adCursor += 2;
+				} else {
+					appDataChildren.push(
+						node(
+							"Feature 1 (truncated)",
+							adCursor,
+							adEnd - adCursor,
+							"truncated feature field",
+							[],
+							"error",
+						),
+					);
+					adCursor = adEnd;
+				}
+			}
+
+			if (hasFeatureTwo) {
+				if (adCursor + 2 <= adEnd) {
+					featureTwo = readLe16(bytes, adCursor);
+					appDataChildren.push(
+						node("Feature 2", adCursor, 2, hex(featureTwo, 2)),
+					);
+					adCursor += 2;
+				} else {
+					appDataChildren.push(
+						node(
+							"Feature 2 (truncated)",
+							adCursor,
+							adEnd - adCursor,
+							"truncated feature field",
+							[],
+							"error",
+						),
+					);
+					adCursor = adEnd;
+				}
+			}
+
+			if (hasName) {
+				if (adCursor < adEnd) {
+					const nameBytes = bytes.subarray(adCursor, adEnd);
+					name = new TextDecoder("utf-8", { fatal: false }).decode(nameBytes);
+					appDataChildren.push(
+						node("Name", adCursor, adEnd - adCursor, name),
+					);
+					adCursor = adEnd;
+				} else {
+					appDataChildren.push(node("Name", adCursor, 0, "(empty)"));
+				}
+			} else if (adCursor < adEnd) {
+				appDataChildren.push(
+					node(
+						"Trailing bytes",
+						adCursor,
+						adEnd - adCursor,
+						`undecoded — ${adEnd - adCursor} raw bytes`,
+						[],
+						"raw",
+					),
+				);
+			}
+
+			advertChildren.push(
+				node("App data", appDataOffset, appDataLength, undefined, appDataChildren),
+			);
+		}
+
+		fields.advertisement = {
+			publicKeyHex,
+			nodeIdHex,
+			timestamp,
+			signatureHex,
+			nodeType,
+			nodeTypeLabel,
+			hasLocation,
+			latitude,
+			longitude,
+			featureOne,
+			featureTwo,
+			name,
+		};
+
 		root.children.push(
-			node(
-				"Advertisement",
-				cursor,
-				payloadLength,
-				`undecoded — ${payloadLength} raw bytes (identity announce; not structurally parsed)`,
-				[],
-				"raw",
-			),
+			node("Advertisement", cursor, payloadLength, undefined, advertChildren),
 		);
-		return { result: "matched", state: "header-only", kind: "advertisement" };
+		return {
+			result: "matched",
+			state: payloadLength > MESHCORE_ADVERT_MINIMUM_PAYLOAD_BYTES ? "payload-decoded" : "header-only",
+			kind: "advertisement",
+		};
 	}
 
 	if (type === MESHCORE_PAYLOAD_TYPE.trace) {

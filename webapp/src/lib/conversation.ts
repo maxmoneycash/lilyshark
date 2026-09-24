@@ -181,6 +181,65 @@ const REASON = {
 } as const;
 
 /**
+ * Reads a MeshCore advertisement's announced sender node ID (first 4 bytes of
+ * public key as 8-char lowercase hex) and name, or null when the frame is not
+ * an advertisement or is too short.
+ */
+export function meshcoreAdvertAddress(
+	bytes: Uint8Array,
+): { src: string; name?: string } | null {
+	if (bytes.length < 1) return null;
+	const header = bytes[0];
+	const type = (header >> 2) & 0x0f;
+	const version = (header >> 6) & 0x03;
+	if (version !== 0 || type !== 4) return null; // Only v1 Advertisement
+
+	const route = header & 0x03;
+	let cursor = 1;
+	if (route === 0 || route === 3) {
+		cursor += 4;
+	}
+	if (cursor >= bytes.length) return null;
+	const encodedPathLength = bytes[cursor++];
+	const pathCount = encodedPathLength & 0x3f;
+	const pathSize = (encodedPathLength >> 6) + 1;
+	cursor += pathCount * pathSize;
+
+	// Minimum advertisement payload is 100 bytes
+	if (cursor + 100 > bytes.length) return null;
+	const nodeId = readLe32(bytes, cursor);
+	const src = nodeId.toString(16).padStart(8, "0");
+
+	let name: string | undefined;
+	const payloadLen = bytes.length - cursor;
+	if (payloadLen > 100) {
+		const appDataOffset = cursor + 100;
+		const flags = bytes[appDataOffset];
+		const hasLocation = (flags & 0x10) !== 0;
+		const hasFeatureOne = (flags & 0x20) !== 0;
+		const hasFeatureTwo = (flags & 0x40) !== 0;
+		const hasName = (flags & 0x80) !== 0;
+		if (hasName) {
+			let offset = 1;
+			if (hasLocation) offset += 8;
+			if (hasFeatureOne) offset += 2;
+			if (hasFeatureTwo) offset += 2;
+			if (appDataOffset + offset < bytes.length) {
+				try {
+					name = new TextDecoder("utf-8", { fatal: false }).decode(
+						bytes.subarray(appDataOffset + offset),
+					);
+				} catch {
+					// Fallback
+				}
+			}
+		}
+	}
+
+	return { src, name };
+}
+
+/**
  * Read one frame's addressing from the bytes its capture profile names a
  * protocol for. `profileId` is the profile the frame actually reported, or
  * null when it reported none.
@@ -206,8 +265,19 @@ export function frameAddressing(
 			}
 			return { src: null, dst, reason: REASON.reticulumNoSource };
 		}
-		case "meshcore":
+		case "meshcore": {
+			const advert = meshcoreAdvertAddress(bytes);
+			if (advert) {
+				return {
+					src: advert.src,
+					dst: null,
+					reason: advert.name
+						? `MeshCore advertisement from ${advert.name}`
+						: "MeshCore advertisement announces node identity",
+				};
+			}
 			return { ...NO_ADDRESSING, reason: REASON.meshcore };
+		}
 		default:
 			return { ...NO_ADDRESSING, reason: REASON.unknownProfile };
 	}

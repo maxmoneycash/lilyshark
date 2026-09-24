@@ -192,6 +192,38 @@ test("MeshCore is excluded explicitly — the dissector claims no address", () =
 	assert.equal(conversationExpression(a), null);
 });
 
+test("MeshCore advertisement names the sender node ID as an addressable source", () => {
+	const header = [0x11];
+	const pathLen = [0x00];
+	const pubKey = new Uint8Array(32).fill(0x01);
+	pubKey[0] = 0xef;
+	pubKey[1] = 0xbe;
+	pubKey[2] = 0xad;
+	pubKey[3] = 0xde;
+	const timestamp = [0x00, 0xf1, 0x53, 0x65];
+	const signature = new Uint8Array(64).fill(0x02);
+	const flags = [0x81]; // Chat with name
+	const nameBytes = new TextEncoder().encode("Relay1");
+
+	const frame = new Uint8Array([
+		...header,
+		...pathLen,
+		...pubKey,
+		...timestamp,
+		...signature,
+		...flags,
+		...nameBytes,
+	]);
+
+	const a = frameAddressing(frame, 2); // profile 2 = MeshCore
+	assert.equal(isAddressable(a), true);
+	assert.equal(a.src, "deadbeef");
+	assert.equal(a.dst, null);
+	assert.match(a.reason ?? "", /Relay1/);
+	assert.equal(conversationExpression(a), "src == deadbeef");
+	assert.equal(conversationLabel(a), "deadbeef →");
+});
+
 test("a frame whose profile named no protocol is excluded, not guessed", () => {
 	for (const profile of [null, 0, 99]) {
 		const a = frameAddressing(meshtasticBytes(0x0badc0de, 0xa1b2c3d4), profile);
