@@ -498,8 +498,6 @@ function dissectPayload(
 	}
 
 	if (isDirectEncryptedType(type)) {
-		// dest_hash[1] + src_hash[1] + MAC[2] + whole AES blocks; the firmware
-		// proves only the arithmetic, so no field inside is claimed here.
 		if (payloadLength < 20 || (payloadLength - 4) % 16 !== 0) {
 			errorNode(
 				root,
@@ -510,14 +508,29 @@ function dissectPayload(
 			return MALFORMED;
 		}
 		fields.encrypted = true;
+		const destHash = bytes[cursor];
+		const srcHash = bytes[cursor + 1];
+		const mac = readLe16(bytes, cursor + 2);
+		const children = [
+			node("Destination hash", cursor, 1, hex(destHash, 1)),
+			node("Source hash", cursor + 1, 1, hex(srcHash, 1)),
+			node("MAC", cursor + 2, 2, hex(mac, 2)),
+			node(
+				"Ciphertext",
+				cursor + 4,
+				payloadLength - 4,
+				`encrypted payload — ${payloadLength - 4} bytes (end-to-end key not held)`,
+				[],
+				"encrypted",
+			),
+		];
 		root.children.push(
 			node(
 				label.charAt(0) + label.slice(1).toLowerCase(),
 				cursor,
 				payloadLength,
-				`encrypted payload — ${payloadLength} bytes (end-to-end key not held)`,
-				[],
-				"encrypted",
+				undefined,
+				children,
 			),
 		);
 		return {
@@ -542,6 +555,7 @@ function dissectPayload(
 		}
 		fields.channelHash = bytes[cursor];
 		fields.encrypted = true;
+		const mac = readLe16(bytes, cursor + 1);
 		root.children.push(
 			node(
 				label === "GROUP TEXT" ? "Group text" : "Group data",
@@ -550,11 +564,12 @@ function dissectPayload(
 				undefined,
 				[
 					node("Channel hash", cursor, 1, hex(bytes[cursor], 1)),
+					node("MAC", cursor + 1, 2, hex(mac, 2)),
 					node(
 						"Ciphertext",
-						cursor + 1,
-						payloadLength - 1,
-						`encrypted payload — ${payloadLength - 1} bytes (channel key not held)`,
+						cursor + 3,
+						payloadLength - 3,
+						`encrypted payload — ${payloadLength - 3} bytes (channel key not held)`,
 						[],
 						"encrypted",
 					),
