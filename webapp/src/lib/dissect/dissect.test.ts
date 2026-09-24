@@ -829,8 +829,14 @@ test("MeshCore advertisement with app data parses node type, position, and name"
 	assert.equal(advert.nodeIdHex, "deadbeef");
 	assert.equal(advert.nodeTypeLabel, "Chat");
 	assert.equal(advert.hasLocation, true);
-	assert.ok(advert.latitude !== undefined && Math.abs(advert.latitude - 37.774929) < 0.00001);
-	assert.ok(advert.longitude !== undefined && Math.abs(advert.longitude - (-122.419416)) < 0.00001);
+	assert.ok(
+		advert.latitude !== undefined &&
+			Math.abs(advert.latitude - 37.774929) < 0.00001,
+	);
+	assert.ok(
+		advert.longitude !== undefined &&
+			Math.abs(advert.longitude - -122.419416) < 0.00001,
+	);
 	assert.equal(advert.featureOne, 0x1234);
 	assert.equal(advert.name, "LilyDeck");
 

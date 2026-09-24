@@ -384,9 +384,7 @@ function dissectPayload(
 				if (adCursor < adEnd) {
 					const nameBytes = bytes.subarray(adCursor, adEnd);
 					name = new TextDecoder("utf-8", { fatal: false }).decode(nameBytes);
-					appDataChildren.push(
-						node("Name", adCursor, adEnd - adCursor, name),
-					);
+					appDataChildren.push(node("Name", adCursor, adEnd - adCursor, name));
 					adCursor = adEnd;
 				} else {
 					appDataChildren.push(node("Name", adCursor, 0, "(empty)"));
@@ -405,7 +403,13 @@ function dissectPayload(
 			}
 
 			advertChildren.push(
-				node("App data", appDataOffset, appDataLength, undefined, appDataChildren),
+				node(
+					"App data",
+					appDataOffset,
+					appDataLength,
+					undefined,
+					appDataChildren,
+				),
 			);
 		}
 
@@ -429,7 +433,10 @@ function dissectPayload(
 		);
 		return {
 			result: "matched",
-			state: payloadLength > MESHCORE_ADVERT_MINIMUM_PAYLOAD_BYTES ? "payload-decoded" : "header-only",
+			state:
+				payloadLength > MESHCORE_ADVERT_MINIMUM_PAYLOAD_BYTES
+					? "payload-decoded"
+					: "header-only",
 			kind: "advertisement",
 		};
 	}

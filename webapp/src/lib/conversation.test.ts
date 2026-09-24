@@ -146,7 +146,10 @@ test("the Reticulum hash reader agrees with a second reader, byte for byte", () 
 	for (const full of crossCheckCases()) {
 		for (let cut = 0; cut <= full.length; cut++) {
 			const bytes = full.slice(0, cut);
-			assert.equal(reticulumDestinationHashHex(bytes), referenceReticulum(bytes));
+			assert.equal(
+				reticulumDestinationHashHex(bytes),
+				referenceReticulum(bytes),
+			);
 			// And what the conversation reads is exactly what that reader found.
 			const address = frameAddressing(bytes, 5);
 			assert.equal(address.src, null);

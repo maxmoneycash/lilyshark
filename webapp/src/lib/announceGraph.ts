@@ -82,7 +82,9 @@ export function buildTransitionGraph(
 		});
 	}
 
-	const sorted = [...destination.observations].sort((a, b) => a.timeS - b.timeS);
+	const sorted = [...destination.observations].sort(
+		(a, b) => a.timeS - b.timeS,
+	);
 	const transitions: PathTransition[] = [];
 
 	for (let i = 1; i < sorted.length; i++) {
@@ -141,7 +143,9 @@ export function buildTransitionGraph(
 	for (const n of nodes) {
 		const id = nodeKeyIndex.get(n.key) ?? "P";
 		const hopsDesc = `${n.hops} hop${n.hops === 1 ? "" : "s"}`;
-		const viaDesc = n.transportIdHex ? ` via ${n.transportIdHex.slice(0, 8)}…` : " (direct)";
+		const viaDesc = n.transportIdHex
+			? ` via ${n.transportIdHex.slice(0, 8)}…`
+			: " (direct)";
 		const title = sanitizeLabel(`${hopsDesc}${viaDesc} [${n.count}×]`);
 		mermaidLines.push(`  ${id}["${title}"]`);
 	}
@@ -150,7 +154,8 @@ export function buildTransitionGraph(
 		const fromId = nodeKeyIndex.get(e.fromKey);
 		const toId = nodeKeyIndex.get(e.toKey);
 		if (fromId && toId) {
-			const deltaPrefix = e.hopsDelta > 0 ? `+${e.hopsDelta}` : String(e.hopsDelta);
+			const deltaPrefix =
+				e.hopsDelta > 0 ? `+${e.hopsDelta}` : String(e.hopsDelta);
 			const label = `${deltaPrefix} hops (${e.count}×)`;
 			mermaidLines.push(`  ${fromId} -->|"${label}"| ${toId}`);
 		}
