@@ -1,8 +1,12 @@
 <p align="center">
-  <img src="assets/brand/lilyshark-wordmark-pink.svg" alt="Lilyshark" width="520">
+  <img src="assets/brand/lilyshark-wordmark-pink.svg" alt="" width="260">
 </p>
-
-<h1 align="center">Lilyshark</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/lilyshark-logotype-dark.png">
+    <img src="assets/brand/lilyshark-logotype-light.png" alt="Lilyshark" width="440">
+  </picture>
+</p>
 <p align="center"><strong>Wireshark for mesh radio, built for the LILYGO T-Deck.</strong></p>
 
 <p align="center">

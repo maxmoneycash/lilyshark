@@ -687,9 +687,8 @@ function App() {
           setMenuOpen(false);
         }}>
           <img className="logo-mark" src="/lilyshark-wordmark-pink.svg" alt="" aria-hidden="true" />
-          <span className="wordmark">
-            <span className="lily">lily</span>shark
-          </span>
+          <img className="logotype logotype-dark" src="/lilyshark-logotype-dark.png" alt="Lilyshark" />
+          <img className="logotype logotype-light" src="/lilyshark-logotype-light.png" alt="Lilyshark" />
         </a>
         <nav ref={navRef} id="main-navigation" aria-label="Main navigation">
           {NAV_TABS.map((tb, i) => (

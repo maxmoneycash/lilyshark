@@ -1238,6 +1238,21 @@ body {
 :root.light .meshterm .logo .wordmark .lily {
 	color: #16090f;
 }
+/* The logotype: LILY in the theme's neutral extreme, SHARK in brand pink,
+   as a transparent bitmap (assets/brand/lilyshark-logotype-*.png). Two
+   files, one shown per theme -- a swap in CSS rather than `content:` on an
+   <img>, which Firefox does not honour. */
+.meshterm .logo .logotype {
+	height: 26px;
+	width: auto;
+	display: block;
+	flex-shrink: 0;
+	-webkit-user-select: none;
+	user-select: none;
+}
+.meshterm .logo .logotype-light { display: none; }
+:root.light .meshterm .logo .logotype-dark { display: none; }
+:root.light .meshterm .logo .logotype-light { display: block; }
 
 /* ── Light-paper contrast ─────────────────────────────────────────────────
    Additions to the light-theme block near the top of the file. The dimmed
@@ -1589,6 +1604,9 @@ body {
 		display: none;
 	}
 	.meshterm .logo .logo-mark {
+		height: 21px;
+	}
+	.meshterm .logo .logotype {
 		height: 21px;
 	}
 	.meshterm .logo .wordmark {
@@ -2819,6 +2837,9 @@ body:has(.meshterm .app.menu-open) {
 	}
 	.meshterm .logo .wordmark {
 		font-size: clamp(13px, 1.2vw, 20px);
+	}
+	.meshterm .logo .logotype {
+		height: clamp(17px, 1.6vw, 26px);
 	}
 	.meshterm .logo .logo-mark {
 		height: clamp(17px, 1.6vw, 26px);
