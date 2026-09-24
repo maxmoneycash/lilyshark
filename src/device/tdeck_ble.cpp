@@ -66,11 +66,93 @@ BLECharacteristic *from_radio = nullptr;
 BLECharacteristic *from_num = nullptr;
 std::uint32_t from_num_value = 0;
 
+BLECharacteristic *lsk_rx = nullptr;
+BLECharacteristic *lsk_tx = nullptr;
+
+constexpr std::size_t kMaxLskLine = 256;
+constexpr std::size_t kLskQueueDepth = 8;
+struct LskLineQueue {
+    char lines[kLskQueueDepth][kMaxLskLine]{};
+    std::size_t head = 0;
+    std::size_t count = 0;
+
+    bool push(const char *line) noexcept
+    {
+        if (line == nullptr || count == kLskQueueDepth) return false;
+        char *slot = lines[(head + count) % kLskQueueDepth];
+        std::strncpy(slot, line, kMaxLskLine - 1);
+        slot[kMaxLskLine - 1] = '\0';
+        ++count;
+        return true;
+    }
+
+    bool pop(char *out, std::size_t capacity) noexcept
+    {
+        if (count == 0 || out == nullptr || capacity == 0) return false;
+        std::strncpy(out, lines[head], capacity - 1);
+        out[capacity - 1] = '\0';
+        head = (head + 1) % kLskQueueDepth;
+        --count;
+        return true;
+    }
+};
+
+constexpr std::size_t kLskTxRingSize = 2048;
+struct LskTxRing {
+    std::uint8_t buffer[kLskTxRingSize]{};
+    std::size_t head = 0;
+    std::size_t tail = 0;
+    std::size_t count = 0;
+
+    bool push(const std::uint8_t *data, std::size_t len) noexcept
+    {
+        if (data == nullptr || len == 0 || count + len > kLskTxRingSize) return false;
+        for (std::size_t i = 0; i < len; ++i) {
+            buffer[head] = data[i];
+            head = (head + 1) % kLskTxRingSize;
+        }
+        count += len;
+        return true;
+    }
+
+    std::size_t pop(std::uint8_t *out, std::size_t max_len) noexcept
+    {
+        if (out == nullptr || max_len == 0 || count == 0) return 0;
+        const std::size_t to_copy = std::min(max_len, count);
+        for (std::size_t i = 0; i < to_copy; ++i) {
+            out[i] = buffer[tail];
+            tail = (tail + 1) % kLskTxRingSize;
+        }
+        count -= to_copy;
+        return to_copy;
+    }
+
+    void clear() noexcept
+    {
+        head = 0;
+        tail = 0;
+        count = 0;
+    }
+};
+
+LskLineQueue lsk_commands{};
+char lsk_rx_buffer[kMaxLskLine]{};
+std::size_t lsk_rx_len = 0;
+LskTxRing lsk_tx_ring{};
+
 class ServerEvents final : public BLEServerCallbacks {
     void onConnect(BLEServer *) override { status.connected = true; }
     void onDisconnect(BLEServer *server) override
     {
         status.connected = false;
+        portENTER_CRITICAL(&queue_lock);
+        lsk_tx_ring.clear();
+        lsk_rx_len = 0;
+        portEXIT_CRITICAL(&queue_lock);
+#if defined(LILYSHARK_DEVICE)
+        extern bool analyzer_link_active;
+        analyzer_link_active = false;
+#endif
         // Without this a deck is invisible after the first phone walks away.
         server->startAdvertising();
     }
@@ -112,9 +194,36 @@ class FromRadioEvents final : public BLECharacteristicCallbacks {
     }
 };
 
+class LskRxEvents final : public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *characteristic) override
+    {
+        const std::string value = characteristic->getValue();
+        if (value.empty()) return;
+        portENTER_CRITICAL(&queue_lock);
+        for (char c : value) {
+            if (c == '\n' || c == '\r') {
+                if (lsk_rx_len > 0) {
+                    lsk_rx_buffer[lsk_rx_len] = '\0';
+                    if (lsk_commands.push(lsk_rx_buffer)) {
+                        ++status.lsk_commands;
+                    }
+                    lsk_rx_len = 0;
+                }
+            } else if (lsk_rx_len + 1 < sizeof(lsk_rx_buffer)) {
+                lsk_rx_buffer[lsk_rx_len++] = c;
+            } else {
+                // Exceeded 240-byte line buffer cap -- discard line
+                lsk_rx_len = 0;
+            }
+        }
+        portEXIT_CRITICAL(&queue_lock);
+    }
+};
+
 ServerEvents server_events{};
 ToRadioEvents to_radio_events{};
 FromRadioEvents from_radio_events{};
+LskRxEvents lsk_rx_events{};
 
 }  // namespace
 
@@ -146,9 +255,25 @@ bool startTDeckBle(const char *name) noexcept
                        sizeof(from_num_value));
 
     service->start();
+
+    BLEService *lsk_service = server->createService(kLskBleService);
+    if (lsk_service == nullptr) return false;
+
+    lsk_rx = lsk_service->createCharacteristic(
+        kLskBleRxChar, BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
+    lsk_tx = lsk_service->createCharacteristic(
+        kLskBleTxChar, BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ);
+    if (lsk_rx == nullptr || lsk_tx == nullptr) return false;
+
+    lsk_rx->setCallbacks(&lsk_rx_events);
+    lsk_tx->addDescriptor(new BLE2902());
+
+    lsk_service->start();
+
     BLEAdvertising *advertising = BLEDevice::getAdvertising();
-    // The phone scans for the service UUID; advertising without it makes the
-    // deck a nameless peripheral no Meshtastic client will offer to connect to.
+    // Advertise the LSK service in the primary advertisement data so Web Bluetooth
+    // service filter matches, and the Meshtastic service for companion apps.
+    advertising->addServiceUUID(kLskBleService);
     advertising->addServiceUUID(kMeshtasticBleService);
     advertising->setScanResponse(true);
     BLEDevice::startAdvertising();
@@ -182,6 +307,47 @@ std::size_t takeBleToRadio(std::uint8_t *out, std::size_t capacity) noexcept
     return length;
 }
 
+bool queueLskBleTx(const std::uint8_t *bytes, std::size_t length) noexcept
+{
+    if (!status.started || bytes == nullptr || length == 0) return false;
+    portENTER_CRITICAL(&queue_lock);
+    const bool queued = lsk_tx_ring.push(bytes, length);
+    portEXIT_CRITICAL(&queue_lock);
+    return queued;
+}
+
+bool queueLskBleTx(const char *str) noexcept
+{
+    if (str == nullptr) return false;
+    return queueLskBleTx(reinterpret_cast<const std::uint8_t *>(str), std::strlen(str));
+}
+
+bool takeLskBleCommand(char *out, std::size_t capacity) noexcept
+{
+    if (!status.started || out == nullptr || capacity == 0) return false;
+    portENTER_CRITICAL(&queue_lock);
+    const bool taken = lsk_commands.pop(out, capacity);
+    portEXIT_CRITICAL(&queue_lock);
+    return taken;
+}
+
+void serviceLskBleTx() noexcept
+{
+    if (!status.started || !status.connected || lsk_tx == nullptr) return;
+    // Deliver chunks to the 20-byte ATT MTU floor (docs/lsk-ble-contract.md).
+    constexpr std::size_t kAttFloor = 20;
+    std::uint8_t chunk[kAttFloor]{};
+    for (int i = 0; i < 4; ++i) {
+        portENTER_CRITICAL(&queue_lock);
+        const std::size_t len = lsk_tx_ring.pop(chunk, sizeof(chunk));
+        portEXIT_CRITICAL(&queue_lock);
+        if (len == 0) break;
+        lsk_tx->setValue(chunk, len);
+        lsk_tx->notify();
+        ++status.lsk_notifications;
+    }
+}
+
 const BleStatus &tdeckBleStatus() noexcept { return status; }
 
 }  // namespace lilyshark
@@ -195,6 +361,10 @@ BleStatus host_status{};
 bool startTDeckBle(const char *) noexcept { return false; }
 bool queueBleFromRadio(const std::uint8_t *, std::size_t) noexcept { return false; }
 std::size_t takeBleToRadio(std::uint8_t *, std::size_t) noexcept { return 0; }
+bool queueLskBleTx(const std::uint8_t *, std::size_t) noexcept { return false; }
+bool queueLskBleTx(const char *) noexcept { return false; }
+bool takeLskBleCommand(char *, std::size_t) noexcept { return false; }
+void serviceLskBleTx() noexcept {}
 const BleStatus &tdeckBleStatus() noexcept { return host_status; }
 }  // namespace lilyshark
 

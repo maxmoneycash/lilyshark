@@ -24,6 +24,11 @@ inline constexpr char kMeshtasticBleFromRadio[] = "2c55e69e-4993-11ed-b878-0242a
 inline constexpr char kMeshtasticBleToRadio[] = "f75c76d2-129e-4dad-a1dd-7866124401e7";
 inline constexpr char kMeshtasticBleFromNum[] = "ed9da18c-a800-4f66-a670-aa7547e34453";
 
+/// LSK analyzer BLE service and characteristic UUIDs (docs/lsk-ble-contract.md).
+inline constexpr char kLskBleService[] = "6c736b00-9c1d-4b7a-b3f2-1d0e5a7c4e10";
+inline constexpr char kLskBleRxChar[]  = "6c736b01-9c1d-4b7a-b3f2-1d0e5a7c4e10";
+inline constexpr char kLskBleTxChar[]  = "6c736b02-9c1d-4b7a-b3f2-1d0e5a7c4e10";
+
 struct BleStatus {
     bool started = false;
     bool connected = false;
@@ -31,6 +36,10 @@ struct BleStatus {
     std::uint32_t writes = 0;
     /// Protobufs handed to the phone through FromRadio.
     std::uint32_t reads = 0;
+    /// LSK commands received from the browser over BLE.
+    std::uint32_t lsk_commands = 0;
+    /// LSK notifications transmitted to the browser over BLE.
+    std::uint32_t lsk_notifications = 0;
 };
 
 /// Bring up the peripheral and start advertising under `name`. Safe to call
@@ -47,6 +56,16 @@ bool queueBleFromRadio(const std::uint8_t *bytes, std::size_t length) noexcept;
 /// Take the next protobuf the phone wrote to ToRadio, if any. Returns the
 /// length written into `out`, or 0 when nothing is waiting.
 std::size_t takeBleToRadio(std::uint8_t *out, std::size_t capacity) noexcept;
+
+/// Queue outgoing bytes for the LSK TX notify characteristic.
+bool queueLskBleTx(const std::uint8_t *bytes, std::size_t length) noexcept;
+bool queueLskBleTx(const char *str) noexcept;
+
+/// Take the next newline-delimited LSK command received on LSK RX.
+bool takeLskBleCommand(char *out, std::size_t capacity) noexcept;
+
+/// Service outgoing LSK BLE TX notifications, chunked to the 20-byte ATT floor.
+void serviceLskBleTx() noexcept;
 
 const BleStatus &tdeckBleStatus() noexcept;
 

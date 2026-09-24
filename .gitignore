@@ -13,7 +13,7 @@ webapp/.vercel/
 .vercel
 
 # Move build output
-contracts/capture-registry/build/
+contracts/*/build/
 
 # Agent worktrees and session transcripts — never publish these
 .claude/

@@ -20,11 +20,24 @@ class USBCaptureSessionTests(unittest.TestCase):
             build = subprocess.run(["swift", "build", "--package-path", str(package), "--arch", arch], capture_output=True, text=True)
             self.assertEqual(build.returncode, 0, build.stderr[-4000:])
             products = package / f".build/{arch}-apple-macosx/debug"
+            module_dir = products / "Modules"
             objects = list((products / "MeshtasticKit.build").glob("*.swift.o"))
-            self.assertTrue(objects)
+            if not objects or not module_dir.exists():
+                spm_products = package / ".build/out/Products/Debug"
+                if spm_products.exists():
+                    module_dir = spm_products
+                    if (spm_products / "MeshtasticKit.o").exists():
+                        objects = [spm_products / "MeshtasticKit.o"]
+                    elif (spm_products / "libMeshtasticKit.a").exists():
+                        objects = [spm_products / "libMeshtasticKit.a"]
+                if not objects:
+                    objects = list((package / ".build").glob(f"**/{arch}/*.o"))
+                    if not objects:
+                        objects = list((package / ".build").glob("**/*.o"))
+            self.assertTrue(objects, "Could not find compiled MeshtasticKit objects")
             binary = work / "session-check"
             compile = subprocess.run(["swiftc", "-parse-as-library", "-target", f"{arch}-apple-macosx15.0",
-                "-I", str(products / "Modules"), str(ROOT / "ios/Shared/Models/USBCaptureSession.swift"),
+                "-I", str(module_dir), str(ROOT / "ios/Shared/Models/USBCaptureSession.swift"),
                 str(Path(__file__).with_name("usb_session.swift")), *map(str, objects), "-o", str(binary)],
                 capture_output=True, text=True)
             self.assertEqual(compile.returncode, 0, compile.stderr[-6000:])

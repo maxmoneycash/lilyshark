@@ -4,9 +4,10 @@ title: Durable capture_registry deployment + wipe caveat
 area: contracts
 size: S
 priority: P1
-status: doing
+status: blocked
 depends_on:
 - CO-001
+- CO-002
 eval:
   auto:
   - grep -qi 'wiped' contracts/capture-registry/README.md

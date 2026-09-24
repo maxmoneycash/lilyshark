@@ -412,7 +412,7 @@ python3 -m unittest discover -s test/ios6_lab -p 'test_*.py'
 # quietly covers less than it appears to is the failure this is fixing.
 if [[ -d webapp/node_modules ]]; then
   echo "Typechecking webapp"
-  (cd webapp && npx --no-install tsc --noEmit -p tsconfig.json)
+  (cd webapp && ./node_modules/.bin/tsc --noEmit -p tsconfig.json)
 
   echo "Testing webapp"
   (cd webapp && npm test --silent)

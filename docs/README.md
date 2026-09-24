@@ -36,6 +36,7 @@ people arrive at documentation. If you already know the file you want, the
 | [what-you-can-see.md](what-you-can-see.md) | What is actually readable off the air, and what is not. |
 | [meridian-gap.md](meridian-gap.md) | Why coverage has holes, and where they are. |
 | [coverage-map.md](coverage-map.md) | The native and web map, its data contracts, and verification. |
+| [most-wanted.md](most-wanted.md) | The most-wanted coverage cells, ranked by bounty and gap score. |
 | [radio-map-visibility.md](radio-map-visibility.md) | How a T-Deck gets a local position or public listing, and the firmware fixes. |
 
 ## I want to understand how it works
@@ -115,7 +116,7 @@ index, because it reads as complete.
 - `DEMO.md`, `FLASHING.md`, `RECORDING_UI.md`
 - `architecture.md`, `channel-key-security.md`, `hardware.md`
 - `join-the-mesh.md`, `lilyshark-capture-format.md`, `lsk-ble-contract.md`
-- `meridian-gap.md`, `meshcore-participation-plan.md`, `quickstart.md`
+- `meridian-gap.md`, `meshcore-participation-plan.md`, `most-wanted.md`, `quickstart.md`
 - `related-networks.md`, `shelby-off-grid.md`, `shelby-pointer-format.md`
 - `what-you-can-see.md`, `whitepaper-traceability.md`, `why-shelby.md`
 - `diagrams/` — diagram sources, rendered by `scripts/build_diagrams.sh`

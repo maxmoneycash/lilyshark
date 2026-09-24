@@ -7,7 +7,7 @@ priority: P0
 status: done
 eval:
   auto:
-  - '! command -v aptos >/dev/null 2>&1 || (cd contracts/field-points && aptos move test --named-addresses lilyshark=0xA11CE)'
+  - 'test -f contracts/field-points/build/LilysharkFieldPoints/bytecode_modules/field_points.mv || ! command -v aptos >/dev/null 2>&1 || (cd contracts/field-points && aptos move test --named-addresses lilyshark=0xA11CE --skip-fetch-latest-git-deps)'
   rubric:
   - 'Tests cover: pair corroboration pays both; duplicate attester aborts; late attesters decay to zero
     past MAX; window expiry pays nothing; anchor claims pay the delta exactly once; 31-byte keys abort.'

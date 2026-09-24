@@ -1,0 +1,82 @@
+{
+  "events": [
+    {
+      "type": "CaptureRegistered",
+      "tx_version": 1001,
+      "event_index": 0,
+      "timestamp_unix": 1760000000,
+      "data": {
+        "publisher": "0x01",
+        "commitment": "0000000000000000000000000000000000000000000000000000000000000001",
+        "blob_name": "capture-sf-mission.lscap",
+        "size_bytes": 14200,
+        "expires_at_unix": 1790000000
+      }
+    },
+    {
+      "type": "CaptureRegistered",
+      "tx_version": 1002,
+      "event_index": 0,
+      "timestamp_unix": 1760001000,
+      "data": {
+        "publisher": "0x02",
+        "commitment": "0000000000000000000000000000000000000000000000000000000000000002",
+        "blob_name": "capture-sf-soma.lscap",
+        "size_bytes": 18500,
+        "expires_at_unix": 1790001000
+      }
+    },
+    {
+      "type": "CaptureRegistered",
+      "tx_version": 1003,
+      "event_index": 0,
+      "timestamp_unix": 1760002000,
+      "data": {
+        "publisher": "0x01",
+        "commitment": "0000000000000000000000000000000000000000000000000000000000000003",
+        "blob_name": "capture-sf-castro.lscap",
+        "size_bytes": 9800,
+        "expires_at_unix": 1790002000
+      }
+    },
+    {
+      "type": "CaptureRegistered",
+      "tx_version": 1004,
+      "event_index": 0,
+      "timestamp_unix": 1760003000,
+      "data": {
+        "publisher": "0x03",
+        "commitment": "0000000000000000000000000000000000000000000000000000000000000004",
+        "blob_name": "capture-sf-presidio-stale.lscap",
+        "size_bytes": 12100,
+        "expires_at_unix": 1790003000
+      }
+    },
+    {
+      "type": "CaptureRegistered",
+      "tx_version": 1005,
+      "event_index": 0,
+      "timestamp_unix": 1760004000,
+      "data": {
+        "publisher": "0x04",
+        "commitment": "0000000000000000000000000000000000000000000000000000000000000005",
+        "blob_name": "capture-london-central.lscap",
+        "size_bytes": 22400,
+        "expires_at_unix": 1790004000
+      }
+    },
+    {
+      "type": "CaptureRegistered",
+      "tx_version": 1006,
+      "event_index": 0,
+      "timestamp_unix": 1760005000,
+      "data": {
+        "publisher": "0x05",
+        "commitment": "0000000000000000000000000000000000000000000000000000000000000006",
+        "blob_name": "capture-london-east.lscap",
+        "size_bytes": 16900,
+        "expires_at_unix": 1790005000
+      }
+    }
+  ]
+}

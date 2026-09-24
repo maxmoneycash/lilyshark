@@ -1,0 +1,145 @@
+{
+  "method": {
+    "active_cell_count": 5,
+    "as_of_week": "2026-W41",
+    "generator": "scripts/field_receipts_score.py most-wanted",
+    "rules_season": "season-0",
+    "rules_sha256": "09c89fec73974732fbe6136f9803fa65dc352d2bdbeeeb17f48a3890909d0139",
+    "stale_after_weeks": 4,
+    "verified_cell_count": 6
+  },
+  "most_wanted": [
+    {
+      "adjacent_active_cells": 3,
+      "band": "US915",
+      "geohash5": "9q8yw",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 3,
+      "band": "US915",
+      "geohash5": "9q8zn",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 2,
+      "band": "US915",
+      "geohash5": "9q8yt",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 2,
+      "band": "US915",
+      "geohash5": "9q8yx",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 2,
+      "band": "US915",
+      "geohash5": "9q8zj",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 2,
+      "band": "US915",
+      "geohash5": "9q8zp",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 2,
+      "band": "EU868",
+      "geohash5": "gbsus",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 2,
+      "band": "EU868",
+      "geohash5": "gbsut",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 2,
+      "band": "EU868",
+      "geohash5": "gbsvh",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 2,
+      "band": "EU868",
+      "geohash5": "gbsvj",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "US915",
+      "geohash5": "9q8ys",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "US915",
+      "geohash5": "9q8yu",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "US915",
+      "geohash5": "9q8zh",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "US915",
+      "geohash5": "9q9n8",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "US915",
+      "geohash5": "9q9nb",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "US915",
+      "geohash5": "9q9p0",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "EU868",
+      "geohash5": "gbsue",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "EU868",
+      "geohash5": "gbsug",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "EU868",
+      "geohash5": "gbsuw",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "EU868",
+      "geohash5": "gbsuy",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "EU868",
+      "geohash5": "gbsv5",
+      "last_surveyed_week": null
+    },
+    {
+      "adjacent_active_cells": 1,
+      "band": "EU868",
+      "geohash5": "gbsvn",
+      "last_surveyed_week": null
+    }
+  ]
+}

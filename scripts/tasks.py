@@ -22,6 +22,7 @@ Exit codes: 0 clean, 1 validation error or eval failure/regression.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -138,9 +139,10 @@ def run_auto(task: Task) -> tuple[bool, list[tuple[str, bool, str]]]:
     """Run a task's auto checks from the repo root. Returns (all_ok, results)."""
     results = []
     ok = True
+    timeout = int(os.environ.get("TASK_TIMEOUT", "3600"))
     for cmd in task.auto:
         proc = subprocess.run(
-            cmd, shell=True, cwd=REPO, capture_output=True, text=True, timeout=600
+            cmd, shell=True, cwd=REPO, capture_output=True, text=True, timeout=timeout
         )
         passed = proc.returncode == 0
         ok &= passed

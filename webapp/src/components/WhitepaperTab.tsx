@@ -17,7 +17,7 @@
 
 import "./whitepaper.css";
 
-const PAGES = 63;
+const PAGES = 64;
 const PAGE_RATIO = 1812 / 1400; // height / width of the pre-rendered pages
 const src = (n: number) => `/paper/page-${String(n).padStart(3, "0")}.webp`;
 

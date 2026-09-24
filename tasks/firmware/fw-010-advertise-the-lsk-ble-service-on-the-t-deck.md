@@ -4,7 +4,7 @@ title: Advertise the LSK Bluetooth service on the T-Deck
 area: firmware
 size: L
 priority: P2
-status: todo
+status: doing
 depends_on: [UI-017]
 eval:
   auto:

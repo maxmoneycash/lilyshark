@@ -1,7 +1,7 @@
 # Whitepaper ↔ repository traceability
 
-The whitepaper ("The Growth Trap in Proof of Physical Work", v1.0,
-2026-08-07, 63 pp — the PAPER tab and
+The whitepaper ("The Growth Trap in Proof of Physical Work", v1.1,
+2026-09-24, 64 pp — the PAPER tab and
 `webapp/public/lilyshark-whitepaper.pdf`) is a research report: it measures
 mesh capacity, ranks verification tiers, and specifies a protocol it would
 fund. It is **not** a spec for the Lilyshark device — the product's own

@@ -4,9 +4,11 @@ title: Related-networks appendix for whitepaper v1.1
 area: paper
 size: M
 priority: P2
-status: todo
+status: done
 depends_on: [PA-001]
 eval:
+  auto:
+  - python3 scripts/generate_whitepaper_v1_1.py --check
   rubric:
   - The appendix answers "why isn't X in the paper" for the overlay networks people actually ask about (Freenet, Hyphanet, I2P, Yggdrasil, Veilid, Nostr), with the scope rule stated once.
   - Each entry names what the network contributes to the paper's argument (prior art, counterexample, candidate layer), not just why it is excluded.

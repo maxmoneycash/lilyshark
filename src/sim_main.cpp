@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <cstdarg>
 #if !defined(ESP_PLATFORM)
 #include <sys/stat.h>
 #include <unistd.h>
@@ -10378,6 +10379,47 @@ void json_copy_ascii(char *out, std::size_t cap, const char *in) noexcept
     out[o] = '\0';
 }
 
+void emit_lsk_print(const char *str) noexcept
+{
+    if (str == nullptr) return;
+    Serial.print(str);
+#if defined(ESP_PLATFORM)
+    if (analyzer_link_active) {
+        (void)::lilyshark::queueLskBleTx(str);
+    }
+#endif
+}
+
+void emit_lsk_println(const char *str) noexcept
+{
+    if (str == nullptr) return;
+    Serial.println(str);
+#if defined(ESP_PLATFORM)
+    if (analyzer_link_active) {
+        (void)::lilyshark::queueLskBleTx(str);
+        (void)::lilyshark::queueLskBleTx("\n");
+    }
+#endif
+}
+
+void emit_lsk_printf(const char *fmt, ...) noexcept
+{
+    if (fmt == nullptr) return;
+    char buf[1024];
+    va_list args;
+    va_start(args, fmt);
+    const int len = std::vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    if (len > 0) {
+        Serial.print(buf);
+#if defined(ESP_PLATFORM)
+        if (analyzer_link_active) {
+            (void)::lilyshark::queueLskBleTx(reinterpret_cast<const std::uint8_t *>(buf), static_cast<std::size_t>(len));
+        }
+#endif
+    }
+}
+
 void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
 {
     if (!analyzer_link_active) return;
@@ -10428,7 +10470,7 @@ void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
     const int hops = packet.hasField(FieldHopStart) && packet.hop_start >= packet.hop_limit
                          ? static_cast<int>(packet.hop_start - packet.hop_limit)
                          : -1;
-    Serial.printf(
+    emit_lsk_printf(
         "LSK F {\"src\":%lu,\"dst\":%lu,\"proto\":\"%s\",\"port\":%u,\"hops\":%d,"
         "\"rssi_x10\":%d,\"snr_x10\":%d,\"kind\":\"%s\",\"sim\":%s",
         static_cast<unsigned long>(packet.source), static_cast<unsigned long>(packet.destination),
@@ -10436,16 +10478,16 @@ void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
         static_cast<int>(record.raw.rf.rssi_dbm_x10), static_cast<int>(record.raw.rf.snr_db_x10),
         packetKindLabel(packet),
         record.raw.rf.origin == FrameOrigin::Synthetic ? "true" : "false");
-    if (have_pos) Serial.printf(",\"lat\":%.6f,\"lon\":%.6f", lat, lon);
-    if (long_name[0] != '\0') Serial.printf(",\"name\":\"%s\"", long_name);
-    if (short_name[0] != '\0') Serial.printf(",\"short\":\"%s\"", short_name);
-    if (text[0] != '\0') Serial.printf(",\"text\":\"%s\"", text);
+    if (have_pos) emit_lsk_printf(",\"lat\":%.6f,\"lon\":%.6f", lat, lon);
+    if (long_name[0] != '\0') emit_lsk_printf(",\"name\":\"%s\"", long_name);
+    if (short_name[0] != '\0') emit_lsk_printf(",\"short\":\"%s\"", short_name);
+    if (text[0] != '\0') emit_lsk_printf(",\"text\":\"%s\"", text);
     // Everything a faithful .lscap record needs, so the analyzer can rebuild a
     // capture from the link rather than from a summary. Without the payload and
     // these measurements a browser-side capture would be a decoded listing
     // wearing a capture format's name.
     const RfMetadata &lsk_rf = record.raw.rf;
-    Serial.printf(",\"seq\":%lu,\"ts\":%llu,\"pf\":%lu,\"freq\":%lu,\"bw\":%lu"
+    emit_lsk_printf(",\"seq\":%lu,\"ts\":%llu,\"pf\":%lu,\"freq\":%lu,\"bw\":%lu"
                   ",\"br\":%lu,\"fdev\":%lu,\"air\":%lu,\"ferr\":%ld"
                   ",\"pre\":%u,\"sync\":%u,\"prof\":%u,\"rstat\":%d,\"txp\":%d"
                   ",\"sf\":%u,\"cr\":%u,\"ch\":%u,\"ridx\":%u"
@@ -10476,12 +10518,12 @@ void emit_analyzer_heard_frame(const FrameRecord &record) noexcept
                                         (lsk_rf.origin == FrameOrigin::Synthetic ? 4U : 0U) |
                                         (lsk_rf.origin == FrameOrigin::Net ? 8U : 0U)),
                   static_cast<unsigned>(record.raw.original_length));
-    Serial.printf(",\"hex\":\"");
+    emit_lsk_print(",\"hex\":\"");
     for (std::uint16_t i = 0; i < record.raw.captured_length; ++i) {
-        Serial.printf("%02x", record.raw.bytes[i]);
+        emit_lsk_printf("%02x", record.raw.bytes[i]);
     }
-    Serial.printf("\"");
-    Serial.printf("}\n");
+    emit_lsk_print("\"");
+    emit_lsk_println("}");
 }
 #endif
 
@@ -10875,7 +10917,7 @@ void ingest_analyzer_frame(const RawFrame &frame, const RadioProfile &profile,
                 for(unsigned index = 0; index < ShelbyPointer::kCommitmentSize; ++index) {
                     std::snprintf(commit_hex + index * 2U, 3U, "%02x", pointer.commitment[index]);
                 }
-                Serial.printf("LSK P {\"size\":%lu,\"expires\":%lu,\"owner\":\"0x%s\",\"commit\":\"0x%s\"}\n",
+                emit_lsk_printf("LSK P {\"size\":%lu,\"expires\":%lu,\"owner\":\"0x%s\",\"commit\":\"0x%s\"}\n",
                               static_cast<unsigned long>(pointer.size_bytes),
                               static_cast<unsigned long>(pointer.expires_at_unix),
                               owner_hex, commit_hex);
@@ -16950,7 +16992,7 @@ void handle_mesh_tx_command(const char *line) noexcept
         char label[9]{};
         const int fields = std::sscanf(line + 9, "%8lx %ld %ld %8s", &id, &lat_i, &lon_i, label);
         if (fields < 3 || id == 0UL || id == 0xffffffffUL) {
-            Serial.println("LSK ERR {\"reason\":\"bad-node\"}");
+            emit_lsk_println("LSK ERR {\"reason\":\"bad-node\"}");
             return;
         }
         NetRumourNode *slot = nullptr;
@@ -16975,7 +17017,7 @@ void handle_mesh_tx_command(const char *line) noexcept
         slot->longitude_degrees = static_cast<double>(lon_i) / 1e7;
         slot->heard_ms = millis();
         live_data_dirty = true;
-        Serial.println("LSK OK {\"kind\":\"node\"}");
+        emit_lsk_println("LSK OK {\"kind\":\"node\"}");
         return;
     }
     // Deliberate advert over USB, for testing next to a stock node. The bare
@@ -16987,10 +17029,10 @@ void handle_mesh_tx_command(const char *line) noexcept
         const char *failure = transmit_meshcore_advert(
             advert_flood ? MeshCoreAdvertReach::Flood : MeshCoreAdvertReach::ZeroHop);
         if (failure != nullptr) {
-            Serial.printf("LSK ERR {\"proto\":\"meshcore\",\"reason\":\"%s\"}\n", failure);
+            emit_lsk_printf("LSK ERR {\"proto\":\"meshcore\",\"reason\":\"%s\"}\n", failure);
             return;
         }
-        Serial.printf("LSK OK {\"proto\":\"meshcore\",\"kind\":\"advert\",\"reach\":\"%s\"}\n",
+        emit_lsk_printf("LSK OK {\"proto\":\"meshcore\",\"kind\":\"advert\",\"reach\":\"%s\"}\n",
                       advert_flood ? "flood" : "zero-hop");
         record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
                              advert_flood ? "MeshCore flood advert transmitted"
@@ -16998,13 +17040,13 @@ void handle_mesh_tx_command(const char *line) noexcept
         return;
     }
     if (std::strncmp(line, "LSK TX meshcore", 15) == 0) {
-        Serial.println("LSK ERR {\"reason\":\"bad-tx\"}");
+        emit_lsk_println("LSK ERR {\"reason\":\"bad-tx\"}");
         return;
     }
     if (std::strncmp(line, "LSK TX meshtastic text ", 23) == 0) {
         const char *text = line + 23;
         const bool ok = transmit_meshtastic(MeshtasticPort::TextMessage, text);
-        Serial.printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"text\"}\n", ok ? "OK" : "ERR");
+        emit_lsk_printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"text\"}\n", ok ? "OK" : "ERR");
         if (ok) {
             record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
                                  "Meshtastic text transmitted");
@@ -17018,7 +17060,7 @@ void handle_mesh_tx_command(const char *line) noexcept
         std::uint8_t digits = 0;
         while (*cursor != '\0' && *cursor != ' ') {
             if (digits >= 8U) {
-                Serial.println("LSK ERR {\"reason\":\"bad-tx\"}");
+                emit_lsk_println("LSK ERR {\"reason\":\"bad-tx\"}");
                 return;
             }
             dest <<= 4U;
@@ -17031,18 +17073,18 @@ void handle_mesh_tx_command(const char *line) noexcept
             } else if (hex >= 'A' && hex <= 'F') {
                 dest |= static_cast<std::uint32_t>(hex - 'A' + 10);
             } else {
-                Serial.println("LSK ERR {\"reason\":\"bad-tx\"}");
+                emit_lsk_println("LSK ERR {\"reason\":\"bad-tx\"}");
                 return;
             }
             any_digit = true;
         }
         if (!any_digit || *cursor != ' ' || cursor[1] == '\0') {
-            Serial.println("LSK ERR {\"reason\":\"bad-tx\"}");
+            emit_lsk_println("LSK ERR {\"reason\":\"bad-tx\"}");
             return;
         }
         const char *text = cursor + 1;
         const bool ok = transmit_meshtastic(MeshtasticPort::TextMessage, text, dest);
-        Serial.printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"dm\"}\n", ok ? "OK" : "ERR");
+        emit_lsk_printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"dm\"}\n", ok ? "OK" : "ERR");
         if (ok) {
             chat_remember_peer(dest, nullptr);
             record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
@@ -17052,17 +17094,17 @@ void handle_mesh_tx_command(const char *line) noexcept
     }
     if (std::strcmp(line, "LSK TX meshtastic position") == 0) {
         const bool ok = transmit_meshtastic(MeshtasticPort::Position, nullptr);
-        Serial.printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"position\"}\n",
+        emit_lsk_printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"position\"}\n",
                       ok ? "OK" : "ERR");
         return;
     }
     if (std::strcmp(line, "LSK TX meshtastic nodeinfo") == 0) {
         const bool ok = transmit_meshtastic(MeshtasticPort::NodeInfo, nullptr);
-        Serial.printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"nodeinfo\"}\n",
+        emit_lsk_printf("LSK %s {\"proto\":\"meshtastic\",\"kind\":\"nodeinfo\"}\n",
                       ok ? "OK" : "ERR");
         return;
     }
-    Serial.println("LSK ERR {\"reason\":\"bad-tx\"}");
+    emit_lsk_println("LSK ERR {\"reason\":\"bad-tx\"}");
 }
 #endif
 
@@ -17093,7 +17135,7 @@ void handle_mesh_inject_command(const char *line) noexcept
         if (!bad) bytes[length++] = value;
     }
     if (bad || length == 0U || *cursor != '\0') {
-        Serial.println("LSK ERR {\"reason\":\"bad-inj\"}");
+        emit_lsk_println("LSK ERR {\"reason\":\"bad-inj\"}");
         return;
     }
     RawFrame frame{};
@@ -17118,7 +17160,7 @@ void handle_mesh_inject_command(const char *line) noexcept
     frame.rf.crc = CrcStatus::Valid;
     frame.rf.origin = FrameOrigin::Net;
     ingest_analyzer_frame(frame, profile, true);
-    Serial.println("LSK OK {\"kind\":\"inj\"}");
+    emit_lsk_println("LSK OK {\"kind\":\"inj\"}");
     return;
 }
 #endif
@@ -17134,15 +17176,15 @@ void handle_sweep_link_command(const char *line) noexcept
     const char *verb = line + 10;
     if (std::strcmp(verb, "start") == 0) {
         if (app_settings.simulate_mode) {
-            Serial.println("LSK ERR {\"reason\":\"simulate-mode\"}");
+            emit_lsk_println("LSK ERR {\"reason\":\"simulate-mode\"}");
             return;
         }
         if (survey_running) {
-            Serial.println("LSK ERR {\"reason\":\"survey-running\"}");
+            emit_lsk_println("LSK ERR {\"reason\":\"survey-running\"}");
             return;
         }
         if (radio_service.spectrumStatus().active()) {
-            Serial.println("LSK ERR {\"reason\":\"sweep-already-running\"}");
+            emit_lsk_println("LSK ERR {\"reason\":\"sweep-already-running\"}");
             return;
         }
         const SpectrumSweepRequest request = spectrum_request_for_profile(
@@ -17150,7 +17192,7 @@ void handle_sweep_link_command(const char *line) noexcept
         if (!radio_service.startSpectrumSweep(request)) {
             const bool radio_down = radio_service.spectrumStatus().failure ==
                                     SpectrumSweepFailure::RadioUnavailable;
-            Serial.printf("LSK ERR {\"reason\":\"%s\"}\n",
+            emit_lsk_printf("LSK ERR {\"reason\":\"%s\"}\n",
                           radio_down ? "radio-unavailable" : "start-failed");
             return;
         }
@@ -17158,7 +17200,7 @@ void handle_sweep_link_command(const char *line) noexcept
         // operator learns the pause was asked for, not a radio fault.
         record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::Spectrum,
                              "Web analyzer started a spectrum scan; receive paused");
-        Serial.println("LSK OK {\"kind\":\"sweep\",\"state\":\"started\"}");
+        emit_lsk_println("LSK OK {\"kind\":\"sweep\",\"state\":\"started\"}");
         return;
     }
     if (std::strcmp(verb, "stop") == 0) {
@@ -17167,10 +17209,10 @@ void handle_sweep_link_command(const char *line) noexcept
         if (radio_service.spectrumStatus().active()) {
             radio_service.cancelSpectrumSweep();
         }
-        Serial.println("LSK OK {\"kind\":\"sweep\",\"state\":\"stopped\"}");
+        emit_lsk_println("LSK OK {\"kind\":\"sweep\",\"state\":\"stopped\"}");
         return;
     }
-    Serial.println("LSK ERR {\"reason\":\"bad-sweep\"}");
+    emit_lsk_println("LSK ERR {\"reason\":\"bad-sweep\"}");
 }
 
 /// One line per completed sweep pass, whether the pass was started from this
@@ -17193,7 +17235,7 @@ void emit_analyzer_sweep_result() noexcept
     const std::uint32_t half_step_hz = result.request.step_hz / 2U;
     const std::uint32_t first_hz = result.points[0].frequency_hz;
     const std::uint32_t last_hz = result.points[result.point_count - 1U].frequency_hz;
-    Serial.printf("LSK S {\"f0\":%lu,\"f1\":%lu,\"bins\":%u,\"db\":[",
+    emit_lsk_printf("LSK S {\"f0\":%lu,\"f1\":%lu,\"bins\":%u,\"db\":[",
                   static_cast<unsigned long>(first_hz > half_step_hz ? first_hz - half_step_hz
                                                                      : 0U),
                   static_cast<unsigned long>(last_hz + half_step_hz),
@@ -17203,10 +17245,10 @@ void emit_analyzer_sweep_result() noexcept
         const std::size_t bin = summary.has_samples
             ? summary.strongest_nonzero_bin
             : kSpectrumPowerBinCount - 1U;
-        Serial.printf("%s%d", point == 0U ? "" : ",",
+        emit_lsk_printf("%s%d", point == 0U ? "" : ",",
                       static_cast<int>(spectrumBinDbmX10(bin) / 10));
     }
-    Serial.printf("]}\n");
+    emit_lsk_println("]}");
 }
 #endif
 
@@ -17216,12 +17258,12 @@ void handle_analyzer_link_command(const char *line) noexcept
         const bool first_link = !analyzer_link_active;
         analyzer_link_active = true;
         analyzer_link_last_telemetry_ms = 0;
-        Serial.printf(
+        emit_lsk_printf(
             "LSK ID {\"app\":\"lilyshark\",\"fw\":\"%s\",\"board\":\"t-deck\",\"node\":\"!%08lx\"}\n",
             firmware_version, static_cast<unsigned long>(localMeshtasticNodeNum()));
         if(first_link) {
             record_runtime_event(RuntimeEventSeverity::Success, RuntimeEventType::System,
-                                 "Web analyzer linked over USB");
+                                 "Web analyzer linked");
 #if defined(LILYSHARK_DEVICE)
             (void)transmit_meshtastic(MeshtasticPort::NodeInfo, nullptr);
             if (hardware_status.snapshot().gps.state == GpsState::Fix) {
@@ -17271,6 +17313,13 @@ ApiNodeEntry api_self_node() noexcept
 
 void service_ble_api() noexcept
 {
+    // Web analyzer BLE command dispatch and TX draining.
+    char ble_lsk_command[256];
+    while (::lilyshark::takeLskBleCommand(ble_lsk_command, sizeof(ble_lsk_command))) {
+        handle_analyzer_link_command(ble_lsk_command);
+    }
+    ::lilyshark::serviceLskBleTx();
+
     // A phone connecting is an event on par with a node appearing, and it
     // was invisible: the deck paired silently and the operator learned it
     // only from the phone's side of the conversation.
@@ -17600,7 +17649,7 @@ void loop()
         const auto latest_direction = static_cast<unsigned>(
             newest != nullptr ? newest->raw.rf.direction : FrameDirection::Unknown);
         if(hardware.gps.state == GpsState::Fix && hardware.gps.position_valid) {
-            Serial.printf(
+            emit_lsk_printf(
                 "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
                 "\"rssi_x10\":%d,\"snr_x10\":%d,\"latest_pf\":%lu,\"latest_dir\":%u,"
                 "\"sim\":%s,\"lat\":%.6f,\"lon\":%.6f,"
@@ -17628,7 +17677,7 @@ void loop()
                 static_cast<unsigned long>(capture_unwritten.total()),
                 lilyshark::captureStorageStatusLabel(capture_storage_status));
         } else {
-            Serial.printf(
+            emit_lsk_printf(
                 "LSK T {\"bat\":\"%s\",\"gps\":\"%s\",\"profile\":\"%s\",\"frames\":%lu,"
                 "\"rssi_x10\":%d,\"snr_x10\":%d,\"latest_pf\":%lu,\"latest_dir\":%u,\"sim\":%s,"
                 "\"mv\":%lu,\"pct\":%u,\"sat\":%u,\"freq_hz\":%lu,\"sf\":%u,\"bw_hz\":%lu,"

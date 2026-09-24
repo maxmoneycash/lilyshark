@@ -4,10 +4,12 @@ title: Most-wanted cells list
 area: growth
 size: S
 priority: P2
-status: doing
+status: done
 depends_on:
 - PR-005
 eval:
+  auto:
+  - python3 scripts/generate_most_wanted.py --check
   rubric:
   - A generated, dated list of empty/stale cells adjacent to active ones, published where contributors
     look (site + README badge).
