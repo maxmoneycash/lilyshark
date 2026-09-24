@@ -48,8 +48,10 @@
  * (conversation.test.ts).
  */
 
-/** Meshtastic's broadcast destination — NODENUM_BROADCAST. */
+import { isReticulumIfac } from "./dissect/rnode";
 import { profileProtocol } from "./profileProtocol";
+
+export { isReticulumIfac };
 
 export const MESHTASTIC_BROADCAST_HEX = "ffffffff";
 
@@ -173,6 +175,9 @@ const REASON = {
 	reticulumNoHeader:
 		"this Reticulum frame carries no readable destination hash — a split continuation, an IFAC-masked header, an out-of-range hop count, or a header cut short",
 	reticulumNoHeaderShort: "no readable Reticulum destination hash",
+	reticulumIfac:
+		"this Reticulum frame is IFAC-masked — inner headers and destination cannot be read without the interface access key",
+	reticulumIfacShort: "IFAC-masked (inner headers encrypted)",
 } as const;
 
 /**
@@ -193,9 +198,13 @@ export function frameAddressing(
 		}
 		case "reticulum": {
 			const dst = reticulumDestinationHashHex(bytes);
-			return dst === null
-				? { ...NO_ADDRESSING, reason: REASON.reticulumNoHeader }
-				: { src: null, dst, reason: REASON.reticulumNoSource };
+			if (dst === null) {
+				const reason = isReticulumIfac(bytes)
+					? REASON.reticulumIfac
+					: REASON.reticulumNoHeader;
+				return { ...NO_ADDRESSING, reason };
+			}
+			return { src: null, dst, reason: REASON.reticulumNoSource };
 		}
 		case "meshcore":
 			return { ...NO_ADDRESSING, reason: REASON.meshcore };
@@ -316,6 +325,7 @@ function shortReason(reason: string): string {
 	if (reason === REASON.meshtasticMalformed)
 		return REASON.meshtasticMalformedShort;
 	if (reason === REASON.reticulumNoHeader) return REASON.reticulumNoHeaderShort;
+	if (reason === REASON.reticulumIfac) return REASON.reticulumIfacShort;
 	return reason;
 }
 

@@ -174,6 +174,17 @@ test("a Reticulum frame with no readable header names no address", () => {
 	assert.equal(conversationLabel(a), null);
 });
 
+test("an IFAC-masked Reticulum frame explains inner headers cannot be read", () => {
+	const ifac = reticulumBytes(RNS_HASH);
+	ifac[1] = 0x81; // IFAC bit set
+	const a = frameAddressing(ifac, 5);
+	assert.deepEqual({ src: a.src, dst: a.dst }, { src: null, dst: null });
+	assert.match(a.reason ?? "", /IFAC-masked/);
+	assert.match(a.reason ?? "", /interface access key/);
+	assert.equal(conversationExpression(a), null);
+	assert.equal(conversationLabel(a), null);
+});
+
 test("MeshCore is excluded explicitly — the dissector claims no address", () => {
 	const a = frameAddressing(new Uint8Array([0x09, 0x00, 1, 2, 3]), 2);
 	assert.equal(isAddressable(a), false);

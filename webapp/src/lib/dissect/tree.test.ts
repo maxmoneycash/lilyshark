@@ -37,8 +37,9 @@ test("profileProtocolHint mirrors the builtin profile table", () => {
 	// meaning checkable against src/core/builtin_profiles.cpp.
 	assert.equal(profileProtocolHint(4), "meshtastic");
 	assert.equal(profileProtocolHint(5), "reticulum");
-	assert.equal(profileProtocolHint(5), "reticulum");
-	assert.equal(profileProtocolHint(6), "custom");
+	assert.equal(profileProtocolHint(6), "reticulum");
+	assert.equal(profileProtocolHint(7), "reticulum");
+	assert.equal(profileProtocolHint(8), "custom");
 	assert.equal(profileProtocolHint(250), "custom");
 });
 

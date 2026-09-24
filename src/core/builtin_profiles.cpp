@@ -63,6 +63,10 @@ const RadioProfile profiles[] = {
     // A US-band starting point for deployment-defined RNode settings. This is
     // not a universal Reticulum channel; tune it to the peer interface.
     makeProfile(5, "RNODE EXAMPLE US", ProtocolId::Reticulum, 915000000U, 125000U, 8, 5, 0x1424),
+    // Standard European 868 MHz Reticulum channel: 868.0 MHz, 125 kHz BW, SF 9, CR 5 (4/5).
+    makeProfile(6, "RNODE EU 868", ProtocolId::Reticulum, 868000000U, 125000U, 9, 5, 0x1424),
+    // High-speed US 915 MHz Reticulum channel: 915.0 MHz, 500 kHz BW, SF 7, CR 5 (4/5).
+    makeProfile(7, "RNODE US FAST", ProtocolId::Reticulum, 915000000U, 500000U, 7, 5, 0x1424),
 };
 
 } // namespace

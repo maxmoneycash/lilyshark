@@ -143,6 +143,18 @@ void testProfileTuningIsWhatTheAirtimesAssume()
     expectEqual("MeshCore US bandwidth", meshcore.bandwidth_hz, 62500U);
     expectEqual("MeshCore US coding rate denominator", meshcore.coding_rate_denominator, 5U);
     expectEqual("MeshCore US preamble symbols", meshcore.preamble_symbols, 32U);
+
+    const RadioProfile &rnode_eu = profileNamed("RNODE EU 868");
+    expectEqual("RNode EU 868 spreading factor", rnode_eu.spreading_factor, 9U);
+    expectEqual("RNode EU 868 bandwidth", rnode_eu.bandwidth_hz, 125000U);
+    expectEqual("RNode EU 868 coding rate denominator", rnode_eu.coding_rate_denominator, 5U);
+    expectEqual("RNode EU 868 preamble symbols", rnode_eu.preamble_symbols, 18U);
+
+    const RadioProfile &rnode_us_fast = profileNamed("RNODE US FAST");
+    expectEqual("RNode US FAST spreading factor", rnode_us_fast.spreading_factor, 7U);
+    expectEqual("RNode US FAST bandwidth", rnode_us_fast.bandwidth_hz, 500000U);
+    expectEqual("RNode US FAST coding rate denominator", rnode_us_fast.coding_rate_denominator, 5U);
+    expectEqual("RNode US FAST preamble symbols", rnode_us_fast.preamble_symbols, 94U);
 }
 
 /// The one figure here with an origin outside this repository. SF7, 125 kHz,

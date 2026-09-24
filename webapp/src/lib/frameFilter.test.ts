@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
 	type FilterFrame,
+	frameIsIfac,
 	parseFrameFilter,
 	protoOfProfile,
 } from "./frameFilter";
@@ -142,6 +143,50 @@ test("has:synthetic and has:pointer atoms", () => {
 	assert.equal(compile("has:pointer")(frame(), false), false);
 	// without the flag, the payload is scanned — 3 junk bytes hold no pointer
 	assert.equal(compile("has:pointer")(frame()), false);
+});
+
+test("IFAC filter expressions: rns.ifac, has:ifac, equality with 1/0 and true/false", () => {
+	// profileId 5 is Reticulum (RNode)
+	// byte 0 = 0x00 (non-split), byte 1 = 0x80 (IFAC bit set)
+	const ifacBytes = new Uint8Array([0x00, 0x80, 0x01, 0x02, 0x03]);
+	const ifacFrame = frame({ profileId: 5, bytes: ifacBytes });
+	// clear Reticulum frame: byte 1 = 0x01 (no IFAC bit)
+	const clearBytes = new Uint8Array([0x00, 0x01, 0x01, 0x02, 0x03]);
+	const clearFrame = frame({ profileId: 5, bytes: clearBytes });
+	// Meshtastic frame with 0x80 in byte 1 (must NOT match rns.ifac because profile is Meshtastic)
+	const meshFrame = frame({ profileId: 1, bytes: ifacBytes });
+
+	assert.equal(frameIsIfac(ifacFrame), true);
+	assert.equal(frameIsIfac(clearFrame), false);
+	assert.equal(frameIsIfac(meshFrame), false);
+
+	// Bare boolean flag
+	assert.equal(compile("rns.ifac")(ifacFrame), true);
+	assert.equal(compile("rns.ifac")(clearFrame), false);
+	assert.equal(compile("rns.ifac")(meshFrame), false);
+	assert.equal(compile("!rns.ifac")(clearFrame), true);
+
+	// has:ifac atom
+	assert.equal(compile("has:ifac")(ifacFrame), true);
+	assert.equal(compile("has:ifac")(clearFrame), false);
+	assert.equal(compile("!has:ifac")(clearFrame), true);
+
+	// == 1 and == 0
+	assert.equal(compile("rns.ifac == 1")(ifacFrame), true);
+	assert.equal(compile("rns.ifac == 1")(clearFrame), false);
+	assert.equal(compile("rns.ifac == 0")(ifacFrame), false);
+	assert.equal(compile("rns.ifac == 0")(clearFrame), true);
+	assert.equal(compile("rns.ifac != 0")(ifacFrame), true);
+	assert.equal(compile("rns.ifac != 1")(clearFrame), true);
+
+	// == true and == false
+	assert.equal(compile("rns.ifac == true")(ifacFrame), true);
+	assert.equal(compile("rns.ifac == false")(clearFrame), true);
+	assert.equal(compile("rns.ifac != false")(ifacFrame), true);
+
+	// case insensitivity
+	assert.equal(compile("RNS.IFAC == 1")(ifacFrame), true);
+	assert.equal(compile("HAS:IFAC")(ifacFrame), true);
 });
 
 test("field and enum literals are case-insensitive", () => {

@@ -173,6 +173,16 @@ export function reticulumDestinationHashHex(bytes: Uint8Array): string | null {
 	return hexBytes(bytes, destinationOffset, RETICULUM_HASH_BYTES);
 }
 
+/**
+ * True when the bytes carry a non-split RNode frame with the Reticulum IFAC
+ * bit set (bit 7 of the RNS flags).
+ */
+export function isReticulumIfac(bytes: Uint8Array): boolean {
+	if (bytes.length < RNODE_SHIM_LENGTH + 1) return false;
+	if ((bytes[0] & 0x01) !== 0) return false; // split continuation
+	return (bytes[1] & 0x80) !== 0;
+}
+
 /** Absolute byte range inside the captured frame (ReticulumByteRange). */
 export interface ReticulumByteRange {
 	offset: number;

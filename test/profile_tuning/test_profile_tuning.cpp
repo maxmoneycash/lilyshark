@@ -336,6 +336,26 @@ void testBuiltinProfilesUseValidatedPoliciesAndPreambles()
         assert(profile.preamble_symbols == derivePreambleSymbols(profile));
         assert(isSupportedTunedProfile(profile));
     }
+
+    const RadioProfile *rnode_eu = findBuiltinProfile(6U);
+    assert(rnode_eu != nullptr);
+    assert(rnode_eu->protocol_hint == ProtocolId::Reticulum);
+    assert(rnode_eu->center_frequency_hz == 868000000U);
+    assert(rnode_eu->bandwidth_hz == 125000U);
+    assert(rnode_eu->spreading_factor == 9U);
+    assert(rnode_eu->coding_rate_denominator == 5U);
+    assert(rnode_eu->sync_word == 0x1424);
+    assert(rnode_eu->preamble_symbols == 18U);
+
+    const RadioProfile *rnode_us_fast = findBuiltinProfile(7U);
+    assert(rnode_us_fast != nullptr);
+    assert(rnode_us_fast->protocol_hint == ProtocolId::Reticulum);
+    assert(rnode_us_fast->center_frequency_hz == 915000000U);
+    assert(rnode_us_fast->bandwidth_hz == 500000U);
+    assert(rnode_us_fast->spreading_factor == 7U);
+    assert(rnode_us_fast->coding_rate_denominator == 5U);
+    assert(rnode_us_fast->sync_word == 0x1424);
+    assert(rnode_us_fast->preamble_symbols == 94U);
 }
 
 void testCodingRateCycle()

@@ -42,8 +42,14 @@
 
 import type { FrameAddressing } from "./conversation";
 import { frameAddressing, reticulumDestinationHashHex } from "./conversation";
+import { isReticulumIfac } from "./dissect/rnode";
 import { findShelbyPointer } from "./lscap";
 import { profileProtocol } from "./profileProtocol";
+
+/** True when this frame is a non-split Reticulum frame carrying the IFAC flag. */
+export function frameIsIfac(frame: FilterFrame): boolean {
+	return protoOfProfile(frame.profileId) === "rnode" && isReticulumIfac(frame.bytes);
+}
 
 /** The subset of an LscapFrame a filter can see. Structural, so tests can
  *  build frames without the full 30-field record. */
@@ -243,8 +249,10 @@ export const FILTER_FIELDS = [
 	...Object.keys(NUMERIC_FIELDS),
 	...Object.keys(ENUM_FIELDS),
 	...Object.keys(HEX_FIELDS),
+	"rns.ifac",
 	"has:pointer",
 	"has:synthetic",
+	"has:ifac",
 ] as const;
 
 /* ── tokenizer ──────────────────────────────────────────────────────── */
@@ -263,7 +271,7 @@ interface Token {
 const OPS = ["&&", "||", "==", "!=", "<=", ">=", "<", ">", "!", "(", ")", ":"];
 const SUFFIX: Record<string, number> = { k: 1e3, m: 1e6, g: 1e9 };
 const NUMBER_RE = /^-?(\d+(\.\d+)?|\.\d+)([kKmMgG])?/;
-const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*/;
+const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_.]*/;
 
 /** Thrown internally only; parseFrameFilter converts it to a FilterResult. */
 class ParseFail {
@@ -424,16 +432,28 @@ class Parser {
 			const atom = this.next();
 			if (
 				atom.kind !== "ident" ||
-				(atom.text !== "pointer" && atom.text !== "synthetic")
+				(atom.text !== "pointer" && atom.text !== "synthetic" && atom.text !== "ifac")
 			) {
 				fail(
-					`unknown atom "${atom.text}" — has:pointer or has:synthetic`,
+					`unknown atom "${atom.text}" — has:pointer or has:synthetic or has:ifac`,
 					atom.start,
 					atom.end,
 				);
 			}
 			if (atom.text === "synthetic") return (f) => f.synthetic;
+			if (atom.text === "ifac") return (f) => frameIsIfac(f);
 			return (f, hp) => hp ?? findShelbyPointer(f.bytes) !== null;
+		}
+		if (t.kind === "ident" && (t.text === "rns.ifac" || t.text === "ifac")) {
+			const next = this.tokens[this.pos + 1];
+			const isOp =
+				next &&
+				next.kind === "op" &&
+				(next.text === "==" || next.text === "!=" || next.text === "<" || next.text === "<=" || next.text === ">" || next.text === ">=");
+			if (!isOp) {
+				this.next();
+				return (f) => frameIsIfac(f);
+			}
 		}
 		if (t.kind === "ident") {
 			return this.parseComparison();
@@ -485,7 +505,8 @@ class Parser {
 		const numeric = NUMERIC_FIELDS[field.text];
 		const enumField = ENUM_FIELDS[field.text];
 		const hexField = HEX_FIELDS[field.text];
-		if (!numeric && !enumField && !hexField) {
+		const isIfac = field.text === "rns.ifac" || field.text === "ifac";
+		if (!numeric && !enumField && !hexField && !isIfac) {
 			fail(
 				`unknown field "${field.text}" — one of ${FILTER_FIELDS.join(", ")}`,
 				field.start,
@@ -500,6 +521,32 @@ class Parser {
 			fail(`expected a comparison after "${field.text}"`, op.start, op.end);
 		}
 		this.next();
+
+		if (isIfac) {
+			if (ordered) {
+				fail(
+					`"${field.text}" has no ordering — use == or !=`,
+					op.start,
+					op.end,
+				);
+			}
+			const value = this.next();
+			let want: boolean;
+			if (value.kind === "number") {
+				if (value.value === 1) want = true;
+				else if (value.value === 0) want = false;
+				else fail(`"${field.text}" flag compares to 1 or 0`, value.start, value.end);
+			} else if (value.kind === "ident") {
+				if (value.text === "true" || value.text === "yes") want = true;
+				else if (value.text === "false" || value.text === "no") want = false;
+				else fail(`"${field.text}" flag compares to 1, 0, true, or false`, value.start, value.end);
+			} else {
+				fail(`"${field.text}" flag compares to 1 or 0`, value.start, value.end);
+			}
+			return op.text === "=="
+				? (f) => frameIsIfac(f) === want
+				: (f) => frameIsIfac(f) !== want;
+		}
 
 		if (hexField) {
 			if (ordered) {

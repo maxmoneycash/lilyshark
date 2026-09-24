@@ -19,7 +19,8 @@ export type ProfileProtocol = "meshtastic" | "meshcore" | "reticulum" | "custom"
 /**
  * Profile id to protocol, mirroring src/core/builtin_profiles.cpp:
  *   1 MESHTASTIC US LF, 2 MESHCORE US, 3 MESHCORE LEGACY,
- *   4 MESHTASTIC BAY MF, 5 RNODE EXAMPLE US.
+ *   4 MESHTASTIC BAY MF, 5 RNODE EXAMPLE US, 6 RNODE EU 868,
+ *   7 RNODE US FAST.
  * Id 0 means the firmware named no profile at all, which is not the same as
  * naming one we do not recognise: the first is silence, the second is a
  * profile this build predates.
@@ -34,6 +35,8 @@ export function profileProtocol(profileId: number | null | undefined): ProfilePr
 		case 3:
 			return "meshcore";
 		case 5:
+		case 6:
+		case 7:
 			return "reticulum";
 		default:
 			return "custom";

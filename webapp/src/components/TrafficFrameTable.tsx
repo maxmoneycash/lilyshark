@@ -12,6 +12,7 @@ import {
   SPACER_ROW_STYLE,
   useRowWindow,
 } from '../lib/useRowWindow';
+import { frameIsIfac } from '../lib/frameFilter';
 import { mapRowWindow, tableKeyNav } from '../lib/virtualRows';
 import { crcClass, fmtFreq } from './trafficFormat';
 
@@ -195,6 +196,15 @@ export function TrafficFrameTable({
                       <span className="ok" title="carries a Shelby pointer">
                         {' '}
                         ◆
+                      </span>
+                    )}
+                    {frameIsIfac(fr) && (
+                      <span
+                        className="warn"
+                        title="IFAC protected: frame is masked with an Interface Access Code; inner headers cannot be read without interface access keys"
+                      >
+                        {' '}
+                        IFAC
                       </span>
                     )}
                   </td>

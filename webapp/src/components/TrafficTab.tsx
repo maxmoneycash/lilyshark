@@ -52,7 +52,7 @@ import {
   parseConversationExpression,
   reticulumDestinationHashHex,
 } from '../lib/conversation';
-import { FILTER_FIELDS, parseFrameFilter, protoOfProfile } from '../lib/frameFilter';
+import { FILTER_FIELDS, frameIsIfac, parseFrameFilter, protoOfProfile } from '../lib/frameFilter';
 import {
   activeSlot,
   type CaptureSlot,
@@ -1246,6 +1246,14 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
                 <span className="v dim">
                   not addressable — {selectedAddress?.reason ?? 'no addressing decoded'}
                 </span>
+              )}
+              {frameIsIfac(f) && (
+                <>
+                  <span className="k">SECURITY</span>
+                  <span className="v warn">
+                    IFAC MASKED · Protected by Interface Access Code (inner headers and destination cannot be read without interface access key)
+                  </span>
+                </>
               )}
               <span className="k">MODULATION</span>
               <span className="v">{f.modulation.toUpperCase()}</span>
