@@ -62,6 +62,8 @@ import {
 } from '../lib/captureSlots';
 import { buildIoGraph, type IoSplit } from '../lib/ioGraph';
 import { applyBrush, type BrushRange, brushLabel } from '../lib/trafficView';
+import { AnnouncePathGraph } from './AnnouncePathGraph';
+import { readAnnounce, summarizeAnnounces } from '../lib/announceView';
 import { CaptureDiffPanel } from './CaptureDiffPanel';
 import { CaptureSlotBar, type SlotTab } from './CaptureSlotBar';
 import { IoGraphPanel } from './IoGraphPanel';
@@ -158,6 +160,8 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
   // one capture, so it stays on the screen and survives a tab change.
   const [split, setSplit] = useState<IoSplit>('protocol');
   const [diffOpen, setDiffOpen] = useState(false);
+  const [pathsOpen, setPathsOpen] = useState(false);
+  const [selectedAnnounceDest, setSelectedAnnounceDest] = useState<string | null>(null);
   /** Which other open capture DIFF is comparing against, "" for none. */
   const [diffBId, setDiffBId] = useState('');
   // Live demo mode adds synthetic frames at a configured cadence. It is
@@ -653,6 +657,16 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
       .find((part) => part.label === 'LXMF message') ?? null;
   }, [f]);
 
+  const announceOverview = useMemo(
+    () => summarizeAnnounces(frames, t0),
+    [frames, t0],
+  );
+
+  const announceReading = useMemo(() => {
+    if (!f || protoOfProfile(f.profileId) !== 'rnode') return null;
+    return readAnnounce(f.bytes, { truncated: f.truncated });
+  }, [f]);
+
   // ── display filter ────────────────────────────────────────────────────
   // Every frame's addressing and Reticulum destination hash are read once
   // per capture and handed to the predicate, so typing into the filter box
@@ -809,6 +823,18 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
             onClick={() => setDiffOpen((v) => !v)}
           >
             DIFF
+          </button>
+          <button
+            className={pathsOpen ? 'primary' : ''}
+            disabled={!capture || announceOverview.announceCount === 0}
+            title={
+              announceOverview.announceCount > 0
+                ? `View Reticulum announce path transitions (${announceOverview.announceCount} announces across ${announceOverview.destinations.length} destinations)`
+                : 'No Reticulum announces in this capture'
+            }
+            onClick={() => setPathsOpen((v) => !v)}
+          >
+            PATHS{announceOverview.destinations.length > 0 ? ` · ${announceOverview.destinations.length}` : ''}
           </button>
           {/* Record what the linked radio hears, then open it right here. */}
           {session.recording ? (
@@ -1294,6 +1320,40 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
               </span>
             </div>
 
+            {announceReading && (
+              <section aria-label="Reticulum announce">
+                <div className="panel-title">
+                  RETICULUM ANNOUNCE
+                  <span className="spacer" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAnnounceDest(announceReading.destinationHashHex);
+                      setPathsOpen(true);
+                    }}
+                    title="Open announce path transition graph for this destination"
+                  >
+                    PATH GRAPH
+                  </button>
+                </div>
+                <dl className="kv" style={{ margin: 0 }}>
+                  <dt className="k">DESTINATION</dt>
+                  <dd className="v" style={{ margin: 0, overflowWrap: 'anywhere' }}>
+                    {announceReading.destinationHashHex}
+                  </dd>
+                  <dt className="k">HOPS</dt>
+                  <dd className="v" style={{ margin: 0 }}>
+                    {announceReading.path.hops} {announceReading.path.hops === 1 ? 'hop' : 'hops'}
+                    {announceReading.path.transportIdHex
+                      ? ` · via ${announceReading.path.transportIdHex.slice(0, 8)}…`
+                      : ' · direct'}
+                  </dd>
+                  <dt className="k">APP DATA</dt>
+                  <dd className="v" style={{ margin: 0 }}>{announceReading.appDataLength} B</dd>
+                </dl>
+              </section>
+            )}
+
             {lxmf && (
               <section aria-label="LXMF message">
                 <div className="panel-title">LXMF MESSAGE</div>
@@ -1379,6 +1439,20 @@ export function TrafficTab({ demoActive }: TrafficTabProps) {
           onPickB={setDiffBId}
           onSelectA={onSelectFrame}
           onClose={() => setDiffOpen(false)}
+        />
+      )}
+
+      {pathsOpen && capture && (
+        <AnnouncePathGraph
+          overview={announceOverview}
+          frames={frames}
+          selectedDestHex={selectedAnnounceDest}
+          onSelectDest={setSelectedAnnounceDest}
+          onFilterDest={(destHex) => {
+            setFilterText(`rns.dest == ${destHex.slice(0, 16)}`);
+          }}
+          onSelectFrame={onSelectFrame}
+          onClose={() => setPathsOpen(false)}
         />
       )}
     </main>
