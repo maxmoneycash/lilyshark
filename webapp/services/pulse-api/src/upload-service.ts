@@ -18,6 +18,13 @@ export interface UploadResult {
   owner: string;
   size: number;
   expiresAt: string;
+  /** Lease expiry in unix seconds — what capture_registry::register stores. */
+  expiresAtUnix: number;
+  /**
+   * 0x-prefixed 32-byte blob commitment (Merkle root), read back from the
+   * chain after the upload. Undefined when the read-back failed.
+   */
+  commitment?: string;
 }
 
 export class UploadService {
@@ -96,6 +103,53 @@ export class UploadService {
   }
 
   /**
+   * Read the just-uploaded blob's on-chain metadata: blobMerkleRoot is the
+   * 32-byte commitment that capture_registry::register anchors and that a
+   * Lilyshark pointer carries over the air. Read back from the chain rather
+   * than recomputed locally, so the anchor vouches for what Shelby actually
+   * registered.
+   */
+  private async readCommitment(blobName: string): Promise<string | undefined> {
+    if (!this.client || !this.account) return undefined;
+    try {
+      const meta = await this.client.coordination.getBlobMetadata({
+        account: this.account.accountAddress,
+        name: blobName,
+      });
+      if (!meta) return undefined;
+      return (
+        "0x" +
+        Array.from(meta.blobMerkleRoot)
+          .map((v) => v.toString(16).padStart(2, "0"))
+          .join("")
+      );
+    } catch (error) {
+      logger.warn({ error, blobName }, "Blob commitment read-back failed");
+      return undefined;
+    }
+  }
+
+  private async buildResult(
+    blobName: string,
+    size: number,
+    expirationMicros: number,
+  ): Promise<UploadResult> {
+    const address = this.account!.accountAddress.toString();
+    const url = `${SHELBY_RPC_BASE}/v1/blobs/${address}/${encodeURIComponent(blobName)}`;
+    const viewerUrl = `/api/share/viewer/${address}/${encodeURIComponent(blobName)}`;
+    return {
+      url,
+      viewerUrl,
+      blobName,
+      owner: address,
+      size,
+      expiresAt: new Date(expirationMicros / 1000).toISOString(),
+      expiresAtUnix: Math.floor(expirationMicros / 1_000_000),
+      commitment: await this.readCommitment(blobName),
+    };
+  }
+
+  /**
    * Upload a file to Shelby
    */
   async uploadFile(
@@ -108,7 +162,6 @@ export class UploadService {
 
     // Sanitize filename
     const blobName = sanitizeFilename(originalName);
-    const address = this.account.accountAddress.toString();
 
     // Try to ensure we have funds
     await this.ensureFunded();
@@ -130,20 +183,18 @@ export class UploadService {
         expirationMicros,
       });
 
-      const url = `${SHELBY_RPC_BASE}/v1/blobs/${address}/${encodeURIComponent(blobName)}`;
-      const viewerUrl = `/api/share/viewer/${address}/${encodeURIComponent(blobName)}`;
-      const expiresAt = new Date(expirationMicros / 1000).toISOString();
-
-      logger.info({ url, viewerUrl, blobName }, "File uploaded successfully");
-
-      return {
-        url,
-        viewerUrl,
+      const result = await this.buildResult(
         blobName,
-        owner: address,
-        size: fileBuffer.length,
-        expiresAt,
-      };
+        fileBuffer.length,
+        expirationMicros,
+      );
+
+      logger.info(
+        { url: result.url, viewerUrl: result.viewerUrl, blobName },
+        "File uploaded successfully",
+      );
+
+      return result;
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       const errStack = error instanceof Error ? error.stack : undefined;
@@ -166,18 +217,7 @@ export class UploadService {
           expirationMicros,
         });
 
-        const url = `${SHELBY_RPC_BASE}/v1/blobs/${address}/${encodeURIComponent(blobName)}`;
-        const viewerUrl = `/api/share/viewer/${address}/${encodeURIComponent(blobName)}`;
-        const expiresAt = new Date(expirationMicros / 1000).toISOString();
-
-        return {
-          url,
-          viewerUrl,
-          blobName,
-          owner: address,
-          size: fileBuffer.length,
-          expiresAt,
-        };
+        return this.buildResult(blobName, fileBuffer.length, expirationMicros);
       }
 
       throw error;

@@ -5,6 +5,7 @@ import os from "os";
 import path from "path";
 import type { DataService } from "./data-service";
 import type { UploadService } from "./upload-service";
+import type { AnchorResult, AnchorService } from "./anchor-service";
 import { logger } from "./logger";
 
 // In-memory session storage for folder links
@@ -63,7 +64,8 @@ const upload = multer({
 
 export function createRouter(
   dataService: DataService,
-  uploadService?: UploadService
+  uploadService?: UploadService,
+  anchorService?: AnchorService
 ): Router {
   const router = Router();
 
@@ -280,7 +282,8 @@ export function createRouter(
       // A capture is evidence, so a file claiming to be one has to actually
       // be one: the .lscap header starts with the LSCP magic. Checked on the
       // bytes because the mimetype and extension are both client-supplied.
-      if (path.extname(file.originalname).toLowerCase() === ".lscap") {
+      const isCapture = path.extname(file.originalname).toLowerCase() === ".lscap";
+      if (isCapture) {
         if (fileBuffer.length < 24 || fileBuffer.toString("latin1", 0, 4) !== "LSCP") {
           cleanup();
           return res.status(400).json({
@@ -291,6 +294,42 @@ export function createRouter(
 
       const result = await uploadService.uploadFile(fileBuffer, file.originalname);
       cleanup();
+
+      // A published capture must also be vouched for on-chain, or its own
+      // RESOLVE trace ends at "no on-chain anchor" (task UI-002). The registry
+      // write is signed server-side with the same account that paid the
+      // upload; the key never reaches the browser. Anchoring failure must not
+      // fail the publish — it is reported as a value so the client can render
+      // an honest not-anchored state.
+      let anchor: AnchorResult | undefined;
+      if (isCapture) {
+        if (anchorService?.isAvailable()) {
+          try {
+            anchor = await anchorService.anchorCapture({
+              commitment: result.commitment ?? "",
+              blobName: result.blobName,
+              sizeBytes: result.size,
+              expiresAtUnix: result.expiresAtUnix,
+            });
+          } catch (anchorErr) {
+            // anchorCapture catches internally; this is a last-resort belt.
+            anchor = {
+              status: "failed",
+              reason:
+                anchorErr instanceof Error ? anchorErr.message : String(anchorErr),
+            };
+          }
+        } else {
+          anchor = {
+            status: "skipped",
+            reason: "anchoring not configured on this deployment",
+          };
+        }
+        logger.info(
+          { blobName: result.blobName, anchor },
+          "Capture anchor result"
+        );
+      }
 
       // If a session ID was provided, add the file to the session
       if (sessionId) {
@@ -322,6 +361,10 @@ export function createRouter(
         size: result.size,
         expiresAt: result.expiresAt,
         sessionId,
+        // On-chain evidence fields (captures only; both may be absent for
+        // ordinary Shelby Share files).
+        commitment: result.commitment ?? null,
+        ...(anchor ? { anchor } : {}),
       });
     } catch (error) {
       cleanup();
@@ -340,6 +383,8 @@ export function createRouter(
     res.json({
       available: uploadService?.isAvailable() ?? false,
       uploaderAddress: uploadService?.getAddress() ?? null,
+      // Whether published captures will also be anchored on-chain (UI-002).
+      anchoring: anchorService?.isAvailable() ?? false,
       maxFileSize: "2GB",
       allowedTypes: ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "avif", "mp4", "webm", "mov", "avi", "mkv", "pdf", "lscap"],
       expiration: "1 year",

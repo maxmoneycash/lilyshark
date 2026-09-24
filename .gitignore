@@ -3,6 +3,7 @@
 /dist/
 __pycache__/
 .hallmark/
+tunnel.url
 
 # webapp
 node_modules

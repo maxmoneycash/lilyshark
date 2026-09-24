@@ -5,9 +5,8 @@ import { loadConfig } from "./config";
 import { logger } from "./logger";
 import { DataService } from "./data-service";
 import { UploadService } from "./upload-service";
+import { AnchorService } from "./anchor-service";
 import { createRouter } from "./routes";
-import { getDatabase } from "./db";
-import { createDurableCoverageService } from "./coverage-service.js";
 
 async function main() {
   const config = loadConfig();
@@ -15,10 +14,6 @@ async function main() {
 
   const app = express();
   const dataService = new DataService(config);
-  // Keep this credential out of the logged general configuration object.
-  const communityCoverage = createDurableCoverageService(getDatabase(), {
-    key: () => process.env.COVERAGE_API_KEY,
-  });
 
   // Initialize Upload Service for Shelby Share feature
   let uploadService: UploadService | undefined;
@@ -35,6 +30,20 @@ async function main() {
     }
   } else {
     logger.warn("SHELBY_PRIVATE_KEY not set - Shelby Share disabled");
+  }
+
+  // On-chain anchoring for published captures (UI-002): signs
+  // lilyshark::capture_registry::register with the same service key that
+  // pays uploads. Constructed even without a key so the routes can answer
+  // with an explicit "skipped" instead of silently omitting the anchor.
+  const anchorService = new AnchorService({
+    privateKey: config.SHELBY_PRIVATE_KEY || undefined,
+    nodeUrl: config.APTOS_NODE_URL,
+    registryAddress: config.CAPTURE_REGISTRY_ADDRESS,
+    dryRun: config.ANCHOR_DRY_RUN === "true" || config.ANCHOR_DRY_RUN === "1",
+  });
+  if (!anchorService.isAvailable()) {
+    logger.warn("Capture anchoring disabled - uploads will report anchor: skipped");
   }
 
   // Middleware
@@ -60,21 +69,7 @@ async function main() {
   });
 
   // Routes
-  app.all("/api/community-coverage", async (req, res) => {
-    if (req.method !== "GET") {
-      res.setHeader("Allow", "GET");
-      return res.status(405).end();
-    }
-    try {
-      const result = await communityCoverage();
-      for (const [name, value] of Object.entries(result.headers)) res.setHeader(name, value);
-      return res.status(result.status).send(result.body);
-    } catch {
-      // Storage failure must not bypass the durable quota reservation.
-      return res.status(503).set("Cache-Control", "private, no-store").json({ error: "coverage_unavailable" });
-    }
-  });
-  app.use("/api", createRouter(dataService, uploadService));
+  app.use("/api", createRouter(dataService, uploadService, anchorService));
 
   // Root endpoint
   app.get("/", (req, res) => {

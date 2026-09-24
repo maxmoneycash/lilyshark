@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 namespace lilyshark {
 namespace {
@@ -30,6 +31,31 @@ DecodeResult malformed(DecodedPacket &output) noexcept
 {
     output.state = DecodeState::Malformed;
     return DecodeResult::Malformed;
+}
+
+std::size_t announceFixedLength(bool has_ratchet) noexcept
+{
+    return kReticulumAnnounceMinimumBytes + (has_ratchet ? kReticulumAnnounceRatchetBytes : 0);
+}
+
+/// True when a payload of this length can hold every fixed announce field the
+/// header promises. Announces are only issued by SINGLE destinations; any
+/// other destination type is a flag inconsistency, not an announce.
+bool announceArithmeticHolds(std::size_t payload_length, std::uint8_t destination_type,
+                             bool has_ratchet) noexcept
+{
+    return destination_type == static_cast<std::uint8_t>(ReticulumDestinationType::Single) &&
+           payload_length >= announceFixedLength(has_ratchet);
+}
+
+void writeHexLower(const std::uint8_t *bytes, std::size_t length, char *out) noexcept
+{
+    static const char digits[] = "0123456789abcdef";
+    for (std::size_t index = 0; index < length; ++index) {
+        out[index * 2] = digits[bytes[index] >> 4U];
+        out[index * 2 + 1] = digits[bytes[index] & 0x0fU];
+    }
+    out[length * 2] = '\0';
 }
 
 bool payloadIsClear(std::uint8_t packet_type, std::uint8_t destination_type, std::uint8_t context) noexcept
@@ -124,6 +150,14 @@ DecodeResult ReticulumDecoder::decode(const RawFrame &frame, const RadioProfile 
 
     if (packet_type == static_cast<std::uint8_t>(ReticulumPacketType::Announce)) {
         output.kind = PacketKind::Advertisement;
+        // Semantic tier: when the payload provably holds the fixed announce
+        // fields (public key, name hash, random hash, promised ratchet,
+        // signature), the packet is more than a bare header. The full field
+        // layout is read back on demand via readReticulumAnnounce.
+        if (announceArithmeticHolds(output.payload_length, destination_type,
+                                    (flags & kContextFlagMask) != 0)) {
+            output.state = DecodeState::PayloadDecoded;
+        }
     } else if (packet_type == static_cast<std::uint8_t>(ReticulumPacketType::LinkRequest) ||
                packet_type == static_cast<std::uint8_t>(ReticulumPacketType::Proof)) {
         output.kind = PacketKind::Control;
@@ -209,6 +243,108 @@ std::uint32_t ReticulumDecoder::destinationHashPrefix(const DecodedPacket &packe
 std::uint32_t ReticulumDecoder::transportIdPrefix(const DecodedPacket &packet) noexcept
 {
     return packet.source;
+}
+
+bool readReticulumAnnounce(const RawFrame &frame, const DecodedPacket &packet,
+                           ReticulumAnnounce &out) noexcept
+{
+    out = ReticulumAnnounce{};
+
+    if (packet.protocol != ProtocolId::Reticulum || packet.state == DecodeState::Malformed) {
+        return false;
+    }
+    if (ReticulumDecoder::isRNodeSplitFrame(packet) || ReticulumDecoder::isIfacProtected(packet)) {
+        return false;
+    }
+    if (ReticulumDecoder::packetType(packet) != ReticulumPacketType::Announce) {
+        return false;
+    }
+
+    // Re-derive the header geometry and refuse anything that does not match
+    // the frame actually handed in — this function may be called against a
+    // stored frame long after decode, and must never read past it.
+    const bool header_two = ReticulumDecoder::headerType(packet) == ReticulumHeaderType::HeaderTwo;
+    const std::size_t header_length = ReticulumDecoder::headerLength(packet);
+    if (header_length !=
+        (header_two ? ReticulumDecoder::kHeaderTwoLength : ReticulumDecoder::kHeaderOneLength)) {
+        return false;
+    }
+    const std::size_t payload_offset = packet.payload_offset;
+    const std::size_t payload_length = packet.payload_length;
+    if (payload_offset != ReticulumDecoder::kRNodeShimLength + header_length ||
+        payload_offset > frame.captured_length ||
+        payload_length > frame.captured_length - payload_offset) {
+        return false;
+    }
+
+    const bool has_ratchet = ReticulumDecoder::contextFlag(packet);
+    const std::uint8_t destination_type =
+        static_cast<std::uint8_t>(ReticulumDecoder::destinationType(packet));
+    if (!announceArithmeticHolds(payload_length, destination_type, has_ratchet)) {
+        return false;
+    }
+    const std::size_t app_data_length = payload_length - announceFixedLength(has_ratchet);
+    if (app_data_length > kReticulumAnnounceMaxAppDataBytes) {
+        return false;
+    }
+
+    out.header_type = header_two ? ReticulumHeaderType::HeaderTwo : ReticulumHeaderType::HeaderOne;
+    out.hops = packet.hop_limit;
+
+    // Addressing: shim, flags, hops, then one or two 16-byte hashes.
+    const std::size_t address_offset = ReticulumDecoder::kRNodeShimLength + 2;
+    const std::size_t destination_offset =
+        header_two ? address_offset + kReticulumHashBytes : address_offset;
+    std::memcpy(out.destination_hash, &frame.bytes[destination_offset], kReticulumHashBytes);
+    writeHexLower(out.destination_hash, kReticulumHashBytes, out.destination_hash_hex);
+    out.destination_hash_range = {static_cast<std::uint16_t>(destination_offset),
+                                  static_cast<std::uint16_t>(kReticulumHashBytes)};
+    if (header_two) {
+        out.has_transport_id = true;
+        std::memcpy(out.transport_id, &frame.bytes[address_offset], kReticulumHashBytes);
+        out.transport_id_range = {static_cast<std::uint16_t>(address_offset),
+                                  static_cast<std::uint16_t>(kReticulumHashBytes)};
+    }
+
+    // Payload fields, laid out back to back from the payload start.
+    std::size_t cursor = payload_offset;
+    out.has_public_key = true;
+    out.public_key_range = {static_cast<std::uint16_t>(cursor),
+                            static_cast<std::uint16_t>(kReticulumAnnouncePublicKeyBytes)};
+    cursor += kReticulumAnnouncePublicKeyBytes;
+
+    std::memcpy(out.name_hash, &frame.bytes[cursor], kReticulumAnnounceNameHashBytes);
+    out.name_hash_range = {static_cast<std::uint16_t>(cursor),
+                           static_cast<std::uint16_t>(kReticulumAnnounceNameHashBytes)};
+    cursor += kReticulumAnnounceNameHashBytes;
+
+    std::memcpy(out.random_hash, &frame.bytes[cursor], kReticulumAnnounceRandomHashBytes);
+    out.random_hash_range = {static_cast<std::uint16_t>(cursor),
+                             static_cast<std::uint16_t>(kReticulumAnnounceRandomHashBytes)};
+    cursor += kReticulumAnnounceRandomHashBytes;
+
+    if (has_ratchet) {
+        out.has_ratchet = true;
+        out.ratchet_range = {static_cast<std::uint16_t>(cursor),
+                             static_cast<std::uint16_t>(kReticulumAnnounceRatchetBytes)};
+        cursor += kReticulumAnnounceRatchetBytes;
+    }
+
+    out.has_signature = true;
+    out.signature_range = {static_cast<std::uint16_t>(cursor),
+                           static_cast<std::uint16_t>(kReticulumAnnounceSignatureBytes)};
+    cursor += kReticulumAnnounceSignatureBytes;
+
+    if (app_data_length > 0) {
+        out.has_app_data = true;
+        out.app_data_length = static_cast<std::uint16_t>(app_data_length);
+        std::memcpy(out.app_data, &frame.bytes[cursor], app_data_length);
+        out.app_data_range = {static_cast<std::uint16_t>(cursor),
+                              static_cast<std::uint16_t>(app_data_length)};
+    }
+
+    out.valid = true;
+    return true;
 }
 
 } // namespace lilyshark

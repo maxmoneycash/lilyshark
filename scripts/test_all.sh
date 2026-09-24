@@ -91,6 +91,11 @@ build_and_run decoder_stress \
   src/core/reticulum_decoder.cpp \
   test/decoder_stress/test_decoder_stress.cpp
 
+build_and_run reticulum_announce \
+  src/core/decoder_registry.cpp \
+  src/core/reticulum_decoder.cpp \
+  test/reticulum_announce/test_reticulum_announce.cpp
+
 build_and_run meshtastic_api \
   src/core/meshtastic_api.cpp \
   src/core/mesh_identity.cpp \
