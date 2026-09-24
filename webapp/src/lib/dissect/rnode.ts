@@ -19,6 +19,7 @@
  */
 
 import { lxmfSubtree, readLxmfMessage, type LxmfMessage } from "./lxmf";
+import { dissectMsgpack } from "./msgpack";
 import type {
 	DecodeState,
 	Dissection,
@@ -817,25 +818,42 @@ function fillAnnounce(
 		),
 	];
 	if (appDataRange) {
-		const hexShown =
-			hexBytes(
-				bytes,
-				appDataRange.offset,
-				Math.min(appDataLength, APP_DATA_HEX_NODE_LIMIT),
-			) + (appDataLength > APP_DATA_HEX_NODE_LIMIT ? "…" : "");
-		children.push(
-			node(
-				"App data",
-				appDataRange.offset,
-				appDataRange.length,
-				`undecoded — ${appDataLength} raw application-defined byte(s) (often msgpack, never interpreted): ${hexShown}` +
-					(previewText !== null
-						? ` · printable-ASCII preview only: ${JSON.stringify(previewText)}`
-						: ""),
-				[],
-				"raw",
-			),
+		const msgpackTree = dissectMsgpack(
+			bytes,
+			appDataRange.offset,
+			appDataRange.length,
 		);
+		if (msgpackTree && msgpackTree.length > 0) {
+			children.push(
+				node(
+					"App data",
+					appDataRange.offset,
+					appDataRange.length,
+					`MessagePack decoded — ${appDataLength} byte(s)`,
+					msgpackTree,
+				),
+			);
+		} else {
+			const hexShown =
+				hexBytes(
+					bytes,
+					appDataRange.offset,
+					Math.min(appDataLength, APP_DATA_HEX_NODE_LIMIT),
+				) + (appDataLength > APP_DATA_HEX_NODE_LIMIT ? "…" : "");
+			children.push(
+				node(
+					"App data",
+					appDataRange.offset,
+					appDataRange.length,
+					`undecoded — ${appDataLength} raw application-defined byte(s) (often msgpack, never interpreted): ${hexShown}` +
+						(previewText !== null
+							? ` · printable-ASCII preview only: ${JSON.stringify(previewText)}`
+							: ""),
+					[],
+					"raw",
+				),
+			);
+		}
 	}
 
 	root.children.push(

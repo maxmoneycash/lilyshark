@@ -58,23 +58,39 @@ web-gated, so completing it takes one human step:
 4. Record the addresses and transaction hashes here, and point the analyzer's
    anchor reads at them.
 
-## Interface
+## Interface (Registry v2, task CO-004)
 
 - `register(publisher, commitment, blob_name, size_bytes, expires_at_unix)` —
   entry function; anchors one capture under the caller and emits
-  `CaptureRegistered`. Rejects commitments that are not exactly 32 bytes.
+  `CaptureRegistered`. Rejects commitments that are not exactly 32 bytes (`E_BAD_COMMITMENT = 1`)
+  and duplicate commitments already anchored by this publisher (`E_DUPLICATE_COMMITMENT = 2`).
 - `count(publisher): u64` — view; number of captures a publisher has anchored.
 - `capture_at(publisher, index): Capture` — view; one anchored capture.
+- `captures_slice(publisher, start, limit): vector<Capture>` — view; ranged slice of
+  up to `limit` captures starting at `start`, bounds-clamped to available total.
+  Eliminates whole-vector fullnode downloads in the analyzer.
+- `has_commitment(publisher, commitment): bool` — view; returns true if the publisher
+  has registered this 32-byte commitment.
+
+## Migration and v1 Compatibility
+
+- **v1 data**: The original v1 contract was deployed strictly to ephemeral prototype
+  environments (`shelbynet` and `aptos devnet`), which wipe state periodically.
+  No production migrations are required ("v1 is demo").
+- **Binary & ABI compatibility**: The `Capture` struct layout and `CaptureRegistered`
+  event fields are preserved verbatim. Existing readers like `field_points` and
+  indexer watchers continue reading `count` and events unchanged.
+- **Client fallback**: In `webapp/src/lib/shelby.ts`, `fetchRegistrySlice` queries
+  `captures_slice` on v2 nodes and gracefully falls back to resource reads on legacy nodes.
+- **Self-serve anchoring**: In addition to the server-side share service, users with
+  Aptos browser wallets can invoke `anchorWithWallet` directly via `window.aptos`.
 
 ## Reproduce
 
 ```sh
-aptos move compile \
-  --named-addresses lilyshark=<your-address>
-
-aptos move publish \
-  --url https://api.shelbynet.aptoslabs.com/v1 \
-  --named-addresses lilyshark=<your-address>
+aptos move test \
+  --named-addresses lilyshark=0xA11CE \
+  --skip-fetch-latest-git-deps
 ```
 
 Query the live deployment without any setup:

@@ -705,3 +705,49 @@ test("garbage bytes never throw under any protocol hint", () => {
 		}
 	}
 });
+
+test("Reticulum announce with MessagePack app_data dissects structured fields", () => {
+	// 1 shim (0x00) + 19 HEADER_1 + 148 announce fixed + 20 msgpack = 188 bytes
+	const shim = [0x00];
+	const flags = [0x01]; // HEADER_1, SINGLE, ANNOUNCE
+	const hops = [0x02];
+	const destHash = new Array(16).fill(0xd0);
+	const context = [0x00];
+	const pubKey = new Array(64).fill(0x11);
+	const nameHash = new Array(10).fill(0x21);
+	const randomHash = new Array(10).fill(0x31);
+	const sig = new Array(64).fill(0x51);
+	// MessagePack map: { "display_name": "Alice" }
+	const key = new TextEncoder().encode("display_name");
+	const val = new TextEncoder().encode("Alice");
+	const msgpack = [0x81, 0xa0 | key.length, ...key, 0xa0 | val.length, ...val];
+
+	const frame = new Uint8Array([
+		...shim,
+		...flags,
+		...hops,
+		...destHash,
+		...context,
+		...pubKey,
+		...nameHash,
+		...randomHash,
+		...sig,
+		...msgpack,
+	]);
+
+	const d = dissectFrame(frame, "reticulum");
+	assert.equal(d.primary.protocol, "Reticulum");
+	assert.equal(d.primary.result, "matched");
+	assert.equal(d.primary.state, "payload-decoded");
+
+	const appDataNode = findNode(d.primary.root, "App data");
+	assert.ok(appDataNode, "App data node exists");
+	assert.match(appDataNode.value ?? "", /MessagePack decoded/);
+
+	const msgpackNode = findNode(appDataNode, "MessagePack");
+	assert.ok(msgpackNode, "MessagePack child node exists");
+
+	const fieldNode = findNode(msgpackNode, "display_name");
+	assert.ok(fieldNode, "display_name key node exists");
+	assert.equal(fieldNode.value, '"Alice"');
+});

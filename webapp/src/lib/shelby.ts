@@ -169,6 +169,119 @@ export async function fetchAnchor(
   );
 }
 
+/**
+ * Range-bounded registry read (task CO-004).
+ * Reads `limit` captures starting at `start` from the on-chain registry view.
+ * If the fullnode view is unsupported or the registry is uninitialized,
+ * falls back to slicing `fetchRegistry(publisher)`.
+ */
+export async function fetchRegistrySlice(
+  publisher: string,
+  start = 0,
+  limit = 50,
+): Promise<RegistryEntry[]> {
+  try {
+    const res = await fetch(`${SHELBY_FULLNODE}/view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        function: `${CAPTURE_REGISTRY}::captures_slice`,
+        type_arguments: [],
+        arguments: [publisher, start.toString(), limit.toString()],
+      }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as [
+        {
+          blob_name: string;
+          commitment: string;
+          size_bytes: string;
+          expires_at_unix: string;
+          registered_at_unix: string;
+        }[],
+      ];
+      const rows = data?.[0] ?? [];
+      return rows.map((c) => ({
+        blobName: c.blob_name,
+        commitment: c.commitment,
+        sizeBytes: Number(c.size_bytes),
+        expiresAtUnix: Number(c.expires_at_unix),
+        registeredAtUnix: Number(c.registered_at_unix),
+      }));
+    }
+  } catch {
+    // view call unavailable; fall back to resource read
+  }
+  const all = await fetchRegistry(publisher);
+  return all.slice(start, start + limit);
+}
+
+/**
+ * Build the entry-function payload for self-serve anchoring on-chain (task CO-004).
+ * Allows a user with an Aptos wallet (e.g. Petra, Martian) to anchor captures
+ * under their own account rather than going through the share service.
+ */
+export function buildAnchorPayload(params: {
+  commitment: string | Uint8Array;
+  blobName: string;
+  sizeBytes: number;
+  expiresAtUnix: number;
+}) {
+  const commitmentBytes =
+    typeof params.commitment === 'string'
+      ? Array.from(
+          (params.commitment.startsWith('0x')
+            ? params.commitment.slice(2)
+            : params.commitment
+          ).match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) ?? [],
+        )
+      : Array.from(params.commitment);
+
+  return {
+    function: `${CAPTURE_REGISTRY}::register`,
+    type_arguments: [],
+    arguments: [
+      commitmentBytes,
+      params.blobName,
+      params.sizeBytes.toString(),
+      params.expiresAtUnix.toString(),
+    ],
+  };
+}
+
+export interface WalletAnchorResult {
+  hash: string;
+}
+
+/**
+ * Anchor a capture under the user's connected wallet account (task CO-004).
+ * Submits the transaction through the browser's Aptos wallet provider.
+ */
+export async function anchorWithWallet(params: {
+  commitment: string | Uint8Array;
+  blobName: string;
+  sizeBytes: number;
+  expiresAtUnix: number;
+}): Promise<WalletAnchorResult> {
+  const aptos = (
+    window as unknown as {
+      aptos?: {
+        signAndSubmitTransaction: (tx: { payload: unknown }) => Promise<{ hash: string }>;
+      };
+    }
+  ).aptos;
+
+  if (!aptos) {
+    throw new Error(
+      'No Aptos wallet detected (e.g. Petra). Please connect a wallet extension or publish via the share service.',
+    );
+  }
+
+  const payload = buildAnchorPayload(params);
+  const result = await aptos.signAndSubmitTransaction({ payload });
+  return { hash: result.hash };
+}
+
 export interface ResolvedBlob {
   /** Name suffix under the owner (e.g. "captures/field-capture-0847.lscap"). */
   name: string;

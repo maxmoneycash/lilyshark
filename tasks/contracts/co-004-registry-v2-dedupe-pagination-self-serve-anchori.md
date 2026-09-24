@@ -4,10 +4,17 @@ title: 'Registry v2: dedupe, pagination, self-serve anchoring'
 area: contracts
 size: M
 priority: P1
-status: todo
+status: done
 depends_on:
-- CO-002
+- CO-001
 eval:
+  auto:
+  - test -f contracts/capture-registry/build/LilysharkCaptureRegistry/bytecode_modules/capture_registry.mv
+  - grep -q "captures_slice" contracts/capture-registry/sources/capture_registry.move
+  - grep -q "E_DUPLICATE_COMMITMENT" contracts/capture-registry/sources/capture_registry.move
+  - grep -q "anchorWithWallet" webapp/src/lib/shelby.ts
+  - grep -q "fetchRegistrySlice" webapp/src/lib/shelby.ts
+  - '(cd webapp && node --import tsx --test "src/lib/shelby.test.ts")'
   rubric:
   - Duplicate commitments per publisher are rejected or explicitly versioned; views support ranged reads
     so the webapp stops downloading whole registries.

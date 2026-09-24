@@ -19,6 +19,8 @@ module lilyshark::capture_registry {
 
     /// Commitment must be exactly 32 bytes (a Shelby blob commitment).
     const E_BAD_COMMITMENT: u64 = 1;
+    /// Duplicate commitment: publisher has already anchored this commitment.
+    const E_DUPLICATE_COMMITMENT: u64 = 2;
 
     /// One anchored capture.
     struct Capture has store, copy, drop {
@@ -49,7 +51,8 @@ module lilyshark::capture_registry {
     }
 
     /// Anchor a capture under the caller's address. First call creates the
-    /// caller's registry.
+    /// caller's registry. Rejects short/long commitments and duplicate
+    /// commitments from the same publisher.
     public entry fun register(
         publisher: &signer,
         commitment: vector<u8>,
@@ -62,6 +65,14 @@ module lilyshark::capture_registry {
         if (!exists<Registry>(addr)) {
             move_to(publisher, Registry { captures: vector::empty() });
         };
+        let registry = borrow_global_mut<Registry>(addr);
+        let len = vector::length(&registry.captures);
+        let i = 0;
+        while (i < len) {
+            let existing = vector::borrow(&registry.captures, i);
+            assert!(existing.commitment != commitment, E_DUPLICATE_COMMITMENT);
+            i = i + 1;
+        };
         event::emit(CaptureRegistered {
             publisher: addr,
             commitment: copy commitment,
@@ -69,7 +80,6 @@ module lilyshark::capture_registry {
             size_bytes,
             expires_at_unix,
         });
-        let registry = borrow_global_mut<Registry>(addr);
         vector::push_back(&mut registry.captures, Capture {
             commitment,
             blob_name,
@@ -91,5 +101,73 @@ module lilyshark::capture_registry {
     #[view]
     public fun capture_at(publisher: address, index: u64): Capture acquires Registry {
         *vector::borrow(&borrow_global<Registry>(publisher).captures, index)
+    }
+
+    #[view]
+    public fun captures_slice(
+        publisher: address,
+        start: u64,
+        limit: u64,
+    ): vector<Capture> acquires Registry {
+        if (!exists<Registry>(publisher)) {
+            return vector::empty()
+        };
+        let reg = &borrow_global<Registry>(publisher).captures;
+        let total = vector::length(reg);
+        if (start >= total || limit == 0) {
+            return vector::empty()
+        };
+        let out = vector::empty<Capture>();
+        let end = start + limit;
+        if (end > total) {
+            end = total;
+        };
+        let i = start;
+        while (i < end) {
+            vector::push_back(&mut out, *vector::borrow(reg, i));
+            i = i + 1;
+        };
+        out
+    }
+
+    #[view]
+    public fun has_commitment(
+        publisher: address,
+        commitment: vector<u8>,
+    ): bool acquires Registry {
+        if (!exists<Registry>(publisher)) {
+            return false
+        };
+        let reg = &borrow_global<Registry>(publisher).captures;
+        let len = vector::length(reg);
+        let i = 0;
+        while (i < len) {
+            if (vector::borrow(reg, i).commitment == commitment) {
+                return true
+            };
+            i = i + 1;
+        };
+        false
+    }
+
+    // Accessors for Capture fields (convenient for callers and test suites)
+    public fun commitment(c: &Capture): vector<u8> {
+        c.commitment
+    }
+
+    public fun blob_name(c: &Capture): String {
+        c.blob_name
+    }
+
+    public fun size_bytes(c: &Capture): u64 {
+        c.size_bytes
+    }
+
+    public fun expires_at_unix(c: &Capture): u64 {
+        c.expires_at_unix
+    }
+
+    public fun registered_at_unix(c: &Capture): u64 {
+        c.registered_at_unix
     }
 }
