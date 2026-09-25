@@ -18,6 +18,9 @@ contracts/*/build/
 # Agent worktrees and session transcripts — never publish these
 .claude/
 
+# Internal task tracking & board — never publish to open-source repository
+tasks/
+
 # Local Argent recordings and device captures
 .argent/
 

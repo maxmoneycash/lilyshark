@@ -106,6 +106,8 @@ def parse_task(path: Path) -> tuple[Task | None, list[str]]:
 def load_board() -> tuple[list[Task], list[str]]:
     tasks: list[Task] = []
     errors: list[str] = []
+    if not TASKS_DIR.exists():
+        return tasks, errors
     for path in sorted(TASKS_DIR.glob("*/*.md")):
         task, errs = parse_task(path)
         errors.extend(errs)
