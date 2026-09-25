@@ -24,7 +24,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import type { HeardFrame } from '../lib/deviceLink';
-import { getDeviceLinkState, sendDeviceLine } from '../lib/deviceLink';
+import { getDeviceLinkState, sendRawInjection } from '../lib/deviceLink';
 import { applyNetFrame } from './analyzerMesh';
 import { decodeEnvelope, encodeEnvelope, shouldPublish } from './netProtocol';
 import { buildLadder, CONNECT_WINDOW_MS, type NetTransport } from './netTransport';
@@ -96,7 +96,7 @@ function onMessage(payload: string): void {
   set({ received: state.received + 1 });
   applyNetFrame(env);
   if (env.raw && getDeviceLinkState().status === 'linked') {
-    sendDeviceLine(`LSK INJ ${env.raw}`)
+    sendRawInjection(env.raw)
       .then(() => set({ injected: state.injected + 1 }))
       .catch(() => {
         /* the deck being briefly busy is not an error worth surfacing */

@@ -9,7 +9,7 @@
  * truth outranks the internet's memory.
  */
 
-import { getDeviceLinkState, sendDeviceLine } from "../lib/deviceLink";
+import { getDeviceLinkState, sendNodeRumour } from "../lib/deviceLink";
 import { getSnapshot, mutate, type NodeEntry } from "./store";
 
 export interface NetNodeRow {
@@ -89,9 +89,7 @@ async function fetchOnce(): Promise<void> {
 			const label =
 				(row.shortName || row.num.toString(16).slice(-4)).replace(/\s+/g, "").slice(0, 8) ||
 				"NODE";
-			await sendDeviceLine(
-				`LSK NODE ${row.num.toString(16).padStart(8, "0")} ${Math.round(row.lat * 1e7)} ${Math.round(row.lon * 1e7)} ${label}`,
-			).catch(() => {});
+			await sendNodeRumour(row.num, row.lat, row.lon, label).catch(() => {});
 		}
 	}
 }

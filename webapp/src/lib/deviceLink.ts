@@ -424,7 +424,7 @@ let activeTransport: DeviceTransport | undefined;
 let identified: (() => void) | undefined;
 let streamEnded: (() => void) | undefined;
 let pendingTx:
-  | { proto: string; kind: string; resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+  | { proto?: string; kind?: string; resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
   | undefined;
 
 function finishPendingTx(ok: boolean, reason?: string): void {
@@ -542,7 +542,9 @@ function handleLine(line: string): void {
   } else if (parsed.kind === 'P') {
     set({ pointer: parsed.pointer });
   } else if (parsed.kind === 'OK') {
-    if (parsed.proto === pendingTx?.proto && parsed.txKind === pendingTx?.kind) {
+    const protoMatches = pendingTx?.proto === undefined || parsed.proto === pendingTx.proto;
+    const kindMatches = pendingTx?.kind === undefined || parsed.txKind === pendingTx.kind;
+    if (protoMatches && kindMatches) {
       finishPendingTx(true);
     }
   } else if (parsed.kind === 'ERR') {
@@ -772,11 +774,21 @@ export async function sendDeviceLine(line: string): Promise<void> {
   // The console has no request IDs. Keep one command in flight so another
   // command's response cannot be mistaken for this transmission's result.
   if (pendingTx) throw new Error('A transmission is waiting for the deck. Retry when it finishes.');
-  if (!line.startsWith('LSK TX ')) {
+
+  let proto: string | undefined;
+  let kind: string | undefined;
+
+  if (line.startsWith('LSK TX ')) {
+    [, , proto, kind] = line.split(' ');
+  } else if (line.startsWith('LSK INJ ')) {
+    kind = 'inj';
+  } else if (line.startsWith('LSK NODE ')) {
+    kind = 'node';
+  } else {
     await send(line);
     return;
   }
-  const [, , proto, kind] = line.split(' ');
+
   await new Promise<void>((resolve, reject) => {
     pendingTx = {
       proto,
@@ -797,6 +809,89 @@ export async function sendDeviceLine(line: string): Promise<void> {
       }
     });
   });
+}
+
+/**
+ * Send a signed MeshCore ADVERT packet over the radio.
+ * @param reach 'zero-hop' (default, single hop local broadcast) or 'flood' (multi-hop flood)
+ */
+export async function sendMeshCoreAdvert(reach: 'flood' | 'zero-hop' = 'zero-hop'): Promise<void> {
+  await sendDeviceLine(reach === 'flood' ? 'LSK TX meshcore advert flood' : 'LSK TX meshcore advert');
+}
+
+/**
+ * Send a Meshtastic broadcast text message over the radio.
+ */
+export async function sendMeshtasticText(text: string): Promise<void> {
+  if (!text) throw new Error('message text cannot be empty');
+  await sendDeviceLine(`LSK TX meshtastic text ${text}`);
+}
+
+/**
+ * Send a Meshtastic direct message (DM) to a target node number.
+ */
+export async function sendMeshtasticDirectMessage(destNode: number | string, text: string): Promise<void> {
+  if (!text) throw new Error('message text cannot be empty');
+  const hex = typeof destNode === 'number'
+    ? (destNode >>> 0).toString(16).padStart(8, '0')
+    : destNode.replace(/^!/, '').padStart(8, '0');
+  if (!/^[0-9a-fA-F]{8}$/.test(hex)) {
+    throw new Error(`invalid destination node ID: ${destNode}`);
+  }
+  await sendDeviceLine(`LSK TX meshtastic dm ${hex.toLowerCase()} ${text}`);
+}
+
+/**
+ * Send current GPS coordinates as a Meshtastic position packet over the radio.
+ */
+export async function sendMeshtasticPosition(): Promise<void> {
+  await sendDeviceLine('LSK TX meshtastic position');
+}
+
+/**
+ * Broadcast local node identity information as a Meshtastic NodeInfo packet over the radio.
+ */
+export async function sendMeshtasticNodeInfo(): Promise<void> {
+  await sendDeviceLine('LSK TX meshtastic nodeinfo');
+}
+
+/**
+ * Inject raw frame bytes directly into the radio receiver pipeline.
+ * @param hexBytes Even-length hex string (max 255 bytes / 510 hex characters)
+ */
+export async function sendRawInjection(hexBytes: string): Promise<void> {
+  const clean = hexBytes.trim().toLowerCase();
+  if (clean.length === 0) {
+    throw new Error('injection payload cannot be empty');
+  }
+  if (clean.length % 2 !== 0 || !/^[0-9a-f]+$/.test(clean)) {
+    throw new Error('invalid hex payload for injection');
+  }
+  if (clean.length > 510) {
+    throw new Error('injection payload exceeds 255-byte limit');
+  }
+  await sendDeviceLine(`LSK INJ ${clean}`);
+}
+
+/**
+ * Inject a simulated or rumoured node into the device's node directory.
+ */
+export async function sendNodeRumour(
+  nodeId: number | string,
+  latDeg: number,
+  lonDeg: number,
+  label: string,
+): Promise<void> {
+  const hex = typeof nodeId === 'number'
+    ? (nodeId >>> 0).toString(16).padStart(8, '0')
+    : nodeId.replace(/^!/, '').padStart(8, '0');
+  if (!/^[0-9a-fA-F]{8}$/.test(hex)) {
+    throw new Error(`invalid node ID: ${nodeId}`);
+  }
+  const cleanLabel = (label || 'Node').replace(/\s+/g, '_');
+  const lat1e7 = Math.round(latDeg * 1e7);
+  const lon1e7 = Math.round(lonDeg * 1e7);
+  await sendDeviceLine(`LSK NODE ${hex.toLowerCase()} ${lat1e7} ${lon1e7} ${cleanLabel}`);
 }
 
 /** Ask the firmware to start or stop sweeping the band. It answers LSK OK or

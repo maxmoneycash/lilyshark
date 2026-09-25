@@ -4,7 +4,7 @@ import type Connection from "@liamcottle/meshcore.js/src/connection/connection.j
 import Constants from "@liamcottle/meshcore.js/src/constants.js";
 import CayenneLpp from "@liamcottle/meshcore.js/src/cayenne_lpp.js";
 import { COOLDOWN_MS, getAlertCfg } from "./alerts";
-import { getDeviceLinkState, sendDeviceLine } from "../lib/deviceLink";
+import { getDeviceLinkState, sendMeshtasticDirectMessage, sendMeshtasticText } from "../lib/deviceLink";
 import { clearDemo, demoSendText, isDemo } from "./demo";
 import { meshtasticBleActive, meshtasticBleRetry, meshtasticBleSendText } from "./meshtasticBle";
 import { t } from "./i18n";
@@ -1342,11 +1342,11 @@ async function transmitDeviceMessage(msg: Message): Promise<void> {
   });
   const isDm = msg.convo.startsWith("dm:");
   const destination = Number(msg.convo.slice(3));
-  await sendDeviceLine(
-    isDm
-      ? `LSK TX meshtastic dm ${(destination >>> 0).toString(16).padStart(8, "0")} ${msg.text}`
-      : `LSK TX meshtastic text ${msg.text}`,
-  );
+  if (isDm) {
+    await sendMeshtasticDirectMessage(destination, msg.text);
+  } else {
+    await sendMeshtasticText(msg.text);
+  }
   setMsgState(msg.id, msg.ts, "sent");
 }
 

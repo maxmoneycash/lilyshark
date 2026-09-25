@@ -8,6 +8,13 @@ import {
   disconnectDeviceLink,
   getDeviceLinkState,
   sendDeviceLine,
+  sendMeshCoreAdvert,
+  sendMeshtasticDirectMessage,
+  sendMeshtasticNodeInfo,
+  sendMeshtasticPosition,
+  sendMeshtasticText,
+  sendNodeRumour,
+  sendRawInjection,
 } from './deviceLink';
 
 const COMMAND = 'LSK TX meshtastic text hello';
@@ -128,5 +135,79 @@ test('USB transmission confirmations stay attached to their command', async (t) 
     assert.equal(messages[0].state, 'sent');
     assert.equal(messages[0].failureReason, undefined);
     assert.deepEqual(writes, [COMMAND, COMMAND]);
+  });
+
+  await t.test('sendMeshCoreAdvert emits correct advert command and handles reach variants', async () => {
+    onWrite = async (line) => {
+      if (line === 'LSK TX meshcore advert') {
+        reply('LSK OK {"proto":"meshcore","kind":"advert","reach":"zero-hop"}');
+      } else if (line === 'LSK TX meshcore advert flood') {
+        reply('LSK OK {"proto":"meshcore","kind":"advert","reach":"flood"}');
+      }
+    };
+    await sendMeshCoreAdvert();
+    await sendMeshCoreAdvert('flood');
+    assert.deepEqual(writes, ['LSK TX meshcore advert', 'LSK TX meshcore advert flood']);
+  });
+
+  await t.test('sendMeshtasticPosition and sendMeshtasticNodeInfo confirm over USB', async () => {
+    onWrite = async (line) => {
+      if (line === 'LSK TX meshtastic position') {
+        reply('LSK OK {"proto":"meshtastic","kind":"position"}');
+      } else if (line === 'LSK TX meshtastic nodeinfo') {
+        reply('LSK OK {"proto":"meshtastic","kind":"nodeinfo"}');
+      }
+    };
+    await sendMeshtasticPosition();
+    await sendMeshtasticNodeInfo();
+    assert.deepEqual(writes, ['LSK TX meshtastic position', 'LSK TX meshtastic nodeinfo']);
+  });
+
+  await t.test('sendMeshtasticText validates non-empty text and emits command', async () => {
+    onWrite = async (line) => {
+      if (line === 'LSK TX meshtastic text broadcast_hello') {
+        reply('LSK OK {"proto":"meshtastic","kind":"text"}');
+      }
+    };
+    await assert.rejects(sendMeshtasticText(''), /cannot be empty/);
+    await sendMeshtasticText('broadcast_hello');
+    assert.deepEqual(writes, ['LSK TX meshtastic text broadcast_hello']);
+  });
+
+  await t.test('sendMeshtasticDirectMessage validates destination and formats command', async () => {
+    onWrite = async (line) => {
+      if (line === 'LSK TX meshtastic dm 0000002a ping') {
+        reply('LSK OK {"proto":"meshtastic","kind":"dm"}');
+      }
+    };
+    await assert.rejects(sendMeshtasticDirectMessage(42, ''), /cannot be empty/);
+    await assert.rejects(sendMeshtasticDirectMessage('xyz', 'hello'), /invalid destination node ID/);
+    await sendMeshtasticDirectMessage(42, 'ping');
+    assert.deepEqual(writes, ['LSK TX meshtastic dm 0000002a ping']);
+  });
+
+  await t.test('sendRawInjection validates hex bounds and awaits inj confirmation', async () => {
+    onWrite = async (line) => {
+      if (line === 'LSK INJ deadbeef') {
+        reply('LSK OK {"kind":"inj"}');
+      }
+    };
+    await assert.rejects(sendRawInjection(''), /cannot be empty/);
+    await assert.rejects(sendRawInjection('123'), /invalid hex payload/);
+    await assert.rejects(sendRawInjection('zz'), /invalid hex payload/);
+    await assert.rejects(sendRawInjection('aa'.repeat(256)), /exceeds 255-byte limit/);
+    await sendRawInjection('DEADBEEF');
+    assert.deepEqual(writes, ['LSK INJ deadbeef']);
+  });
+
+  await t.test('sendNodeRumour validates node ID and formats coordinates to 1e7 integers', async () => {
+    onWrite = async (line) => {
+      if (line === 'LSK NODE 0000002a 377749000 -1224194000 San_Francisco') {
+        reply('LSK OK {"kind":"node"}');
+      }
+    };
+    await assert.rejects(sendNodeRumour('invalid', 0, 0, 'Test'), /invalid node ID/);
+    await sendNodeRumour(42, 37.7749, -122.4194, 'San Francisco');
+    assert.deepEqual(writes, ['LSK NODE 0000002a 377749000 -1224194000 San_Francisco']);
   });
 });
