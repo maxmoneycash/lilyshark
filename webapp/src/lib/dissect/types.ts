@@ -1,5 +1,5 @@
 /**
- * Shared model for the in-browser protocol dissection tree (UI-004).
+ * Shared model for the in-browser protocol dissection tree.
  *
  * Mirrors the firmware's decoder vocabulary in
  * include/lilyshark/core/decoded_packet.h and include/lilyshark/core/decoder.h:
@@ -71,7 +71,7 @@ export interface Dissection {
 }
 
 /**
- * A user-supplied channel key (UI-011). The name is the user's own label for
+ * A user-supplied channel key. The name is the user's own label for
  * the key and is what decrypted-state labels report, so a decode always says
  * WHICH key read it. Key material lives only in the caller's memory — the
  * dissectors never copy it anywhere else.

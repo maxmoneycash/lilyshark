@@ -44,12 +44,12 @@ attesting the witness key from `WITNESS-VECTOR-1` in the protocol spec:
 Devnet is wiped periodically, so these transactions are a dated proof of
 the path, not a durable deployment.
 
-## Where this deploys (task CO-002)
+## Where this deploys
 
 Not shelbynet — that prototype chain is wiped roughly weekly; it is the
 blobs' home, not the scoreboard's. And not devnet, for the same reason.
 The durable home is **Aptos testnet**, which requires one human step: the
-testnet faucet is web-gated. To complete CO-002:
+testnet faucet is web-gated. To deploy to testnet:
 
 1. `aptos init --profile lilyshark-testnet --network testnet --skip-faucet`
 2. Fund the printed address at https://aptos.dev/network/faucet

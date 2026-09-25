@@ -10,8 +10,8 @@ unit and the hour you do not spend fighting esptool.
 **Gate: this does not launch until physical hardware verification (SD writes, touch calibration, scan recovery) is done.**
 Shipping hardware whose microSD writes, touch calibration, and scan
 recovery have never been verified on a physical device would be selling an
-unknown. The QA checklist below is written against the validation FW-001
-performs; until it passes, there is nothing to sell.
+unknown. The QA checklist below is written against on-device
+physical validation; until it passes, there is nothing to sell.
 
 ## What ships
 
@@ -27,7 +27,7 @@ there yet.
 ## Per-unit QA checklist
 
 Derived from `scripts/preflight_tdeck.sh` (host-side checks, already
-automated) plus the on-device pass FW-001 defines. Every unit gets all of
+automated) plus the on-device manual validation pass. Every unit gets all of
 it, and the results are recorded per serial:
 
 **Before flashing (automated, `scripts/preflight_tdeck.sh`):**

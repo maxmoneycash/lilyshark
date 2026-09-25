@@ -55,8 +55,8 @@ The parts that are design law rather than product scope carried over:
   modules, per the paper's Aptos-over-Solana argument (§18, §36).
 - **Prover-invariant discipline.** §19's argument that score-keeping
   modules should carry machine-checked invariants, not comments, is
-  adopted as task **CO-005** (prover specs for `field_points`). Partial
-  today: unit tests exist, prover specs do not.
+  adopted with Move Prover formal specifications for `field_points`
+  (`contracts/field-points/sources/field_points.spec.move`).
 
 ## What this repo deliberately does not build
 

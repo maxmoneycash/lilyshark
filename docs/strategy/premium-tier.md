@@ -76,10 +76,10 @@ premium is free that month.**
 - Require an account for free-tier use. Accounts appear exactly where
   state must persist server-side.
 
-## Build order (each lands as its own task when scheduled)
+## Build order
 
-1. Accounts + entitlement check against scorer output (needs PR-005).
+1. Accounts + entitlement check against scorer output.
 2. History (retention + search over published captures).
-3. Alerting on standing filters (reuses UI-003's filter engine server-side).
+3. Alerting on standing filters (reuses analyzer filter engine server-side).
 4. API over the aggregated dataset (needs enough data to be worth selling).
 5. Team workspaces last — sell to individuals first, teams follow usage.

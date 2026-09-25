@@ -296,7 +296,7 @@ export function createRouter(
       cleanup();
 
       // A published capture must also be vouched for on-chain, or its own
-      // RESOLVE trace ends at "no on-chain anchor" (task UI-002). The registry
+      // RESOLVE trace ends at "no on-chain anchor". The registry
       // write is signed server-side with the same account that paid the
       // upload; the key never reaches the browser. Anchoring failure must not
       // fail the publish — it is reported as a value so the client can render
@@ -383,7 +383,7 @@ export function createRouter(
     res.json({
       available: uploadService?.isAvailable() ?? false,
       uploaderAddress: uploadService?.getAddress() ?? null,
-      // Whether published captures will also be anchored on-chain (UI-002).
+      // Whether published captures will also be anchored on-chain.
       anchoring: anchorService?.isAvailable() ?? false,
       maxFileSize: "2GB",
       allowedTypes: ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "avif", "mp4", "webm", "mov", "avi", "mkv", "pdf", "lscap"],

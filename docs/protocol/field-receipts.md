@@ -200,7 +200,7 @@ A survey observation maps to a **cell**: geohash-5 (~5 km) × band × ISO
 week. First verified capture anchored from a previously empty cell earns a
 discovery bonus; repeat surveys of the same cell decay. Cell scoring needs
 GPS context that lives inside capture files, not on-chain, so it is
-computed by `scripts/field_receipts_score.py` (task PR-005) — a
+computed by `scripts/field_receipts_score.py` — a
 deterministic script anyone can run against the public event log and the
 public blobs. Publishing the scorer *is* the trust model: disputes are
 settled by re-running it.
@@ -289,15 +289,13 @@ shows real usage.
 
 ## Sequencing
 
-1. `field_points` module with witness book and anchor claims, unit-tested
-   (CO-001..003).
+1. `field_points` module with witness book and anchor claims, unit-tested.
 2. Witness-key computation in `scripts/` + `webapp` from existing `.lscap`
-   files, golden-vectored across implementations like the pointer
-   (PR-002..004).
+   files, golden-vectored across implementations like the pointer.
 3. Analyzer: attest from capture, corroboration badge in TRAFFIC,
-   leaderboard panel reading events (UI tasks).
-4. Season 0 scorer + published rules (PR-005..006); firmware witness
-   sidecar last (FW), since the analyzer path exercises the whole loop
+   leaderboard panel reading events.
+4. Season 0 scorer + published rules; firmware witness
+   sidecar last, since the analyzer path exercises the whole loop
    without touching the device.
 
 Every step is independently useful: witness keys alone are a dedup/

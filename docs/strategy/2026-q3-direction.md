@@ -96,7 +96,7 @@ now; conversion only if and when there is real value to distribute.
 One operational consequence of the weekly wipe: the shelbynet deployment
 of `capture_registry` is ephemeral. Durable anchoring and the points
 ledger belong on Aptos (testnet now, mainnet when it matters), with Shelby
-holding the blobs; the pointer format doesn't change (CO-004).
+holding the blobs; the pointer format doesn't change.
 
 ## 4. How this makes money
 

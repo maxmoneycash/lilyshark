@@ -1,5 +1,5 @@
 /**
- * Pure view logic for the dissection tree pane (UI-004).
+ * Pure view logic for the dissection tree pane.
  *
  * The tree itself comes from dissectFrame; this module turns it into what a
  * UI actually renders and drives: the profile→hint mapping that picks the

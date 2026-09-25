@@ -1,4 +1,4 @@
-// Tests for lilyshark::capture_registry v2 (task CO-004)
+// Tests for lilyshark::capture_registry v2
 #[test_only]
 module lilyshark::capture_registry_tests {
     use std::string;

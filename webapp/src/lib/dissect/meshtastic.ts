@@ -8,7 +8,7 @@
  * - src/core/meshtastic_payload.cpp — the default-key payload reader.
  *
  * The payload reader applies the *published* default channel PSK that every
- * Meshtastic radio ships with, then any user-supplied channel keys (UI-011),
+ * Meshtastic radio ships with, then any user-supplied channel keys,
  * in order. Success under the default key proves the traffic was never
  * private; success under a user key is labeled with that key's name and
  * claims nothing more. Failure leaves the payload opaque, which is the
@@ -1676,7 +1676,7 @@ export interface MeshtasticFields {
 	/** Readable under the published default key — never a broken secret. */
 	defaultKeyReadable: boolean;
 	/**
-	 * Set when a user-supplied channel key (UI-011) read the payload instead.
+	 * Set when a user-supplied channel key read the payload instead.
 	 * Mutually exclusive with defaultKeyReadable — the default PSK is always
 	 * tried first.
 	 */
@@ -1880,8 +1880,8 @@ function payloadNodes(
  * 16-byte outer header, or a zero sender (which the official firmware
  * rejects as an altered packet, and `dissectMeshtastic` reports as
  * malformed). This is the same header arithmetic `dissectMeshtastic`
- * performs, without building a tree, for the follow-conversation filter
- * (UI-008), which reads every frame of a capture on every keystroke.
+ * performs, without building a tree, for the follow-conversation filter,
+ * which reads every frame of a capture on every keystroke.
  * conversation.test.ts pins it against `dissectMeshtastic`'s own fields for
  * fixtures, every prefix of them, and random bytes, so the two cannot drift.
  */

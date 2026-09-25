@@ -1,5 +1,5 @@
 /**
- * UI-011 — user-supplied Meshtastic channel keys.
+ * User-supplied Meshtastic channel keys.
  *
  * Fixtures are built by encrypting known Data-message plaintext with the
  * lib's own cipher (aesCtrXcrypt is symmetric) over the exported

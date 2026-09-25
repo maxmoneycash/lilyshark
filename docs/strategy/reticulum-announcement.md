@@ -1,6 +1,6 @@
 # Telling Reticulum that its analyzer exists
 
-Task GR-007. First-mover credit in a gap only counts if the people who
+First-mover credit in a gap only counts if the people who
 named the gap see the thing working. The FOSDEM 2026 community meetup
 listed thin observability among Reticulum's open problems; as of this
 writing a search for a Reticulum dissector or GUI analyzer turns up
@@ -134,20 +134,20 @@ harder to walk back than to prevent.
 
 ---
 
-## Routing feedback back into the development roadmap
+## Routing feedback back into development
 
-Any technical feedback, corrections, or feature requests from these venues are triaged directly into the project roadmap:
+Any technical feedback, corrections, or feature requests from these venues are triaged directly:
 
-1. **`UI-019` (Dissect MessagePack in Reticulum announce `app_data`):**
+1. **Dissect MessagePack in Reticulum announce `app_data`:**
    - *Trigger:* Community asks for human-readable display of common app payloads (NomadNet, LXMF, Sideband announce dicts).
    - *Requirement:* Bounded structural MessagePack reader that safely decodes non-encrypted dictionary keys while leaving unknown or binary payloads as raw bytes.
-2. **`FW-011` (Reticulum IFAC packet handling and filter flags):**
+2. **Reticulum IFAC packet handling and filter flags:**
    - *Trigger:* Questions regarding IFAC-protected broadcast or unicast frames.
    - *Requirement:* Explicit UI badge and filter expression (`rns.ifac == 1`) for IFAC-masked frames, clearly conveying why inner headers cannot be read without interface access keys.
-3. **`UI-020` (Reticulum announce path-change graph visualization):**
+3. **Reticulum announce path-change graph visualization:**
    - *Trigger:* Requests to visualize topology shifts across multiple announces.
    - *Requirement:* Directed node-to-transport transition diagram derived from destination announce histories over time.
-4. **`FW-012` (Reticulum regional channel presets and airtime profiles):**
+4. **Reticulum regional channel presets and airtime profiles:**
    - *Trigger:* Clarifications on standard regional channel plans (EU 868 MHz 125 kHz SF9, US 915 MHz 500 kHz SF7).
    - *Requirement:* Built-in profile presets in firmware and webapp matching standard Reticulum interface configurations.
 

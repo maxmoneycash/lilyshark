@@ -60,7 +60,7 @@ scoring, one record per capture whose GPS context has been read:
 In production these records come from fetching each anchored blob,
 verifying it against its on-chain commitment, and reading the GPS context
 inside — that fetch pipeline is out of scope here (it needs the deployed
-chain, task CO-002). The scorer still cross-checks each record against
+chain). The scorer still cross-checks each record against
 the event log: a record whose (publisher, commitment) was never anchored
 by a CaptureRegistered event is not "verified" and earns nothing (it is
 reported in `discrepancies`).
@@ -87,7 +87,7 @@ of the account's corroborations, the account's recomputed witness points
 in season standings. On-chain totals are never modified.
 
 `fetch` exists only as a stub: live event fetching is out of scope until
-the module is deployed (CO-002).
+the module is deployed.
 """
 
 from __future__ import annotations
@@ -585,7 +585,7 @@ def command_fetch(args: argparse.Namespace) -> int:
     del args
     print(
         "error: fetch is a stub — live event fetching is out of scope until "
-        "field_points is deployed (task CO-002). Query the Aptos indexer "
+        "field_points is deployed. Query the Aptos indexer "
         "GraphQL for the module's events (lilyshark::field_points::"
         "WitnessAttested / PointsAwarded and lilyshark::capture_registry::"
         "CaptureRegistered), ordered by transaction_version, save them in "

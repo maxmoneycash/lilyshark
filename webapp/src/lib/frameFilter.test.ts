@@ -338,7 +338,7 @@ test("errors are returned, never thrown", () => {
 	}
 });
 
-/* ── dest: the Reticulum destination hash (UI-013) ───────────────────── */
+/* ── dest: the Reticulum destination hash ────────────────────────────── */
 
 /**
  * A clear RNode/Reticulum HEADER_1 frame naming one destination hash:

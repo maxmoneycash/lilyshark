@@ -100,8 +100,8 @@ standings and the post-mortem.*
 - No user-facing token, airdrop, or points-to-money conversion is
   planned or promised; if that ever changes it will be a separate,
   publicly argued decision with legal review.
-- Hardware validation of the T-Deck firmware is incomplete (tasks
-  FW-001/002/008) and is not part of this request.
+- Physical hardware endurance and field validation of the T-Deck firmware
+  is ongoing and is not part of this request.
 
 ## Submission checklist
 

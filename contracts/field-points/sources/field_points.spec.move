@@ -1,4 +1,4 @@
-/// Move Prover specification for `lilyshark::field_points` (task CO-005).
+/// Move Prover specification for `lilyshark::field_points`.
 ///
 /// The scoreboard is the one part of Field Receipts that anyone has an
 /// incentive to attack, so the properties that make it a scoreboard rather

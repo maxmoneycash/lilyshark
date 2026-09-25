@@ -1,5 +1,5 @@
 /**
- * Directed node-to-transport transition graph for Reticulum destination announces (UI-020).
+ * Directed node-to-transport transition graph for Reticulum destination announces.
  *
  * Derives topology shifts across consecutive announces for a destination:
  * when a destination moves from a direct link to an intermediary transport

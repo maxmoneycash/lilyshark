@@ -1,6 +1,5 @@
 /**
- * Structural MessagePack reader and dissector for Reticulum announce app_data
- * (task UI-019).
+ * Structural MessagePack reader and dissector for Reticulum announce app_data.
  *
  * Traverses MessagePack primitives and containers (maps, arrays, strings, binary,
  * numbers) and yields DissectNode trees with byte-accurate ranges.
@@ -335,7 +334,7 @@ export function msgpackValueToNodes(val: MsgpackValue): DissectNode[] {
 }
 
 /**
- * Attempt to dissect raw bytes as MessagePack (task UI-019).
+ * Attempt to dissect raw bytes as MessagePack.
  * Returns array of DissectNodes if successful, or null if the bytes are not valid MessagePack.
  */
 export function dissectMsgpack(

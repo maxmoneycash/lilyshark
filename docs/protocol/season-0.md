@@ -31,7 +31,7 @@ and are enforced on-chain, not by this document:
 | Beyond position 8, or outside the window | 0 | Recorded (corroboration count is useful data) but not credited |
 | Anchor claim | 10 | Per capture anchored in `capture_registry`, claimed via `claim_anchor_points` |
 
-The module is a draft not yet deployed to durable rails (CO-004). If the
+The module is a draft not yet deployed to durable rails. If the
 deployed constants differ from the table above at season start, this
 document is corrected and re-frozen before 2026-10-01; after that date the
 deployed module is the authority and this table must match it.
@@ -40,7 +40,7 @@ deployed module is the authority and this table must match it.
 
 A **cell** is geohash-5 (~5 km) × band × ISO week. Cell scoring needs GPS
 context from inside capture blobs, so it is computed off-chain by the
-Season 0 scorer (`scripts/field_receipts_score.py`, task PR-005) — a
+Season 0 scorer (`scripts/field_receipts_score.py`) — a
 deterministic script over public chain events and public blobs. Disputes
 are settled by re-running it.
 
@@ -65,10 +65,10 @@ season standings, the scorer applies a discount:
 | Partner-concentration threshold | ≥ 80% of an account's corroborations with the same set of ≤ 3 partners | **Season 0 parameter** — frozen at season start; this document is the freeze |
 | Discount applied to that account's witness points in standings | × 0.25 | **Season 0 parameter** — frozen at season start; this document is the freeze |
 
-The mechanism is implemented and documented in the scorer (PR-005); the
+The mechanism is implemented and documented in the scorer; the
 measurement of how well the threshold performed — degree distributions,
-timing anomalies, cliques it caught and missed — is task PR-007, run
-against Season 0 data and feeding Season 1's rules. On-chain point totals
+timing anomalies, cliques it caught and missed — is analyzed
+against Season 0 data and feeds Season 1's rules. On-chain point totals
 are never modified; the discount exists only in season standings.
 
 ## What Season 0 points redeem for
@@ -114,7 +114,7 @@ Season 0's weights follow it:
 
 | Date | Event |
 | --- | --- |
-| Before 2026-10-01 | Rules published (this document); scorer published (PR-005); freeze announced |
+| Before 2026-10-01 | Rules published (this document); scorer published; freeze announced |
 | 2026-10-01 00:00 UTC | Season 0 opens; rules frozen |
 | 2026-12-31 23:59 UTC | Season 0 closes (event timestamps on-chain decide inclusion) |
-| January 2027 | Final scorer run published with inputs pinned; PR-007 clique analysis; Season 1 rules drafted from both |
+| January 2027 | Final scorer run published with inputs pinned; clique analysis; Season 1 rules drafted from both |

@@ -1,5 +1,5 @@
 /**
- * On-chain anchoring for published captures (task UI-002).
+ * On-chain anchoring for published captures.
  *
  * After the share service uploads a capture to Shelby, this service registers
  * it in `lilyshark::capture_registry` (contracts/capture-registry) under the
@@ -108,7 +108,7 @@ export class AnchorService {
   }
 
   /**
-   * Registry v1 has no on-chain dedupe (see task CO-004), but the service
+   * Registry v1 has no on-chain dedupe, but the service
    * always anchors under its own account, so one fullnode GET of its own
    * Registry resource is enough to avoid double-registering a re-published
    * capture. A failed read only means we may register a duplicate — v1's

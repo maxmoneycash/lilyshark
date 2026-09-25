@@ -1,5 +1,5 @@
 /**
- * Golden-vector and safety tests for the in-browser dissectors (UI-004).
+ * Golden-vector and safety tests for the in-browser dissectors.
  *
  * The fixture corpus under ./fixtures/ carries the same bytes the firmware
  * C++ tests pin (each entry names its source test), so the TypeScript
@@ -37,7 +37,7 @@ interface Fixture {
 	kind?: string;
 	expect?: Record<string, unknown>;
 	expectPayload?: Record<string, unknown>;
-	/** Reticulum semantic announce tier (UI-013) — fields.announce. */
+	/** Reticulum semantic announce tier — fields.announce. */
 	expectAnnounce?: Record<string, unknown>;
 	expectShelby?: Record<string, unknown>;
 }
@@ -318,7 +318,7 @@ test("a bare Shelby pointer with no outer protocol decodes as Custom", () => {
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
- * Reticulum announce, semantic tier (UI-013). The port must agree with
+ * Reticulum announce, semantic tier. The port must agree with
  * readReticulumAnnounce in src/core/reticulum_decoder.cpp field for field,
  * and must never claim more than length-and-flag arithmetic proves.
  * ──────────────────────────────────────────────────────────────────────── */

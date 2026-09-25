@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sybil-clique analysis over the Field Receipts witness graph (task PR-007).
+"""Sybil-clique analysis over the Field Receipts witness graph.
 
 Season 0's threat model (docs/protocol/field-receipts.md#threat-model-honestly)
 does not claim sybil-proofness: it claims every farming path either costs

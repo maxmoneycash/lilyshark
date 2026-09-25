@@ -6,7 +6,7 @@ Reticulum, and Starlink, but not the other decentralized networks people
 care about — Freenet, I2P, Yggdrasil, Veilid, and their kin? The short
 answer: **the paper's unit of analysis is the physical layer**, and those
 networks don't have one. This page keeps the long answer in one place, and
-task PA-006 tracks folding it into a v1.1 appendix of the paper itself.
+is planned for a v1.1 appendix of the paper itself.
 
 ## The scope rule
 

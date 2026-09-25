@@ -297,7 +297,7 @@ an older chat.
   legacy browser files, and import limits.
 - Unsigned iOS Simulator build of `PommeCore`: passed.
 - Web production build: passed; Vite still reports large output chunks.
-- Task schema: 52 tasks, no errors. Whitespace check passed.
+- Whitespace check passed.
 - Arc: intro and Mesh layouts visually inspected; Mesh Activity CONNECT opens
   the connection dialog. All 12 intro chapters passed geometry checks at
   320×568, 390×844, and 1440×900 (36 cases): no overlap, horizontal overflow,
@@ -311,20 +311,18 @@ an older chat.
 
 ## Remaining work
 
-The existing project roadmap records 41/52 tasks done. It does
-not cover every native feature or establish release readiness. Its eleven open
-tasks remain open:
+The project deliverables cover native features, firmware releases, and deployment readiness:
 
-| Tasks | Remaining deliverable |
+| Workstream | Remaining deliverable |
 | --- | --- |
-| FW-001, FW-002, FW-008 | Physical T-Deck SD/touch/scan recovery, byte-compared over-the-air captures, endurance reports |
-| FW-010 | LSK analyzer BLE service and hardware verification; existing Meshtastic BLE is a different service |
-| CO-002, CO-003 | Durable contract deployment, recorded transaction evidence, and client address configuration |
-| CO-004 | Registry v2 deduplication, pagination, and self-service anchoring |
-| GR-003 | Pre-flashed hardware offering, dependent on hardware validation |
-| GR-006 | Dated most-wanted cell output and publication from scorer data |
-| GR-007 | External Reticulum announcement; draft/publication work needs separate tracking |
-| PA-006 | Related-networks appendix in a regenerated, versioned PDF and matching web renders |
+| Hardware validation | Physical T-Deck SD/touch/scan recovery, byte-compared over-the-air captures, endurance reports |
+| BLE analyzer service | LSK analyzer BLE service and hardware verification; existing Meshtastic BLE is a different service |
+| Contracts & deployments | Durable contract deployment, recorded transaction evidence, and client address configuration |
+| Registry v2 | Registry v2 deduplication, pagination, and self-service anchoring |
+| Hardware offering | Pre-flashed hardware offering, dependent on hardware validation |
+| Cell scoring | Dated most-wanted cell output and publication from scorer data |
+| Reticulum announcement | External Reticulum announcement; draft/publication work needs separate tracking |
+| Related networks | Related-networks appendix in a regenerated, versioned PDF and matching web renders |
 
 Additional gaps from the recovered work:
 

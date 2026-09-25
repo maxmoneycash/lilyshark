@@ -170,7 +170,7 @@ export async function fetchAnchor(
 }
 
 /**
- * Range-bounded registry read (task CO-004).
+ * Range-bounded registry read.
  * Reads `limit` captures starting at `start` from the on-chain registry view.
  * If the fullnode view is unsupported or the registry is uninitialized,
  * falls back to slicing `fetchRegistry(publisher)`.
@@ -217,7 +217,7 @@ export async function fetchRegistrySlice(
 }
 
 /**
- * Build the entry-function payload for self-serve anchoring on-chain (task CO-004).
+ * Build the entry-function payload for self-serve anchoring on-chain.
  * Allows a user with an Aptos wallet (e.g. Petra, Martian) to anchor captures
  * under their own account rather than going through the share service.
  */
@@ -254,7 +254,7 @@ export interface WalletAnchorResult {
 }
 
 /**
- * Anchor a capture under the user's connected wallet account (task CO-004).
+ * Anchor a capture under the user's connected wallet account.
  * Submits the transaction through the browser's Aptos wallet provider.
  */
 export async function anchorWithWallet(params: {

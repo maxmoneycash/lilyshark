@@ -32,7 +32,7 @@ async function main() {
     logger.warn("SHELBY_PRIVATE_KEY not set - Shelby Share disabled");
   }
 
-  // On-chain anchoring for published captures (UI-002): signs
+  // On-chain anchoring for published captures: signs
   // lilyshark::capture_registry::register with the same service key that
   // pays uploads. Constructed even without a key so the routes can answer
   // with an explicit "skipped" instead of silently omitting the anchor.

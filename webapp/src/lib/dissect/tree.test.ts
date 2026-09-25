@@ -1,5 +1,5 @@
 /**
- * Tests for the pure tree-pane logic (UI-004): profile→hint mapping,
+ * Tests for the pure tree-pane logic: profile→hint mapping,
  * flattening, keyboard navigation, and byte→row lookup — including on a
  * real dissection, so the view logic is exercised against the same shapes
  * the dissectors emit.

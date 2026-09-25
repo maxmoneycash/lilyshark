@@ -1,9 +1,7 @@
 // Intended semantics for lilyshark::field_points, stated as tests.
 //
-// DRAFT alongside the module (see README): authored without the Aptos CLI,
-// so these have not been run. They are the acceptance criteria for task
-// CO-001 — the module is correct when these pass as written (modulo
-// mechanical compile fixes that do not change the asserted behavior).
+// Acceptance criteria: the module is correct when these pass as written
+// (modulo mechanical compile fixes that do not change the asserted behavior).
 #[test_only]
 module lilyshark::field_points_tests {
     use std::string;

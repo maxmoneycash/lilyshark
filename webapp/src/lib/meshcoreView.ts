@@ -1,6 +1,6 @@
 /**
  * Reading MeshCore frames off a capture and aggregating network health,
- * repeater topology, and node directory (UI-022).
+ * repeater topology, and node directory.
  *
  * Derives:
  * 1. Discovered node directory from signed ADVERT frames: node ID, role

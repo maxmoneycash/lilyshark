@@ -46,7 +46,7 @@ CORS header, so a browser cannot use it. Event history therefore has to be
 read per account from submitted transactions until a supported indexer
 route exists.
 
-**Aptos testnet (the durable target, task CO-003/CO-002).** Anchors and the
+**Aptos testnet (the durable target).** Anchors and the
 points ledger belong on Aptos, with Shelby holding the blobs: the pointer
 format is backend-agnostic and unchanged either way. The testnet faucet is
 web-gated, so completing it takes one human step:
@@ -58,7 +58,7 @@ web-gated, so completing it takes one human step:
 4. Record the addresses and transaction hashes here, and point the analyzer's
    anchor reads at them.
 
-## Interface (Registry v2, task CO-004)
+## Interface (Registry v2)
 
 - `register(publisher, commitment, blob_name, size_bytes, expires_at_unix)` —
   entry function; anchors one capture under the caller and emits

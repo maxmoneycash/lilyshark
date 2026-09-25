@@ -290,7 +290,7 @@ export interface ReticulumFields {
 	payloadOffset: number;
 	payloadLength: number;
 	encrypted: boolean;
-	/** Semantic announce tier (UI-013); null unless provably an announce. */
+	/** Semantic announce tier; null unless provably an announce. */
 	announce: ReticulumAnnounceFields | null;
 	lxmf: LxmfMessage | null;
 }

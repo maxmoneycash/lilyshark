@@ -254,7 +254,7 @@ export function pcapExclusionNote(result: {
 	excludedSynthetic: number;
 	excludedUnencodable: number;
 	/**
-	 * Annotations (UI-010) the export was carrying and pcap could not: the
+	 * Annotations the export was carrying and pcap could not: the
 	 * LoRaTap v0 header has no annotation channel, exactly as it has none for
 	 * provenance. Omitted when there were none to leave out.
 	 */

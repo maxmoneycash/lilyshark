@@ -1,5 +1,5 @@
 /**
- * Diff two captures (UI-009) — two T-Decks, one RF event.
+ * Diff two captures — two T-Decks, one RF event.
  *
  * Two devices in the field produce two captures of the same air. Comparing
  * them by hand is how a coverage claim or a witness claim gets checked, and

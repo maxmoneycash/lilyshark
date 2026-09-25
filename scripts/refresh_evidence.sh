@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Refresh the network-evidence snapshot in one command (task PA-004).
+# Refresh the network-evidence snapshot in one command.
 #
 # Fetches the live indexer endpoints behind lilyshark.vercel.app, pins the
 # result as analysis/fixtures/shelby_network_snapshot.json, regenerates
@@ -49,5 +49,5 @@ Review the diff before committing:
 
 Then update any prose that quotes the headline numbers — each quote must
 carry the new snapshot date (see "Refreshing the snapshot" in
-analysis/README.md, and task PA-003 for the single-source rule).
+analysis/README.md for the single-source rule).
 EOF
