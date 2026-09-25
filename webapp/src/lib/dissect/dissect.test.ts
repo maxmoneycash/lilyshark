@@ -1215,3 +1215,57 @@ test("Meshtastic neighbor info payload unpacks reporting node, edges, SNR, and r
 	const n2Node = findNode(primary.root, "Neighbor 2");
 	assert.ok(n2Node && n2Node.value?.includes("!aabbccdd · -4.5 dB"));
 });
+
+test("Reticulum LinkRequest unpacks 32-byte ephemeral key and data payload", () => {
+	const destHash = new Uint8Array(16).fill(0x33);
+	const ephKey = new Uint8Array(32).fill(0xaa);
+	const extraData = new Uint8Array([0x01, 0x02, 0x03, 0x04]);
+
+	// Shim (0xa0) + Flags (0x02 = H1, SINGLE, linkRequest) + Hops (0) + DestHash (16) + Context (0)
+	const header = new Uint8Array([0xa0, 0x02, 0x00, ...destHash, 0x00]);
+	const frame = new Uint8Array(header.length + ephKey.length + extraData.length);
+	frame.set(header, 0);
+	frame.set(ephKey, header.length);
+	frame.set(extraData, header.length + ephKey.length);
+
+	const d = dissectFrame(frame, "reticulum");
+	assert.equal(d.primary.result, "matched");
+	assert.equal(d.primary.protocol, "Reticulum");
+	assertTreeInvariants(d.primary.root, frame.length, "LinkRequest");
+
+	const keyNode = findNode(d.primary.root, "Ephemeral public key (X25519)");
+	assert.ok(keyNode);
+	assert.equal(keyNode.byteLength, 32);
+	assert.ok(keyNode.value?.includes("aaaaaaaa"));
+
+	const dataNode = findNode(d.primary.root, "Link request data");
+	assert.ok(dataNode);
+	assert.equal(dataNode.byteLength, 4);
+});
+
+test("Reticulum Proof unpacks 64-byte Ed25519 signature and extra proof data", () => {
+	const destHash = new Uint8Array(16).fill(0x44);
+	const signature = new Uint8Array(64).fill(0xbb);
+	const proofData = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+
+	// Shim (0xa0) + Flags (0x0f = H1, LINK dest type (3 << 2 = 0x0c), proof packet type (0x03)) + Hops (0) + DestHash (16) + Context (0)
+	const header = new Uint8Array([0xa0, 0x0f, 0x00, ...destHash, 0x00]);
+	const frame = new Uint8Array(header.length + signature.length + proofData.length);
+	frame.set(header, 0);
+	frame.set(signature, header.length);
+	frame.set(proofData, header.length + signature.length);
+
+	const d = dissectFrame(frame, "reticulum");
+	assert.equal(d.primary.result, "matched");
+	assert.equal(d.primary.protocol, "Reticulum");
+	assertTreeInvariants(d.primary.root, frame.length, "Proof");
+
+	const sigNode = findNode(d.primary.root, "Proof signature (Ed25519)");
+	assert.ok(sigNode);
+	assert.equal(sigNode.byteLength, 64);
+	assert.ok(sigNode.value?.includes("bbbbbbbb"));
+
+	const dataNode = findNode(d.primary.root, "Proof data");
+	assert.ok(dataNode);
+	assert.equal(dataNode.byteLength, 4);
+});

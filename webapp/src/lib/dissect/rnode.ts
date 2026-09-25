@@ -638,6 +638,81 @@ export function dissectRNode(
 			lxmfSubtree(fields.lxmf, physicalHeaderLength),
 		));
 		state = "payload-decoded";
+	} else if (
+		!opts.truncated &&
+		packetType === RETICULUM_PACKET_TYPE.linkRequest &&
+		fields.payloadLength >= 32
+	) {
+		const keyOffset = physicalHeaderLength;
+		const keyHex = hexBytes(bytes, keyOffset, 32);
+		const payloadChildren: DissectNode[] = [
+			node(
+				"Ephemeral public key (X25519)",
+				keyOffset,
+				32,
+				`${keyHex} (32 bytes)`,
+			),
+		];
+		if (fields.payloadLength > 32) {
+			const extraLen = fields.payloadLength - 32;
+			payloadChildren.push(
+				node(
+					"Link request data",
+					keyOffset + 32,
+					extraLen,
+					`${extraLen} raw byte${extraLen === 1 ? "" : "s"}`,
+					[],
+					"raw",
+				),
+			);
+		}
+		root.children.push(
+			node(
+				"Payload",
+				physicalHeaderLength,
+				fields.payloadLength,
+				`Link request — ${fields.payloadLength} bytes (ephemeral key: ${keyHex.slice(0, 16)}…)`,
+				payloadChildren,
+			),
+		);
+	} else if (
+		!opts.truncated &&
+		packetType === RETICULUM_PACKET_TYPE.proof &&
+		clear &&
+		fields.payloadLength >= 64
+	) {
+		const sigOffset = physicalHeaderLength;
+		const sigHex = hexBytes(bytes, sigOffset, 64);
+		const payloadChildren: DissectNode[] = [
+			node(
+				"Proof signature (Ed25519)",
+				sigOffset,
+				64,
+				`${sigHex.slice(0, 16)}… (64 bytes)`,
+			),
+		];
+		if (fields.payloadLength > 64) {
+			const extraLen = fields.payloadLength - 64;
+			payloadChildren.push(
+				node(
+					"Proof data",
+					sigOffset + 64,
+					extraLen,
+					`${extraLen} raw byte${extraLen === 1 ? "" : "s"}`,
+					[],
+					"raw",
+				),
+			);
+		}
+		root.children.push(
+			node(
+				"Payload",
+				physicalHeaderLength,
+				fields.payloadLength,
+				`Proof — ${fields.payloadLength} bytes (signature: ${sigHex.slice(0, 16)}…)`,
+				payloadChildren,
+			),
+		);
 	} else {
 		// The generic clear-payload node, with the firmware reader's refusal
 		// reasons said out loud where the flags looked like an announce.
