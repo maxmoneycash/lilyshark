@@ -311,7 +311,7 @@ an older chat.
 
 ## Remaining work
 
-The existing [task board](../tasks/README.md) records 41/52 tasks done. It does
+The existing project roadmap records 41/52 tasks done. It does
 not cover every native feature or establish release readiness. Its eleven open
 tasks remain open:
 

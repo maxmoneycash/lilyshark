@@ -52,5 +52,5 @@ Reticulum does. If that happens, the paper's airtime arithmetic applies to
 them instantly — a Freenet contract update competing for a 200-byte LoRa
 payload budget faces exactly the R = 7.36 flood tax the paper measures.
 Nothing in this repo builds toward that today; if it ever does, it enters
-the [task board](../tasks/README.md) as tasks, per the same rule as
+the project roadmap as defined milestones, per the same rule as
 [meridian-gap.md](meridian-gap.md).

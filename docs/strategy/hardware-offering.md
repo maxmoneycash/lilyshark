@@ -7,7 +7,7 @@ question of whether this community pays for convenience on this hardware.
 Ours is GPL-3.0 and free to flash yourself — what is being sold is a tested
 unit and the hour you do not spend fighting esptool.
 
-**Gate: this does not launch until [FW-001](../../tasks/firmware/) is done.**
+**Gate: this does not launch until physical hardware verification (SD writes, touch calibration, scan recovery) is done.**
 Shipping hardware whose microSD writes, touch calibration, and scan
 recovery have never been verified on a physical device would be selling an
 unknown. The QA checklist below is written against the validation FW-001

@@ -2,7 +2,7 @@
 
 This memo settles three questions with evidence: what changed in the mesh
 world, what Lilyshark should be, and where the money is. The work it
-commits to lives on the [task board](../../tasks/README.md); the protocol
+commits to is structured across the project roadmap; the protocol
 it introduces is specified in
 [field-receipts.md](../protocol/field-receipts.md). Sources were pulled
 August 2026; links inline.
@@ -144,5 +144,4 @@ generating), and ads.
   tier scoped; Aptos grant application submitted with the deployed
   contracts and live leaderboard as evidence.
 
-Everything above is broken into evaluable tasks on the
-[board](../../tasks/README.md) (`python3 scripts/tasks.py board`).
+Everything above is broken into verifiable milestones across the firmware, analyzer webapp, protocol, and contracts.

@@ -58,8 +58,8 @@ in CI. *Artifact: passing prover run in the repo's GitHub Actions.*
 Witness attestation from an opened capture, per-frame corroboration state,
 and a season leaderboard rendered from chain events via the Aptos indexer
 — the loop that makes the on-chain data visible to non-crypto users.
-*Artifact: shipped on lilyshark.com, with the tasks' acceptance rubrics
-met (`tasks/ui/ui-014`, `ui-015`).*
+*Artifact: shipped on lilyshark.com, with full acceptance rubrics
+met (witness corroboration in TRAFFIC and leaderboard panel).*
 
 **Milestone 4 — Season 0, run in public ($7,000).**
 Publish the frozen season rules (already drafted at

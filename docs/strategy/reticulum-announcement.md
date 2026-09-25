@@ -134,9 +134,9 @@ harder to walk back than to prevent.
 
 ---
 
-## Routing feedback back into the board as tasks
+## Routing feedback back into the development roadmap
 
-Any technical feedback, corrections, or feature requests from these venues are triaged directly into the project task board under `tasks/ui/` or `tasks/firmware/`:
+Any technical feedback, corrections, or feature requests from these venues are triaged directly into the project roadmap:
 
 1. **`UI-019` (Dissect MessagePack in Reticulum announce `app_data`):**
    - *Trigger:* Community asks for human-readable display of common app payloads (NomadNet, LXMF, Sideband announce dicts).

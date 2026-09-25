@@ -88,8 +88,8 @@ scores by hand has ended the competition's credibility, not resolved a
 dispute.
 
 For a live event, run it at intervals and project the standings. The
-[leaderboard panel](../../tasks/ui/) (task UI-015) will render the same
-data from chain events once it ships; until then the JSON and a terminal
+leaderboard panel in the webapp will render the same
+data from chain events; until then the JSON and a terminal
 are enough.
 
 ## Prizes

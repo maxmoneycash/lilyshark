@@ -76,7 +76,7 @@ That is the intended state, not an unfinished one.
 
 ## What would change this
 
-Scope changes here happen on the [task board](../tasks/README.md) or not
+Scope changes here happen on the project roadmap or not
 at all. GNSS-interference observation would enter this repo only as
 evaluable tasks with the same discipline as everything else — and, by the
 paper's own gate, serious work on it would follow a paying counterparty
