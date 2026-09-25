@@ -1172,7 +1172,7 @@ function parseRouting(
 					val.next - tagStart,
 					`${fields.errorName} (${val.value})`,
 					[],
-					val.value === 0 ? undefined : "warn",
+					val.value === 0 ? undefined : "error",
 				),
 			);
 			cursor = val.next;
