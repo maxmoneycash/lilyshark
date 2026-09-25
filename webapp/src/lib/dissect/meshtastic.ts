@@ -326,6 +326,23 @@ export interface MeshtasticRoutingFields {
 	routeReply: MeshtasticRouteDiscoveryFields | null;
 }
 
+export interface MeshtasticNeighbor {
+	nodeId: number;
+	nodeHex: string;
+	snrDb: number | null;
+	lastRxTime: number | null;
+	broadcastIntervalSecs: number | null;
+}
+
+export interface MeshtasticNeighborInfoFields {
+	nodeId: number;
+	nodeHex: string;
+	lastSentById: number | null;
+	lastSentByHex: string | null;
+	broadcastIntervalSecs: number | null;
+	neighbors: MeshtasticNeighbor[];
+}
+
 export interface MeshtasticPayloadFields {
 	portnum: number;
 	portLabel: string;
@@ -340,6 +357,7 @@ export interface MeshtasticPayloadFields {
 	telemetry?: MeshtasticTelemetryFields | null;
 	routeDiscovery?: MeshtasticRouteDiscoveryFields | null;
 	routing?: MeshtasticRoutingFields | null;
+	neighborInfo?: MeshtasticNeighborInfoFields | null;
 }
 
 /** A decoded region, tracked so tree nodes can point into the ciphertext. */
@@ -371,6 +389,7 @@ interface PayloadParse {
 	telemetryNodes: DissectNode[] | null;
 	routeDiscoveryNodes: DissectNode[] | null;
 	routingNodes: DissectNode[] | null;
+	neighborInfoNodes: DissectNode[] | null;
 }
 
 interface VarintResult {
@@ -1186,6 +1205,233 @@ function parseRouting(
 	return { fields, nodes };
 }
 
+interface NeighborParse {
+	fields: MeshtasticNeighbor;
+	nodes: DissectNode[];
+}
+
+function parseNeighbor(
+	bytes: Uint8Array,
+	base: number,
+	length: number,
+): NeighborParse | null {
+	let cursor = base;
+	const end = base + length;
+	let nodeId = 0;
+	let snrDb: number | null = null;
+	let lastRxTime: number | null = null;
+	let broadcastIntervalSecs: number | null = null;
+	const nodes: DissectNode[] = [];
+
+	while (cursor < end) {
+		const tagStart = cursor;
+		const tag = readVarint(bytes, end, cursor);
+		if (!tag) return null;
+		const field = tag.value >>> 3;
+		const wire = tag.value & 0x07;
+
+		if (field === 1 && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			nodeId = val.value >>> 0;
+			const hexStr = `!${nodeId.toString(16).padStart(8, "0")}`;
+			nodes.push(
+				node("Node ID", tagStart, val.next - tagStart, `${nodeId} (${hexStr})`),
+			);
+			cursor = val.next;
+		} else if (field === 2 && wire === WIRE_32) {
+			if (tag.next + 4 > end) return null;
+			const snr = readFloat32(bytes, tag.next);
+			if (Number.isFinite(snr)) {
+				snrDb = snr;
+				nodes.push(
+					node(
+						"SNR",
+						tagStart,
+						tag.next + 4 - tagStart,
+						`${snrDb > 0 ? "+" : ""}${snrDb.toFixed(2)} dB`,
+					),
+				);
+			} else {
+				nodes.push(
+					node(
+						"SNR",
+						tagStart,
+						tag.next + 4 - tagStart,
+						"invalid float",
+						[],
+						"error",
+					),
+				);
+			}
+			cursor = tag.next + 4;
+		} else if (field === 3 && (wire === WIRE_32 || wire === WIRE_VARINT)) {
+			let timeVal: number;
+			let fieldLen: number;
+			if (wire === WIRE_32) {
+				if (tag.next + 4 > end) return null;
+				timeVal = readLe32(bytes, tag.next);
+				fieldLen = tag.next + 4 - tagStart;
+				cursor = tag.next + 4;
+			} else {
+				const val = readVarint(bytes, end, tag.next);
+				if (!val) return null;
+				timeVal = val.value >>> 0;
+				fieldLen = val.next - tagStart;
+				cursor = val.next;
+			}
+			lastRxTime = timeVal;
+			const dateStr =
+				timeVal > 0 ? new Date(timeVal * 1000).toISOString() : "none";
+			nodes.push(
+				node("Last RX time", tagStart, fieldLen, `${timeVal} (${dateStr})`),
+			);
+		} else if (field === 4 && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			broadcastIntervalSecs = val.value >>> 0;
+			nodes.push(
+				node(
+					"Broadcast interval",
+					tagStart,
+					val.next - tagStart,
+					`${broadcastIntervalSecs} s`,
+				),
+			);
+			cursor = val.next;
+		} else {
+			const next = skipField(bytes, end, tag.next, wire);
+			if (next === null) return null;
+			cursor = next;
+		}
+	}
+
+	const nodeHex = `!${nodeId.toString(16).padStart(8, "0")}`;
+	return {
+		fields: {
+			nodeId,
+			nodeHex,
+			snrDb,
+			lastRxTime,
+			broadcastIntervalSecs,
+		},
+		nodes,
+	};
+}
+
+interface NeighborInfoParse {
+	fields: MeshtasticNeighborInfoFields;
+	nodes: DissectNode[];
+}
+
+function parseNeighborInfo(
+	bytes: Uint8Array,
+	base: number,
+	length: number,
+): NeighborInfoParse | null {
+	let cursor = base;
+	const end = base + length;
+	let nodeId = 0;
+	let lastSentById: number | null = null;
+	let broadcastIntervalSecs: number | null = null;
+	const neighbors: MeshtasticNeighbor[] = [];
+	const nodes: DissectNode[] = [];
+
+	while (cursor < end) {
+		const tagStart = cursor;
+		const tag = readVarint(bytes, end, cursor);
+		if (!tag) return null;
+		const field = tag.value >>> 3;
+		const wire = tag.value & 0x07;
+
+		if (field === 1 && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			nodeId = val.value >>> 0;
+			const hexStr = `!${nodeId.toString(16).padStart(8, "0")}`;
+			nodes.push(
+				node(
+					"Reporting node ID",
+					tagStart,
+					val.next - tagStart,
+					`${nodeId} (${hexStr})`,
+				),
+			);
+			cursor = val.next;
+		} else if (field === 2 && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			lastSentById = val.value >>> 0;
+			const hexStr = `!${lastSentById.toString(16).padStart(8, "0")}`;
+			nodes.push(
+				node(
+					"Last sent by ID",
+					tagStart,
+					val.next - tagStart,
+					`${lastSentById} (${hexStr})`,
+				),
+			);
+			cursor = val.next;
+		} else if (field === 3 && wire === WIRE_VARINT) {
+			const val = readVarint(bytes, end, tag.next);
+			if (!val) return null;
+			broadcastIntervalSecs = val.value >>> 0;
+			nodes.push(
+				node(
+					"Broadcast interval",
+					tagStart,
+					val.next - tagStart,
+					`${broadcastIntervalSecs} s`,
+				),
+			);
+			cursor = val.next;
+		} else if (field === 4 && wire === WIRE_LENGTH_DELIMITED) {
+			const size = readVarint(bytes, end, tag.next);
+			if (!size || size.value > end - size.next) return null;
+			const n = parseNeighbor(bytes, size.next, size.value);
+			if (n) {
+				neighbors.push(n.fields);
+				const snrLabel =
+					n.fields.snrDb !== null
+						? ` · ${n.fields.snrDb > 0 ? "+" : ""}${n.fields.snrDb.toFixed(1)} dB`
+						: "";
+				nodes.push(
+					node(
+						`Neighbor ${neighbors.length}`,
+						tagStart,
+						size.next + size.value - tagStart,
+						`${n.fields.nodeHex}${snrLabel}`,
+						n.nodes,
+					),
+				);
+			}
+			cursor = size.next + size.value;
+		} else {
+			const next = skipField(bytes, end, tag.next, wire);
+			if (next === null) return null;
+			cursor = next;
+		}
+	}
+
+	const nodeHex = `!${nodeId.toString(16).padStart(8, "0")}`;
+	const lastSentByHex =
+		lastSentById !== null
+			? `!${lastSentById.toString(16).padStart(8, "0")}`
+			: null;
+
+	return {
+		fields: {
+			nodeId,
+			nodeHex,
+			lastSentById,
+			lastSentByHex,
+			broadcastIntervalSecs,
+			neighbors,
+		},
+		nodes,
+	};
+}
+
 /**
  * CryptoEngine::initNonce — the packet id occupies a 64-bit little-endian
  * slot (so the upper four bytes are zero for every packet a radio actually
@@ -1272,6 +1518,7 @@ function parseDataMessage(
 		telemetry: null,
 		routeDiscovery: null,
 		routing: null,
+		neighborInfo: null,
 	};
 	const parse: Omit<PayloadParse, "source"> = {
 		fields,
@@ -1286,6 +1533,7 @@ function parseDataMessage(
 		telemetryNodes: null,
 		routeDiscoveryNodes: null,
 		routingNodes: null,
+		neighborInfoNodes: null,
 	};
 
 	if (payloadSpan && payloadSpan.length > 0) {
@@ -1346,6 +1594,16 @@ function parseDataMessage(
 			if (rout) {
 				fields.routing = rout.fields;
 				parse.routingNodes = rout.nodes;
+			}
+		} else if (portnum === MESHTASTIC_PORT.neighborinfo) {
+			const ni = parseNeighborInfo(
+				plain,
+				payloadSpan.offset,
+				payloadSpan.length,
+			);
+			if (ni) {
+				fields.neighborInfo = ni.fields;
+				parse.neighborInfoNodes = ni.nodes;
 			}
 		}
 	}
@@ -1572,6 +1830,9 @@ function payloadNodes(
 			}
 			if (parse.routingNodes && parse.routingNodes.length > 0) {
 				inner.push(...parse.routingNodes.map((n) => offsetTree(n, base)));
+			}
+			if (parse.neighborInfoNodes && parse.neighborInfoNodes.length > 0) {
+				inner.push(...parse.neighborInfoNodes.map((n) => offsetTree(n, base)));
 			}
 			if (inner.length === 0) {
 				inner.push(

@@ -12,17 +12,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-
-import type { AnyDissection, ProtocolHint } from "./registry";
-import { dissectFrame } from "./registry";
-import type { ReticulumFields } from "./rnode";
-import { reticulumDestinationHashHex } from "./rnode";
 import {
 	aesCtrXcrypt,
 	MESHTASTIC_DEFAULT_PSK,
 	MESHTASTIC_PORT,
 	meshtasticNonce,
 } from "./meshtastic";
+import type { AnyDissection, ProtocolHint } from "./registry";
+import { dissectFrame } from "./registry";
+import type { ReticulumFields } from "./rnode";
+import { reticulumDestinationHashHex } from "./rnode";
 import type { DissectNode } from "./types";
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -1118,4 +1117,101 @@ test("Meshtastic routing payload unpacks routing error reason codes and request 
 	assert.ok(reqIdNode && reqIdNode.value?.includes("0x12345678"));
 	const errNode = findNode(primary.root, "Routing error");
 	assert.ok(errNode && errNode.value?.includes("NO_ROUTE (1)"));
+});
+
+test("Meshtastic neighbor info payload unpacks reporting node, edges, SNR, and rx timestamps", () => {
+	// Neighbor 1: node_id = 0x11223344, snr = 6.25 dB, last_rx_time = 1774392000, broadcast_interval = 900 s
+	const neighbor1Bytes = [
+		0x08,
+		...varintBytes(0x11223344), // field 1: node_id
+		0x15,
+		...float32Bytes(6.25), // field 2: snr (wire 5)
+		0x1d,
+		...le32Bytes(1774392000), // field 3: last_rx_time (wire 5)
+		0x20,
+		...varintBytes(900), // field 4: broadcast_interval
+	];
+
+	// Neighbor 2: node_id = 0xaabbccdd, snr = -4.50 dB, last_rx_time = 1774392050, broadcast_interval = 1800 s
+	const neighbor2Bytes = [
+		0x08,
+		...varintBytes(0xaabbccdd),
+		0x15,
+		...float32Bytes(-4.5),
+		0x1d,
+		...le32Bytes(1774392050),
+		0x20,
+		...varintBytes(1800),
+	];
+
+	// NeighborInfo: node_id = 0x12345678, last_sent_by_id = 0x87654321, interval = 900 s, repeated neighbors
+	const niBytes = [
+		0x08,
+		...varintBytes(0x12345678), // field 1: node_id
+		0x10,
+		...varintBytes(0x87654321), // field 2: last_sent_by_id
+		0x18,
+		...varintBytes(900), // field 3: node_broadcast_interval_secs
+		0x22,
+		...varintBytes(neighbor1Bytes.length), // field 4: neighbor 1
+		...neighbor1Bytes,
+		0x22,
+		...varintBytes(neighbor2Bytes.length), // field 4: neighbor 2
+		...neighbor2Bytes,
+	];
+
+	// Wrap in Data protobuf (portnum = 71: NEIGHBORINFO)
+	const dataBytes = new Uint8Array([
+		0x08,
+		MESHTASTIC_PORT.neighborinfo,
+		0x12,
+		...varintBytes(niBytes.length),
+		...niBytes,
+	]);
+
+	const frame = buildMeshtasticTestFrame(
+		0x12345678,
+		0xffffffff,
+		404,
+		dataBytes,
+	);
+	const { primary } = dissectFrame(frame, "meshtastic");
+
+	assert.equal(primary.protocol, "Meshtastic");
+	assert.equal(primary.result, "matched");
+	assert.equal(primary.state, "payload-decoded");
+	assertTreeInvariants(primary.root, frame.length, "meshtastic-neighborinfo");
+
+	const ni = primary.fields?.payload?.neighborInfo;
+	assert.ok(ni);
+	assert.equal(ni.nodeId, 0x12345678);
+	assert.equal(ni.nodeHex, "!12345678");
+	assert.equal(ni.lastSentById, 0x87654321);
+	assert.equal(ni.lastSentByHex, "!87654321");
+	assert.equal(ni.broadcastIntervalSecs, 900);
+	assert.equal(ni.neighbors.length, 2);
+
+	const n1 = ni.neighbors[0];
+	assert.equal(n1.nodeId, 0x11223344);
+	assert.equal(n1.nodeHex, "!11223344");
+	assert.ok(Math.abs((n1.snrDb ?? 0) - 6.25) < 0.01);
+	assert.equal(n1.lastRxTime, 1774392000);
+	assert.equal(n1.broadcastIntervalSecs, 900);
+
+	const n2 = ni.neighbors[1];
+	assert.equal(n2.nodeId, 0xaabbccdd);
+	assert.equal(n2.nodeHex, "!aabbccdd");
+	assert.ok(Math.abs((n2.snrDb ?? 0) - -4.5) < 0.01);
+	assert.equal(n2.lastRxTime, 1774392050);
+	assert.equal(n2.broadcastIntervalSecs, 1800);
+
+	const repNode = findNode(primary.root, "Reporting node ID");
+	assert.ok(repNode && repNode.value?.includes("!12345678"));
+	const lastSentNode = findNode(primary.root, "Last sent by ID");
+	assert.ok(lastSentNode && lastSentNode.value?.includes("!87654321"));
+
+	const n1Node = findNode(primary.root, "Neighbor 1");
+	assert.ok(n1Node && n1Node.value?.includes("!11223344 · +6.3 dB"));
+	const n2Node = findNode(primary.root, "Neighbor 2");
+	assert.ok(n2Node && n2Node.value?.includes("!aabbccdd · -4.5 dB"));
 });
