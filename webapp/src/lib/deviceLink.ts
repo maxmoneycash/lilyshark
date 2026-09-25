@@ -19,21 +19,26 @@
  */
 
 import { useSyncExternalStore } from 'react';
+import {
+  bleLinkAvailability,
+  createBleTransport,
+  grantedLskBleDevices,
+  requestLskBleDevice,
+} from './bleTransport';
 import { recordFrame } from './captureSession';
+import type { DeviceTransport } from './deviceTransport';
+import {
+  createSerialTransport,
+  grantedSerialPorts,
+  isWebSerialAvailable,
+  requestSerialPort,
+} from './serialTransport';
 import { recordSnifferFrame } from './snifferSession';
 import {
   appendSpectrumSweep,
   parseSpectrumBody,
   type SpectrumSweep,
 } from './spectrum';
-
-/** USB vendors that put a serial device on a dev board: Espressif's native
- *  USB (the T-Deck), then the CH34x / CP210x / FTDI bridges other boards use.
- *  Bluetooth and console ports report no USB vendor at all, so this alone
- *  clears the noise off the picker. */
-const ESPRESSIF_USB_VENDOR = 0x303a;
-const KNOWN_USB_VENDORS = [ESPRESSIF_USB_VENDOR, 0x1a86, 0x10c4, 0x0403];
-const PORT_FILTERS = KNOWN_USB_VENDORS.map((usbVendorId) => ({ usbVendorId }));
 
 /** How long a single open port gets to answer LSK HELLO. Opening ESP32-S3
  *  native USB almost always resets the board, and Lilyshark only reads the
@@ -415,12 +420,7 @@ export function getDeviceLinkState(): DeviceLinkState {
 }
 const listeners = new Set<() => void>();
 
-let port: SerialPort | undefined;
-let writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
-let activeReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-let pumpDone: Promise<void> | undefined;
-/** False means a disconnect was asked for, so a read ending is not a fault. */
-let reading = false;
+let activeTransport: DeviceTransport | undefined;
 let identified: (() => void) | undefined;
 let streamEnded: (() => void) | undefined;
 let pendingTx:
@@ -487,7 +487,7 @@ export function useDeviceLink(): DeviceLinkState {
 }
 
 async function send(line: string): Promise<void> {
-  await writer?.write(new TextEncoder().encode(line + '\n'));
+  await activeTransport?.write(line);
 }
 
 function markLinked(firmware?: string, node?: number): void {
@@ -551,170 +551,88 @@ function handleLine(line: string): void {
 }
 
 async function teardown(): Promise<void> {
-  reading = false;
   finishPendingTx(false, 'T-Deck disconnected before confirming TX');
   try {
-    await activeReader?.cancel();
+    await activeTransport?.close();
   } catch {
     /* already gone */
   }
-  try {
-    await pumpDone;
-  } catch {
-    /* already gone */
-  }
-  try {
-    writer?.releaseLock();
-  } catch {
-    /* already gone */
-  }
-  try {
-    await port?.close();
-  } catch {
-    /* already gone */
-  }
-  activeReader = undefined;
-  writer = undefined;
-  port = undefined;
-  pumpDone = undefined;
-}
-
-async function readAvailable(candidate: SerialPort): Promise<void> {
-  const decoder = new TextDecoder();
-  let pending = '';
-  while (reading) {
-    if (!activeReader) {
-      const readable = candidate.readable;
-      if (!readable) return;
-      try {
-        activeReader = readable.getReader();
-      } catch {
-        return;
-      }
-    }
-    try {
-      const { value, done } = await activeReader.read();
-      if (done) {
-        try {
-          activeReader.releaseLock();
-        } catch {
-          /* already released */
-        }
-        activeReader = undefined;
-        await new Promise((r) => setTimeout(r, 200));
-        continue;
-      }
-      pending += decoder.decode(value, { stream: true });
-      let nl = pending.indexOf('\n');
-      while (nl >= 0) {
-        // Consume the line before handling it. Handled first, a line that threw
-        // stayed at the head of the buffer and was retried on every pass of the
-        // outer loop, wedging the link while the status still read as linked.
-        const line = pending.slice(0, nl).trim();
-        pending = pending.slice(nl + 1);
-        nl = pending.indexOf('\n');
-        try {
-          handleLine(line);
-        } catch {
-          /* one bad line is dropped, not replayed */
-        }
-      }
-    } catch {
-      try {
-        // Optional, because the branch above may already have cleared it: a
-        // throw after that point made this a TypeError on `undefined`, which
-        // the inner catch then swallowed as "already released". It worked,
-        // but by raising an error to stand in for a check.
-        activeReader?.releaseLock();
-      } catch {
-        /* already released */
-      }
-      activeReader = undefined;
-      await new Promise((r) => setTimeout(r, 200));
-    }
-  }
-}
-
-/** Stream lines until the port ends. A drop during handshake is a reboot, not
- *  a failed identity check — the opener decides whether to retry. */
-async function pump(candidate: SerialPort): Promise<void> {
-  try {
-    await readAvailable(candidate);
-  } catch {
-    /* unplugged or rebooted mid-read */
-  }
-  if (!reading) return;
-  streamEnded?.();
-}
-
-async function openCandidate(candidate: SerialPort): Promise<boolean> {
-  try {
-    await candidate.open({ baudRate: 115200 });
-    return true;
-  } catch {
-    /* already open in this origin, or held by another tab */
-  }
-  try {
-    await candidate.close();
-  } catch {
-    /* was not ours */
-  }
-  try {
-    await candidate.open({ baudRate: 115200 });
-    return true;
-  } catch {
-    return false;
-  }
+  activeTransport = undefined;
 }
 
 type HandshakeResult = 'linked' | 'drop' | 'timeout' | 'busy';
 
-async function openAndWait(candidate: SerialPort): Promise<HandshakeResult> {
-  if (!(await openCandidate(candidate))) return 'busy';
-  try {
-    // Release reset/boot after the host has opened. Too late to prevent the
-    // first CDC reset, but it keeps the board out of the bootloader.
-    await candidate.setSignals({ dataTerminalReady: false, requestToSend: false });
-  } catch {
-    /* not every platform exposes setSignals */
-  }
-
-  port = candidate;
-  writer = candidate.writable?.getWriter();
-  activeReader = candidate.readable?.getReader();
-  if (!writer || !activeReader) {
-    await teardown();
-    return 'busy';
-  }
-  reading = true;
-  pumpDone = pump(candidate);
+async function openAndWait(transport: DeviceTransport): Promise<HandshakeResult> {
+  activeTransport = transport;
 
   return await new Promise<HandshakeResult>((resolve) => {
-    const hello = setInterval(() => void send('LSK HELLO'), 1200);
-    const firstHello = setTimeout(() => void send('LSK HELLO'), HELLO_AFTER_OPEN_MS);
-    const timer = setTimeout(() => finish('timeout'), HANDSHAKE_TIMEOUT_MS);
+    let hello: ReturnType<typeof setInterval> | undefined;
+    let firstHello: ReturnType<typeof setTimeout> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let done = false;
+
     const finish = (result: HandshakeResult) => {
-      clearInterval(hello);
-      clearTimeout(firstHello);
-      clearTimeout(timer);
+      if (done) return;
+      done = true;
+      if (hello) clearInterval(hello);
+      if (firstHello) clearTimeout(firstHello);
+      if (timer) clearTimeout(timer);
       identified = undefined;
       streamEnded = undefined;
       resolve(result);
     };
+
     identified = () => finish('linked');
     streamEnded = () => finish('drop');
+
+    timer = setTimeout(() => finish('timeout'), HANDSHAKE_TIMEOUT_MS);
+
+    void transport
+      .open({
+        onLine: (line: string) => {
+          try {
+            handleLine(line);
+          } catch {
+            /* one bad line is dropped, not replayed */
+          }
+        },
+        onDrop: () => streamEnded?.(),
+      })
+      .then(async (opened) => {
+        if (done) return;
+        if (opened !== 'opened') {
+          await teardown();
+          finish('busy');
+          return;
+        }
+        if (state.status === 'linked') {
+          finish('linked');
+          return;
+        }
+        hello = setInterval(() => void send('LSK HELLO'), 1200);
+        firstHello = setTimeout(() => void send('LSK HELLO'), HELLO_AFTER_OPEN_MS);
+        void send('LSK HELLO');
+      })
+      .catch(async () => {
+        if (done) return;
+        await teardown();
+        finish('busy');
+      });
   });
 }
 
-/** Open one port and ask it to identify. Survives the ESP32-S3 USB reboot
- *  that almost always happens on the first open. */
-async function attemptPort(candidate: SerialPort): Promise<boolean> {
+/** Open one transport and ask it to identify, retrying across the ESP32-S3
+ *  USB reboot that almost always happens on the first open. Transport-blind
+ *  on purpose: Bluetooth gets the same retry budget and the same tolerance
+ *  for a link that drops mid-handshake. */
+async function attemptTransport(transport: DeviceTransport): Promise<boolean> {
   for (let attempt = 0; attempt < HANDSHAKE_MAX_ATTEMPTS; attempt++) {
     if (operatorDisconnected()) return false;
-    const result = await openAndWait(candidate);
+    const result = await openAndWait(transport);
     if (result === 'linked') return true;
     await teardown();
     if (operatorDisconnected()) return false;
+    if (result === 'busy') return false;
     const action = nextSerialAction({
       event: result === 'timeout' ? 'timeout' : 'stream-drop',
       deliberate: false,
@@ -727,21 +645,26 @@ async function attemptPort(candidate: SerialPort): Promise<boolean> {
   return false;
 }
 
-async function grantedCandidates(vendors: number[] = KNOWN_USB_VENDORS): Promise<SerialPort[]> {
-  const ports = await navigator.serial.getPorts();
-  return ports.filter((p) => {
-    const vendor = p.getInfo().usbVendorId;
-    return vendor !== undefined && vendors.includes(vendor);
-  });
+export type DeviceLinkTransport = 'serial' | 'ble';
+
+export interface ConnectDeviceLinkOptions {
+  /** Skip the already-granted devices and go straight to the picker. */
+  picker?: boolean;
+  /** Defaults to 'serial', the only transport a shipped T-Deck speaks. */
+  transport?: DeviceLinkTransport;
 }
 
 /**
- * Link to a T-Deck. Tries every already-granted USB serial port, keeping the
- * first that identifies as Lilyshark; opens the picker (filtered to real USB
- * serial devices) when none does.
+ * Link to a T-Deck. Tries every already-granted port/device, keeping the
+ * first that identifies as Lilyshark; opens the picker when none does.
  */
-export async function connectDeviceLink(options: { picker?: boolean } = {}): Promise<void> {
-  if (!('serial' in navigator)) {
+export async function connectDeviceLink(options: ConnectDeviceLinkOptions = {}): Promise<void> {
+  if ((options.transport ?? 'serial') === 'ble') return connectOverBluetooth(options);
+  return connectOverSerial(options);
+}
+
+async function connectOverSerial(options: ConnectDeviceLinkOptions): Promise<void> {
+  if (!isWebSerialAvailable()) {
     set({ status: 'error', error: 'this browser has no Web Serial — use Chrome, Edge or Arc' });
     return;
   }
@@ -752,14 +675,14 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
 
   try {
     if (!options.picker) {
-      for (const candidate of await grantedCandidates()) {
-        if (await attemptPort(candidate)) return;
+      for (const candidate of await grantedSerialPorts()) {
+        if (await attemptTransport(createSerialTransport(candidate))) return;
       }
     }
     // Nothing answered: ask the user which device, listing only USB serial
     // hardware so a headset or Bluetooth port cannot be chosen by mistake.
-    const chosen = await navigator.serial.requestPort({ filters: PORT_FILTERS });
-    if (await attemptPort(chosen)) return;
+    const chosen = await requestSerialPort();
+    if (await attemptTransport(createSerialTransport(chosen))) return;
     set({
       status: 'error',
       error:
@@ -781,6 +704,50 @@ export async function connectDeviceLink(options: { picker?: boolean } = {}): Pro
       canPick: true,
       error: /Failed to open/i.test(message)
         ? 'port is busy — close other lilyshark.com tabs or serial monitors, then retry'
+        : message,
+    });
+  }
+}
+
+/**
+ * The same handshake over Web Bluetooth. Refuses before touching the radio
+ * when either half of the link is missing — a browser without Web Bluetooth,
+ * or (today) firmware that does not advertise the LSK GATT service at all.
+ * Saying so is the whole point: a Bluetooth button that always times out
+ * would be indistinguishable from a broken radio.
+ */
+async function connectOverBluetooth(options: ConnectDeviceLinkOptions): Promise<void> {
+  const availability = bleLinkAvailability();
+  if (!availability.usable) {
+    set({ status: 'error', error: availability.detail, canPick: false });
+    return;
+  }
+  if (state.status === 'connecting' || state.status === 'linked') {
+    await disconnectDeviceLink();
+  }
+  set({ status: 'connecting', error: undefined, canPick: undefined, lastRx: undefined });
+
+  try {
+    if (!options.picker) {
+      for (const granted of await grantedLskBleDevices()) {
+        if (await attemptTransport(createBleTransport(granted))) return;
+      }
+    }
+    const chosen = await requestLskBleDevice();
+    if (await attemptTransport(createBleTransport(chosen))) return;
+    set({
+      status: 'error',
+      error:
+        'that radio never answered over Bluetooth — keep it in range and awake, then retry. If it links over USB but not here, its firmware predates the LSK Bluetooth service.',
+      canPick: true,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'connection failed';
+    set({
+      status: 'error',
+      canPick: true,
+      error: /User cancelled|chooser|No device selected/i.test(message)
+        ? 'no device chosen'
         : message,
     });
   }
