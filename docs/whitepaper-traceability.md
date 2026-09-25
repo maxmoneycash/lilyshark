@@ -61,5 +61,5 @@ for the model figures, the paper for reach and saturation, and
 A claim may live in three states: built with evidence, not built and
 labeled, or disagreed with in writing. The fourth state — implied and
 unverifiable — is the one this matrix exists to catch. Update it whenever
-a task above lands; `python3 scripts/tasks.py eval --all` checks the
-mechanical half.
+a milestone above lands; the test suite (`bash scripts/test_all.sh --host-only`)
+checks the mechanical half.

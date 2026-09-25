@@ -20,6 +20,7 @@ contracts/*/build/
 
 # Internal task tracking & board — never publish to open-source repository
 tasks/
+scripts/tasks.py
 
 # Local Argent recordings and device captures
 .argent/

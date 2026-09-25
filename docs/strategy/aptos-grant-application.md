@@ -87,9 +87,8 @@ standings and the post-mortem.*
   hardware presence gets spoofed hardware. We would rather be the
   example that shows on-chain verification working without an emission
   schedule.
-- **The work is already shipping.** The repository shows a task board
-  where each item carries its own acceptance rubric and eval commands
-  (`python3 scripts/tasks.py board`), CI that fails on regressions, and
+- **The work is already shipping.** The repository shows active development
+  with comprehensive tests, CI that fails on regressions, and
   a whitepaper-to-code traceability matrix that states plainly what is
   built and what is not. Grant money accelerates a project that is
   moving, not one that starts on funding.
