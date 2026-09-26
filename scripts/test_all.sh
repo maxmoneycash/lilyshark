@@ -82,6 +82,12 @@ build_and_run core_runtime \
   src/core/reticulum_decoder.cpp \
   test/core_runtime/test_core_runtime.cpp
 
+build_and_run lsk_line_assembler \
+  test/lsk_line_assembler/test_lsk_line_assembler.cpp
+
+build_and_run lsk_tx_line_framer \
+  test/lsk_line_assembler/test_lsk_tx_line_framer.cpp
+
 build_and_run decoder_stress \
   src/core/decoder_registry.cpp \
   src/core/meshtastic_decoder.cpp \

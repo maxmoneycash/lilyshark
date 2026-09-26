@@ -94,6 +94,11 @@ the prefix holds.
 - Nothing may be sent before the browser subscribes; anything the device
   emits before the CCCD is written is dropped by the stack, so the device
   must not treat the connection as linked until it sees `LSK HELLO`.
+- Firmware stages each complete newline-terminated line before adding it to
+  the BLE transmit ring. Queue pressure or an overlong line drops that whole
+  record, so the browser cannot receive a partial JSON record joined to the
+  next one. The host test exercises fragmented writes and overflow; physical
+  notification timing is still unverified.
 
 ### UTF-8
 

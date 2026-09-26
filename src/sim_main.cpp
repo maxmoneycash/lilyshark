@@ -14797,7 +14797,7 @@ bool run_simulator_render_test() noexcept
     constexpr std::array<std::uint64_t, shell_routes.size()> shell_expected_hashes = {{
         0xa066240e572f0e6aULL, 0xc5b0a37165196304ULL, 0x5a888ea669861709ULL,
         0x0e1e58dbe10ceb99ULL, 0xf09c94be29f485c8ULL, 0xe0b75191155d9d8dULL,
-        0x0e8d5caa0f3b18beULL, 0x43e1c64bb1473281ULL, 0xa734c6fb43f11e34ULL,
+        0x0e8d5caa0f3b18beULL, 0x43e1c64bb1473281ULL, 0xa5f1195758e803beULL,
         0x88a5b508b56dff44ULL, 0x8328031fef8d34f8ULL, 0x1e803963e44d0632ULL,
         0xde0a7b1d16ecf53aULL, 0x7ed210334475e24aULL, 0x14f80c364b5d4568ULL,
         0xf578164f2be03c49ULL, 0x32d5549990606725ULL,

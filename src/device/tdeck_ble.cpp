@@ -1,4 +1,6 @@
 #include "lilyshark/device/tdeck_ble.h"
+#include "lilyshark/core/lsk_line_assembler.h"
+#include "lilyshark/core/lsk_tx_line_framer.h"
 
 #if defined(ESP_PLATFORM)
 
@@ -69,7 +71,7 @@ std::uint32_t from_num_value = 0;
 BLECharacteristic *lsk_rx = nullptr;
 BLECharacteristic *lsk_tx = nullptr;
 
-constexpr std::size_t kMaxLskLine = 240;
+constexpr std::size_t kMaxLskLine = LskLineAssembler::kCapacity;
 constexpr std::size_t kLskQueueDepth = 8;
 struct LskLineQueue {
     char lines[kLskQueueDepth][kMaxLskLine]{};
@@ -142,11 +144,10 @@ struct LskTxRing {
 };
 
 LskLineQueue lsk_commands{};
-char lsk_rx_buffer[kMaxLskLine]{};
-std::size_t lsk_rx_len = 0;
-bool lsk_rx_discarding = false;
+LskLineAssembler lsk_rx_assembler{};
 bool lsk_disconnect_pending = false;
 LskTxRing lsk_tx_ring{};
+LskTxLineFramer<1536> lsk_tx_framer{};
 
 class ServerEvents final : public BLEServerCallbacks {
     void onConnect(BLEServer *) override { status.connected = true; }
@@ -155,9 +156,9 @@ class ServerEvents final : public BLEServerCallbacks {
         status.connected = false;
         portENTER_CRITICAL(&queue_lock);
         lsk_tx_ring.clear();
+        lsk_tx_framer.reset();
         lsk_commands.clear();
-        lsk_rx_len = 0;
-        lsk_rx_discarding = false;
+        lsk_rx_assembler.reset();
         lsk_disconnect_pending = true;
         portEXIT_CRITICAL(&queue_lock);
         // Without this a deck is invisible after the first phone walks away.
@@ -207,26 +208,9 @@ class LskRxEvents final : public BLECharacteristicCallbacks {
         const std::string value = characteristic->getValue();
         if (value.empty()) return;
         portENTER_CRITICAL(&queue_lock);
-        for (char c : value) {
-            if (c == '\n' || c == '\r') {
-                if (!lsk_rx_discarding && lsk_rx_len > 0) {
-                    lsk_rx_buffer[lsk_rx_len] = '\0';
-                    if (lsk_commands.push(lsk_rx_buffer)) {
-                        ++status.lsk_commands;
-                    }
-                }
-                lsk_rx_len = 0;
-                lsk_rx_discarding = false;
-            } else if (lsk_rx_discarding) {
-                continue;
-            } else if (lsk_rx_len + 1 < sizeof(lsk_rx_buffer)) {
-                lsk_rx_buffer[lsk_rx_len++] = c;
-            } else {
-                // Ignore the entire overlong line, including later BLE writes.
-                lsk_rx_len = 0;
-                lsk_rx_discarding = true;
-            }
-        }
+        lsk_rx_assembler.feed(value.data(), value.size(), [](const char *line) {
+            if (lsk_commands.push(line)) ++status.lsk_commands;
+        });
         portEXIT_CRITICAL(&queue_lock);
     }
 };
@@ -329,7 +313,10 @@ bool queueLskBleTx(const std::uint8_t *bytes, std::size_t length) noexcept
 {
     if (!status.started || bytes == nullptr || length == 0) return false;
     portENTER_CRITICAL(&queue_lock);
-    const bool queued = lsk_tx_ring.push(bytes, length);
+    const bool queued = lsk_tx_framer.feed(bytes, length,
+        [](const std::uint8_t *line, std::size_t line_length) {
+            return lsk_tx_ring.push(line, line_length);
+        });
     portEXIT_CRITICAL(&queue_lock);
     return queued;
 }
