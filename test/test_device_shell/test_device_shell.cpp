@@ -904,6 +904,10 @@ bool healthyScenario()
     // want-ack message is confirmed the way official firmware would.
     {
         const std::size_t sent_before = radiolib_fake::state().transmitted.size();
+        Serial.pushInput(std::string(240U, 'x') + "LSK TX meshtastic dm 778899aa ignored");
+        loop();
+        if(!require(radiolib_fake::state().transmitted.size() == sent_before,
+                    "an overlong LSK line executed its trailing command")) return false;
         Serial.pushInput("LSK TX meshtastic dm 778899aa checking in");
         loop();
         auto &sent = radiolib_fake::state().transmitted;

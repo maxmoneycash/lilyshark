@@ -111,6 +111,11 @@ class HardwareSerial {
         if(!console_) device_shell_fake::record("gps.end");
     }
 
+    void print(const char *text)
+    {
+        if(console_ && text != nullptr) device_shell_fake::state().serial_log += text;
+    }
+
     void println(const char *line)
     {
         if(!console_) return;

@@ -69,7 +69,7 @@ std::uint32_t from_num_value = 0;
 BLECharacteristic *lsk_rx = nullptr;
 BLECharacteristic *lsk_tx = nullptr;
 
-constexpr std::size_t kMaxLskLine = 256;
+constexpr std::size_t kMaxLskLine = 240;
 constexpr std::size_t kLskQueueDepth = 8;
 struct LskLineQueue {
     char lines[kLskQueueDepth][kMaxLskLine]{};
@@ -94,6 +94,12 @@ struct LskLineQueue {
         head = (head + 1) % kLskQueueDepth;
         --count;
         return true;
+    }
+
+    void clear() noexcept
+    {
+        head = 0;
+        count = 0;
     }
 };
 
@@ -138,6 +144,8 @@ struct LskTxRing {
 LskLineQueue lsk_commands{};
 char lsk_rx_buffer[kMaxLskLine]{};
 std::size_t lsk_rx_len = 0;
+bool lsk_rx_discarding = false;
+bool lsk_disconnect_pending = false;
 LskTxRing lsk_tx_ring{};
 
 class ServerEvents final : public BLEServerCallbacks {
@@ -147,12 +155,11 @@ class ServerEvents final : public BLEServerCallbacks {
         status.connected = false;
         portENTER_CRITICAL(&queue_lock);
         lsk_tx_ring.clear();
+        lsk_commands.clear();
         lsk_rx_len = 0;
+        lsk_rx_discarding = false;
+        lsk_disconnect_pending = true;
         portEXIT_CRITICAL(&queue_lock);
-#if defined(LILYSHARK_DEVICE)
-        extern bool analyzer_link_active;
-        analyzer_link_active = false;
-#endif
         // Without this a deck is invisible after the first phone walks away.
         server->startAdvertising();
     }
@@ -202,18 +209,22 @@ class LskRxEvents final : public BLECharacteristicCallbacks {
         portENTER_CRITICAL(&queue_lock);
         for (char c : value) {
             if (c == '\n' || c == '\r') {
-                if (lsk_rx_len > 0) {
+                if (!lsk_rx_discarding && lsk_rx_len > 0) {
                     lsk_rx_buffer[lsk_rx_len] = '\0';
                     if (lsk_commands.push(lsk_rx_buffer)) {
                         ++status.lsk_commands;
                     }
-                    lsk_rx_len = 0;
                 }
+                lsk_rx_len = 0;
+                lsk_rx_discarding = false;
+            } else if (lsk_rx_discarding) {
+                continue;
             } else if (lsk_rx_len + 1 < sizeof(lsk_rx_buffer)) {
                 lsk_rx_buffer[lsk_rx_len++] = c;
             } else {
-                // Exceeded 240-byte line buffer cap -- discard line
+                // Ignore the entire overlong line, including later BLE writes.
                 lsk_rx_len = 0;
+                lsk_rx_discarding = true;
             }
         }
         portEXIT_CRITICAL(&queue_lock);
@@ -271,10 +282,17 @@ bool startTDeckBle(const char *name) noexcept
     lsk_service->start();
 
     BLEAdvertising *advertising = BLEDevice::getAdvertising();
-    // Advertise the LSK service in the primary advertisement data so Web Bluetooth
-    // service filter matches, and the Meshtastic service for companion apps.
-    advertising->addServiceUUID(kLskBleService);
-    advertising->addServiceUUID(kMeshtasticBleService);
+    // Legacy advertising has 31 bytes per packet. Two 128-bit UUIDs need 36
+    // bytes before flags or a name, so put LSK in the primary advertisement
+    // and Meshtastic plus a short recognisable name in the scan response.
+    BLEAdvertisementData advertisement_data;
+    advertisement_data.setFlags(ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT);
+    advertisement_data.setCompleteServices(BLEUUID(kLskBleService));
+    BLEAdvertisementData scan_response_data;
+    scan_response_data.setCompleteServices(BLEUUID(kMeshtasticBleService));
+    scan_response_data.setName("Lilyshark");
+    advertising->setAdvertisementData(advertisement_data);
+    advertising->setScanResponseData(scan_response_data);
     advertising->setScanResponse(true);
     BLEDevice::startAdvertising();
 
@@ -331,6 +349,15 @@ bool takeLskBleCommand(char *out, std::size_t capacity) noexcept
     return taken;
 }
 
+bool takeLskBleDisconnect() noexcept
+{
+    portENTER_CRITICAL(&queue_lock);
+    const bool disconnected = lsk_disconnect_pending;
+    lsk_disconnect_pending = false;
+    portEXIT_CRITICAL(&queue_lock);
+    return disconnected;
+}
+
 void serviceLskBleTx() noexcept
 {
     if (!status.started || !status.connected || lsk_tx == nullptr) return;
@@ -364,6 +391,7 @@ std::size_t takeBleToRadio(std::uint8_t *, std::size_t) noexcept { return 0; }
 bool queueLskBleTx(const std::uint8_t *, std::size_t) noexcept { return false; }
 bool queueLskBleTx(const char *) noexcept { return false; }
 bool takeLskBleCommand(char *, std::size_t) noexcept { return false; }
+bool takeLskBleDisconnect() noexcept { return false; }
 void serviceLskBleTx() noexcept {}
 const BleStatus &tdeckBleStatus() noexcept { return host_status; }
 }  // namespace lilyshark

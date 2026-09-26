@@ -1,19 +1,14 @@
 /**
  * The Web Bluetooth transport for the LSK link.
  *
- * Read this first: **no Lilyshark firmware advertises the GATT service below
- * yet.** The device's analyzer link is USB CDC only — `loop()` in
- * `src/sim_main.cpp` drains `Serial`, and the `t-deck` PlatformIO environment
- * pulls in no BLE stack at all. So this file is one half of a contract, not a
- * working link: the browser half, written against the service documented in
- * `docs/lsk-ble-contract.md`, which is what the firmware must implement.
+ * The firmware source defines this GATT service, but a physical BLE session
+ * and a released build have not been verified. The browser half implements
+ * the service documented in `docs/lsk-ble-contract.md`.
  *
  * It is shipped rather than stubbed because the contract is only real if
  * something holds it to a shape — chunking, reassembly, notify handling and
- * reconnect are all written and tested here, so the day the firmware
- * advertises the service the browser side is already correct. Until then
- * `bleLinkAvailability()` reports the honest truth and the connect sheet
- * refuses to offer a button that would always fail.
+ * reconnect are all written and tested here. Until the firmware is validated
+ * and released, `bleLinkAvailability()` keeps the Bluetooth option unavailable.
  *
  * Nothing here is the MeshCore companion BLE path (`src/mesh/radio.ts`, which
  * uses meshcore.js). That protocol is binary framing over its own service;
@@ -51,7 +46,8 @@ export type LskBleFirmwareStatus = 'absent' | 'advertised';
 
 /**
  * Whether any released Lilyshark firmware advertises the service above.
- * Flip this to 'advertised' — in the same change that lands the firmware —
+ * Flip this to 'advertised' after the firmware passes physical BLE validation
+ * and ships —
  * and the connect sheet starts offering Bluetooth. Lying here would produce
  * a button that always fails, which is worse than no button.
  */
@@ -93,7 +89,7 @@ export function bleLinkAvailability(
       firmwareSupported,
       usable: false,
       detail:
-        'the T-Deck firmware does not advertise the LSK Bluetooth service yet — the analyzer link is USB only. The browser side is written and tested against docs/lsk-ble-contract.md and turns on the day the firmware ships it.',
+        'The released analyzer link is USB only while LSK Bluetooth firmware awaits physical validation and release.',
     };
   }
   return {

@@ -59,7 +59,7 @@ radio in a field.
 | --- | --- |
 | [lilyshark-capture-format.md](lilyshark-capture-format.md) | `.lscap` — the native capture format |
 | [shelby-pointer-format.md](shelby-pointer-format.md) | `SHLB` — the 82-byte off-grid pointer |
-| [lsk-ble-contract.md](lsk-ble-contract.md) | `LSK` over USB, and the Meshtastic BLE service |
+| [lsk-ble-contract.md](lsk-ble-contract.md) | `LSK` over USB and the pending analyzer BLE service |
 | [RECORDING_UI.md](RECORDING_UI.md) | Recording the interface, for docs and for regression frames |
 
 ## Evidence and method

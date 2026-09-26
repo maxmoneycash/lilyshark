@@ -451,11 +451,11 @@ const char *stored_key_name(const MeshtasticKeyState &key_state) noexcept;
 void format_key_provenance(char *out, std::size_t capacity,
                            const MeshtasticKeyState &key_state) noexcept;
 
-// Web-analyzer USB link: lilyshark.com handshakes over the CDC serial with
-// "LSK HELLO"; while linked, the device loop streams newline-delimited
-// telemetry lines the analyzer renders live. Plain text on purpose — a human
-// with a serial monitor reads the same protocol the web app does.
+// Web-analyzer links share the LSK command path over USB CDC and BLE. The
+// aggregate state gates telemetry; each carrier retains its own session flag.
 bool analyzer_link_active = false;
+bool analyzer_usb_link_active = false;
+bool analyzer_ble_link_active = false;
 
 // Frames the radio decoded cleanly and the analyzer link still did not
 // report, counted rather than merely not sent.
@@ -549,6 +549,7 @@ constexpr std::uint32_t kMeshCoreAdvertMs = 900000U;
 
 char analyzer_link_line[240]{};
 std::size_t analyzer_link_line_length = 0;
+bool analyzer_link_line_discarding = false;
 
 bool observed_radio_initialized = false;
 bool observed_radio_receiving = false;
@@ -10384,7 +10385,7 @@ void emit_lsk_print(const char *str) noexcept
     if (str == nullptr) return;
     Serial.print(str);
 #if defined(ESP_PLATFORM)
-    if (analyzer_link_active) {
+    if (analyzer_ble_link_active) {
         (void)::lilyshark::queueLskBleTx(str);
     }
 #endif
@@ -10395,7 +10396,7 @@ void emit_lsk_println(const char *str) noexcept
     if (str == nullptr) return;
     Serial.println(str);
 #if defined(ESP_PLATFORM)
-    if (analyzer_link_active) {
+    if (analyzer_ble_link_active) {
         (void)::lilyshark::queueLskBleTx(str);
         (void)::lilyshark::queueLskBleTx("\n");
     }
@@ -10413,8 +10414,10 @@ void emit_lsk_printf(const char *fmt, ...) noexcept
     if (len > 0) {
         Serial.print(buf);
 #if defined(ESP_PLATFORM)
-        if (analyzer_link_active) {
-            (void)::lilyshark::queueLskBleTx(reinterpret_cast<const std::uint8_t *>(buf), static_cast<std::size_t>(len));
+        if (analyzer_ble_link_active) {
+            const std::size_t written = static_cast<std::size_t>(len) < sizeof(buf)
+                ? static_cast<std::size_t>(len) : sizeof(buf) - 1U;
+            (void)::lilyshark::queueLskBleTx(reinterpret_cast<const std::uint8_t *>(buf), written);
         }
 #endif
     }
@@ -17252,10 +17255,12 @@ void emit_analyzer_sweep_result() noexcept
 }
 #endif
 
-void handle_analyzer_link_command(const char *line) noexcept
+void handle_analyzer_link_command(const char *line, bool from_ble) noexcept
 {
     if(std::strcmp(line, "LSK HELLO") == 0) {
         const bool first_link = !analyzer_link_active;
+        if (from_ble) analyzer_ble_link_active = true;
+        else analyzer_usb_link_active = true;
         analyzer_link_active = true;
         analyzer_link_last_telemetry_ms = 0;
         emit_lsk_printf(
@@ -17276,7 +17281,9 @@ void handle_analyzer_link_command(const char *line) noexcept
             record_runtime_event(RuntimeEventSeverity::Info, RuntimeEventType::System,
                                  "Web analyzer link closed");
         }
-        analyzer_link_active = false;
+        if (from_ble) analyzer_ble_link_active = false;
+        else analyzer_usb_link_active = false;
+        analyzer_link_active = analyzer_usb_link_active || analyzer_ble_link_active;
 #if defined(LILYSHARK_DEVICE)
     } else if(std::strncmp(line, "LSK TX ", 7) == 0) {
         handle_mesh_tx_command(line);
@@ -17313,10 +17320,14 @@ ApiNodeEntry api_self_node() noexcept
 
 void service_ble_api() noexcept
 {
+    if (::lilyshark::takeLskBleDisconnect()) {
+        analyzer_ble_link_active = false;
+        analyzer_link_active = analyzer_usb_link_active;
+    }
     // Web analyzer BLE command dispatch and TX draining.
     char ble_lsk_command[256];
     while (::lilyshark::takeLskBleCommand(ble_lsk_command, sizeof(ble_lsk_command))) {
-        handle_analyzer_link_command(ble_lsk_command);
+        handle_analyzer_link_command(ble_lsk_command, true);
     }
     ::lilyshark::serviceLskBleTx();
 
@@ -17544,13 +17555,19 @@ void loop()
     while(Serial.available() > 0) {
         const char received = static_cast<char>(Serial.read());
         if(received == '\n' || received == '\r') {
-            analyzer_link_line[analyzer_link_line_length] = '\0';
-            if(analyzer_link_line_length > 0U) handle_analyzer_link_command(analyzer_link_line);
+            if(!analyzer_link_line_discarding && analyzer_link_line_length > 0U) {
+                analyzer_link_line[analyzer_link_line_length] = '\0';
+                handle_analyzer_link_command(analyzer_link_line, false);
+            }
             analyzer_link_line_length = 0;
+            analyzer_link_line_discarding = false;
+        } else if(analyzer_link_line_discarding) {
+            continue;
         } else if(analyzer_link_line_length + 1U < sizeof(analyzer_link_line)) {
             analyzer_link_line[analyzer_link_line_length++] = received;
         } else {
             analyzer_link_line_length = 0;
+            analyzer_link_line_discarding = true;
         }
     }
 

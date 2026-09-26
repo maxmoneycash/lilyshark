@@ -1,11 +1,11 @@
-# LSK over BLE — the GATT contract the firmware must implement
+# LSK over BLE — GATT contract
 
-**Status: browser side written and tested, firmware side does not exist.**
+**Status: browser and firmware source implemented; physical BLE validation and firmware release pending.**
 
 Lilyshark's analyzer link (LSK) is plain, newline-delimited text between
-lilyshark.com and a T-Deck running Lilyshark firmware. Today it runs over
-USB CDC only. This document specifies the Bluetooth Low Energy carrier for
-the *same* protocol, so that field use can be one-handed and cable-free.
+lilyshark.com and a T-Deck running Lilyshark firmware. Released firmware uses
+USB CDC. This document specifies the Bluetooth Low Energy carrier for the
+*same* protocol, so that field use can be one-handed and cable-free.
 
 Nothing in the LSK protocol itself changes. Same `LSK HELLO` handshake, same
 `LSK ID` / `LSK T` / `LSK F` / `LSK S` / `LSK P` / `LSK OK` / `LSK ERR` lines, same
@@ -20,20 +20,18 @@ JSON bodies. Only the pipe changes.
   shares the handshake, reboot tolerance and retry budget in
   `webapp/src/lib/deviceLink.ts` with the Web Serial path. Covered by
   `webapp/src/lib/bleTransport.test.ts` against faked GATT objects.
-- **Firmware:** the separate LSK analyzer service specified here is absent.
-  `src/sim_main.cpp` drains `Serial` in `loop()` and writes LSK lines to USB.
-  The firmware already has a **Meshtastic BLE service** in
-  `src/device/tdeck_ble.cpp`, using the ESP32 BLE stack. That service carries
-  Meshtastic protobuf traffic; it is not the LSK byte stream or these UUIDs.
+- **Firmware source:** `src/device/tdeck_ble.cpp` defines the LSK service and
+  characteristics alongside the Meshtastic BLE service. The device loop sends
+  both carriers through the existing LSK command handler. A fresh T-Deck build
+  links; discovery, streaming, reconnection, and power cost still need a
+  physical device check before release.
 - **Native Mac app:** USB spectrum scans and traffic recording use
-  `MeshtasticKit`'s LSK serial transport. This does not add LSK BLE to the
-  firmware or enable live analyzer recording on iOS.
-- **UI:** the connect sheet shows the Bluetooth option as unavailable and
-  says the firmware does not support it yet, rather than offering a button
-  that would always time out.
+  `MeshtasticKit`'s LSK serial transport. The native app does not yet use LSK
+  BLE or enable live analyzer recording on iOS.
+- **UI:** the connect sheet keeps Bluetooth unavailable until firmware is
+  validated and released.
 
-A firmware task is needed to close this. Until it lands, the honest state
-is the one the app shows.
+The firmware task remains open for hardware validation and release.
 
 ## The service
 
@@ -162,7 +160,7 @@ see below.
 
 ## Turning it on
 
-When the firmware ships this service:
+After a physical T-Deck verifies the service and firmware ships it:
 
 1. Flip `LSK_BLE_FIRMWARE_STATUS` in `webapp/src/lib/bleTransport.ts` from
    `'absent'` to `'advertised'` — that constant is the single place the

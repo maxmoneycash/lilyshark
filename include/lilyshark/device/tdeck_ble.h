@@ -64,6 +64,9 @@ bool queueLskBleTx(const char *str) noexcept;
 /// Take the next newline-delimited LSK command received on LSK RX.
 bool takeLskBleCommand(char *out, std::size_t capacity) noexcept;
 
+/// Consume a BLE disconnect event on the main loop, where analyzer state lives.
+bool takeLskBleDisconnect() noexcept;
+
 /// Service outgoing LSK BLE TX notifications, chunked to the 20-byte ATT floor.
 void serviceLskBleTx() noexcept;
 
