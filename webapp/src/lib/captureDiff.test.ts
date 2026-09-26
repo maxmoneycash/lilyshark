@@ -32,6 +32,7 @@ function frame(
 		presentFields: REPORTS_BOTH,
 		rssiDbm: -90,
 		snrDb: 5,
+		direction: "rx",
 		...over,
 	};
 }
@@ -101,6 +102,29 @@ test("identical captures match fully, with nothing left over", () => {
 		assert.equal(pair.deltaUs, 0);
 		assert.equal(pair.residualUs, 0);
 	}
+});
+
+test("TX and unknown-direction records cannot align clocks or count as shared reception", () => {
+	const a = [
+		frame(1, 1_000_000, [0x11], { direction: "tx" }),
+		frame(2, 2_000_000, [0x22], { direction: "unknown" }),
+		frame(3, 3_000_000, [0x33]),
+		frame(4, 4_000_000, [0x44]),
+	];
+	const b = heardAgain(a, 5_000_000, (index) => index < 2 ? { direction: "rx" } : {});
+	const diff = diffCaptures(a, b);
+	assert.equal(diff.anchors, 2);
+	assert.equal(diff.matched.length, 2);
+	assert.equal(diff.ineligibleA, 2);
+	assert.equal(diff.ineligibleB, 0);
+	assert.equal(witnessSummary(diff).bothHeard, 2);
+	assert.equal(witnessSummary(diff).onlyB, 2);
+	assert.match(diffSummaryNote(diff), /TX or unknown-direction/);
+
+	const onlyOther = diffCaptures(a.slice(0, 2), b.slice(0, 2));
+	assert.equal(onlyOther.offsetSource, "none");
+	assert.equal(onlyOther.matched.length, 0);
+	assert.equal(witnessSummary(onlyOther).onlyA, 0);
 });
 
 test("a time-shifted capture still matches under offset estimation", () => {
@@ -189,7 +213,7 @@ test("a matched pair carries each side's own RSSI and SNR", () => {
 test("a field a radio did not report is null, never a zero", () => {
 	const a = [frame(1, 1_000_000, [7, 7], { presentFields: 0 })];
 	const b = [frame(9, 1_000_000, [7, 7])];
-	const diff = diffCaptures(a, b);
+	const diff = diffCaptures(a, b, { offsetUs: 0 });
 	assert.equal(diff.matched.length, 1);
 	assert.deepEqual(diff.matched[0].a, { rssiDbm: null, snrDb: null });
 	assert.deepEqual(diff.matched[0].b, { rssiDbm: -90, snrDb: 5 });
@@ -244,7 +268,7 @@ test("payloads of equal length but different bytes never pair", () => {
 	assert.deepEqual(diff.unmatchedB, [0]);
 });
 
-test("two captures with nothing in common say the clock is a guess", () => {
+test("two captures with nothing in common stay unaligned", () => {
 	const a = captureA();
 	const b = [frame(9, 40_000_000, [0xff, 0xee])];
 	const diff = diffCaptures(a, b);
@@ -252,8 +276,44 @@ test("two captures with nothing in common say the clock is a guess", () => {
 	assert.equal(diff.offsetUs, 0);
 	assert.equal(diff.anchors, 0);
 	assert.equal(diff.matched.length, 0);
-	assert.match(diffSummaryNote(diff), /no shared payload to align on/);
-	assert.match(diffSummaryNote(diff), /assumption, not a measurement/);
+	assert.match(diffSummaryNote(diff), /clock not aligned/);
+	assert.match(diffSummaryNote(diff), /no frames paired/);
+	assert.doesNotMatch(diffSummaryNote(diff), /only in A|only in B/);
+});
+
+test("one repeated or coincidental payload cannot fabricate a witness", () => {
+	const a = [frame(1, 1_000_000, [0x11, 0x22])];
+	const b = [frame(2, 20_000_000, [0x11, 0x22])];
+	const diff = diffCaptures(a, b);
+	assert.equal(diff.offsetSource, "none");
+	assert.deepEqual(diff.matched, []);
+	assert.deepEqual(diff.unmatchedA, [0]);
+	assert.deepEqual(diff.unmatchedB, [0]);
+	assert.deepEqual(diffRows(a, b, diff).map((row) => [row.kind, row.timeS]), [
+		["a-only", 0],
+		["b-only", 0],
+	]);
+	assert.equal(diffCaptures(a, b, { offsetUs: 19_000_000 }).matched.length, 1);
+
+	const repeated = diffCaptures(
+		[a[0], frame(3, 2_000_000, [0x11, 0x22])],
+		[b[0], frame(4, 21_000_000, [0x11, 0x22])],
+	);
+	assert.equal(repeated.offsetSource, "none");
+	assert.deepEqual(repeated.matched, []);
+});
+
+test("generated frames cannot corroborate physical reception", () => {
+	const a = captureA();
+	const b = heardAgain(a, 5_000_000, (i) => ({ synthetic: i < 3 }));
+	const diff = diffCaptures(a, b);
+	assert.equal(diff.offsetSource, "none");
+	assert.equal(diff.syntheticB, 3);
+	assert.equal(diff.matched.length, 0);
+	assert.match(diffSummaryNote(diff), /3 generated frame\(s\) excluded/);
+	const manual = diffCaptures(a, b, { offsetUs: 5_000_000 });
+	assert.equal(manual.matched.length, 1);
+	assert.deepEqual(manual.unmatchedB, [0, 1, 2]);
 });
 
 test("an empty capture diffs without dividing by anything", () => {
@@ -326,7 +386,7 @@ test("the summary line reports what the alignment rests on", () => {
 	const a = captureA();
 	const diff = diffCaptures(a, heardAgain(a, 12_500_000));
 	const note = diffSummaryNote(diff);
-	assert.match(note, /4 frame\(s\) heard by both/);
+	assert.match(note, /4 shared RX match\(es\)/);
 	assert.match(note, /clock offset \+12\.500 s estimated from 4 anchor\(s\)/);
 	assert.match(note, /matched within ±1000 ms/);
 	assert.equal(offsetLabel(-1_500_000), "−1.500 s");

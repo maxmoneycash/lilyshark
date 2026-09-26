@@ -18,17 +18,14 @@
  * The clock is the hard half. .lscap timestamps are each device's own
  * boot-relative monotonic microseconds (docs/lilyshark-capture-format.md) —
  * two radios that heard the same transmission report two unrelated numbers.
- * So the offset between the two clocks is ESTIMATED from the data: every
- * payload that appears exactly once on each side is an anchor, the anchors'
- * time differences are clustered, and the largest cluster's median is the
- * offset. Frames then pair up one-to-one within a tolerance around it.
+ * So the offset between the two clocks is ESTIMATED from at least two distinct
+ * shared payloads whose time differences agree. Frames then pair up one-to-one
+ * within a tolerance around it.
  *
  * Everything the estimate rests on is reported — how many anchors it used
- * and how tightly they agreed — because an offset derived from two anchors
- * that disagree by a second is not a fact about the air, and the view must
- * be able to say so. When no anchor exists at all the offset is zero and
- * `offsetSource` is "none": the captures are compared on their raw clocks,
- * which for two devices is a guess, and it is labelled as one.
+ * and how tightly they agreed. With fewer than two agreeing anchors,
+ * `offsetSource` is "none" and no frames are paired. TX, unknown-direction,
+ * and generated records cannot establish a clock offset or corroborate RX.
  *
  * Nothing here interprets a payload, and nothing decides which capture is
  * "right": a matched pair reports each side's own RSSI and SNR (null where
@@ -37,7 +34,7 @@
  * is the operator's call, not this module's.
  */
 
-import { RF_FIELD } from "./lscap";
+import { RF_FIELD, type FrameDirection } from "./lscap";
 
 /** The slice of an LscapFrame the diff reads. */
 export interface DiffFrame {
@@ -48,6 +45,10 @@ export interface DiffFrame {
 	presentFields: number;
 	rssiDbm: number;
 	snrDb: number;
+	/** Only a recorded receive can corroborate another receiver's capture. */
+	direction: FrameDirection;
+	/** Generated frames are never evidence that a radio heard a transmission. */
+	synthetic?: boolean;
 }
 
 /** One side's radio measurements for a matched frame; null = not reported. */
@@ -91,6 +92,15 @@ export interface CaptureDiff {
 	unmatchedB: number[];
 	countA: number;
 	countB: number;
+	/** Generated frames remain visible as unmatched, but cannot corroborate reception. */
+	syntheticA: number;
+	syntheticB: number;
+	/** TX, unknown-direction, and generated records cannot support a receiver match. */
+	ineligibleA: number;
+	ineligibleB: number;
+	/** Unmatched recorded RX frames, excluding the ineligible records above. */
+	unmatchedRxA: number;
+	unmatchedRxB: number;
 }
 
 export interface DiffOptions {
@@ -141,6 +151,10 @@ function measurement(frame: DiffFrame): SideMeasurement {
 	};
 }
 
+export function isReceivedEvidence(frame: DiffFrame): boolean {
+	return !frame.synthetic && frame.direction === "rx";
+}
+
 /** Payload hash → frame indices, in ascending time order. */
 function bucketByPayload(frames: readonly DiffFrame[]): Map<string, number[]> {
 	const order = frames
@@ -148,6 +162,7 @@ function bucketByPayload(frames: readonly DiffFrame[]): Map<string, number[]> {
 		.sort((x, y) => Number(frames[x].timestampUs - frames[y].timestampUs));
 	const buckets = new Map<string, number[]>();
 	for (const i of order) {
+		if (!isReceivedEvidence(frames[i])) continue;
 		const key = payloadHashHex(frames[i].bytes);
 		const list = buckets.get(key);
 		if (list) list.push(i);
@@ -176,12 +191,10 @@ function median(sorted: readonly number[]): number {
 /**
  * Estimate B's clock minus A's clock from the payloads both captures hold.
  *
- * Anchors are payloads that appear EXACTLY ONCE on each side: one occurrence
- * each means the two occurrences are the same transmission, so their time
- * difference is a direct reading of the offset. Repeated payloads (a mesh
- * rebroadcasting one packet, a beacon sending the same bytes again) are
- * ambiguous and only used when there are no unique anchors at all — and then
- * only as aligned pairs, never as a full cross product.
+ * Anchors are payloads that appear exactly once on each side. One shared
+ * payload alone cannot establish that the captures overlap: a later beacon
+ * can reuse identical bytes. Require at least two distinct payloads whose
+ * time differences agree. Repeated payloads cannot establish an offset.
  *
  * The readings are clustered with a window of `toleranceUs`: the largest
  * cluster wins and its median is the offset, so a handful of coincidental
@@ -195,7 +208,6 @@ export function estimateTimeOffsetUs(
 	const bucketsA = bucketByPayload(a);
 	const bucketsB = bucketByPayload(b);
 	const unique: number[] = [];
-	const ambiguous: number[] = [];
 	for (const [key, listA] of bucketsA) {
 		const listB = bucketsB.get(key);
 		if (!listB) continue;
@@ -204,17 +216,10 @@ export function estimateTimeOffsetUs(
 			unique.push(Number(b[listB[0]].timestampUs - a[listA[0]].timestampUs));
 			continue;
 		}
-		// Ambiguous bucket: pair them in time order and read those deltas. This
-		// is a fallback, and only reached when nothing unique exists.
-		const n = Math.min(listA.length, listB.length);
-		for (let i = 0; i < n; i++) {
-			if (!bytesEqual(a[listA[i]].bytes, b[listB[i]].bytes)) continue;
-			ambiguous.push(Number(b[listB[i]].timestampUs - a[listA[i]].timestampUs));
-		}
 	}
 
-	const deltas = unique.length > 0 ? unique : ambiguous;
-	if (deltas.length === 0) return { offsetUs: 0, anchors: 0, spreadUs: 0 };
+	const deltas = unique;
+	if (deltas.length < 2) return { offsetUs: 0, anchors: 0, spreadUs: 0 };
 
 	deltas.sort((x, y) => x - y);
 	// Widest run of deltas that all agree to within the tolerance.
@@ -229,6 +234,7 @@ export function estimateTimeOffsetUs(
 		}
 	}
 	const cluster = deltas.slice(bestStart, bestEnd);
+	if (cluster.length < 2) return { offsetUs: 0, anchors: 0, spreadUs: 0 };
 	return {
 		offsetUs: median(cluster),
 		anchors: cluster.length,
@@ -268,7 +274,7 @@ export function diffCaptures(
 	const takenA = new Set<number>();
 	const takenB = new Set<number>();
 
-	for (const [key, listA] of bucketsA) {
+	for (const [key, listA] of offsetSource === "none" ? [] : bucketsA) {
 		const listB = bucketsB.get(key);
 		if (!listB) continue;
 		let i = 0;
@@ -328,6 +334,8 @@ export function diffCaptures(
 	for (let i = 0; i < a.length; i++) if (!takenA.has(i)) unmatchedA.push(i);
 	const unmatchedB: number[] = [];
 	for (let i = 0; i < b.length; i++) if (!takenB.has(i)) unmatchedB.push(i);
+	const unmatchedRxA = unmatchedA.filter((i) => isReceivedEvidence(a[i])).length;
+	const unmatchedRxB = unmatchedB.filter((i) => isReceivedEvidence(b[i])).length;
 
 	return {
 		offsetUs: estimate.offsetUs,
@@ -340,6 +348,12 @@ export function diffCaptures(
 		unmatchedB,
 		countA: a.length,
 		countB: b.length,
+		syntheticA: a.filter((frame) => frame.synthetic).length,
+		syntheticB: b.filter((frame) => frame.synthetic).length,
+		ineligibleA: unmatchedA.length - unmatchedRxA,
+		ineligibleB: unmatchedB.length - unmatchedRxB,
+		unmatchedRxA,
+		unmatchedRxB,
 	};
 }
 
@@ -357,16 +371,28 @@ export interface DiffRow {
 }
 
 /**
- * The two captures interleaved on one clock: matched pairs on one line,
- * unmatched frames on their own, ordered by time. B's frames are placed by
- * B's clock minus the offset, so a row's position means the same thing
- * whichever capture it came from.
+ * When aligned, the two captures interleave on one clock. Otherwise each
+ * file's rows keep their own relative clock, with all A rows before B rows.
  */
 export function diffRows(
 	a: readonly DiffFrame[],
 	b: readonly DiffFrame[],
 	diff: CaptureDiff,
 ): DiffRow[] {
+	if (diff.offsetSource === "none") {
+		const aStart = a[0]?.timestampUs ?? 0n;
+		const bStart = b[0]?.timestampUs ?? 0n;
+		return [
+			...diff.unmatchedA.map((i): DiffRow => ({
+				kind: "a-only", aIndex: i, bIndex: null,
+				timeS: Number(a[i].timestampUs - aStart) / 1e6, pair: null,
+			})),
+			...diff.unmatchedB.map((i): DiffRow => ({
+				kind: "b-only", aIndex: null, bIndex: i,
+				timeS: Number(b[i].timestampUs - bStart) / 1e6, pair: null,
+			})),
+		];
+	}
 	// The common clock's zero: A's first frame, or — with no A frames at all —
 	// B's first frame carried back across the offset.
 	const zeroUs =
@@ -446,8 +472,8 @@ export function witnessSummary(diff: CaptureDiff): WitnessSummary {
 	}
 	return {
 		bothHeard: diff.matched.length,
-		onlyA: diff.unmatchedA.length,
-		onlyB: diff.unmatchedB.length,
+		onlyA: diff.unmatchedRxA,
+		onlyB: diff.unmatchedRxB,
 		meanRssiDeltaDb: rssiPairs > 0 ? rssiSum / rssiPairs : null,
 		meanSnrDeltaDb: snrPairs > 0 ? snrSum / snrPairs : null,
 		rssiPairs,
@@ -468,11 +494,13 @@ export function offsetLabel(offsetUs: number): string {
  */
 export function diffSummaryNote(diff: CaptureDiff): string {
 	const parts = [
-		`${diff.matched.length} frame(s) heard by both · ${diff.unmatchedA.length} only in A · ${diff.unmatchedB.length} only in B`,
+		diff.offsetSource === "none"
+			? `${diff.unmatchedRxA} RX frame(s) in A · ${diff.unmatchedRxB} in B; unpaired because clocks are not aligned`
+			: `${diff.matched.length} shared RX match(es) · ${diff.unmatchedRxA} RX only in A · ${diff.unmatchedRxB} RX only in B`,
 	];
 	if (diff.offsetSource === "none") {
 		parts.push(
-			"no shared payload to align on — compared on the raw capture clocks, which for two devices is an assumption, not a measurement",
+			"clock not aligned — need at least two distinct shared payloads with agreeing times; no frames paired",
 		);
 	} else if (diff.offsetSource === "given") {
 		parts.push(`clock offset ${offsetLabel(diff.offsetUs)} (set by hand)`);
@@ -481,6 +509,11 @@ export function diffSummaryNote(diff: CaptureDiff): string {
 			`clock offset ${offsetLabel(diff.offsetUs)} estimated from ${diff.anchors} anchor(s) agreeing to within ${(diff.spreadUs / 1000).toFixed(1)} ms`,
 		);
 	}
-	parts.push(`matched within ±${(diff.toleranceUs / 1000).toFixed(0)} ms`);
+	if (diff.offsetSource !== "none")
+		parts.push(`matched within ±${(diff.toleranceUs / 1000).toFixed(0)} ms`);
+	if (diff.syntheticA + diff.syntheticB > 0)
+		parts.push(`${diff.syntheticA + diff.syntheticB} generated frame(s) excluded from matching`);
+	const other = diff.ineligibleA + diff.ineligibleB - diff.syntheticA - diff.syntheticB;
+	if (other > 0) parts.push(`${other} TX or unknown-direction record(s) excluded from matching`);
 	return parts.join(" · ");
 }
