@@ -1,5 +1,14 @@
 # Direction, 2026 Q3 — where the mesh moved, where we focus, how this pays
 
+> **September 26 update:** The token section below records an August research
+> snapshot. Shelby now publishes a [high-level token-economics design](https://docs.shelby.xyz/protocol/architecture/token-economics),
+> while saying full tokenomics and initial distribution will come later. Its
+> [network page](https://docs.shelby.xyz/protocol/architecture/networks) still
+> describes only a frequently wiped developer prototype. Neither page gives
+> Lilyshark a token entitlement or a live reward path. Read the later
+> [market analysis](lora-sniffing-market-analysis-2026-09.md) before using the
+> market-size or subscription claims below.
+
 This memo settles three questions with evidence: what changed in the mesh
 world, what Lilyshark should be, and where the money is. The work it
 commits to is structured across the project roadmap; the protocol

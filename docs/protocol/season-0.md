@@ -1,5 +1,13 @@
 # Season 0 rules
 
+> **Readiness status, September 26:** These are proposed frozen parameters,
+> not evidence that a public competition is operating. A physical capture
+> path, durable deployment, authentic live input feed, privacy review, and
+> operated scorer still need verification before the scheduled October 1
+> start. The [operator plan](../strategy/operator-growth-and-product-plan-2026-09-26.md)
+> recommends a public launch decision before that date; synthetic fixtures
+> must remain labeled as simulation.
+
 Season 0 of [Field Receipts](field-receipts.md) runs **2026-10-01 through
 2026-12-31** (calendar Q4 2026, UTC; a season is a calendar quarter). These
 rules are announced now and **frozen at season start: this document is the

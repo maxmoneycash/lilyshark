@@ -5,6 +5,7 @@
     "generator": "scripts/field_receipts_score.py most-wanted",
     "rules_season": "season-0",
     "rules_sha256": "09c89fec73974732fbe6136f9803fa65dc352d2bdbeeeb17f48a3890909d0139",
+    "source": "synthetic-fixture",
     "stale_after_weeks": 4,
     "verified_cell_count": 6
   },

@@ -36,7 +36,8 @@ people arrive at documentation. If you already know the file you want, the
 | [what-you-can-see.md](what-you-can-see.md) | What is actually readable off the air, and what is not. |
 | [meridian-gap.md](meridian-gap.md) | Why coverage has holes, and where they are. |
 | [coverage-map.md](coverage-map.md) | The native and web map, its data contracts, and verification. |
-| [most-wanted.md](most-wanted.md) | The most-wanted coverage cells, ranked by bounty and gap score. |
+| [most-wanted.md](most-wanted.md) | Synthetic example of a gap list; no live coverage targets are published yet. |
+| [strategy/operator-growth-and-product-plan-2026-09-26.md](strategy/operator-growth-and-product-plan-2026-09-26.md) | Buyer study, wardriving scope, hardware gates, and points decision. |
 | [radio-map-visibility.md](radio-map-visibility.md) | How a T-Deck gets a local position or public listing, and the firmware fixes. |
 
 ## I want to understand how it works

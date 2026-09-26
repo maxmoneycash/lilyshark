@@ -82,6 +82,9 @@ logic here, at hobby scale:
 
 - Publish the [most-wanted cells](../../scripts/field_receipts_score.py)
   (`most-wanted --markdown`) alongside the store.
+- The checked-in [list](../most-wanted.md) is synthetic test data. Replace it
+  only after obtaining authenticated live receipts and publishing the input
+  provenance; it cannot determine who receives a gap credit today.
 - Applicants in a most-wanted cell get a discount, or a free unit when
   margin from paid sales allows it, in exchange for keeping it running
   and publishing captures.

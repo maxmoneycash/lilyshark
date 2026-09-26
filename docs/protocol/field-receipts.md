@@ -1,10 +1,15 @@
 # Field Receipts — a proof-of-capture protocol (v0 draft)
 
-Lilyshark already produces evidence: a capture is bytes the radio heard,
-committed to Shelby, anchored on-chain. Field Receipts is the layer that
-makes producing that evidence *worth something* — a protocol for turning
-verifiable field work (capturing, witnessing, surveying) into an on-chain
-score that a community can rank, reward, and eventually redeem.
+Lilyshark can record captures and compute content commitments. Field Receipts
+proposes turning field work (capturing, witnessing, surveying) into a public
+score. A commitment checks bytes against a known value; it does not prove
+that a radio heard them or that a claimed location is real.
+
+> **Status, September 26:** This is a research design. The contracts and
+> scorer have tests, but there is no verified live input feed, operated public
+> competition, Lilyshark token, or redemption right. Prototype shelbynet
+> deployments may be reset. The [operator plan](../strategy/operator-growth-and-product-plan-2026-09-26.md)
+> lists the physical, privacy, and buyer gates before any public season.
 
 This is a v0 design document. The primitives are chosen so that everything
 awarded on-chain is checkable on-chain, and everything that requires
@@ -21,10 +26,10 @@ because they made the invisible work *legible*: measured, ranked, and
 rewarded. Lilyshark is unusually well placed to do the same for LoRa mesh,
 because the device's whole job is producing tamper-evident measurements.
 
-The design constraint that separates this from the DePIN graveyard: **the
-reward tracks evidence quality, not hardware presence.** Helium paid for
-being there and got spoofed by simulated hotspots; we pay for receipts that
-independent parties corroborate.
+The design constraint is that a future reward would need to track evidence
+quality, not hardware presence. The present witness-key mechanism can find
+matching bytes, but independent receiver control and physical reception are
+not established by matching captures alone.
 
 ## Where this sits on the whitepaper's verification ladder
 
@@ -39,11 +44,11 @@ flooded mesh subsidizes the exact airtime consumption that collapses it
 Field Receipts is designed to comply with that finding, not to work around
 it:
 
-- **Witness attestation is observation-tier.** A corroborated witness key
-  is a measurement — "this transmission occurred, and two independently
-  operated receivers heard the same bytes" — checkable by anyone against
-  the anchored captures. It pays for *hearing*, never for relaying, and a
-  receiver is passive: rewarding more listeners adds zero airtime.
+- **Witness attestation is proposed as observation-tier.** A matching witness
+  key means two submitted captures contain the same bytes in the same time
+  bucket. It does not prove separate receiver ownership or physical reception.
+  The intended reward is for hearing, never for relaying; passive listening
+  adds no transmission airtime.
 - **Anchored captures are the evidence floor**, priced by real storage and
   gas costs rather than emissions.
 - **Coverage cells are the one coverage-tier element**, and they are
@@ -65,10 +70,12 @@ discipline — to the instrument this repo actually ships.
 
 ### 1. Capture receipt (exists today)
 
-`lilyshark::capture_registry::register` anchors a capture: publisher,
+`lilyshark::capture_registry::register` can anchor a capture: publisher,
 32-byte Shelby blob commitment, blob name, size, lease expiry. Anyone can
 fetch the blob and verify the bytes against the commitment. This is the
-base unit of the protocol and it is already deployed to shelbynet.
+base unit of the protocol. It has been deployed to prototype shelbynet; check
+the current address and blob availability before treating an old receipt as
+live evidence.
 
 ### 2. Witness attestation (new)
 
@@ -217,29 +224,31 @@ Scoring runs in **seasons** (calendar quarters). Each season's rules —
 point weights, decay curves, cell bonuses — are published before the season
 starts and frozen for its duration.
 
-**The Shelby token path.** Shelby's serving economy (metered reads,
-compensated gateways) is the economic engine this design bets on, and
-Shelby has not published a token or pricing schedule yet (see
+**The Shelby token path.** A future storage-serving economy is one possible
+commercial dependency of this design, and
+Shelby has published a [high-level token-economics design](https://docs.shelby.xyz/protocol/architecture/token-economics),
+but says full tokenomics and initial distribution will come later. Its
+[network page](https://docs.shelby.xyz/protocol/architecture/networks) still
+describes a frequently wiped developer prototype; no Lilyshark token reward
+or conversion right follows from that design (see
 [why-shelby.md](../why-shelby.md)). The honest sequencing:
 
-1. **Now — points and rank.** Leaderboards, badges, and profile pages on
-   lilyshark.com read the on-chain events. Rewards are non-monetary:
-   recognition, early-access firmware, premium analyzer features.
-2. **When Shelby's economy is live** — season points become the
-   distribution key for whatever value the project actually captures:
-   revenue share from the data products (below), sponsored reward pools,
-   or conversion into Shelby-native compensation if their gateway economy
-   admits third-party pools.
+1. **Prototype — points and rank.** The contract and scorer define a
+   non-transferable scoreboard. Public leaderboards, badges, and access
+   benefits remain proposals until they are deployed and operated.
+2. **If a real data service has buyers** — decide its payment and contributor
+   terms from demonstrated value and current law. Existing season points do
+   not grant conversion, revenue share, or a claim on Shelby rewards.
 3. **A Lilyshark-issued token is explicitly out of scope for v0.**
    Issuing a token against future rewards is a securities decision, not an
    engineering one, and nothing in this design requires it. Every
-   primitive here works if a token never exists; everything is *ready* if
-   one does, because the score is already on-chain and sybil-priced.
+   primitive here can be evaluated without a token. A public score does not
+   establish sybil resistance or make a token distribution ready.
 
-### What the points buy even without a token
+### Proposed non-monetary benefits
 
-The redemption loop that works today, patterned on Flightradar24's
-feed-for-premium trade:
+These benefits are product hypotheses, patterned on contributor programs;
+they are not currently redeemable:
 
 - **Rank** — season leaderboards and per-cell "first surveyed by" credit
   on the coverage map.

@@ -1,173 +1,88 @@
-# What you can actually see
+# What Lilyshark can show
 
-Start here. This page answers the question every other document assumes you
-already have an answer to: **what does Lilyshark show you, and what does it
-refuse to show you?**
+Lilyshark is a developer alpha for examining supported LoRa mesh traffic. Its
+T-Deck receiver listens on **one configured radio profile at a time**. It keeps
+captured bytes alongside measurements the radio reports, applies the selected
+protocol decoder, and can save `.lscap` and LoRaTap PCAP files to microSD. The
+web analyzer opens captures, inspects packets, and compares two captures.
 
-Everything below is what the shipped code does. Where a limit exists it is
-stated as a limit, not softened.
+The code for several capabilities is complete enough to build and test on a
+host, but a build is not a field result. The [README status table](../README.md#project-status)
+records what was observed on two physical T-Decks and what still needs a
+physical check. In particular, microSD writes, scan recovery, calibrated touch,
+and live MeshCore and RNode reception remain unverified on hardware.
 
-## "Wireshark for LoRa" — what that means
+## Receiving and transmitting
 
-Wireshark does not create traffic. It sits on a network you can already
-reach, captures the frames crossing it, and explains each one field by
-field: this is the header, this is the payload, this is the checksum, this
-one is malformed.
+The analyzer can listen without sending. The firmware also **transmits** when
+the operator uses supported messaging, position, node-info, advertisement, or
+raw-injection controls. A paired Meshtastic phone app can send messages through
+the deck. Do not treat a messaging session as passive capture. Spectrum sweeps
+also interrupt reception because the same SX1262 radio performs the scan.
 
-Lilyshark is that instrument for LoRa mesh radio. A T-Deck's SX1262 is put
-into receive on one channel, and every frame that lands is:
+The selected frequency, bandwidth, spreading factor, coding rate, sync word,
+and preamble determine what can be heard. A quiet capture says only that this
+receiver recorded nothing under those conditions. It cannot establish that a
+whole mesh was silent or a remote hop failed.
 
-1. **recorded whole** — the raw bytes, exactly as heard;
-2. **measured** — RSSI, SNR, frequency error, airtime, CRC pass or fail;
-3. **explained** — as far as the protocol allows, and no further;
-4. **saved** — to `.lscap` and to LoRaTap PCAP you can open in Wireshark itself.
+## Payloads and privacy
 
-The difference from Wi-Fi or Ethernet is that a LoRa mesh has no cable to
-tap and no interface to put in promiscuous mode. The radio *is* the tap.
-Anything transmitted within earshot on the channel you are tuned to is
-yours to record — that is how radio works, and it is why a mesh needs
-encryption at all.
-
-**What Lilyshark never does:** transmit. It does not inject frames, does
-not probe, does not join the mesh, does not acknowledge anything. It is a
-receiver. The one thing it writes is your microSD card.
-
-## Is mesh traffic encrypted? Can Lilyshark decrypt it?
-
-This is the question that matters, and the honest answer has two halves.
-
-### The half people find surprising
-
-**Meshtastic ships every radio on Earth with the same channel key.** It is a
-published constant in the Meshtastic source (`Channels.h`, `defaultpsk`); the
-familiar `AQ==` channel shorthand selects exactly it. Its sixteen bytes are:
-
-```
-d4 f1 bb 3a 20 29 07 59 f0 bc ff ab cf 4e 69 01
-```
-
-The default **LongFast** channel — the channel most radios are on, out of the
-box, forever — is encrypted with that key. Which means traffic on the default
-channel is readable by anyone within radio range who bothers to apply a key
-they already have.
-
-Lilyshark applies it. On the default channel you get the actual message:
-
-| What | Shown as |
-| --- | --- |
-| Text messages | the message text, up to 200 bytes, when the bytes are printable |
-| Positions | latitude and longitude in degrees |
-| Node info | long name (up to 40 chars) and short name (up to 8) |
-| Telemetry, routing, traceroute, neighbor info | named port + payload length |
-| Anything else | the port number, reported numerically rather than hidden |
-
-That is not an attack on a cipher. Nothing here searches a keyspace or
-exploits a weakness. It applies a key that is printed in public source code
-and shipped in every device — and it stops the instant the result fails to
-parse, because noise from a wrong key must never be dressed up as a message.
-
-If you take one thing from this page: **the Meshtastic default channel is
-not private.** Most people running it do not know that. Seeing your own
-"encrypted" test message appear in a sniffer's frame list is the fastest way
-to understand why you should set a real channel key.
-
-### The other half
-
-**A channel with a real PSK stays opaque.** If you or anyone else creates a
-channel with an actual key, Lilyshark cannot read the payload, and does not
-pretend to. You get the outer header and the RF measurements — nothing more.
-The same is true of protected MeshCore payloads and IFAC-marked Reticulum
-traffic.
-
-There is no key cracking, no dictionary of keys, no key management at all.
-That is a deliberate boundary, not a missing feature.
-
-## What you get regardless of encryption
-
-The physical layer is never encrypted, because it cannot be — a receiver has
-to demodulate before there is anything to decrypt. So for **every** frame,
-protected or not, you always get:
-
-- frequency, bandwidth, spreading factor, coding rate
-- RSSI and SNR
-- frequency error
-- airtime and payload length
-- CRC valid, invalid, or absent
-- capture timestamp and sequence
-
-This is most of what a network problem actually looks like. "Nobody relayed
-my message" is not a payload question — it is a question about whether a
-frame appeared at all, from whom, at what signal strength, and whether its
-CRC held.
-
-## Per-protocol reality
-
-| Protocol | Readable today | Stays opaque |
+| Traffic | What the implementation can show | Limit |
 | --- | --- | --- |
-| **Meshtastic** | Outer header — source, destination, packet id, channel hash, hop limit and start, next hop, relay byte, broadcast/ACK/MQTT flags. **Plus full payload on the published default key**: text, position, node names, port. | Any channel with a real PSK. |
-| **MeshCore** | v1 route type, payload type, encoded path shape, transport codes, group channel, ACK checksum, structural length validation. | Protected direct, group, and anonymous payloads. Advertisement bodies are not expanded into contacts. |
-| **Reticulum / RNode** | RNode shim, split marker, header type, packet and destination type, context, hops, hash prefixes, outer-header protection marker. | IFAC-marked content without an interface key. |
-| **Unknown LoRa** | Raw bytes plus every RF measurement. | Everything else — and no protocol label is invented for it. |
+| Meshtastic | Outer routing header; readable payloads on the published default channel key, including supported text, position, and node-info forms | A private channel needs its key. Modern public-key direct messages require the recipient's key material. |
+| Meshtastic channel with an operator-supplied key | The T-Deck can store up to eight 16-byte channel keys and decode matching traffic | Keys are stored in plaintext in flash. The web dissector and device have different key support; see [channel key security](channel-key-security.md). |
+| MeshCore | Structural route and payload fields; the web dissector also expands supported advertisements | Protected direct, group, and anonymous content stays opaque without the relevant key. Live over-air decoding awaits a sample captured on hardware. |
+| Reticulum / RNode | Outer structure, supported clear LinkRequest and Proof fields, and supported unencrypted LXMF content | IFAC-marked or end-to-end encrypted content stays opaque without the relevant key. Live RNode reception awaits a hardware sample. |
+| Unknown LoRa | Captured bytes and reported radio measurements | No protocol identity or plaintext is inferred. |
 
-Decoding is **profile-gated**, not automatic. These protocols do not all carry
-an unambiguous magic value, so you tell Lilyshark which network you are
-pointing it at (press `P` on the device) and it uses the matching structural
-decoder. It will not guess and then lie about the guess.
+Decoding is tied to the selected profile. Matching a packet shape is not proof
+that a decryption key was valid; the decoder must also parse the result. A
+published shared key is not a privacy boundary. [Meshtastic's encryption
+overview](https://meshtastic.org/docs/overview/encryption/) explains the
+default channel and private channel model.
 
-## What you can't see
+## RF evidence and its limits
 
-Being clear about this is the point of the tool.
+The capture format can hold frequency, bandwidth, spreading factor, coding
+rate, RSSI, SNR, frequency error, airtime, CRC state, timestamp, sequence, and
+raw bytes. A particular record may lack a measurement; the analyzer displays
+missing fields as missing rather than zero. The T-Deck capture clock is
+boot-relative, so two devices need alignment before their timelines can be
+compared. It is not a wall-clock timestamp.
 
-- **Traffic on a channel you are not tuned to.** One SX1262, one channel at a
-  time. A frame at 906.875 MHz is invisible while you sit on 910.525 MHz.
-- **Traffic out of radio range.** A sniffer hears its neighbourhood, not the
-  network. The mesh may be healthy three hops away while your view is empty.
-- **Payloads under a real key.** Covered above.
-- **Anything during a spectrum sweep.** The scan owns the single radio, so
-  packet reception pauses visibly while it runs. Lilyshark says so on screen
-  rather than showing a stale feed.
-- **Wall-clock time.** The T-Deck has no dependable real-time clock, so
-  capture timestamps are monotonic microseconds since boot. Order and
-  intervals are trustworthy; absolute dates are not. Use relative-time
-  columns in Wireshark.
+The web analyzer's **Same Event** comparison uses identical bytes and **at
+least two distinct shared payloads with agreeing time differences** to estimate
+that alignment. With less evidence it leaves frames unpaired. Transmitted,
+unknown-direction, and generated records cannot corroborate reception.
+**Separate Visits** summarizes each
+capture's received frames, reported radio settings, and measured signal
+samples without pairing transmissions. Neither mode by itself proves a
+network-wide delivery rate, receiver independence, or why a frame was missed.
+Keep the original files and radio settings with any field conclusion.
 
-## So why would you use it
+The spectrum view reads the SX1262's 33-bin histogram at each scan step. The
+scan path is experimental and its receive-restoration behavior still needs
+physical validation. The single radio cannot receive packets while scanning.
+LoRaTap PCAP also cannot encode every configured bandwidth; `.lscap` remains
+the complete local capture format for those profiles.
 
-Concretely, the situations it is built for:
+## Stored files and stronger claims
 
-**"My message didn't go through and I have no idea why."** The app shows
-nothing either way. Lilyshark shows whether your frame went out, whether
-anyone repeated it, and whether an ACK came back — turning "it's broken"
-into "hop 2 never relayed it."
+The implementation writes `.lscap`, LoRaTap PCAP where representable, and BMP
+screenshots to microSD. The byte-exact writers have host tests; microSD writes
+and desktop opening of a card-produced file still need a physical run. A
+content hash can show that bytes have not changed relative to a known hash. It
+does **not** prove that a radio originally heard those bytes, that its location
+was correct, or that two witnesses were independent. See the [Field Receipts
+draft](protocol/field-receipts.md) for the proposed trust model.
 
-**"The mesh got slower as more people joined."** LoRa is ~1 kbit/s and
-flood-routed; a few chatty nodes can eat the channel. Airtime and utilization
-show who is spending it and how close to saturation you are.
+## Start here
 
-**"Something is interfering and I can't see it."** 915 MHz is shared with
-garage doors, sensors, and everyone else. The spectrum scan reads the
-SX1262's own 33-bin power histogram across the band so you can find the
-noise or move away from it.
+- [Quickstart](quickstart.md) opens a sample capture without a radio.
+- [Hardware status](hardware.md) separates physical observations from simulated views.
+- [Capture format](lilyshark-capture-format.md) documents `.lscap` fields.
+- [Radio visibility](radio-map-visibility.md) explains what a map pin does and does not mean.
 
-**"One bad node is wrecking the network."** A radio with a wrong hop limit
-or spamming position updates degrades everyone. Per-node stats and the event
-log name it.
-
-**"I need to prove what happened."** Captures are written to `.lscap` and
-LoRaTap PCAP on microSD, and can be published to content-addressed storage
-so the file's address is a hash of its bytes. A screenshot can be faked; that
-cannot.
-
-## Where to go next
-
-- [Quickstart](quickstart.md) — evaluate it in ten minutes, no radio required
-- [Lilyshark on real hardware](hardware.md) — what to expect on a real T-Deck
-- [Architecture](architecture.md) — how capture, decode, and export fit together
-- [Capture format](lilyshark-capture-format.md) — the `.lscap` layout
-
-## Legal note
-
-Rules on receiving and recording radio transmissions vary by country. You are
-responsible for operating within the rules where you are. Lilyshark only
-receives, but "only receiving" is not a defence everywhere, and the fact that
-a key is published does not make every use of the traffic it protects lawful.
+Radio reception, recording, and transmission rules vary by location. Operate
+within the rules that apply to your equipment and region, and respect other
+people's communications when sharing captures.

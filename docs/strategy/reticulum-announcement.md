@@ -1,5 +1,12 @@
 # Telling Reticulum that its analyzer exists
 
+> **Draft only, September 26 review:** The venue copy below predates the
+> current hardware status. Live RNode reception has not been validated on a
+> physical deck, and the LSK browser Bluetooth path remains disabled pending
+> validation and release. Competitor and first-mover claims need a fresh
+> source check before posting. Use the [capability guide](../what-you-can-see.md)
+> for current language; no announcement has been sent from this draft.
+
 First-mover credit in a gap only counts if the people who
 named the gap see the thing working. The FOSDEM 2026 community meetup
 listed thin observability among Reticulum's open problems; as of this

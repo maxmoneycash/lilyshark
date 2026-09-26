@@ -1,5 +1,12 @@
 # The premium tier, scoped — feed to unlock
 
+> **Proposal, not a shipped entitlement:** The prices and capture-hour unlock
+> below have no customer validation. The LSK analyzer Bluetooth option is
+> disabled until physical firmware validation and release. The later
+> [market analysis](lora-sniffing-market-analysis-2026-09.md) and
+> [operator plan](operator-growth-and-product-plan-2026-09-26.md) set the
+> buyer and hardware tests before building a paid tier.
+
 Revenue stream #1 from the [direction memo](2026-q3-direction.md):
 lilyshark.com stays a free instrument, the professional conveniences are
 paid, and **feeding the network unlocks them for free**. Flightradar24

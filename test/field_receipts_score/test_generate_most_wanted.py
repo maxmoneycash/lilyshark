@@ -23,6 +23,8 @@ class GenerateMostWantedTests(unittest.TestCase):
         self.assertIn("most_wanted", output)
         self.assertGreater(len(output["most_wanted"]), 0)
         self.assertIn("Most-Wanted Cells", markdown)
+        self.assertIn("Synthetic test data", markdown)
+        self.assertEqual(output["method"]["source"], "synthetic-fixture")
         self.assertIn("| Cell (Geohash-5) |", markdown)
 
     def test_cli_execution_and_check(self):
@@ -48,6 +50,7 @@ class GenerateMostWantedTests(unittest.TestCase):
             self.assertTrue(tmp_json.exists())
             data = json.loads(tmp_json.read_text(encoding="utf-8"))
             self.assertEqual(len(data["most_wanted"]), 5)
+            self.assertEqual(data["method"]["source"], "synthetic-fixture")
 
 
 if __name__ == "__main__":

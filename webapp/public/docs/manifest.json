@@ -1,7 +1,7 @@
 [
   {
     "id": "what-you-can-see",
-    "title": "What you can actually see",
+    "title": "What Lilyshark can show",
     "path": "/docs/what-you-can-see.md",
     "source": "docs/what-you-can-see.md"
   },
@@ -61,7 +61,7 @@
   },
   {
     "id": "results-evidence",
-    "title": "Evidence from the live Shelby network",
+    "title": "Shelby prototype indexer snapshot",
     "path": "/docs/analysis/results_evidence.md",
     "source": "analysis/results_evidence.md"
   },

@@ -1,11 +1,17 @@
-# Evidence from the live Shelby network
+# Shelby prototype indexer snapshot
 
-Snapshot: 2026-08-15T21:37:25Z (Early Access testnet, via the public indexer that
-backs lilyshark.vercel.app). Regenerate with
-`python3 analysis/shelby_network_evidence.py`. These are measured values from
-the running network, not model outputs.
+Snapshot: 2026-08-15T21:37:25Z (Early Access testnet, via the indexer that
+backed lilyshark.vercel.app). Regenerate with
+`python3 analysis/shelby_network_evidence.py --offline` for the pinned
+fixture. These are historical indexer counters, not current network
+metrics or independently audited storage and payment records.
 
-## The network is real and economically active
+> Shelby's [current network documentation](https://docs.shelby.xyz/protocol/architecture/networks)
+> describes a developer prototype that can be reset. Transaction and
+> activity counts below do not establish durable retrieval, user demand,
+> a production economy, or Lilyshark gateway compensation.
+
+## What the indexer reported at the snapshot time
 
 | Measure | Value |
 | --- | ---: |
@@ -20,16 +26,15 @@ the running network, not model outputs.
 | ShelbyUSD volume (24 h) | 647.68 |
 | Average transaction | 0.031 ShelbyUSD |
 
-A storage network with payment rails that are already exercised millions of
-times is what the capture archive and the off-grid pointer need: not a
-promise of infrastructure, but running infrastructure.
+These counters describe activity in one prototype environment at one
+date. They do not establish who paid whom or whether old blobs still resolve.
 
-## The network's average object is already capture-sized
+## The snapshot's average object was capture-sized
 
-The average blob on Shelby today is **275 KB**. A Lilyshark
+The average blob in this snapshot was **275 KB**. A Lilyshark
 field-session capture is ~200 KB; the demo capture in this
 repo is 4.7 KB. Captures are not an unusual
-object for this network — they sit squarely in its existing workload:
+object for that recorded workload:
 
 | Content type | Blobs | GB stored | Share | Avg size |
 | --- | ---: | ---: | ---: | ---: |
@@ -40,20 +45,18 @@ object for this network — they sit squarely in its existing workload:
 | json | 65,305 | 24.30 | 16.6% | 372 KB |
 | archive | 11 | 0.00 | 0.0% | 38 KB |
 
-Each blob also accrues ~9 activity records — the
-write-once, act-on-repeatedly pattern of an archive that gets read, shared,
-and referenced, which is the pattern Shelby's serving compensation rewards.
+The indexer counted ~9 activity records per blob.
+That count alone does not show distinct readers, useful retrievals, or
+compensation to serving gateways.
 
 ![Average blob size by content type vs a capture](chart_blob_sizes.svg)
 
-## What this supports
+## What this does and does not support
 
-- **Captures belong here.** Immutable, content-addressed, retrievable by
-  name — and the network's median workload is already objects of this size
-  and access pattern.
-- **The 82-byte pointer references something real.** A pointer names a blob
-  on a network that provably holds hundreds of thousands of them and meters
-  their movement in a live unit of account.
-- **Serving is measured.** The `blob_activities` indexer (3,529,910 records) is
-  the raw material for paying gateways that resolve pointers — the work the
-  grant would fund is instrumentable end to end.
+- The prototype indexer reported objects of roughly capture size.
+  Size compatibility is useful for a design test, not a storage SLA.
+- The 82-byte pointer can name a content-committed blob. Test current
+  resolution and retention before relying on it for field evidence.
+- The `blob_activities` indexer (3,529,910 records) is
+  a possible input to a future serving audit; it is not proof that
+  Lilyshark gateways were paid.

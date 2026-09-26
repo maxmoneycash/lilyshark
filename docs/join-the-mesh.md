@@ -1,147 +1,100 @@
-# Join the mesh: flashing a new T-Deck
+# Set up a T-Deck for Lilyshark
 
-The exact path from a fresh clone to a T-Deck that other Lilyshark decks can
-see. Written so a person — or their coding agent — can follow it without any
-context from earlier sessions.
+This is a developer-alpha setup path. The current source builds for T-Deck
+Plus, but a fresh unit still needs a physical smoke test. See the
+[hardware status](hardware.md) before relying on capture files or a scan.
 
-## 0. Get the right code
+## Build and flash
 
-> [!IMPORTANT]
-> Until PR #14 merges, `main` is an old alpha with a radio bug that leaves the
-> device **permanently unable to receive after its first transmit**. Do not
-> flash `main`, and do not use the browser flasher at lilyshark.com/flash while
-> the site still serves that build. Use the branch:
+Build from the current `main` source. Check the release page and image date
+separately before using a hosted flasher; a hosted image may lag the source.
 
 ```sh
 git clone https://github.com/maxmoneycash/lilyshark.git
 cd lilyshark
-git checkout agent/lilyshark-usb-first-class   # skip once PR #14 has merged
+./scripts/build_release.sh
+./scripts/flash_tdeck.sh --factory --auto   # first flash; erases saved settings
 ```
 
-## 1. Build and flash
+The scripts require Python 3 and `uv` and bootstrap the pinned PlatformIO
+toolchain. After the first flash, use `./scripts/flash_tdeck.sh --auto` to
+write only the application and preserve saved radio settings. The auto
+selector stops unless it finds exactly one eligible USB serial device. A
+fresh build has a georeferenced chart but no locally baked map imagery.
 
-Requirements: Python 3 with `uv` (`pip install uv`), and the T-Deck on USB.
-The build bootstraps its own pinned PlatformIO — nothing global to install.
+## Select and verify the radio profile
+
+On first run, choose the network and radio profile used by the peers you intend
+to test. `MESHTASTIC US LF` is the included US LongFast starting profile;
+`MESHTASTIC BAY MF` is an included Bay Area MediumFast starting profile. Check
+the actual region, channel, frequency, bandwidth, spreading factor, coding
+rate, and channel key on both ends. A preset name alone does not establish
+compatibility with a local community's current configuration.
+
+With the deck attached over USB, save a bounded startup log and run the smoke
+script:
 
 ```sh
-./scripts/build_release.sh                    # ~1 min; ends with "Release artifacts are in .../dist"
-./scripts/flash_tdeck.sh --factory --auto     # first flash on a new deck
+python3 scripts/smoke_tdeck.py --auto --seconds 90 --log tdeck-startup.log
+python3 scripts/listen_tdeck.py /dev/cu.usbmodem1101 90
 ```
 
-`--factory` writes the whole image and erases any saved settings, which is
-what a deck that has never run Lilyshark needs. **Afterwards, update with plain
-`./scripts/flash_tdeck.sh --auto`** — that writes only the application and
-keeps the radio profile, so an update cannot silently move a deck onto a
-different frequency from the rest of your mesh.
+Replace the serial path with the port on your computer; install `pyserial`
+if the listener requests it. Check for the deck's identity, radio
+initialization, and a GPS fix where sky view permits. A rising receive count
+or peer line is evidence only for frames heard under the selected settings.
+Save the exact image revision, card, antenna, and profile with the log.
 
-A fresh clone builds **without map imagery** (the baked tiles are generated,
-not committed) — the map shows a georeferenced field chart instead. That is
-expected; imagery comes in step 3.
+## Optional map imagery
 
-## 2. First boot, and proving it works
-
-On the device: the guided first run asks which network to inspect — choose
-**MESHTASTIC**. To talk to the wider Bay Area community, press `P` afterwards
-and choose **MESHTASTIC BAY MF** — Bay Area Mesh runs Medium Range Fast on
-frequency slot 45 (913.125 MHz), not the stock default, and every deck in this
-group should sit there too. The stock defaults (US LongFast, 906.875 MHz, and the published
-default channel key) match every other Lilyshark deck and stock Meshtastic
-nodes, so no keys or settings need to be exchanged.
-
-Then verify from the laptop:
+The map can read imagery from a microSD card. Plan and fetch tiles for your
+own location, then copy the resulting `maps` directory to the card:
 
 ```sh
-pip install pyserial
-python3 scripts/listen_tdeck.py /dev/cu.usbmodem1101 90    # macOS; /dev/ttyACM0 on Linux
-```
-
-You should see the deck's identity (`local: !xxxxxxxx`), GPS moving from
-`FINDING GPS` to `GPS ON` if it can see sky, and — if any Meshtastic node is
-in range — `*** PEER` lines as it hears them. `rx` climbing with `crc=0` is
-the radio working.
-
-## 3. Map imagery for where you actually are
-
-The map needs tiles for *your* location. The recommended path is a microSD
-card — no rebuild, and it survives reflashes:
-
-```sh
-# Plan first (downloads nothing), then build. Use your own coordinates.
 python3 scripts/build_map_card.py --lat 37.3230 --lon -122.0322 \
-    --radius-km 2 --min-zoom 12 --max-zoom 20 --out /tmp/mapcard --dry-run
+  --radius-km 2 --min-zoom 12 --max-zoom 20 --out /tmp/mapcard --dry-run
 python3 scripts/build_map_card.py --lat 37.3230 --lon -122.0322 \
-    --radius-km 2 --min-zoom 12 --max-zoom 20 --out /tmp/mapcard
-# Copy /tmp/mapcard onto the card so the tiles live at /maps, insert, done.
+  --radius-km 2 --min-zoom 12 --max-zoom 20 --out /tmp/mapcard
 ```
 
-To bake imagery into the firmware itself instead (works with no card), fetch
-tiles for each zoom with `scripts/fetch_satellite_map.py`, run
-`scripts/embed_map_tiles.py --centre-lat … --centre-lon …`, and rebuild.
+This path needs a physical card check; firmware build success does not prove
+that the deck mounted or wrote the card. See [flashing](FLASHING.md) for the
+full flash procedure and [hardware](hardware.md) for pending tests.
 
-## 4. Pair your phone (optional)
+## Pair a phone and use the analyzer
 
-The deck advertises Meshtastic's client Bluetooth service. Open the official
-Meshtastic app, scan, and connect to **Lilyshark <shortname>** — the app gets
-your node identity, the node list the deck can currently hear, the LongFast
-channel, and the radio settings, and then texts flow both ways: what the deck
-hears shows up in the app, and what you type in the app goes out over the
-deck's radio and into its chat log. Node positions come across as well, so
-the app's map places your neighbours.
+The firmware includes Meshtastic's client Bluetooth service and a message
+bridge. Pair the official Meshtastic app with `Lilyshark <shortname>`, then
+verify a live receive and send with a second radio. Settings written from the
+phone are not applied yet; use the deck's settings screen.
 
-## 5. Use it as an analyzer
+Open [lilyshark.com](https://lilyshark.com) in a computer browser with Web
+Serial and choose **LILYSHARK T-DECK · USB** for the analyzer link. Its
+SNIFFER view inspects frames; TRAFFIC opens and compares captures; SPECTRUM
+shows scans from the deck. The separate **LSK analyzer Bluetooth** service
+exists in source, but the browser option remains disabled until a physical BLE
+session and a released image have been verified. Chromium's Meshtastic and
+MeshCore Bluetooth client paths are separate protocol connections.
 
-The deck is also an instrument, and most of that lives in the browser.
-Open **lilyshark.com** in Chrome, Edge or Arc on a computer, press CONNECT,
-and choose **LILYSHARK T-DECK · USB** for the analyzer link or
-**LILYSHARK T-DECK · BLUETOOTH** for the mesh conversation. Then:
+The site installs as an offline app. Once loaded, local capture inspection
+works without internet. Remote capture fetching, maps, and regional feeds
+need a network connection. On iPhone, use the native app in `ios/` for
+supported device connectivity; Safari has no Web Bluetooth or Web Serial.
 
-- **SNIFFER** lists every frame the deck hears, with a dissection tree that
-  names each field and highlights the bytes it came from. Export the capture
-  as LoRaTap PCAP and open it in Wireshark, or as CSV or JSON.
-- **SPECTRUM** draws a live waterfall from sweeps the deck runs on command.
-- **TRAFFIC** follows a conversation between two nodes, diffs two captures,
-  and takes a display-filter expression.
-- **MAP** shows what your radio has actually heard, and — in amber, labelled
-  NET — what the wider internet-connected mesh knows is out there. The two
-  are never mixed up: amber is somebody else's hearing, not yours.
+## What a connection proves
 
-The site installs as an offline app. Once it has loaded, it opens with no
-internet at all, which matters for an instrument whose network does not need
-one either.
+Two T-Deck Plus units have exchanged and decoded live Meshtastic traffic and
+direct messages. Range depends on placement, antenna, obstruction, and RF
+settings. A GPS position is needed for a map location; a received identity
+alone does not provide one. The spectrum scan and microSD capture paths still
+need physical validation.
 
-There is also a native app in `ios/` for iPhone, Mac and Watch, because Apple
-does not permit Web Bluetooth and the website therefore cannot reach a deck
-from an iPhone. Build it with `./scripts/build_ios.sh`; it needs Xcode and
-your own signing identity.
+The internet relay is an optional, separately connected path, **off by
+default** in CONFIG. It is not proof of LoRa reachability. Delivery depends
+on both clients, the relay, and their live connections. Relayed data must
+retain its **NET** provenance in the interface. Test an end-to-end
+conversation before relying on it; there is no delivery guarantee.
 
-## 6. What you will and won't see of each other
-
-- **In LoRa range** (same neighbourhood, line of sight — hundreds of metres
-  urban, kilometres open): each deck appears in the other's NODES list with
-  range and signal, on the MAP once it has a GPS fix, and CHAT works both
-  ways, including direct messages. This is tested hardware-to-hardware.
-- **Beyond the view**: the map zooms out to a ~150 km span, and a heard node
-  beyond the current view is pointed at from the screen edge with its name
-  and range — you don't have to hunt for the dot.
-- **Across a region** (Kenwood ↔ Cupertino is ~100 km): two handheld T-Decks
-  will **not** reach each other directly — that is physics, not firmware. The
-  guaranteed path is the **net relay**: keep the deck USB-linked to the
-  analyzer at [lilyshark.com](https://lilyshark.com) on both ends. Every frame
-  a deck hears is shared with the other analyzers in the room, shown on their
-  web maps, and handed down the cable so it lands on the deck itself — node on
-  the map, message in chat, chime and all — marked **NET** wherever
-  provenance shows. It is on by default; the toggle lives in CONFIG. Direct
-  messages work across it exactly like over the air: open the node, MESSAGE,
-  send. Positions may *also* arrive over RF via the public Meshtastic mesh
-  (we beacon with the standard hop limit of 3), but treat that as a bonus.
-  When the decks are physically together, plain radio does everything.
-
-## If it doesn't
-
-- `heard nothing` from `listen_tdeck.py` with other nodes nearby: confirm the
-  device shows `US LF 906.875` on Home; press `P` to reopen the profile picker.
-  Two decks on different profiles are on different frequencies and will never
-  hear each other, however close they are — this is the first thing to check.
-- Port busy: only one program can hold the serial port — close the web
-  analyzer tab or the monitor before flashing.
-- Map all chart, no imagery: that is a fresh clone without tiles — step 3.
+If nothing is heard, first compare the configured radio profiles and keys.
+If a serial port is busy, close its analyzer or monitor tab before flashing.
+A chart without satellite imagery is expected until tiles are installed.

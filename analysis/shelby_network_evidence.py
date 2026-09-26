@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Evidence from the live Shelby network, not simulation.
+"""Render a dated Shelby prototype indexer snapshot, not a live forecast.
 
 Pulls the public indexer endpoints that back lilyshark.vercel.app and turns
-them into the case for the design: the network is live and economically
-active, and its average stored object is already the size of a Lilyshark
-field capture.
+them into a historical workload comparison. Indexer counters do not establish
+durability, market demand, or gateway income.
 
 Endpoints (read-only, no auth):
   /api/network/stats  /api/analytics  /api/economy  /api/sync/status
@@ -106,14 +105,20 @@ def analyze(snap: dict[str, object]) -> dict[str, object]:
 def build_report(a: dict[str, object]) -> str:
     lines: list[str] = []
     w = lines.append
-    w("# Evidence from the live Shelby network")
+    w("# Shelby prototype indexer snapshot")
     w("")
-    w(f"Snapshot: {a['fetched_at']} (Early Access testnet, via the public indexer that")
-    w("backs lilyshark.vercel.app). Regenerate with")
-    w("`python3 analysis/shelby_network_evidence.py`. These are measured values from")
-    w("the running network, not model outputs.")
+    w(f"Snapshot: {a['fetched_at']} (Early Access testnet, via the indexer that")
+    w("backed lilyshark.vercel.app). Regenerate with")
+    w("`python3 analysis/shelby_network_evidence.py --offline` for the pinned")
+    w("fixture. These are historical indexer counters, not current network")
+    w("metrics or independently audited storage and payment records.")
     w("")
-    w("## The network is real and economically active")
+    w("> Shelby's [current network documentation](https://docs.shelby.xyz/protocol/architecture/networks)")
+    w("> describes a developer prototype that can be reset. Transaction and")
+    w("> activity counts below do not establish durable retrieval, user demand,")
+    w("> a production economy, or Lilyshark gateway compensation.")
+    w("")
+    w("## What the indexer reported at the snapshot time")
     w("")
     w("| Measure | Value |")
     w("| --- | ---: |")
@@ -128,16 +133,15 @@ def build_report(a: dict[str, object]) -> str:
     w(f"| ShelbyUSD volume (24 h) | {a['volume_24h_shelbyusd']:,.2f} |")
     w(f"| Average transaction | {a['avg_tx_shelbyusd']:.3f} ShelbyUSD |")
     w("")
-    w("A storage network with payment rails that are already exercised millions of")
-    w("times is what the capture archive and the off-grid pointer need: not a")
-    w("promise of infrastructure, but running infrastructure.")
+    w("These counters describe activity in one prototype environment at one")
+    w("date. They do not establish who paid whom or whether old blobs still resolve.")
     w("")
-    w("## The network's average object is already capture-sized")
+    w("## The snapshot's average object was capture-sized")
     w("")
-    w(f"The average blob on Shelby today is **{a['avg_blob_kb']:,.0f} KB**. A Lilyshark")
+    w(f"The average blob in this snapshot was **{a['avg_blob_kb']:,.0f} KB**. A Lilyshark")
     w(f"field-session capture is ~{SESSION_CAPTURE_KB} KB; the demo capture in this")
     w(f"repo is {SAMPLE_CAPTURE_BYTES / 1000:.1f} KB. Captures are not an unusual")
-    w("object for this network — they sit squarely in its existing workload:")
+    w("object for that recorded workload:")
     w("")
     w("| Content type | Blobs | GB stored | Share | Avg size |")
     w("| --- | ---: | ---: | ---: | ---: |")
@@ -147,24 +151,22 @@ def build_report(a: dict[str, object]) -> str:
             f"{trow['share']:.1f}% | {trow['avg_kb']:,.0f} KB |"
         )
     w("")
-    w(f"Each blob also accrues ~{a['activities_per_blob']:.0f} activity records — the")
-    w("write-once, act-on-repeatedly pattern of an archive that gets read, shared,")
-    w("and referenced, which is the pattern Shelby's serving compensation rewards.")
+    w(f"The indexer counted ~{a['activities_per_blob']:.0f} activity records per blob.")
+    w("That count alone does not show distinct readers, useful retrievals, or")
+    w("compensation to serving gateways.")
     w("")
     w("![Average blob size by content type vs a capture](chart_blob_sizes.svg)")
     w("")
-    w("## What this supports")
+    w("## What this does and does not support")
     w("")
-    w("- **Captures belong here.** Immutable, content-addressed, retrievable by")
-    w("  name — and the network's median workload is already objects of this size")
-    w("  and access pattern.")
-    w("- **The 82-byte pointer references something real.** A pointer names a blob")
-    w("  on a network that provably holds hundreds of thousands of them and meters")
-    w("  their movement in a live unit of account.")
-    w("- **Serving is measured.** The `blob_activities` indexer ("
+    w("- The prototype indexer reported objects of roughly capture size.")
+    w("  Size compatibility is useful for a design test, not a storage SLA.")
+    w("- The 82-byte pointer can name a content-committed blob. Test current")
+    w("  resolution and retention before relying on it for field evidence.")
+    w("- The `blob_activities` indexer ("
       f"{a['activities']:,} records) is")
-    w("  the raw material for paying gateways that resolve pointers — the work the")
-    w("  grant would fund is instrumentable end to end.")
+    w("  a possible input to a future serving audit; it is not proof that")
+    w("  Lilyshark gateways were paid.")
     w("")
     return "\n".join(lines)
 

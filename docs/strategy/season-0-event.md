@@ -45,6 +45,8 @@ Score weighted toward previously unsurveyed cells: the
 [most-wanted list](../../scripts/field_receipts_score.py) (`most-wanted
 --markdown`) is published at the start, and it names where the gaps are.
 Flightradar24's most-wanted receiver map, applied to LoRa.
+The checked-in [example list](../most-wanted.md) uses synthetic fixtures and
+must not be used as a real route or event target.
 
 ## Entry rules
 

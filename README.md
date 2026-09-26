@@ -9,7 +9,7 @@
   <a href="#project-status"><img alt="Status: developer alpha" src="https://img.shields.io/badge/status-developer%20alpha-FF4F9D"></a>
   <a href="#target-hardware"><img alt="Target: LILYGO T-Deck" src="https://img.shields.io/badge/target-LILYGO%20T--Deck-66F05A"></a>
   <a href="https://lvgl.io/"><img alt="LVGL 9.3" src="https://img.shields.io/badge/LVGL-9.3-71D8DF"></a>
-  <a href="docs/most-wanted.md"><img alt="Most-Wanted Cells" src="https://img.shields.io/badge/cells-most--wanted-FF4F9D"></a>
+  <a href="docs/most-wanted.md"><img alt="Sample Most-Wanted Cells" src="https://img.shields.io/badge/cells-sample%20only-FF4F9D"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-F0F4EF"></a>
 </p>
 
@@ -77,7 +77,7 @@ a native app that carries the same mesh onto a phone, a Mac and a watch.
 | | Where | What it does |
 | --- | --- | --- |
 | **Firmware** | `src/`, `include/` | Captures LoRa frames off the SX1262 with their radio measurements. Writes `.lscap` and LoRaTap PCAP to microSD. |
-| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app. **TRAFFIC** opens captures Wireshark-style — frame list, decoded RF metadata, hex dump, statistics, inline Shelby-pointer decode. **SNIFFER** adds a protocol dissection tree whose rows highlight the bytes they came from, and exports the capture as LoRaTap PCAP, CSV or JSON. **SPECTRUM** draws a live waterfall from sweeps the deck streams up the cable. CHAT/NODES/MAP/MESH/TELEMETRY drive a real radio over USB or Bluetooth. It installs as an offline app: once loaded, it opens with no internet at all, which is the point for an instrument whose network does not need one. Without a radio attached it seeds an explicitly synthetic demo mesh, labelled as such. |
+| **Analyzer** | [`webapp/`](webapp/) — live at **[lilyshark.com](https://lilyshark.com)** | A terminal-style web app. **TRAFFIC** opens captures with a frame list, RF metadata, hex dump, statistics, Shelby-pointer decode, and a guarded two-capture comparison. **SNIFFER** adds a protocol dissection tree and exports LoRaTap PCAP, CSV, or JSON. **SPECTRUM** draws sweeps from a USB-linked deck. Mesh conversation uses supported radio transports; the LSK analyzer Bluetooth option remains disabled pending physical validation. The app opens with no capture or radio data until one is connected or an explicitly labelled sample or simulation is selected. Local capture inspection works offline after installation; remote feeds require internet. |
 | **App** | [`ios/`](ios/) | A native iOS, macOS and watchOS client, built on [PommeCore](https://github.com/mbedworth/PommeCore) (Apache 2.0, by Michael P. Bedworth) with a `MeshtasticKit` package added beside its MeshCore one. It exists because Apple does not permit Web Bluetooth, so lilyshark.com can never reach a deck from an iPhone — and it brings a real macOS client with it. Build it with `./scripts/build_ios.sh`. |
 
 Try it without a radio: open [lilyshark.com](https://lilyshark.com), press **SAMPLE** on the TRAFFIC screen, and select frame 9 — it carries a Shelby pointer, decoded inline.
@@ -463,17 +463,12 @@ that cannot be sealed still goes out under the channel key — a message nobody
 can open would be worse than one the channel can read.
 
 A **channel key** somebody gives you is different: it makes their traffic
-readable, and it must not make you loud. So a frame opened with a stored key is
-never acknowledged on the public channel (the acknowledgement would be sealed
-with the default key, announcing both that you hold the key and which packet you
-just read), it is not forwarded to a paired phone (that API has no field to say
-which key opened it, so the message would arrive looking public), and it appears
-on MESSAGES rather than in CHAT — because CHAT has a Send button and a reply
-would go out publicly into a conversation you believed was private.
-
-That last rule holds until the deck can transmit sealed with a stored key. The
-comment in the code says so, and names itself as the thing that changes when it
-can.
+readable, and it must not make a private reply public. The deck can answer on
+the stored key's channel when its name and header hash agree, and it refuses
+to send a public-key acknowledgement for a frame opened by a stored key.
+Stored-key plaintext is not forwarded to the paired phone: that API cannot
+label which key opened it. The key and channel boundaries are detailed in
+[channel key security](docs/channel-key-security.md).
 
 ## Protocol coverage
 
@@ -481,14 +476,14 @@ Decoding is profile-gated because these LoRa protocols do not all carry an unamb
 
 | Protocol | Included profiles | Fields decoded today | Current boundary |
 | --- | --- | --- | --- |
-| **Meshtastic** | US LongFast, 906.875 MHz, 250 kHz, SF11, CR 4/5 | Outer header, source, destination, packet ID, channel hash/hint, hop limit/start, next hop, relay byte, broadcast/ACK/MQTT flags | Protobuf payload stays opaque. The outer header alone does not prove whether it is clear or encrypted; channel keys and payload decryption are not implemented. |
-| **MeshCore** | Current US recommendation at 910.525 MHz/62.5 kHz/SF7; legacy 915 MHz/250 kHz/SF10 | Version 1 route type, payload type, encoded path shape, transport codes, group channel, ACK checksum, structural length validation | Protected direct, group, and anonymous payloads stay opaque. Advertisement bodies are not expanded into contacts. |
+| **Meshtastic** | US LongFast, 906.875 MHz, 250 kHz, SF11, CR 4/5 | Outer header, source, destination, packet ID, channel hash/hint, hop limit/start, next hop, relay byte, broadcast/ACK/MQTT flags; supported default-channel and stored-key payloads | A channel without its key remains opaque. The T-Deck supports stored 16-byte channel keys; see [key security](docs/channel-key-security.md). |
+| **MeshCore** | Current US recommendation at 910.525 MHz/62.5 kHz/SF7; legacy 915 MHz/250 kHz/SF10 | Version 1 route type, payload type, encoded path shape, transport codes, group channel, ACK checksum, structural length validation; supported advertisement fields in the web dissector | Protected direct, group, and anonymous payloads stay opaque. Live over-air validation remains pending. |
 | **Reticulum / RNode** | Documented EU example at 867.2 MHz plus a tunable 915 MHz US starting point, both 125 kHz/SF8 | RNode shim, split marker, Reticulum header type, packet and destination type, context, hops, hash prefixes, outer-header protection marker. LXMF messages that were never encrypted are read out of the payload: destination and source hashes, timestamp, title, body, and a count of structured fields | RNode PHY settings are deployment-defined. IFAC-marked content stays opaque and unverified without an interface key. LXMF to a SINGLE destination is encrypted end to end and stays that way. The included profiles are starting points, not universal Reticulum channels. |
 | **Unknown LoRa** | User code can add `RadioProfile` entries | Raw frame, integrity state, and all RF metadata supplied by the radio | No protocol labels are invented. The frame is still inspectable and exportable. |
 
 The decoder API preserves uncertainty. MeshCore transport codes are not presented as node IDs, and Reticulum's 32-bit hash prefixes are not presented as complete identities.
 
-No decoder here attacks a cipher. Two payload formats are readable because of what they are, not because anything was broken: a Meshtastic channel using the published default key, which every radio ships with, and an LXMF message sent to a destination type that carries no encryption. Both give up the moment the bytes stop parsing, because noise must never be presented as a message. A real PSK, and an LXMF message to a SINGLE destination, stay opaque -- exactly as they should.
+No decoder here attacks a cipher. A Meshtastic channel using the published default key is readable because that key is public; an operator-supplied supported channel key can decode its own channel. LXMF sent in an unencrypted form can also be read. Parsing must succeed before bytes are presented as a message. Channels without their keys and LXMF messages to a SINGLE destination remain opaque.
 
 ### Built-in PHY profiles
 
@@ -898,7 +893,7 @@ The standalone C++ tests compile with warnings as errors and run under AddressSa
 - [ ] Calibrate touch orientation, battery voltage, and spectral power against known references.
 - [ ] Exercise scan cancellation, SD removal, CRC bursts, missing peripherals, and radio recovery.
 - [ ] Run an overnight capture and spectrum endurance test on hardware.
-- [ ] Add sync-word/preamble editing, key management, deeper payload decoders, and more regional presets.
+- [ ] Add sync-word/preamble editing, broader key support, deeper payload decoders, and more regional presets.
 - [ ] Publish a hardware-validated tagged release with checksums and a field-test report.
 
 ## Documentation
