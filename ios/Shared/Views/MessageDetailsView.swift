@@ -33,12 +33,18 @@ struct MessageDeliveryButton: View {
         Button(action: action) {
             Label(evidence.shortTitle(conversation: conversation), systemImage: evidence.symbol)
                 .font(.caption)
-                .foregroundStyle(evidence.canRetry ? MeshTheme.disconnected : MeshTheme.accent)
+                .foregroundStyle(evidence.canRetry ? MeshTheme.disconnected : MeshTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+                // A full 44pt target that does not stand the footer 44pt
+                // tall: the hit area grows, then the layout gives it back.
+                .frame(minWidth: Design.minimumTouchTarget)
+                .padding(.vertical, 12)
                 .contentShape(Rectangle())
-                .touchable()
+                .padding(.vertical, -12)
         }
-        .buttonStyle(.meshPlain)
+        // Not .meshPlain: that style stands every label 44pt tall, and the
+        // footer under each message would be a 44pt band.
+        .buttonStyle(.plain)
         .accessibilityLabel("Message details: \(evidence.shortTitle(conversation: conversation))")
         .accessibilityHint("Explains the radio's report for this message")
     }

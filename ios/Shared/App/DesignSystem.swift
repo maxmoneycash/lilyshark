@@ -134,6 +134,10 @@ enum Design {
 
         var scale: CGFloat = 0.96
 
+        init(scale: CGFloat = 0.96) {
+            self.scale = scale
+        }
+
         func makeBody(configuration: Configuration) -> some View {
             configuration.label
                 // Scale only. No opacity change: a control that dims under

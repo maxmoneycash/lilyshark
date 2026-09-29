@@ -97,6 +97,7 @@
 		8EF971496F064F1AD761B796 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21606E2B959E6496D3B0230D /* ContactListView.swift */; };
 		9144822AD9EB38340AF2317E /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFFE2BF3488F0C0647632CD /* ChatView.swift */; };
 		96059FF0363E830C376C23ED /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		02FB726918434CEA9EF26A89 /* GlassChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9CC9B3B2174B9DB5761E39 /* GlassChat.swift */; };
 		D7FC5192647A41ECAFB6E1ED /* PommeCoreViewModel+SavedRadio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */; };
 		EFDC1F9606464307ACBB8EAF /* MapNodeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484BC111565E46B88FC48CC7 /* MapNodeViews.swift */; };
 		412FBCF2589A4D2ABBDFCA6D /* MessageDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */; };
@@ -136,6 +137,7 @@
 		A3B4C5D6E7F8A9B0C1D2E3F4 /* NavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */; };
 		A3C4EC30F51CEF0E73260DD5 /* RadioPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E616344CEDCD1ADC41548B7 /* RadioPreset.swift */; };
 		A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		90068BD86DBD49829C4F4A30 /* GlassChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9CC9B3B2174B9DB5761E39 /* GlassChat.swift */; };
 		BD421F7191324A26BA372D68 /* PommeCoreViewModel+SavedRadio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */; };
 		50D95B7C4E6F450FA327B959 /* MapNodeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484BC111565E46B88FC48CC7 /* MapNodeViews.swift */; };
 		394BE77F241D477E9243EA47 /* MessageDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */; };
@@ -177,6 +179,7 @@
 		BD93571403214ED79B2F4D15 /* pulse.caf in Resources */ = {isa = PBXBuildFile; fileRef = A6CD3768D637428BAC0630D8 /* pulse.caf */; };
 		C3D4E5F60718293AB4C5D6E7 /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* ShareView.swift */; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* ContactRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* ContactRowView.swift */; };
+		652D5AAF3E194A65A1BE8750 /* InboxRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6924DA7EE7F412CB2A39E45 /* InboxRows.swift */; };
 		C9CEA8D3714859C1177D7704 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21606E2B959E6496D3B0230D /* ContactListView.swift */; };
 		CATKUXG25PTVMENJWXQZY49X /* RemoteManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LP9PDGZGN1LKSGLAB8EQ67PF /* RemoteManagementView.swift */; };
 		CLA10000000100000000002 /* ContactListView+ContactActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLA10000000000000000000 /* ContactListView+ContactActions.swift */; };
@@ -194,6 +197,7 @@
 		D0850BE9C3F24035AFC8E789 /* chime.caf in Resources */ = {isa = PBXBuildFile; fileRef = 6F287F4DDB0C464C99076282 /* chime.caf */; };
 		D3633106D9031C89E0589468 /* PommeCoreViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FBBD4DD1E3CAFDF4D56504 /* PommeCoreViewModel.swift */; };
 		D4E5F6A7B8C9D0E1F2A3B4C5 /* ContactRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* ContactRowView.swift */; };
+		4609988C4C794E0A89DEED2C /* InboxRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6924DA7EE7F412CB2A39E45 /* InboxRows.swift */; };
 		D5EA89B86D044DD69287E9D0 /* pulse.caf in Resources */ = {isa = PBXBuildFile; fileRef = A6CD3768D637428BAC0630D8 /* pulse.caf */; };
 		DBG10000000000000000002 /* DebugLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBG10000000000000000000 /* DebugLogView.swift */; };
 		DBG10000000000000000003 /* DebugLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBG10000000000000000000 /* DebugLogView.swift */; };
@@ -211,6 +215,7 @@
 		TDKBLD0000000000000001 /* TDeck in Resources */ = {isa = PBXBuildFile; fileRef = TDKREF0000000000000001 /* TDeck */; };
 		TDKBLD0000000000000002 /* TDeck in Resources */ = {isa = PBXBuildFile; fileRef = TDKREF0000000000000001 /* TDeck */; };
 		FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6BA0593D517B1467DBC1C42 /* Theme.swift */; };
+		682D590BD788454F952A5CD0 /* GlassChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9CC9B3B2174B9DB5761E39 /* GlassChat.swift */; };
 		11C7B429BD364CB6AACE6AE3 /* PommeCoreViewModel+SavedRadio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */; };
 		BE27CC3474FC408DA4CFF16C /* MapNodeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484BC111565E46B88FC48CC7 /* MapNodeViews.swift */; };
 		D028BD3988DE4BE8819EEED6 /* MessageDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */; };
@@ -422,6 +427,7 @@
 		9B4226DA6FB1C6225C757D16 /* WatchUnlockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchUnlockManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5C /* ShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* ContactRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactRowView.swift; sourceTree = "<group>"; };
+		C6924DA7EE7F412CB2A39E45 /* InboxRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/InboxRows.swift"; sourceTree = SOURCE_ROOT; };
 		A259126AAB80661010C6A336 /* PommeCoreApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PommeCoreApp.swift; sourceTree = "<group>"; };
 		A6CD3768D637428BAC0630D8 /* pulse.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = pulse.caf; sourceTree = "<group>"; };
 		AE9677D40F85F6D31BD8C43C /* PommeCore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PommeCore.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -440,6 +446,7 @@
 		E09A1F63605E4CA4ACDE7634 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* NavigationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStore.swift; sourceTree = "<group>"; };
 		F6BA0593D517B1467DBC1C42 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		ED9CC9B3B2174B9DB5761E39 /* GlassChat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/GlassChat.swift"; sourceTree = SOURCE_ROOT; };
 		88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/ViewModels/PommeCoreViewModel+SavedRadio.swift"; sourceTree = SOURCE_ROOT; };
 		484BC111565E46B88FC48CC7 /* MapNodeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MapNodeViews.swift"; sourceTree = SOURCE_ROOT; };
 		3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MessageDetailsView.swift"; sourceTree = SOURCE_ROOT; };
@@ -653,6 +660,7 @@
 				CLU10000000000000000000 /* ContactListView+ContactsUI.swift */,
 				CLA10000000000000000000 /* ContactListView+ContactActions.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* ContactRowView.swift */,
+				C6924DA7EE7F412CB2A39E45 /* InboxRows.swift */,
 				2377BED4FF5A7170783BA649 /* DeviceScannerView.swift */,
 				5D859AE9C98610F71C2FBAAF /* SettingsView.swift */,
 				SVS10000000000000000000 /* SettingsView+Sections.swift */,
@@ -798,6 +806,7 @@
 			children = (
 				A259126AAB80661010C6A336 /* PommeCoreApp.swift */,
 				F6BA0593D517B1467DBC1C42 /* Theme.swift */,
+				ED9CC9B3B2174B9DB5761E39 /* GlassChat.swift */,
 				88C7CAB7903040D2B318073D /* PommeCoreViewModel+SavedRadio.swift */,
 				484BC111565E46B88FC48CC7 /* MapNodeViews.swift */,
 				3E9CC72C686B4933B61497EF /* MessageDetailsView.swift */,
@@ -1111,6 +1120,7 @@
 			files = (
 				894905739E99B7E425A27485 /* PommeCoreApp.swift in Sources */,
 				A81875C1B0A1226A9333AFCF /* Theme.swift in Sources */,
+				90068BD86DBD49829C4F4A30 /* GlassChat.swift in Sources */,
 				BD421F7191324A26BA372D68 /* PommeCoreViewModel+SavedRadio.swift in Sources */,
 				50D95B7C4E6F450FA327B959 /* MapNodeViews.swift in Sources */,
 				394BE77F241D477E9243EA47 /* MessageDetailsView.swift in Sources */,
@@ -1172,6 +1182,7 @@
 				OTASVC00000001000000002 /* Services/FirmwareOTAService.swift in Sources */,
 				LNK10000000000000000001 /* Services/LinkPreviewService.swift in Sources */,
 				D4E5F6A7B8C9D0E1F2A3B4C5 /* ContactRowView.swift in Sources */,
+				4609988C4C794E0A89DEED2C /* InboxRows.swift in Sources */,
 				B4C5D6E7F8A9B0C1D2E3F4A5 /* NavigationStore.swift in Sources */,
 				18B6F45B61F3581FB64D1DB0 /* DeviceScannerView.swift in Sources */,
 				F466BDEE333B5D296E925DA5 /* PommeCoreApp.swift in Sources */,
@@ -1186,6 +1197,7 @@
 				SVT10000000100000000002 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000002 /* SettingsView+Editors.swift in Sources */,
 				96059FF0363E830C376C23ED /* Theme.swift in Sources */,
+				02FB726918434CEA9EF26A89 /* GlassChat.swift in Sources */,
 				D7FC5192647A41ECAFB6E1ED /* PommeCoreViewModel+SavedRadio.swift in Sources */,
 				EFDC1F9606464307ACBB8EAF /* MapNodeViews.swift in Sources */,
 				412FBCF2589A4D2ABBDFCA6D /* MessageDetailsView.swift in Sources */,
@@ -1297,6 +1309,7 @@
 				OTASVC00000001000000003 /* Services/FirmwareOTAService.swift in Sources */,
 				LNK10000000000000000002 /* Services/LinkPreviewService.swift in Sources */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* ContactRowView.swift in Sources */,
+				652D5AAF3E194A65A1BE8750 /* InboxRows.swift in Sources */,
 				A3B4C5D6E7F8A9B0C1D2E3F4 /* NavigationStore.swift in Sources */,
 				9A92FFC5BE2A781BEC80720C /* DeviceScannerView.swift in Sources */,
 				57D771A61E08BB1991C80DE6 /* PommeCoreApp.swift in Sources */,
@@ -1311,6 +1324,7 @@
 				SVT10000000100000000003 /* SettingsView+TipJar.swift in Sources */,
 				SVE10000000100000000003 /* SettingsView+Editors.swift in Sources */,
 				FAA4FA7E3E52FCF631D55675 /* Theme.swift in Sources */,
+				682D590BD788454F952A5CD0 /* GlassChat.swift in Sources */,
 				11C7B429BD364CB6AACE6AE3 /* PommeCoreViewModel+SavedRadio.swift in Sources */,
 				BE27CC3474FC408DA4CFF16C /* MapNodeViews.swift in Sources */,
 				D028BD3988DE4BE8819EEED6 /* MessageDetailsView.swift in Sources */,

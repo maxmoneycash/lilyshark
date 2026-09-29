@@ -26,6 +26,9 @@ extension Notification.Name {
 
 struct ChatView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @State private var followsLatest = true
     @State private var hasPositionedInitially = false
     @State private var isVisible = false
@@ -82,6 +85,13 @@ struct ChatView: View {
         let fmt = RelativeDateTimeFormatter()
         fmt.unitsStyle = .abbreviated
         return fmt.localizedString(for: date, relativeTo: Date())
+    }
+
+    /// Astra's presence dot: heard within the last quarter hour.
+    private var isRecentlyHeard: Bool {
+        _ = refreshTick
+        let heard = TimeInterval(contactStore.nodeObservations[liveContact.publicKeyPrefix]?.lastHeard ?? liveContact.lastAdvert)
+        return heard > 1_000_000_000 && Date().timeIntervalSince1970 - heard < 15 * 60
     }
 
     private var toolbarName: (text: String, font: Font) {
@@ -142,11 +152,11 @@ struct ChatView: View {
                 .accessibilityLabel("Clear message search")
             }
         }
-        .padding(8)
-        .background(MeshTheme.surfaceLight)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Design.Space.regular)
+        .frame(minHeight: Design.minimumTouchTarget)
+        .chatGlass(Capsule())
+        .padding(.horizontal, Design.Space.regular)
+        .padding(.vertical, Design.Space.hairline)
     }
 
     var body: some View {
@@ -158,13 +168,15 @@ struct ChatView: View {
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 0) {
-                    Divider()
-                        .overlay(MeshTheme.surfaceLight)
-                    messageInput
-                }
+                messageInput
             }
         .onReceive(refreshTimer) { refreshTick = $0 }
+        #if os(iOS)
+        // The conversation takes the whole screen on a phone, as in Messages:
+        // the floating composer is the bottom of the page. A regular-width
+        // split view keeps its tabs.
+        .toolbar(horizontalSizeClass == .compact ? .hidden : .automatic, for: .tabBar)
+        #endif
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #else
@@ -174,20 +186,23 @@ struct ChatView: View {
         .toolbar {
             #if os(iOS)
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 1) {
-                    Text(toolbarName.text)
-                        .font(toolbarName.font)
-                        .foregroundStyle(MeshTheme.textPrimary)
-                        .lineLimit(1)
-                    HStack(spacing: 4) {
-                        Text(routeLabel)
-                            .font(.caption2)
-                            .foregroundStyle(routeColor)
-                        if let lastSeen = lastSeenText {
-                            Text("\u{2022}").font(.caption2).foregroundStyle(MeshTheme.textSecondary)
-                            Text(lastSeen)
+                HStack(spacing: Design.Space.tight) {
+                    NodeOrb(seed: contact.publicKey, title: toolbarName.text, size: 34, isRecentlyHeard: isRecentlyHeard)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(toolbarName.text)
+                            .font(toolbarName.font)
+                            .foregroundStyle(MeshTheme.textPrimary)
+                            .lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(routeLabel)
                                 .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
+                                .foregroundStyle(routeColor)
+                            if let lastSeen = lastSeenText {
+                                Text("\u{2022}").font(.caption2).foregroundStyle(MeshTheme.textSecondary)
+                                Text(lastSeen)
+                                    .font(.caption2)
+                                    .foregroundStyle(MeshTheme.textSecondary)
+                            }
                         }
                     }
                 }
@@ -403,7 +418,7 @@ struct ChatView: View {
                     ContentUnavailableView("Start a conversation", systemImage: "bubble.left.and.bubble.right",
                                            description: Text("Messages you send and receive with this contact will appear here."))
                 }
-                LazyVStack(spacing: 4) {
+                LazyVStack(spacing: 0) {
                     if !searchText.isEmpty {
                         Text("^[\(displayedMessages.count) result](inflect: true)")
                             .font(.caption2)
@@ -419,6 +434,8 @@ struct ChatView: View {
                         }
                         MessageBubble(
                             message: message,
+                            run: .of(index, in: displayedMessages, isOutgoing: \.isOutgoing, timestamp: \.timestamp),
+                            peer: NodeOrb(seed: contact.publicKey, title: toolbarName.text, size: ChatGlass.bubbleOrb),
                             onQuote: { quotedMessage = $0 },
                             onReact: { msg, emoji in
                                 messageStoreManager.addReaction(emoji, to: msg)
@@ -429,12 +446,12 @@ struct ChatView: View {
                             }
                         )
                             .id(message.id)
-                            .transition(.opacity)
+                            .transition(.bubbleArrival(isOutgoing: message.isOutgoing))
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .meshAnimation(Design.Motion.quick, value: messages.last?.id)
+                .padding(.horizontal, Design.Space.regular)
+                .padding(.vertical, Design.Space.tight)
+                .meshAnimation(ChatGlass.arrival, value: messages.last?.id)
             }
             .chatScrollTracking(followsLatest: $followsLatest)
             #if !os(watchOS)
@@ -452,12 +469,13 @@ struct ChatView: View {
                     } label: {
                         Label("Latest messages", systemImage: "arrow.down")
                             .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal)
+                            .foregroundStyle(MeshTheme.textPrimary)
+                            .padding(.horizontal, Design.Space.regular)
                             .touchable()
+                            .chatGlass(Capsule(), interactive: true)
                     }
-                    .buttonStyle(.meshSecondary)
-                    .background(.regularMaterial, in: Capsule())
-                    .padding(.bottom, 8)
+                    .buttonStyle(.pressable)
+                    .padding(.bottom, Design.Space.tight)
                     .transition(.opacity)
                 }
             }
@@ -522,8 +540,8 @@ struct ChatView: View {
     }
 
     private var messageInput: some View {
-        VStack(spacing: 4) {
-            // Quote preview bar
+        VStack(spacing: 0) {
+            // The quote being replied to, on glass above the composer.
             if let quoted = quotedMessage {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -546,21 +564,33 @@ struct ChatView: View {
                 }
                 .padding(.leading, 11)
                 .overlay(alignment: .leading) {
-                    Rectangle().fill(MeshTheme.accent).frame(width: 3)
+                    Capsule().fill(MeshTheme.brandPink.opacity(0.7)).frame(width: 3)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(MeshTheme.surfaceLight)
+                .padding(.leading, Design.Space.regular)
+                .padding(.trailing, Design.Space.hairline)
+                .padding(.vertical, Design.Space.tight)
+                .chatGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .padding(.horizontal, Design.Space.regular)
+                .padding(.top, Design.Space.tight)
+                .transition(.opacity)
             }
             MessageComposer(
                 text: $messageText,
                 budget: MessageTextBudget(outgoingText, limit: messageStoreManager.messageByteLimit),
                 isConnected: messageStoreManager.canSendMessages,
+                shareLocation: shareLocationAction,
                 connect: { connectionManager.requestShowScanner = true },
                 send: send
             )
         }
-        .background(MeshTheme.surface)
+    }
+
+    private var shareLocationAction: (() -> Void)? {
+        #if os(watchOS)
+        nil
+        #else
+        sendLocationAsDM
+        #endif
     }
 
     private var outgoingText: String {

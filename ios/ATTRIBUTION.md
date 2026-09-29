@@ -80,3 +80,16 @@ takes a sibling protocol module rather than a change to this one. The wire
 format for that module is not guesswork: it is implemented and byte-tested on
 both sides already, in `src/core/meshtastic_api.cpp` on the firmware and
 `webapp/src/mesh/meshtasticProto.ts` in the browser.
+
+## The chat's Liquid Glass design
+
+The conversation screens, the phone inbox and the composer follow Cookbook 2
+("Astra") of **Liquid Glass Chat UI** by Appllama,
+https://github.com/Appllama/liquid-glass-chat-ui, MIT licensed. That project
+is React Native, so none of its code is in this app. What was carried over is
+its design: bubble shapes and tints, padding, the floating glass composer,
+the search field and filter chips, the list row, and the spring values in its
+`docs/MOTION_SPEC.md`. Each borrowed number is quoted beside its use in
+`Shared/Views/GlassChat.swift` and `Shared/Views/InboxRows.swift`. None of its
+artwork, sample people or branding is used: mesh nodes have no photographs, so
+their portraits are glass marbles tinted from each node's public key.

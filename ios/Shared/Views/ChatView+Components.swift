@@ -16,6 +16,11 @@ import MeshCoreKit
 
 struct MessageBubble: View {
     let message: Message
+    /// Where this message sits in its run. Only a run's end shows the time,
+    /// the delivery state, and the other person's orb.
+    var run = ChatRunPosition()
+    /// The other person, shown beside the end of their runs.
+    var peer: NodeOrb?
     var onQuote: ((Message) -> Void)?
     var onReact: ((Message, String) -> Void)?
     var onForward: ((Message) -> Void)?
@@ -79,10 +84,16 @@ struct MessageBubble: View {
         return message.text
     }
 
+    private var bodyText: String { quotedText != nil ? replyText : message.interfaceText }
+
+    private var hasSignalReport: Bool { !message.isOutgoing && (message.hops != nil || message.snr != nil) }
+
+    private func showDetails() {
+        messageDetails = MessageDetailsSelection(message: message, conversation: .direct, store: messageStoreManager)
+    }
+
     @ViewBuilder private var messageActions: some View {
-        Button {
-            messageDetails = MessageDetailsSelection(message: message, conversation: .direct, store: messageStoreManager)
-        } label: {
+        Button(action: showDetails) {
             Label("Message details", systemImage: "info.circle")
         }
         Button {
@@ -113,6 +124,11 @@ struct MessageBubble: View {
         } label: {
             Label("Forward", systemImage: "arrowshape.turn.up.right")
         }
+        if hasSignalReport {
+            Button { showPathSheet = true } label: {
+                Label("Signal path", systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+            }
+        }
         if message.isOutgoing && message.status == .failed {
             Button {
                 messageStoreManager.retryMessage(message)
@@ -130,150 +146,74 @@ struct MessageBubble: View {
     }
 
     var body: some View {
-        HStack {
-            if message.isOutgoing { Spacer(minLength: 48) }
-
-            VStack(alignment: message.isOutgoing ? .trailing : .leading, spacing: 2) {
-                ZStack(alignment: message.isOutgoing ? .topLeading : .topTrailing) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        // Quoted text block
-                        if let quoted = quotedText {
-                            Text(quoted)
-                                .font(.caption)
-                                .foregroundStyle(MeshTheme.textOnAccent.opacity(0.7))
-                                .lineLimit(2)
-                                .padding(.leading, 8)
-                                .overlay(alignment: .leading) {
-                                    Rectangle().fill(MeshTheme.accent.opacity(0.6)).frame(width: 2)
-                                }
-                            .padding(.bottom, 2)
-                            .accessibilityLabel("Quoted: \(quoted)")
-                        }
-                        // Message text
-                        linkifyMeshcoreURLs(quotedText != nil ? replyText : message.interfaceText)
-                            .textSelection(.enabled)
-
-                        // Link preview
-                        if let meta = linkMetadata, meta.title != nil {
-                            LinkPreviewCard(metadata: meta)
-                        }
-
-                        // Shared coordinates render as a tappable map card
-                        if let coord = detectCoordinate(in: quotedText != nil ? replyText : message.interfaceText) {
-                            MessageMapCard(coordinate: coord)
-                        }
-                    }
-                    // The message is the product, and it was the smallest
-                    // text on the screen -- 15pt in a 9pt-tall bubble, which
-                    // is the size of a caption. Sized from Design now, so a
-                    // message read at arm's length outdoors does not need a
-                    // second look.
-                    .font(Design.Text.message)
-                    .padding(.horizontal, Design.Space.regular)
-                    .padding(.vertical, Design.Space.snug)
-                    .background(message.isOutgoing ? MeshTheme.outgoingBubble : MeshTheme.incomingBubble)
-                    .foregroundStyle(MeshTheme.textOnAccent)
-                    // Continuous curvature, not a circular corner: at this
-                    // radius the difference is visible, and the squircle is
-                    // what every other rounded shape on iOS uses.
-                    .clipShape(RoundedRectangle(cornerRadius: Design.Radius.bubble, style: .continuous))
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(bubbleAccessibilityLabel)
-                    .padding(.top, message.reactions.isEmpty ? 0 : 22)
-
-                    if !message.reactions.isEmpty {
-                        ReactionBadge(reactions: message.reactions)
-                            .accessibilityHidden(true)
-                    }
-                }
-
-                MessageMetadataRow(isOutgoing: message.isOutgoing) {
-                    Text(message.timestamp, style: .time)
-                        .font(.caption2)
-                        .foregroundStyle(MeshTheme.textSecondary)
-
-                    if message.isOutgoing {
-                        MessageDeliveryButton(message: message, conversation: .direct) {
-                            messageDetails = MessageDetailsSelection(message: message, conversation: .direct, store: messageStoreManager)
-                        }
-                    }
-
-                    if !message.isOutgoing {
-                        if let hops = message.hops {
-                            Text("\u{2022}")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                            if hops == 0 || hops == 0xFF {
-                                Text(hops == 0 ? "direct" : "hops not reported")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.textSecondary)
-                            } else {
-                                Text("^[\(hops) hop](inflect: true)")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.textSecondary)
-                            }
-                        }
-                        if let snr = message.snr {
-                            Text("\u{2022}")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                            Text(formatSNR(snr))
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                        }
-                        if message.hops != nil || message.snr != nil {
-                            Button {
-                                showPathSheet = true
-                            } label: {
-                                Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.accent)
-                                    .touchable()
-                            }
-                            .buttonStyle(.meshPlain)
-                            .sheet(isPresented: $showPathSheet) {
-                                MessagePathSheet(message: message)
-                            }
-                            .accessibilityLabel("Show message path")
-                        }
-                    }
-
-                    if message.isSigned {
-                        HStack(spacing: 2) {
-                            Image(systemName: "checkmark.shield.fill")
-                                .font(.caption2)
-                            Text("Verified")
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(MeshTheme.connected)
-                    }
-
-                    Menu { messageActions } label: {
-                        Label("Message actions", systemImage: "ellipsis")
-                            .labelStyle(.iconOnly)
-                            .font(.caption)
-                            .touchable()
-                    }
-                    .buttonStyle(.meshPlain)
-                    .accessibilityLabel("Message actions")
-                }
-                .padding(.horizontal, 4)
-                .accessibilityElement(children: .contain)
-
-                if message.isOutgoing && message.status == .failed {
-                    MessageSendFailure(message: message)
-                }
+        ChatMessageRow(isOutgoing: message.isOutgoing, run: run, orb: peer, reactions: message.reactions) {
+            bubble
+        } footer: {
+            if run.endsRun || message.needsDeliveryFooter(acknowledged: true) { metadata }
+            if message.isOutgoing && message.status == .failed {
+                MessageSendFailure(message: message)
             }
-            .contentShape(Rectangle())
-
-            if !message.isOutgoing { Spacer(minLength: 48) }
         }
-        .contentShape(Rectangle())
-        .contextMenu { messageActions }
         .sheet(item: $messageDetails) { MessageDetailsView(selection: $0) }
+        .sheet(isPresented: $showPathSheet) { MessagePathSheet(message: message) }
         .task(id: message.id) {
             guard linkMetadata == nil, let url = firstHTTPURL(in: message.text) else { return }
             linkMetadata = await LinkPreviewService.shared.fetchMetadata(for: url)
+        }
+    }
+
+    // A long press opens the actions, as in Messages. The text is not
+    // selectable inside the bubble: selection claimed the same long press, so
+    // the menu was unreliable and needed a separate button on every message.
+    // Copy Text is in the menu.
+    private var bubble: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let quoted = quotedText {
+                Text(quoted)
+                    .font(.subheadline)
+                    .foregroundStyle(MeshTheme.textSecondary)
+                    .lineLimit(2)
+                    .padding(.leading, 10)
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(MeshTheme.brandPink.opacity(0.7)).frame(width: 3)
+                    }
+                    .padding(.bottom, 2)
+            }
+            linkifyMeshcoreURLs(bodyText)
+            if let meta = linkMetadata, meta.title != nil {
+                LinkPreviewCard(metadata: meta)
+            }
+            // Shared coordinates render as a tappable map card
+            if let coord = detectCoordinate(in: bodyText) {
+                MessageMapCard(coordinate: coord)
+            }
+        }
+        .chatBubble(isOutgoing: message.isOutgoing)
+        .contextMenu { messageActions }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(bubbleAccessibilityLabel)
+        .accessibilityAction(named: "Message details", showDetails)
+        .accessibilityAction(named: "Quote") { onQuote?(message) }
+        .accessibilityAction(named: "Copy text") { copyToClipboard(message.text) }
+        .accessibilityAction(named: "Forward") { onForward?(message) }
+    }
+
+    private var metadata: some View {
+        MessageMetadataRow(isOutgoing: message.isOutgoing) {
+            Text(message.timestamp, style: .time)
+            if message.isOutgoing {
+                MessageDeliveryButton(message: message, conversation: .direct, action: showDetails)
+            } else {
+                if let hops = message.hops {
+                    MetadataDot()
+                    hopSummary(hops)
+                }
+                if let snr = message.snr {
+                    MetadataDot()
+                    Text(formatSNR(snr))
+                }
+            }
+            if message.isSigned { VerifiedMark() }
         }
     }
 
@@ -292,8 +232,44 @@ struct MessageBubble: View {
 
 }
 
+extension Message {
+    /// Only the end of a run shows its footer, but every mesh message is
+    /// confirmed on its own. An outgoing message whose outcome is still open,
+    /// or went wrong, keeps its footer anywhere in a run, so a stuck message in
+    /// the middle is never hidden behind a later one that was delivered.
+    /// `acknowledged` conversations (direct, room) wait for the recipient's
+    /// ACK; a channel send is finished once the radio has sent it.
+    func needsDeliveryFooter(acknowledged: Bool) -> Bool {
+        guard isOutgoing else { return false }
+        switch status {
+        case .failed, .sending, .retrying, .flooding: return true
+        case .sent: return acknowledged
+        case .delivered, .repeated: return false
+        }
+    }
+}
+
+/// How far a received message came, in the words the footer uses.
+func hopSummary(_ hops: UInt8) -> Text {
+    switch hops {
+    case 0: Text("direct")
+    case 0xFF: Text("hops not reported")
+    default: Text("^[\(Int(hops)) hop](inflect: true)")
+    }
+}
+
+/// A signed message's mark in the footer.
+struct VerifiedMark: View {
+    var body: some View {
+        Label("Verified", systemImage: "checkmark.shield.fill")
+            .labelStyle(.titleAndIcon)
+            .foregroundStyle(MeshTheme.connected)
+    }
+}
+
 struct ChannelMessageBubble: View {
     let message: Message
+    var run = ChatRunPosition()
     @State private var messageDetails: MessageDetailsSelection?
     @Environment(ContactStore.self) private var contactStore
     @Environment(DeviceConfig.self) private var deviceConfig
@@ -306,10 +282,17 @@ struct ChannelMessageBubble: View {
         return highlightMentions(in: message.interfaceText, myName: deviceConfig.deviceName)
     }
 
+    private var senderName: String? {
+        guard !message.isOutgoing, let sender = message.senderName, !sender.isEmpty else { return nil }
+        return contactStore.channelSenderDisplayName(sender)
+    }
+
+    private func showDetails() {
+        messageDetails = MessageDetailsSelection(message: message, conversation: .channel, store: messageStoreManager)
+    }
+
     @ViewBuilder private var messageActions: some View {
-        Button {
-            messageDetails = MessageDetailsSelection(message: message, conversation: .channel, store: messageStoreManager)
-        } label: {
+        Button(action: showDetails) {
             Label("Message details", systemImage: "info.circle")
         }
         Button {
@@ -351,150 +334,59 @@ struct ChannelMessageBubble: View {
     }
 
     var body: some View {
-        HStack {
-            if message.isOutgoing { Spacer(minLength: 48) }
-
-            VStack(alignment: message.isOutgoing ? .trailing : .leading, spacing: 2) {
-                if !message.isOutgoing, let sender = message.senderName, !sender.isEmpty {
-                    Text(contactStore.channelSenderDisplayName(sender))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(MeshTheme.accent)
-                        .padding(.horizontal, 4)
-                        .accessibilityAddTraits(.isHeader)
-                }
-
-                ZStack(alignment: message.isOutgoing ? .topLeading : .topTrailing) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        highlightedText
-                            .textSelection(.enabled)
-
-                        // Shared coordinates render as a tappable map card
-                        if let coord = detectCoordinate(in: message.text) {
-                            MessageMapCard(coordinate: coord)
-                        }
-                    }
-                    // The message is the product, and it was the smallest
-                    // text on the screen -- 15pt in a 9pt-tall bubble, which
-                    // is the size of a caption. Sized from Design now, so a
-                    // message read at arm's length outdoors does not need a
-                    // second look.
-                    .font(Design.Text.message)
-                    .padding(.horizontal, Design.Space.regular)
-                    .padding(.vertical, Design.Space.snug)
-                    .background(message.isOutgoing ? MeshTheme.outgoingBubble : MeshTheme.incomingBubble)
-                    .foregroundStyle(MeshTheme.textOnAccent)
-                    // Continuous curvature, not a circular corner: at this
-                    // radius the difference is visible, and the squircle is
-                    // what every other rounded shape on iOS uses.
-                    .clipShape(RoundedRectangle(cornerRadius: Design.Radius.bubble, style: .continuous))
-                    .padding(.top, message.reactions.isEmpty ? 0 : 22)
-
-                    if !message.reactions.isEmpty {
-                        ReactionBadge(reactions: message.reactions)
-                    }
-                }
-
-                MessageMetadataRow(isOutgoing: message.isOutgoing) {
-                    Text(message.timestamp, style: .time)
-                        .font(.caption2)
-                        .foregroundStyle(MeshTheme.textSecondary)
-
-                    if message.isOutgoing {
-                        MessageDeliveryButton(message: message, conversation: .channel) {
-                            messageDetails = MessageDetailsSelection(message: message, conversation: .channel, store: messageStoreManager)
-                        }
-                    }
-
-                    if !message.isOutgoing {
-                        if let hops = message.hops {
-                            Text("\u{2022}")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                                .accessibilityHidden(true)
-                            if hops == 0 || hops == 0xFF {
-                                Text(hops == 0 ? "direct" : "hops not reported")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.textSecondary)
-                            } else {
-                                Text("^[\(hops) hop](inflect: true)")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.textSecondary)
-                            }
-                        }
-                        if let snr = message.snr {
-                            Text("\u{2022}")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                                .accessibilityHidden(true)
-                            Text(formatSNR(snr))
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                        }
-                    }
-
-                    if message.isSigned {
-                        HStack(spacing: 2) {
-                            Image(systemName: "checkmark.shield.fill")
-                                .font(.caption2)
-                            Text("Verified")
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(MeshTheme.connected)
-                    }
-
-                    Menu { messageActions } label: {
-                        Label("Message actions", systemImage: "ellipsis")
-                            .labelStyle(.iconOnly)
-                            .font(.caption)
-                            .touchable()
-                    }
-                    .buttonStyle(.meshPlain)
-                    .accessibilityLabel("Message actions")
-                }
-                .padding(.horizontal, 4)
-                if message.isOutgoing && message.status == .failed {
-                    MessageSendFailure(message: message)
+        ChatMessageRow(
+            isOutgoing: message.isOutgoing,
+            run: run,
+            // Every incoming channel message keeps the portrait column, so a
+            // message from someone the channel never named still lines up.
+            orb: message.isOutgoing ? nil : NodeOrb(name: senderName ?? "?", size: ChatGlass.bubbleOrb),
+            senderLabel: senderName,
+            reactions: message.reactions
+        ) {
+            VStack(alignment: .leading, spacing: 6) {
+                highlightedText
+                // Shared coordinates render as a tappable map card
+                if let coord = detectCoordinate(in: message.text) {
+                    MessageMapCard(coordinate: coord)
                 }
             }
-            .accessibilityElement(children: .contain)
-            .contentShape(Rectangle())
-
-            if !message.isOutgoing { Spacer(minLength: 48) }
+            .chatBubble(isOutgoing: message.isOutgoing)
+            .contextMenu { messageActions }
+            .accessibilityElement(children: .combine)
+            .accessibilityAction(named: "Message details", showDetails)
+            .accessibilityAction(named: "Copy text") { copyToClipboard(message.text) }
+        } footer: {
+            if run.endsRun || message.needsDeliveryFooter(acknowledged: false) {
+                MessageMetadataRow(isOutgoing: message.isOutgoing) {
+                    Text(message.timestamp, style: .time)
+                    if message.isOutgoing {
+                        MessageDeliveryButton(message: message, conversation: .channel, action: showDetails)
+                    } else {
+                        if let hops = message.hops {
+                            MetadataDot()
+                            hopSummary(hops)
+                        }
+                        if let snr = message.snr {
+                            MetadataDot()
+                            Text(formatSNR(snr))
+                        }
+                    }
+                    if message.isSigned { VerifiedMark() }
+                }
+            }
+            if message.isOutgoing && message.status == .failed {
+                MessageSendFailure(message: message)
+            }
         }
-        .contentShape(Rectangle())
-        .contextMenu { messageActions }
         .sheet(item: $messageDetails) { MessageDetailsView(selection: $0) }
     }
 }
 
-// MARK: - Reaction Badge
+// MARK: - Footer and day headings
 
-private struct ReactionBadge: View {
-    let reactions: [String]
-    @ScaledMetric private var circleSize: CGFloat = 34
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(reactions, id: \.self) { emoji in
-                ZStack {
-                    Circle()
-                        .fill(.regularMaterial)
-                        .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
-                    Image(systemName: MessageReaction.symbolName(for: emoji))
-                        .font(.body)
-                }
-                .frame(width: circleSize, height: circleSize)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Reactions: \(reactions.map { MessageReaction.label(for: $0) }.joined(separator: ", "))")
-    }
-}
-
-// MARK: - Date Separator
-
-/// Keep a readable delivery action when accessibility text no longer fits
-/// alongside the timestamp. The message text keeps the user's chosen size.
+/// A message's footer: time, delivery or signal, in one quiet line. At
+/// accessibility sizes an outgoing footer stacks, so the delivery action stays
+/// readable beside a long timestamp. The message keeps the reader's text size.
 struct MessageMetadataRow<Content: View>: View {
     let isOutgoing: Bool
     @ViewBuilder var content: Content
@@ -505,6 +397,9 @@ struct MessageMetadataRow<Content: View>: View {
             ? AnyLayout(VStackLayout(alignment: .trailing, spacing: Design.Space.hairline))
             : AnyLayout(HStackLayout(spacing: Design.Space.hairline))
         layout { content }
+            .font(.caption)
+            .foregroundStyle(MeshTheme.textSecondary)
+            .padding(.horizontal, Design.Space.tight)
     }
 }
 
@@ -512,18 +407,7 @@ struct DateSeparator: View {
     let date: Date
 
     var body: some View {
-        HStack {
-            VStack { Divider() }
-            Text(formattedDate(date))
-                .font(.caption2)
-                .foregroundStyle(MeshTheme.textSecondary)
-                .padding(.horizontal, 8)
-                .fixedSize(horizontal: false, vertical: true)
-                .layoutPriority(1)
-            VStack { Divider() }
-        }
-        .padding(.vertical, 8)
-        .accessibilityAddTraits(.isHeader)
+        ChatDayHeading(title: formattedDate(date))
     }
 
     private func formattedDate(_ date: Date) -> String {
@@ -619,15 +503,15 @@ func linkifyMeshcoreURLs(_ text: String) -> Text {
 
 struct UnreadDivider: View {
     var body: some View {
-        HStack {
-            VStack { Divider().background(MeshTheme.accent) }
-            Text("New Messages")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(MeshTheme.accent)
-                .padding(.horizontal, 8)
-            VStack { Divider().background(MeshTheme.accent) }
-        }
-        .padding(.vertical, 4)
+        Text("New messages")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(MeshTheme.accent)
+            .padding(.horizontal, Design.Space.snug)
+            .padding(.vertical, 6)
+            .chatGlass(Capsule(), tint: MeshTheme.brandPink.opacity(0.1))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Design.Space.tight)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

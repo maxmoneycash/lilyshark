@@ -18,7 +18,12 @@ unfamiliar.
 
 Usage:
   scripts/add_ios_source.py ios/Shared/App/DesignSystem.swift
+  scripts/add_ios_source.py ios/Shared/Views/X.swift --like ContactRowView.swift
   scripts/add_ios_source.py --check          # every Swift file is compiled
+
+--like copies another file's target membership instead of Theme.swift's.
+Theme.swift is in every target, including the watch app; a view that uses
+types only the phone and Mac compile must follow one of those views instead.
 """
 from __future__ import annotations
 
@@ -129,7 +134,7 @@ def compiled_swift_paths(text: str, source_root: Path) -> set[Path]:
     return compiled
 
 
-def add(target: Path) -> int:
+def add(target: Path, model: str = "Theme.swift") -> int:
     if not target.exists():
         return fail(f"{target} does not exist")
     if target.suffix != ".swift":
@@ -151,8 +156,8 @@ def add(target: Path) -> int:
 
     # Model the edit on a file that is already there, so the new entries carry
     # exactly the shape this project uses rather than a shape that merely
-    # parses. Theme.swift is a plain Shared/App source in every target.
-    model = "Theme.swift"
+    # parses. Theme.swift, the default, is a plain Shared/App source in every
+    # target.
     file_ref_match = re.search(
         r"([0-9A-F]{24}) /\* " + re.escape(model) + r" \*/ = \{isa = PBXFileReference;[^}]*\};",
         text,
@@ -233,6 +238,11 @@ def main() -> int:
         action="store_true",
         help="verify every tracked Swift file is compiled",
     )
+    parser.add_argument(
+        "--like",
+        default="Theme.swift",
+        help="an existing file whose target membership the new file copies",
+    )
     args = parser.parse_args()
 
     if not PBXPROJ.exists():
@@ -242,7 +252,7 @@ def main() -> int:
     if not args.file:
         parser.print_help()
         return 2
-    return add(Path(args.file).resolve())
+    return add(Path(args.file).resolve(), model=args.like)
 
 
 if __name__ == "__main__":

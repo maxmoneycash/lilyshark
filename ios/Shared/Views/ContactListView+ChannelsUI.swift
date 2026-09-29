@@ -97,9 +97,11 @@ extension ContactListView {
                         .accessibilityHidden(true)
                 }
                 .touchable()
+                .modifier(InboxGlassCard(enabled: usesGlassInbox))
             }
             .buttonStyle(.meshPlain)
-            .listRowBackground(MeshTheme.surface)
+            .listRowBackground(inboxRowBackground())
+            .modifier(InboxRowChrome(glass: usesGlassInbox))
             .contextMenu {
                 if connectionManager.connectionState == .ready || connectionManager.connectionState == .connected {
                     #if os(macOS) || targetEnvironment(macCatalyst)
@@ -178,7 +180,17 @@ extension ContactListView {
         }
     }
 
+    @ViewBuilder
     var publicChannelRow: some View {
+        if usesGlassInbox {
+            InboxChannelRow(index: 0, title: primaryChannelName, symbol: "megaphone.fill",
+                            isMuted: channelStore.channelNotifyMode(for: primaryChannelName) == .muted)
+        } else {
+            sidebarPublicChannelRow
+        }
+    }
+
+    private var sidebarPublicChannelRow: some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
@@ -247,11 +259,8 @@ extension ContactListView {
             NavigationLink(value: SidebarSelection.publicChannel) {
                 publicChannelRow
             }
-            .listRowBackground(
-                navigationStore.showPublicChannel
-                    ? MeshTheme.surfaceLight
-                    : MeshTheme.surface
-            )
+            .listRowBackground(inboxRowBackground(selected: navigationStore.showPublicChannel))
+            .modifier(InboxRowChrome(glass: usesGlassInbox))
             #endif
             }
 
@@ -302,11 +311,8 @@ extension ContactListView {
                         Label("Remove", systemImage: "trash")
                     }
                 }
-                .listRowBackground(
-                    navigationStore.selectedChannelIndex == channel.index
-                        ? MeshTheme.surfaceLight
-                        : MeshTheme.surface
-                )
+                .listRowBackground(inboxRowBackground(selected: navigationStore.selectedChannelIndex == channel.index))
+                .modifier(InboxRowChrome(glass: usesGlassInbox))
                 #endif
             }
         } header: {
@@ -352,7 +358,18 @@ extension ContactListView {
         }
     }
 
+    @ViewBuilder
     func channelRow(_ channel: MeshChannel) -> some View {
+        if usesGlassInbox {
+            InboxChannelRow(index: channel.index, title: "\(channel.channelType.displayPrefix)\(channel.name)",
+                            symbol: channel.channelType.iconName,
+                            isMuted: channelStore.channelNotifyMode(for: channel.name) == .muted)
+        } else {
+            sidebarChannelRow(channel)
+        }
+    }
+
+    private func sidebarChannelRow(_ channel: MeshChannel) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()

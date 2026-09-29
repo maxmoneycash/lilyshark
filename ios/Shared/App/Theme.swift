@@ -40,6 +40,11 @@ enum MeshTheme {
     private static let pink = (r: 1.0, g: 0.310, b: 0.616)      // #FF4F9D
     private static let pinkDeep = (r: 0.753, g: 0.0, b: 0.408)  // #C00068
 
+    /// The bright mark itself, for fills and glass tints where no text sits in
+    /// the colour. Anything that colours text uses `accent`, which carries the
+    /// contrast decision above.
+    static let brandPink = Color(red: pink.r, green: pink.g, blue: pink.b)
+
     // Primary accent — adaptive Lily Pink: deeper in light mode, bright in dark mode
     static var accent: Color {
         #if os(macOS)

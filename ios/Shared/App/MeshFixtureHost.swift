@@ -6,7 +6,7 @@ import MeshtasticKit
 /// Uses the existing chat fixture's persistence guards and the production tab routes.
 /// No coordinator is created; commands cannot reach a radio.
 struct MeshFixtureHost: View {
-    @State private var fixture = MeshFixtureState(populated: true)
+    @State private var fixture = MeshFixtureState.fromLaunchArguments()
     @AppStorage("uiFixtureTextSize") private var textSize = FixtureTextSize.defaultValue.rawValue
 
     var body: some View {
@@ -15,6 +15,7 @@ struct MeshFixtureHost: View {
                 Text("UI fixture · \(fixture.meshtastic ? "Meshtastic" : "MeshCore")").font(.caption)
                 Spacer()
                 Menu("Scenario") {
+                    Button("Conversation") { fixture = MeshFixtureState(populated: true, conversation: true) }
                     Button("Node map") { fixture = MeshFixtureState(populated: true, locations: true) }
                     Button("MeshCore mesh") { fixture = MeshFixtureState(populated: true) }
                     Button("Meshtastic mesh") { fixture = MeshFixtureState(populated: true, meshtastic: true) }
@@ -63,6 +64,7 @@ struct MeshFixtureHost: View {
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
             fixture.connection.setMeshFixtureConnected(true, meshtastic: fixture.meshtastic)
+            await fixture.tourIfRequested()
         }
     }
 }
@@ -81,7 +83,60 @@ private final class MeshFixtureState {
     let geofences = GeofenceStore()
     let meshtastic: Bool
 
-    init(populated: Bool, meshtastic: Bool = false, withMessages: Bool = true, delivery: Bool = false, locations: Bool = false) {
+    /// Screenshots need a screen without taps, so a launch can pick one:
+    /// `-uiFixtureScenario conversation|delivery|meshtastic|empty` and
+    /// `-uiFixtureOpen messages|alex|public|room`. Arguments land in
+    /// UserDefaults' argument domain, which is never written to disk.
+    static func fromLaunchArguments() -> MeshFixtureState {
+        let defaults = UserDefaults.standard
+        let scenario = defaults.string(forKey: "uiFixtureScenario")
+        let state = MeshFixtureState(
+            populated: scenario != "empty",
+            meshtastic: scenario == "meshtastic",
+            delivery: scenario == "delivery",
+            conversation: scenario == "conversation"
+        )
+        guard let open = defaults.string(forKey: "uiFixtureOpen") else { return state }
+        state.navigation.section = .messages
+        switch open {
+        case "alex": state.navigation.sidebarSelection = state.contacts.contacts.first.map { .contact($0.publicKeyPrefix) }
+        case "public": state.navigation.sidebarSelection = .publicChannel
+        case "room":
+            if let room = state.contacts.contacts.first(where: { $0.type == .room }) {
+                state.remote.remoteSession(for: room).loginState = .loggedIn(permission: .readWrite)
+                state.navigation.sidebarSelection = .contact(room.publicKeyPrefix)
+            }
+        default: break
+        }
+        return state
+    }
+
+    /// `-uiFixtureTour YES` walks the inbox, a conversation, a channel and a
+    /// room, `-uiFixtureTourSeconds` apart (45 by default), so one launch can
+    /// be screenshotted screen by screen on a machine too busy to relaunch.
+    func tourIfRequested() async {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "uiFixtureTour") else { return }
+        let seconds = max(5, defaults.integer(forKey: "uiFixtureTourSeconds") == 0 ? 45 : defaults.integer(forKey: "uiFixtureTourSeconds"))
+        let room = contacts.contacts.first { $0.type == .room }
+        if let room { remote.remoteSession(for: room).loginState = .loggedIn(permission: .readWrite) }
+        let stops: [SidebarSelection?] = [
+            nil,
+            contacts.contacts.first.map { .contact($0.publicKeyPrefix) },
+            .publicChannel,
+            room.map { .contact($0.publicKeyPrefix) },
+            nil,
+        ]
+        navigation.section = .messages
+        for stop in stops {
+            navigation.sidebarSelection = stop
+            try? await Task.sleep(for: .seconds(seconds))
+            if Task.isCancelled { return }
+        }
+    }
+
+    init(populated: Bool, meshtastic: Bool = false, withMessages: Bool = true, delivery: Bool = false,
+         locations: Bool = false, conversation: Bool = false) {
         self.meshtastic = meshtastic
         connection.setMeshFixtureConnected(true, meshtastic: meshtastic)
         config.deviceName = "Trail Deck"
@@ -182,6 +237,54 @@ private final class MeshFixtureState {
             }
             navigation.sidebarSelection = .contact(alex.publicKeyPrefix)
         }
+        if conversation && !meshtastic {
+            loadConversation(alex: alex)
+        }
+    }
+
+    /// A real-sized exchange: runs from both sides, a quote, a reaction, a
+    /// shared position, every delivery state, and a channel with several
+    /// speakers. Simulated, like everything else in this fixture.
+    private func loadConversation(alex: Contact) {
+        func ago(_ minutes: Double) -> Date { Date().addingTimeInterval(-minutes * 60) }
+        let key = alex.publicKeyPrefix
+        messages.messagesByContact[key] = [
+            Message(senderKeyHash: key, contactKeyHash: key, text: "Made it to the north trail junction.",
+                    timestamp: ago(52), isOutgoing: false, status: .sent, snr: 22, hops: 1),
+            Message(senderKeyHash: key, contactKeyHash: key, text: "Signal is weak up here. Two repeaters between us, I think.",
+                    timestamp: ago(51), isOutgoing: false, status: .sent, snr: 14, hops: 2),
+            Message(contactKeyHash: key, text: "Copy. Are you heading for the lookout?",
+                    timestamp: ago(47), isOutgoing: true, status: .delivered, roundTripMs: 1840),
+            Message(senderKeyHash: key, contactKeyHash: key, text: "Yes. About twenty minutes out.",
+                    timestamp: ago(31), isOutgoing: false, status: .sent, snr: 18, hops: 2, reactions: ["👍"]),
+            Message(contactKeyHash: key, text: "Meet at the ridge lookout then.",
+                    timestamp: ago(12), isOutgoing: true, status: .delivered, roundTripMs: 1320),
+            Message(contactKeyHash: key, text: "Bring the long antenna. The stubby one could not hear the valley repeater last time.",
+                    timestamp: ago(11.5), isOutgoing: true, status: .delivered, roundTripMs: 1410),
+            Message(senderKeyHash: key, contactKeyHash: key, text: "@[Me]\n>Meet at th..\nWill do. Here is where I am now.",
+                    timestamp: ago(6), isOutgoing: false, status: .sent, snr: 20, hops: 1, reactions: ["❤️"]),
+            Message(senderKeyHash: key, contactKeyHash: key, text: "Location: 37.9125, -122.5694",
+                    timestamp: ago(5.8), isOutgoing: false, status: .sent, snr: 20, hops: 1),
+            Message(contactKeyHash: key, text: "On my way.",
+                    timestamp: ago(1), isOutgoing: true, status: .sent, expectedACK: 4242),
+        ]
+        let channel = Data([0])
+        messages.messagesByContact[channel] = [
+            Message(contactKeyHash: channel, text: "Anyone near the creek crossing? Water is high today.",
+                    timestamp: ago(40), isOutgoing: false, status: .sent, snr: 9, hops: 3, channelIndex: 0,
+                    senderName: "Casey · Creek crossing"),
+            Message(contactKeyHash: channel, text: "Crossed an hour ago. Use the log bridge upstream.",
+                    timestamp: ago(36), isOutgoing: false, status: .sent, snr: 17, hops: 1, channelIndex: 0,
+                    senderName: "Jordan · South trail"),
+            Message(contactKeyHash: channel, text: "It held two of us fine.",
+                    timestamp: ago(35.5), isOutgoing: false, status: .sent, snr: 17, hops: 1, channelIndex: 0,
+                    senderName: "Jordan · South trail"),
+            Message(contactKeyHash: channel, text: "Thanks, heading there now.",
+                    timestamp: ago(33), isOutgoing: false, status: .sent, snr: 8, hops: 3, channelIndex: 0,
+                    senderName: "Casey · Creek crossing"),
+            Message(contactKeyHash: channel, text: "Ridge repeater is up again if anyone lost the valley.",
+                    timestamp: ago(8), isOutgoing: true, status: .repeated, channelIndex: 0),
+        ]
     }
 }
 #endif

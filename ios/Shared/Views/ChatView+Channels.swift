@@ -21,6 +21,9 @@ import AppKit
 
 struct ChannelChatView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @State private var followsLatest = true
     @State private var hasPositionedInitially = false
     @State private var isVisible = false
@@ -47,16 +50,19 @@ struct ChannelChatView: View {
         messageStoreManager.messagesByContact[channelKey] ?? []
     }
 
+    private var channelSymbol: String {
+        channelStore.channels.first { $0.index == channelIndex }?.channelType.iconName ?? "number"
+    }
+
     var body: some View {
         messageList
             .background(MeshTheme.background)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 0) {
-                    Divider()
-                        .overlay(MeshTheme.surfaceLight)
-                    messageInput
-                }
+                messageInput
             }
+        #if os(iOS)
+        .toolbar(horizontalSizeClass == .compact ? .hidden : .automatic, for: .tabBar)
+        #endif
         .alert("Message not sent", isPresented: $showSendError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -74,26 +80,20 @@ struct ChannelChatView: View {
             #if os(iOS)
             ToolbarItem(placement: .principal) {
                 Button { showChannelDetail = true } label: {
-                    Text(channelName)
-                        .font(.headline)
-                        .foregroundStyle(MeshTheme.textPrimary)
-                        .touchable()
+                    HStack(spacing: Design.Space.tight) {
+                        NodeOrb(seed: Data([channelIndex]) + Data(channelName.utf8), title: channelName,
+                                symbol: channelSymbol, size: 34)
+                        Text(channelName)
+                            .font(.headline)
+                            .foregroundStyle(MeshTheme.textPrimary)
+                            .lineLimit(1)
+                    }
+                    .touchable()
                 }
                 .buttonStyle(.meshPlain)
                 .accessibilityLabel("Channel details for \(channelName)")
             }
             #endif
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    sendLocationToChannel()
-                } label: {
-                    Image(systemName: "location.fill")
-                        .foregroundStyle(MeshTheme.accent)
-                        .touchable()
-                }
-                .accessibilityLabel("Send location to channel")
-                .disabled(!messageStoreManager.canSendMessages)
-            }
             ToolbarItem(placement: .automatic) {
                 Button {
                     // Cycle notification mode: all → mentions → muted → all
@@ -166,7 +166,7 @@ struct ChannelChatView: View {
                     ContentUnavailableView("Channel messages", systemImage: "number.square",
                                            description: Text("Messages this deck reports for the channel will appear here."))
                 }
-                LazyVStack(spacing: 4) {
+                LazyVStack(spacing: 0) {
                     ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                         if index == 0 || isDifferentDay(messages[index - 1].timestamp, message.timestamp) {
                             DateSeparator(date: message.timestamp)
@@ -174,14 +174,18 @@ struct ChannelChatView: View {
                         if index == unreadDividerIndex {
                             UnreadDivider()
                         }
-                        ChannelMessageBubble(message: message)
+                        ChannelMessageBubble(
+                            message: message,
+                            run: .of(index, in: messages, isOutgoing: \.isOutgoing,
+                                     sender: { $0.senderName }, timestamp: \.timestamp)
+                        )
                             .id(message.id)
-                            .transition(.opacity)
+                            .transition(.bubbleArrival(isOutgoing: message.isOutgoing))
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .meshAnimation(Design.Motion.quick, value: messages.last?.id)
+                .padding(.horizontal, Design.Space.regular)
+                .padding(.vertical, Design.Space.tight)
+                .meshAnimation(ChatGlass.arrival, value: messages.last?.id)
             }
             .chatScrollTracking(followsLatest: $followsLatest)
             #if !os(watchOS)
@@ -199,12 +203,13 @@ struct ChannelChatView: View {
                     } label: {
                         Label("Latest messages", systemImage: "arrow.down")
                             .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal)
+                            .foregroundStyle(MeshTheme.textPrimary)
+                            .padding(.horizontal, Design.Space.regular)
                             .touchable()
+                            .chatGlass(Capsule(), interactive: true)
                     }
-                    .buttonStyle(.meshSecondary)
-                    .background(.regularMaterial, in: Capsule())
-                    .padding(.bottom, 8)
+                    .buttonStyle(.pressable)
+                    .padding(.bottom, Design.Space.tight)
                     .transition(.opacity)
                 }
             }
@@ -302,7 +307,9 @@ struct ChannelChatView: View {
                     }
                 }
                 .frame(maxHeight: 200)
-                .background(MeshTheme.surface)
+                .chatGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .padding(.horizontal, Design.Space.regular)
+                .padding(.top, Design.Space.tight)
             }
 
             MessageComposer(
@@ -310,6 +317,7 @@ struct ChannelChatView: View {
                 budget: MessageTextBudget(messageText, limit: messageStoreManager.messageByteLimit),
                 isConnected: messageStoreManager.canSendMessages,
                 sendLabel: "Send to \(channelName)",
+                shareLocation: sendLocationToChannel,
                 connect: { connectionManager.requestShowScanner = true },
                 send: send
             )
@@ -366,6 +374,9 @@ struct ChannelChatView: View {
 /// Chat view for room servers — requires login, shows room messages, has gear icon for management.
 struct RoomChatView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @Environment(\.scenePhase) private var scenePhase
     @State private var followsLatest = true
     @State private var hasPositionedInitially = false
@@ -438,18 +449,21 @@ struct RoomChatView: View {
                 .background(MeshTheme.surface)
 
                 messageList
-                Divider()
-                    .overlay(MeshTheme.surfaceLight)
-                if permission.canPost {
-                    roomMessageInput
-                } else {
-                    readOnlyInputBar
-                }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if permission.canPost {
+                            roomMessageInput
+                        } else {
+                            readOnlyInputBar
+                        }
+                    }
             } else {
                 roomLoginPrompt
             }
         }
         .background(MeshTheme.background)
+        #if os(iOS)
+        .toolbar(horizontalSizeClass == .compact && isLoggedIn ? .hidden : .automatic, for: .tabBar)
+        #endif
         .alert("Message not sent", isPresented: $showSendError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -460,6 +474,18 @@ struct RoomChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
+            #if os(iOS)
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: Design.Space.tight) {
+                    NodeOrb(seed: contact.publicKey, title: contactStore.displayName(for: contact),
+                            symbol: "server.rack", size: 34)
+                    Text(contactStore.displayName(for: contact))
+                        .font(.headline)
+                        .foregroundStyle(MeshTheme.textPrimary)
+                        .lineLimit(1)
+                }
+            }
+            #endif
             #if !os(watchOS)
             ToolbarItem(placement: .automatic) {
                 Button { showContactDetail = true } label: {
@@ -545,19 +571,23 @@ struct RoomChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 4) {
+                LazyVStack(spacing: 0) {
                     ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                         if index == 0 || isDifferentDay(messages[index - 1].timestamp, message.timestamp) {
                             DateSeparator(date: message.timestamp)
                         }
-                        RoomMessageBubble(message: message)
+                        RoomMessageBubble(
+                            message: message,
+                            run: .of(index, in: messages, isOutgoing: \.isOutgoing,
+                                     sender: { RoomMessageBubble.parse($0).sender }, timestamp: \.timestamp)
+                        )
                             .id(message.id)
-                            .transition(.opacity)
+                            .transition(.bubbleArrival(isOutgoing: message.isOutgoing))
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .meshAnimation(Design.Motion.quick, value: messages.last?.id)
+                .padding(.horizontal, Design.Space.regular)
+                .padding(.vertical, Design.Space.tight)
+                .meshAnimation(ChatGlass.arrival, value: messages.last?.id)
             }
             .chatScrollTracking(followsLatest: $followsLatest)
             #if !os(watchOS)
@@ -575,12 +605,13 @@ struct RoomChatView: View {
                     } label: {
                         Label("Latest messages", systemImage: "arrow.down")
                             .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal)
+                            .foregroundStyle(MeshTheme.textPrimary)
+                            .padding(.horizontal, Design.Space.regular)
                             .touchable()
+                            .chatGlass(Capsule(), interactive: true)
                     }
-                    .buttonStyle(.meshSecondary)
-                    .background(.regularMaterial, in: Capsule())
-                    .padding(.bottom, 8)
+                    .buttonStyle(.pressable)
+                    .padding(.bottom, Design.Space.tight)
                     .transition(.opacity)
                 }
             }
@@ -633,9 +664,10 @@ struct RoomChatView: View {
                 .font(.subheadline)
                 .foregroundStyle(MeshTheme.textSecondary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(MeshTheme.surface)
+        .frame(maxWidth: .infinity, minHeight: 58)
+        .chatGlass(RoundedRectangle(cornerRadius: 29, style: .continuous))
+        .padding(.horizontal, Design.Space.regular)
+        .padding(.vertical, Design.Space.tight)
     }
 
     private var roomLoginPrompt: some View {
@@ -805,13 +837,14 @@ struct RoomChatView: View {
 /// Message bubble for room chat — shows sender name for incoming messages.
 struct RoomMessageBubble: View {
     let message: Message
+    var run = ChatRunPosition()
     @State private var messageDetails: MessageDetailsSelection?
     @Environment(ContactStore.self) private var contactStore
     @Environment(MessageStoreManager.self) private var messageStoreManager
 
     /// Try to extract sender name from room server message prefix.
     /// Room servers often prefix messages with "SenderName: actual message"
-    private var senderAndText: (sender: String?, text: String) {
+    static func parse(_ message: Message) -> (sender: String?, text: String) {
         if !message.isOutgoing {
             let text = message.interfaceText
             // Look for "Name: message" pattern (common room server format)
@@ -832,14 +865,16 @@ struct RoomMessageBubble: View {
         return (nil, message.interfaceText)
     }
 
-    @ViewBuilder private var messageActions: some View {
-        Button {
-            messageDetails = MessageDetailsSelection(message: message, conversation: .room, store: messageStoreManager)
-        } label: {
+    private func showDetails() {
+        messageDetails = MessageDetailsSelection(message: message, conversation: .room, store: messageStoreManager)
+    }
+
+    @ViewBuilder private func messageActions(text: String) -> some View {
+        Button(action: showDetails) {
             Label("Message details", systemImage: "info.circle")
         }
         Button {
-            copyToClipboard(senderAndText.text)
+            copyToClipboard(text)
         } label: {
             Label("Copy", systemImage: "doc.on.doc")
         }
@@ -852,84 +887,41 @@ struct RoomMessageBubble: View {
     }
 
     var body: some View {
-        let parsed = senderAndText
-        HStack {
-            if message.isOutgoing { Spacer(minLength: 48) }
-
-            VStack(alignment: message.isOutgoing ? .trailing : .leading, spacing: 2) {
-                if !message.isOutgoing, let rawSender = parsed.sender {
-                    let sender = contactStore.channelSenderDisplayName(rawSender)
-                    Text(sender)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(MeshTheme.accent)
-                        .padding(.horizontal, 4)
-                }
-
-                linkifyMeshcoreURLs(parsed.text)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(message.isOutgoing ? MeshTheme.outgoingBubble : MeshTheme.incomingBubble)
-                    .foregroundStyle(MeshTheme.textOnAccent)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-
+        let parsed = Self.parse(message)
+        let sender = parsed.sender.map { contactStore.channelSenderDisplayName($0) }
+        ChatMessageRow(
+            isOutgoing: message.isOutgoing,
+            run: run,
+            orb: message.isOutgoing ? nil : NodeOrb(name: sender ?? "?", size: ChatGlass.bubbleOrb),
+            senderLabel: sender
+        ) {
+            linkifyMeshcoreURLs(parsed.text)
+                .chatBubble(isOutgoing: message.isOutgoing)
+                .contextMenu { messageActions(text: parsed.text) }
+                .accessibilityAction(named: "Message details", showDetails)
+                .accessibilityAction(named: "Copy text") { copyToClipboard(parsed.text) }
+        } footer: {
+            if run.endsRun || message.needsDeliveryFooter(acknowledged: true) {
                 MessageMetadataRow(isOutgoing: message.isOutgoing) {
                     Text(message.timestamp, style: .time)
-                        .font(.caption2)
-                        .foregroundStyle(MeshTheme.textSecondary)
-
                     if message.isOutgoing {
-                        MessageDeliveryButton(message: message, conversation: .room) {
-                            messageDetails = MessageDetailsSelection(message: message, conversation: .room, store: messageStoreManager)
-                        }
-                    }
-
-                    if !message.isOutgoing {
+                        MessageDeliveryButton(message: message, conversation: .room, action: showDetails)
+                    } else {
                         if let hops = message.hops {
-                            Text("\u{2022}")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
-                            if hops == 0 || hops == 0xFF {
-                                Text(hops == 0xFF ? "Hops not reported" : "Direct")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.textSecondary)
-                            } else {
-                                Text("^[\(hops) hop](inflect: true)")
-                                    .font(.caption2)
-                                    .foregroundStyle(MeshTheme.textSecondary)
-                            }
+                            MetadataDot()
+                            hopSummary(hops)
                         }
                         if let snr = message.snr {
-                            Text("\u{2022}")
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
+                            MetadataDot()
                             Text(formatSNR(snr))
-                                .font(.caption2)
-                                .foregroundStyle(MeshTheme.textSecondary)
                         }
                     }
-
-                    Menu { messageActions } label: {
-                        Label("Message actions", systemImage: "ellipsis")
-                            .labelStyle(.iconOnly)
-                            .font(.caption)
-                            .touchable()
-                    }
-                    .buttonStyle(.meshPlain)
-                    .accessibilityLabel("Message actions")
-                }
-                .padding(.horizontal, 4)
-
-                if message.isOutgoing && message.status == .failed {
-                    MessageSendFailure(message: message)
                 }
             }
-            .contentShape(Rectangle())
-
-            if !message.isOutgoing { Spacer(minLength: 48) }
+            if message.isOutgoing && message.status == .failed {
+                MessageSendFailure(message: message)
+            }
         }
-        .contentShape(Rectangle())
-        .contextMenu { messageActions }
         .sheet(item: $messageDetails) { MessageDetailsView(selection: $0) }
     }
 }

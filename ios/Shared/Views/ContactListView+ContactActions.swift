@@ -75,6 +75,8 @@ extension ContactListView {
                 guard messageStoreManager.unreadCount(for: contact) > 0 else { return false }
             case .favourites:
                 guard contact.isFavourite else { return false }
+            case .channels:
+                return false
             case .all: break
             }
             guard !conversationQuery.isEmpty else { return true }
@@ -110,6 +112,7 @@ extension ContactListView {
 
     func matchesChannel(index: UInt8, name: String) -> Bool {
         if conversationFilter == .favourites { return false }
+        // A channel is never unread-filtered away under Channels.
         if conversationFilter == .unread,
            (messageStoreManager.unreadCounts[Data([index])] ?? 0) == 0 { return false }
         return conversationQuery.isEmpty || name.localizedStandardContains(conversationQuery)
@@ -136,6 +139,8 @@ extension ContactListView {
                 Label("No matching conversations", systemImage: "magnifyingglass")
             } else if conversationFilter == .favourites {
                 Label("No favourites yet", systemImage: "star")
+            } else if conversationFilter == .channels {
+                Label("No channels", systemImage: "number")
             } else {
                 Label("No unread conversations", systemImage: "tray")
             }
@@ -144,6 +149,8 @@ extension ContactListView {
                 Text("Try another name or node ID, or show all conversations.")
             } else if conversationFilter == .favourites {
                 Text("Swipe right on a contact or use its menu to add a favourite.")
+            } else if conversationFilter == .channels {
+                Text("Join or create a channel from the Channels heading.")
             } else {
                 Text("New unread messages will appear here.")
             }
@@ -154,7 +161,8 @@ extension ContactListView {
             }
             .buttonStyle(.meshSecondary)
         }
-        .listRowBackground(MeshTheme.surface)
+        .listRowBackground(inboxRowBackground())
+        .modifier(InboxRowChrome(glass: usesGlassInbox))
     }
 
     @ViewBuilder
@@ -325,8 +333,13 @@ extension ContactListView {
         }
     }
 
+    @ViewBuilder
     func contactRow(_ contact: Contact) -> some View {
-        ContactRowView(contact: contact, isConversation: usesConversationInbox, refreshTick: refreshTick)
+        if usesGlassInbox {
+            InboxContactRow(contact: contact, refreshTick: refreshTick)
+        } else {
+            ContactRowView(contact: contact, isConversation: usesConversationInbox, refreshTick: refreshTick)
+        }
     }
 
     /// Returns the appropriate detail view for a contact based on its type.

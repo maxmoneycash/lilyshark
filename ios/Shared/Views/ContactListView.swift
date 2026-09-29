@@ -15,9 +15,20 @@ struct ContactListView: View {
     enum ConversationFilter: String, CaseIterable, Identifiable {
         case all = "All conversations"
         case unread = "Unread"
+        case channels = "Channels"
         case favourites = "Favourites"
 
         var id: Self { self }
+
+        /// The short name on the phone inbox's filter chips.
+        var chipTitle: String {
+            switch self {
+            case .all: String(localized: "All")
+            case .unread: String(localized: "Unread")
+            case .channels: String(localized: "Channels")
+            case .favourites: String(localized: "Favourites")
+            }
+        }
     }
 
     @Environment(ContactStore.self) var contactStore
@@ -92,6 +103,22 @@ struct ContactListView: View {
         false
         #endif
     }
+    /// The phone inbox gets Astra's glass treatment (see InboxRows.swift). The
+    /// iPad sidebar, the Mac and the contact book keep the sidebar list they
+    /// were designed as.
+    var usesGlassInbox: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        usesConversationInbox && horizontalSizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
+    /// Glass rows sit on the page; sidebar rows keep their surface.
+    func inboxRowBackground(selected: Bool = false) -> Color {
+        if usesGlassInbox { return .clear }
+        return selected ? MeshTheme.surfaceLight : MeshTheme.surface
+    }
     @AppStorage("contactSortByLastSeen") var sortByLastSeen = true
     @AppStorage("channelsFirst") var channelsFirst = true
 
@@ -141,13 +168,16 @@ struct ContactListView: View {
     private var contactListNavigation: some View {
         mainListWithGroupSheets
         #if os(iOS) && !targetEnvironment(macCatalyst)
-        .navigationTitle(showsContactBook ? "Contacts" : conversationFilter == .all ? "Messages" : conversationFilter.rawValue)
+        .navigationTitle(showsContactBook ? "Contacts" : (conversationFilter == .all || usesGlassInbox) ? "Messages" : conversationFilter.rawValue)
         .navigationBarTitleDisplayMode(.large)
-        .toolbar(.visible, for: .tabBar)
+        // On a phone an open conversation fills the screen, as in Messages.
+        // The collapsed split view shows the list's preference, not the
+        // conversation's, so the list decides for both.
+        .toolbar(usesGlassInbox && localSelection != nil ? .hidden : .visible, for: .tabBar)
         #else
         .lilysharkNavigationTitle()
         #endif
-        .searchable(text: $conversationSearch, prompt: "Contacts, channels, or node ID")
+        .modifier(ConversationSearch(text: $conversationSearch, isEnabled: !usesGlassInbox))
         .onChange(of: conversationSearch) { _, _ in revealFilteredConversations() }
         .onChange(of: conversationFilter) { _, _ in revealFilteredConversations() }
         // navigationDestination is only needed on iOS (not macOS/Catalyst) because on
@@ -227,7 +257,7 @@ struct ContactListView: View {
                         conversationFilter = .all
                     }
                 }
-            } else {
+            } else if !usesGlassInbox {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         Picker("Conversations", selection: $conversationFilter) {
@@ -674,7 +704,12 @@ private extension ContactListView {
             #endif
         }
         #if os(iOS)
-        .listStyle(.sidebar)
+        .modifier(InboxListStyle(glass: usesGlassInbox))
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if usesGlassInbox {
+                InboxSearchAndFilters(search: $conversationSearch, filter: $conversationFilter)
+            }
+        }
         #else
         .meshListStyle()
         #endif
@@ -685,6 +720,39 @@ private extension ContactListView {
         }
     }
 }
+
+/// The system search field everywhere except the phone inbox, which draws its
+/// own glass field above the list.
+private struct ConversationSearch: ViewModifier {
+    @Binding var text: String
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.searchable(text: $text, prompt: "Contacts, channels, or node ID")
+        } else {
+            content
+        }
+    }
+}
+
+#if os(iOS)
+/// Plain rows on the page for the phone inbox; the sidebar list otherwise.
+private struct InboxListStyle: ViewModifier {
+    let glass: Bool
+
+    func body(content: Content) -> some View {
+        if glass {
+            content
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(MeshTheme.background)
+        } else {
+            content.listStyle(.sidebar)
+        }
+    }
+}
+#endif
 
 // MARK: - Delete Alerts (extracted to break type-checker chain)
 private extension ContactListView {

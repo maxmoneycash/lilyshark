@@ -336,7 +336,8 @@ extension ContactListView {
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
                 .accessibilityLabel("\(emptyContactsTitle). \(emptyContactsDescription)")
-                .listRowBackground(MeshTheme.surface)
+                .listRowBackground(inboxRowBackground())
+                .modifier(InboxRowChrome(glass: usesGlassInbox))
             } else {
                 ForEach(ungroupedContacts) { contact in
                     #if os(watchOS)
@@ -389,12 +390,11 @@ extension ContactListView {
                         .tint(.yellow)
                         .disabled(!canChangeContact(contact))
                     }
-                    .listRowBackground(
-                        navigationStore.selectedContactKey == contact.publicKeyPrefix
+                    .listRowBackground(inboxRowBackground(
+                        selected: navigationStore.selectedContactKey == contact.publicKeyPrefix
                             && !navigationStore.showPublicChannel
-                            ? MeshTheme.surfaceLight
-                            : MeshTheme.surface
-                    )
+                    ))
+                    .modifier(InboxRowChrome(glass: usesGlassInbox))
                     } // end else (not selecting)
                     #endif
                 }
