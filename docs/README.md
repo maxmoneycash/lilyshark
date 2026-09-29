@@ -89,6 +89,8 @@ matters.
 | [design-guidance.md](design-guidance.md) | Verified design skills and the shared iOS/web map direction. |
 | [strategy/2026-q3-direction.md](strategy/2026-q3-direction.md) | Where this is going. |
 | [strategy/meshcore-app-direction-2026-09-14.md](strategy/meshcore-app-direction-2026-09-14.md) | MeshCore app priorities, competitor baseline, and release criteria. |
+| [connect-onboarding-2026-09-29.md](connect-onboarding-2026-09-29.md) | First launch, the guided connect flow (radar, live steps, arrival), the trail demo, and when permissions are asked. |
+| [glass-chat-ui-2026-09-28.md](glass-chat-ui-2026-09-28.md) | The chat ported to Liquid Glass after Appllama's Astra design: bubbles, runs, composer, node orbs, phone inbox. |
 | [meshcore-ux-qa-2026-09-14.md](meshcore-ux-qa-2026-09-14.md) | Inbox, node roles, compose, and room/repeater UI changes with simulator evidence. |
 | [overnight-web-qa-2026-09-18.md](overnight-web-qa-2026-09-18.md) | Intro sizing on phones, map footer, Mesh and Config labels, iOS CI fix, and the tunnel-plus-render-service verification loop. |
 | [overnight-web-qa-2026-09-16.md](overnight-web-qa-2026-09-16.md) | Simple intro, real web map, explicit demo, draft/history fixes, and 654-test browser/build validation. |

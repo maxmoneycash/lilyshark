@@ -98,15 +98,25 @@ struct ConnectFlowView: View {
 
     private var candidateIDs: [UUID] { candidates.map(\.id) }
 
-    // Split from body so each piece type-checks on its own.
+    // Split from body, with every closure typed, so each piece type-checks
+    // quickly: `.connected` also names a BLEConnectionState case, and CI's
+    // slower runner timed out resolving the untyped version.
     private var withFeedback: some View {
+        animated
+            .sensoryFeedback(.success, trigger: phase, condition: Self.arrived)
+            .sensoryFeedback(.error, trigger: phase, condition: Self.failedNow)
+            .sensoryFeedback(.selection, trigger: candidateIDs.count, condition: Self.grew)
+    }
+
+    private var animated: some View {
         screen
             .meshAnimation(ChatGlass.snap, value: phase)
             .meshAnimation(ChatGlass.snap, value: candidateIDs)
-            .sensoryFeedback(.success, trigger: phase) { _, new in new == .connected }
-            .sensoryFeedback(.error, trigger: phase) { _, new in new == .failed }
-            .sensoryFeedback(.selection, trigger: candidateIDs.count) { old, new in new > old }
     }
+
+    private static func arrived(_ old: Phase, _ new: Phase) -> Bool { new == Phase.connected }
+    private static func failedNow(_ old: Phase, _ new: Phase) -> Bool { new == Phase.failed }
+    private static func grew(_ old: Int, _ new: Int) -> Bool { new > old }
 
     private var screen: some View {
         ZStack(alignment: .top) {
