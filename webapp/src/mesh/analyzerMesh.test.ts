@@ -331,15 +331,15 @@ test("encodeEnvelope round-trips a device frame the relay would send", () => {
     kind: "POS",
     sim: false,
     atMs: 1_772_000_006_000,
-    lat: 38.3996,
-    lon: -122.5795,
+    lat: 37.775,
+    lon: -122.419,
   };
   assert.equal(shouldPublish(frame), true);
-  const env = encodeEnvelope(frame, "lsk-kenwood", 1_772_000_006_000);
+  const env = encodeEnvelope(frame, "lsk-field", 1_772_000_006_000);
   clearNodes();
   applyNetFrame(env);
   const node = getSnapshot().nodes.get(0xcda172e0);
   assert.ok(node);
-  assert.equal(node.lat, 38.3996);
+  assert.equal(node.lat, 37.775);
   assert.equal(node.viaNet, true);
 });

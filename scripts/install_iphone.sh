@@ -60,7 +60,7 @@ mkdir -p "${derived}"
 # phone". Naming the device is also what registers its UDID with the team.
 devices="$(xcrun devicectl list devices 2>/dev/null || true)"
 # Match the UUID itself rather than counting columns: the line reads
-# "max's iPhone  maxs-iPhone.coredevice.local  <UUID>  connected  iPhone 16 Pro
+# "Name's iPhone  names-iPhone.coredevice.local  <UUID>  connected  iPhone 16 Pro
 # Max (iPhone17,2)", so a positional field grabs "Pro" out of the model name.
 identifier="$(echo "${devices}" \
     | grep -iE "iphone|ipad" \

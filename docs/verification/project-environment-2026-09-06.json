@@ -46,7 +46,7 @@
     "start_dev_server": null,
     "build_ios": "./scripts/build_ios.sh",
     "build_android": null,
-    "notes": "Native app, no Metro. Root coordinates simulator use. Installed environment-inspector guidance found in ~/.claude/agents. Root located Argent skills at /Users/maxmohammadi/.nvm/versions/node/v22.22.1/lib/node_modules/@swmansion/argent/skills."
+    "notes": "Native app, no Metro. Root coordinates simulator use. Installed environment-inspector guidance found in ~/.claude/agents. Root located Argent skills at ~/.nvm/versions/node/v22.22.1/lib/node_modules/@swmansion/argent/skills."
   },
   "ios_has_podfile": false,
   "android_has_gradle": false,

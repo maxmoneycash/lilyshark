@@ -123,7 +123,7 @@ provider override errors distinct from application errors. Compound automation
 calls occasionally timed out after completing their actions; subsequent observations
 established the resulting state.
 
-Use ARM Node `/Users/maxmohammadi/.nvm/versions/node/v22.22.1/bin/node`. The default
+Use ARM Node `~/.nvm/versions/node/v22.22.1/bin/node`. The default
 x64 Node cannot use installed ARM Rollup. Dependencies were not reinstalled.
 
 The existing Rhai overnight workflow contains stale branch/port/screen-count and

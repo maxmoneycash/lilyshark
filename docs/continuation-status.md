@@ -245,8 +245,8 @@ this folder, excluding this recovery conversation and review subagents:
 
 | Date (Pacific) | Codex thread | Work |
 | --- | --- | --- |
-| September 8, 03:18–13:09 | `01a08086-6967-79a2-8da1-16d6a5cf755f` | Web intro, original copy/screens, interactive T-Deck, web polish |
-| September 8, 03:17–13:08 | `01a08085-ef1b-7d03-ad7f-eb6616d74798` | Native/web coverage maps, native home and onboarding |
+| September 8, 03:18–13:09 | (local session) | Web intro, original copy/screens, interactive T-Deck, web polish |
+| September 8, 03:17–13:08 | (local session) | Native/web coverage maps, native home and onboarding |
 
 Both identify `gpt-6-astra`. Their local rollout files are under
 `~/.codex/sessions/2026/09/08/`; the thread IDs identify the filenames.
@@ -254,8 +254,8 @@ Both identify `gpt-6-astra`. Their local rollout files are under
 Two later Grok continuations are under the Lilyshark project in
 `~/.grok/sessions/`:
 
-- `01a082cf-3aa4-7401-8d86-d9e60834e45c` — “Restore Lilyshark intro sequence matching production,” last updated September 9, 17:58.
-- `01a082ce-cedb-7751-8249-cfef4f3021e1` — “Interactive T-Deck home screen and mesh tutorials,” last updated September 9, 04:41.
+- (local session) — “Restore Lilyshark intro sequence matching production,” last updated September 9, 17:58.
+- (local session) — “Interactive T-Deck home screen and mesh tutorials,” last updated September 9, 04:41.
 
 The September 10 commits and original uncommitted native analyzer drafts were
 newer than those conversations; their authoring chat was not established.
@@ -445,7 +445,7 @@ To reload this client's configuration while keeping this exact conversation,
 exit Codex with `/quit`, then run in the same terminal:
 
 ```sh
-codex resume -C /Users/maxmohammadi/lilyshark 01a09d42-aca4-7710-a5ce-df10d312792a
+codex resume -C ~/lilyshark <session id>
 ```
 
 On resumption, use the new session's actual tool inventory to establish Argent

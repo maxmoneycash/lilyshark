@@ -58,7 +58,7 @@ Neither beacon needs a laptop attached. That was the bug described below.
 ## Map imagery
 
 The device reads tiles from `/maps` on a microSD card, and falls back to tiles
-baked into flash. The baked set covers 38.400, -122.580 at zoom 12 to 20. For
+baked into flash. The repository carries a San Francisco set, 37.775, -122.419 at zoom 12 to 16. For
 somewhere else:
 
 ```sh
@@ -96,11 +96,11 @@ back to a drawn field chart. A microSD card fixes that for good:
 
 ```sh
 # See what it would cost before downloading anything.
-python3 scripts/build_map_card.py --lat 38.3996 --lon -122.5795 \
+python3 scripts/build_map_card.py --lat 37.775 --lon -122.419 \
     --radius-km 1 --min-zoom 12 --max-zoom 20 --out /tmp/mapcard --dry-run
 
 # Build it, then copy the directory to the card root as /maps.
-python3 scripts/build_map_card.py --lat 38.3996 --lon -122.5795 \
+python3 scripts/build_map_card.py --lat 37.775 --lon -122.419 \
     --radius-km 1 --min-zoom 12 --max-zoom 20 --out /tmp/mapcard
 ```
 

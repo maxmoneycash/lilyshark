@@ -14156,7 +14156,7 @@ bool run_simulator_interaction_test() noexcept
     // sign error here is exactly what put the imagery 391 px off screen.
     {
         constexpr int card_zoom = 20;
-        const MapCardPlacement here = map_card_placement(38.399649, -122.579476, card_zoom);
+        const MapCardPlacement here = map_card_placement(37.754400, -122.447700, card_zoom);
         const double centre_x = (static_cast<double>(here.first_x) + 0.5) *
                                 static_cast<double>(kSatelliteWidth);
         const double centre_y = (static_cast<double>(here.first_y) + 0.5) *
@@ -14195,7 +14195,7 @@ bool run_simulator_interaction_test() noexcept
         map_chart = false;
         map_zoom = 20;
         map_bundled_tiles_only = true;
-        const MapCardPlacement spot = map_card_placement(38.399649, -122.579467, map_zoom);
+        const MapCardPlacement spot = map_card_placement(37.754400, -122.447700, map_zoom);
         const double tile_cx = (static_cast<double>(spot.first_x) + 0.5) *
                                static_cast<double>(kSatelliteWidth);
         const double tile_cy = (static_cast<double>(spot.first_y) + 0.5) *

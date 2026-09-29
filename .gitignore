@@ -38,3 +38,6 @@ ios/*.log
 # Swift Package Manager build output. `swift test` writes it inside the
 # package, and a worktree merge brought 200+ of these in looking like source.
 ios/Packages/*/.build/
+
+# Local agent memory and logs: they record this machine, not the project.
+.grok/
