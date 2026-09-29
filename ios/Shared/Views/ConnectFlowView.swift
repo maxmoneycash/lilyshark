@@ -403,7 +403,11 @@ struct ConnectFlowView: View {
         let deckRead = ready && !deviceConfig.isLoading && (!deviceConfig.deviceName.isEmpty || !deviceConfig.loadedSections.isEmpty)
         let heard = contactStore.contacts.count
         return [
-            Step(title: "Reaching the deck", detail: nil, done: linked, active: !linked),
+            // The firmware chimes and shows PHONE CONNECTED OVER BLUETOOTH on
+            // the link (sim_main.cpp), so the two screens agree out loud.
+            Step(title: "Reaching the deck",
+                 detail: linked && chosen?.kind != .meshCore ? String(localized: "Your deck chimes and shows Phone connected") : nil,
+                 done: linked, active: !linked),
             Step(title: "Opening its radio service", detail: nil, done: ready, active: linked && !ready),
             Step(title: "Reading its settings", detail: deviceConfig.deviceName.isEmpty ? nil : deviceConfig.deviceName,
                  done: deckRead, active: ready && !deckRead),

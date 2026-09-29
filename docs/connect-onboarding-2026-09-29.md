@@ -84,8 +84,9 @@ What it found:
     response.
   - Info.plist keys: `NSAccessorySetupKitSupports` = `[Bluetooth]` and
     `NSAccessorySetupBluetoothServices`.
-- **The deck's own screen** should say "Connected to iPhone" when a phone
-  connects, so the two screens agree.
+- **The deck's own screen** already confirms the link: it chimes and shows
+  PHONE CONNECTED OVER BLUETOOTH. The connect flow now points at that
+  ("Your deck chimes and shows Phone connected") so the two screens agree.
 - **App Store Connect** has no Lilyshark app record yet. Apple does not allow
   creating one through the API. Once it exists (bundle `com.lilyshark.app`),
   TestFlight builds can be uploaded with the API key already on this machine.
