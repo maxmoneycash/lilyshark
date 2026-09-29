@@ -5,6 +5,8 @@ import SwiftUI
 /// copy matched identically to lilyshark.com.
 struct WelcomeHomeView: View {
     @Binding var showScanner: Bool
+    /// Opens the simulated mesh for someone without a deck. Nil hides it.
+    var showDemo: Binding<Bool>? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -169,17 +171,30 @@ struct WelcomeHomeView: View {
     // MARK: - Connect
 
     private var connectAction: some View {
-        Button {
-            showScanner = true
-        } label: {
-            Label("Connect a Radio", systemImage: "antenna.radiowaves.left.and.right")
-                .frame(maxWidth: .infinity)
-                .touchable()
+        HStack(spacing: Design.Space.tight) {
+            Button {
+                showScanner = true
+            } label: {
+                Label("Connect my T-Deck", systemImage: "antenna.radiowaves.left.and.right")
+                    .frame(maxWidth: .infinity)
+                    .touchable()
+            }
+            .buttonStyle(.meshPrimary)
+            .foregroundStyle(MeshTheme.textOnAccent)
+            .sensoryFeedback(.impact(weight: .light), trigger: showScanner)
+            .accessibilityHint("Scans for nearby decks and radios")
+            if let showDemo {
+                Button {
+                    showDemo.wrappedValue = true
+                } label: {
+                    Label("Demo", systemImage: "play.circle")
+                        .touchable()
+                }
+                .buttonStyle(.meshSecondary)
+                .accessibilityLabel("Explore the demo")
+                .accessibilityHint("Shows a simulated mesh. No radio needed.")
+            }
         }
-        .buttonStyle(.meshPrimary)
-        .foregroundStyle(MeshTheme.textOnAccent)
-        .sensoryFeedback(.impact(weight: .light), trigger: showScanner)
-        .accessibilityHint("Scans for nearby decks and radios")
     }
 
     // MARK: - How the mesh works

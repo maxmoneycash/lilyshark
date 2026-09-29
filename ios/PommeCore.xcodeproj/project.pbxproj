@@ -179,6 +179,8 @@
 		BD93571403214ED79B2F4D15 /* pulse.caf in Resources */ = {isa = PBXBuildFile; fileRef = A6CD3768D637428BAC0630D8 /* pulse.caf */; };
 		C3D4E5F60718293AB4C5D6E7 /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* ShareView.swift */; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* ContactRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* ContactRowView.swift */; };
+		2C0EBD80FAD9456C8D25D24A /* MeshDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7FF40508E944CCB1B7B9BB /* MeshDemoView.swift */; };
+		87B97E0E15344C038382AE5D /* ConnectFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF34CD9465F74F97BE726EA3 /* ConnectFlowView.swift */; };
 		652D5AAF3E194A65A1BE8750 /* InboxRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6924DA7EE7F412CB2A39E45 /* InboxRows.swift */; };
 		C9CEA8D3714859C1177D7704 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21606E2B959E6496D3B0230D /* ContactListView.swift */; };
 		CATKUXG25PTVMENJWXQZY49X /* RemoteManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LP9PDGZGN1LKSGLAB8EQ67PF /* RemoteManagementView.swift */; };
@@ -197,6 +199,8 @@
 		D0850BE9C3F24035AFC8E789 /* chime.caf in Resources */ = {isa = PBXBuildFile; fileRef = 6F287F4DDB0C464C99076282 /* chime.caf */; };
 		D3633106D9031C89E0589468 /* PommeCoreViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FBBD4DD1E3CAFDF4D56504 /* PommeCoreViewModel.swift */; };
 		D4E5F6A7B8C9D0E1F2A3B4C5 /* ContactRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* ContactRowView.swift */; };
+		660ECD14F6CD473192E7EBA9 /* MeshDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7FF40508E944CCB1B7B9BB /* MeshDemoView.swift */; };
+		8C39580BF21046D5B985F55F /* ConnectFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF34CD9465F74F97BE726EA3 /* ConnectFlowView.swift */; };
 		4609988C4C794E0A89DEED2C /* InboxRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6924DA7EE7F412CB2A39E45 /* InboxRows.swift */; };
 		D5EA89B86D044DD69287E9D0 /* pulse.caf in Resources */ = {isa = PBXBuildFile; fileRef = A6CD3768D637428BAC0630D8 /* pulse.caf */; };
 		DBG10000000000000000002 /* DebugLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBG10000000000000000000 /* DebugLogView.swift */; };
@@ -427,6 +431,8 @@
 		9B4226DA6FB1C6225C757D16 /* WatchUnlockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchUnlockManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5C /* ShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* ContactRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactRowView.swift; sourceTree = "<group>"; };
+		4C7FF40508E944CCB1B7B9BB /* MeshDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/MeshDemoView.swift"; sourceTree = SOURCE_ROOT; };
+		FF34CD9465F74F97BE726EA3 /* ConnectFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/ConnectFlowView.swift"; sourceTree = SOURCE_ROOT; };
 		C6924DA7EE7F412CB2A39E45 /* InboxRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Views/InboxRows.swift"; sourceTree = SOURCE_ROOT; };
 		A259126AAB80661010C6A336 /* PommeCoreApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PommeCoreApp.swift; sourceTree = "<group>"; };
 		A6CD3768D637428BAC0630D8 /* pulse.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = pulse.caf; sourceTree = "<group>"; };
@@ -660,6 +666,8 @@
 				CLU10000000000000000000 /* ContactListView+ContactsUI.swift */,
 				CLA10000000000000000000 /* ContactListView+ContactActions.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* ContactRowView.swift */,
+				4C7FF40508E944CCB1B7B9BB /* MeshDemoView.swift */,
+				FF34CD9465F74F97BE726EA3 /* ConnectFlowView.swift */,
 				C6924DA7EE7F412CB2A39E45 /* InboxRows.swift */,
 				2377BED4FF5A7170783BA649 /* DeviceScannerView.swift */,
 				5D859AE9C98610F71C2FBAAF /* SettingsView.swift */,
@@ -1182,6 +1190,8 @@
 				OTASVC00000001000000002 /* Services/FirmwareOTAService.swift in Sources */,
 				LNK10000000000000000001 /* Services/LinkPreviewService.swift in Sources */,
 				D4E5F6A7B8C9D0E1F2A3B4C5 /* ContactRowView.swift in Sources */,
+				660ECD14F6CD473192E7EBA9 /* MeshDemoView.swift in Sources */,
+				8C39580BF21046D5B985F55F /* ConnectFlowView.swift in Sources */,
 				4609988C4C794E0A89DEED2C /* InboxRows.swift in Sources */,
 				B4C5D6E7F8A9B0C1D2E3F4A5 /* NavigationStore.swift in Sources */,
 				18B6F45B61F3581FB64D1DB0 /* DeviceScannerView.swift in Sources */,
@@ -1309,6 +1319,8 @@
 				OTASVC00000001000000003 /* Services/FirmwareOTAService.swift in Sources */,
 				LNK10000000000000000002 /* Services/LinkPreviewService.swift in Sources */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* ContactRowView.swift in Sources */,
+				2C0EBD80FAD9456C8D25D24A /* MeshDemoView.swift in Sources */,
+				87B97E0E15344C038382AE5D /* ConnectFlowView.swift in Sources */,
 				652D5AAF3E194A65A1BE8750 /* InboxRows.swift in Sources */,
 				A3B4C5D6E7F8A9B0C1D2E3F4 /* NavigationStore.swift in Sources */,
 				9A92FFC5BE2A781BEC80720C /* DeviceScannerView.swift in Sources */,

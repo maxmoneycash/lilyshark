@@ -81,8 +81,10 @@ struct PommeCoreApp: App {
                 .meshTheme()
                 .onChange(of: hasCompletedOnboarding) { _, completed in
                     if completed {
+                        // Bluetooth now, because the welcome's next step is
+                        // finding a deck. Notifications wait for a connected
+                        // deck, when "someone messaged you" means something.
                         viewModel.connectionManager.activateBluetooth()
-                        viewModel.requestNotificationPermissionsIfNeeded()
                     }
                 }
             } else if appLock.appLockEnabled && !appLock.isUnlocked {
@@ -91,6 +93,11 @@ struct PommeCoreApp: App {
             } else {
                 ContentView()
                     .task { presetService.fetchIfNeeded() }
+                    .onChange(of: viewModel.connectionManager.connectionState) { _, state in
+                        // First asked here, once a deck is connected. The
+                        // system shows its prompt only the first time.
+                        if state == .ready { viewModel.requestNotificationPermissionsIfNeeded() }
+                    }
                     .environmentObject(viewModel)
                     .environment(viewModel.deviceConfig)
                     .environment(presetService)
@@ -109,7 +116,7 @@ struct PommeCoreApp: App {
                     .meshTheme()
                     .onAppear {
                         viewModel.connectionManager.activateBluetooth()
-                        viewModel.requestNotificationPermissionsIfNeeded()
+                        viewModel.refreshNotificationsIfAlreadyAsked()
                     }
                     #if os(iOS)
                     .onAppear { appDelegate.viewModel = viewModel }
@@ -253,6 +260,16 @@ struct ContentView: View {
     @State private var hasRequestedAutoScan = false
     /// Bridged from OnboardingView's "Open Settings Now" button.
     @AppStorage("openSettingsAfterOnboarding") private var openSettingsAfterOnboarding = false
+    /// The welcome's choice, "connect" or "demo", opened once the app is showing.
+    @AppStorage("afterOnboarding") private var afterOnboarding = ""
+    @State private var showDemo = false
+    @State private var showOtherConnections = false
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    @State private var connectFlowFinish: ConnectFlowView.Finish?
+    /// The setup wizard waits for the connect flow to close instead of
+    /// covering its arrival screen.
+    @State private var pendingSetupWizardOffer = false
+    #endif
 
     var body: some View {
         #if DEBUG && LILYSHARK_UI_CHAT_FIXTURE && os(iOS)
@@ -335,6 +352,34 @@ struct ContentView: View {
             }
         }
         #endif
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        // On a phone, connecting is a full-screen guided flow that stays up
+        // through its arrival screen; see ConnectFlowView.
+        .fullScreenCover(isPresented: $showScanner, onDismiss: connectFlowDismissed) {
+            ConnectFlowView { finish in
+                connectFlowFinish = finish
+                showScanner = false
+            }
+            .meshTheme()
+        }
+        .fullScreenCover(isPresented: $showDemo) {
+            MeshDemoView(
+                onConnect: {
+                    showDemo = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { showScanner = true }
+                },
+                onClose: { showDemo = false }
+            )
+            .meshTheme()
+        }
+        .sheet(isPresented: $showOtherConnections) {
+            NavigationStack {
+                DeviceScannerView()
+                    .lilysharkSheet { showOtherConnections = false }
+            }
+            .meshTheme()
+        }
+        #else
         .sheet(isPresented: $showScanner) {
             NavigationStack {
                 DeviceScannerView()
@@ -345,6 +390,7 @@ struct ContentView: View {
             .frame(minWidth: 360, minHeight: 400)
             #endif
         }
+        #endif
         #if os(iOS) && !targetEnvironment(macCatalyst)
         .onChange(of: showSettings) { _, requested in
             if requested {
@@ -402,6 +448,7 @@ struct ContentView: View {
         }
         .onAppear {
             requestAutoScanOnce()
+            openAfterOnboarding()
             if openSettingsAfterOnboarding {
                 openSettingsAfterOnboarding = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -413,6 +460,7 @@ struct ContentView: View {
         .onChange(of: connectionManager.connectionState) { _, newState in
             handleConnectionStateChange(newState)
         }
+        .onChange(of: afterOnboarding) { openAfterOnboarding() }
         .onChange(of: connectionManager.requestShowScanner) { _, shouldShow in
             if shouldShow {
                 dismissAllSheets()
@@ -457,7 +505,7 @@ struct ContentView: View {
                     if connectionManager.connectionState == .disconnected
                         && contactStore.contacts.isEmpty
                         && messageStoreManager.messagesByContact.isEmpty {
-                        WelcomeHomeView(showScanner: $showScanner)
+                        WelcomeHomeView(showScanner: $showScanner, showDemo: $showDemo)
                             .lilysharkNavigationTitle()
                     } else {
                         MeshHomeView()
@@ -625,16 +673,70 @@ struct ContentView: View {
     }
 
     private func handleConnectionStateChange(_ newState: BLEConnectionState) {
-        // Auto-dismiss scanner when connection succeeds
         if newState == .ready || newState == .connected {
+            #if os(iOS) && !targetEnvironment(macCatalyst)
+            // The connect flow closes itself after its arrival screen.
+            if showScanner {
+                pendingSetupWizardOffer = true
+            } else {
+                offerSetupWizardIfNeeded()
+            }
+            #else
+            // Auto-dismiss scanner when connection succeeds
             showScanner = false
             // Auto-show setup wizard on first connection with a default/unconfigured name
             offerSetupWizardIfNeeded()
+            #endif
         }
         // No alert on connecting → disconnected — the auto-reconnect and
         // auto-scan flow handles this silently via status bar updates.
         previousConnectionState = newState
     }
+
+    /// Open what the welcome screen chose, once, after it has gone.
+    private func openAfterOnboarding() {
+        let next = afterOnboarding
+        guard !next.isEmpty else { return }
+        afterOnboarding = ""
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            dismissAllSheets()
+            if next == "demo" {
+                showDemo = true
+            } else {
+                showScanner = true
+            }
+        }
+    }
+
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    /// Carry out what the connect flow's last screen asked for.
+    private func connectFlowDismissed() {
+        let finish = connectFlowFinish
+        connectFlowFinish = nil
+        if pendingSetupWizardOffer {
+            pendingSetupWizardOffer = false
+            offerSetupWizardIfNeeded()
+        }
+        switch finish {
+        case .sayHello:
+            let publicKey = Data([0])
+            if messageStoreManager.loadDraft(for: publicKey).isEmpty {
+                let deck = deviceConfig.deviceName
+                messageStoreManager.saveDraft("Hello from \(deck.isEmpty ? "Lilyshark" : deck)", for: publicKey)
+            }
+            navigationStore.section = .messages
+            navigationStore.sidebarSelection = .publicChannel
+        case .showMap:
+            navigationStore.section = .map
+        case .otherConnection:
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showOtherConnections = true }
+        case .demo:
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showDemo = true }
+        case .done, nil:
+            break
+        }
+    }
+    #endif
 
     /// Check if device has a default name and offer the setup wizard.
     /// Only prompts once per radio (keyed by public key prefix).
@@ -643,6 +745,8 @@ struct ContentView: View {
     /// sheet booleans simultaneously causes "only presenting a single sheet" warnings.
     private func dismissAllSheets() {
         showScanner = false
+        showDemo = false
+        showOtherConnections = false
         showSettings = false
         showDiscover = false
         showRemoteManagement = false

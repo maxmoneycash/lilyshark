@@ -1,6 +1,12 @@
 import SwiftUI
 
-/// A short introduction with scrollable content and a persistent action bar.
+/// The first screen anyone sees.
+///
+/// It used to be four pages of text about PINs and radio profiles. A first
+/// screen has one job: say what this is for, in words a person without a
+/// radio would use, and put the two next steps under their thumb. Connect a
+/// deck, or feel what it does in the demo. Everything else the old pages
+/// explained is now said where it happens, in the connect flow itself.
 struct OnboardingView: View {
     enum Mode {
         case firstRun
@@ -10,221 +16,133 @@ struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.openURL) private var openURL
     @Binding var hasCompletedOnboarding: Bool
     var navigateToSettings: (() -> Void)? = nil
     var mode: Mode = .firstRun
-    @State private var currentPage = 0
-    #if os(iOS) || os(macOS)
-    @State private var showDeck = false
-    #endif
-    private let lastPage = 3
+    /// What the app opens once it is showing: "connect" or "demo". ContentView
+    /// reads and clears it, because this screen is shown before the stores the
+    /// connect flow needs exist.
+    @AppStorage("afterOnboarding") private var afterOnboarding = ""
+
+    private let useCases: [(symbol: String, title: LocalizedStringKey, detail: LocalizedStringKey)] = [
+        ("mountain.2.fill", "Off the grid", "Stay in touch on trails, at sea and in the backcountry, where there are no bars."),
+        ("person.3.fill", "In a crowd", "Find your group when festival and stadium networks jam."),
+        ("bolt.slash.fill", "When the network is down", "Keep talking through outages and storms. The mesh has no towers to lose."),
+    ]
 
     var body: some View {
         GeometryReader { geo in
             ScrollView {
-                VStack(alignment: .leading, spacing: Design.Space.loose) {
-                    pageContent(containerHeight: geo.size.height)
+                VStack(spacing: Design.Space.loose) {
+                    #if os(iOS) || os(macOS)
+                    TDeckHeroView()
+                        .frame(height: TDeckStage.height(
+                            in: geo.size.height,
+                            accessibility: dynamicTypeSize.isAccessibilitySize,
+                            fraction: 0.42
+                        ))
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, -Design.Space.loose)
+                    #endif
+                    VStack(spacing: Design.Space.snug) {
+                        Text("Talk to the mesh around you")
+                            .font(.largeTitle.weight(.bold))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(MeshTheme.textPrimary)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("Pair your iPhone with a T-Deck and message people kilometres away. No cell service, no internet, no account.")
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(MeshTheme.textSecondary)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: Design.Space.tight) {
+                        ForEach(useCases, id: \.symbol) { useCase in
+                            HStack(alignment: .top, spacing: Design.Space.regular) {
+                                Image(systemName: useCase.symbol)
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(MeshTheme.accent)
+                                    .frame(width: 32)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(useCase.title)
+                                        .font(.headline)
+                                        .foregroundStyle(MeshTheme.textPrimary)
+                                    Text(useCase.detail)
+                                        .font(.subheadline)
+                                        .foregroundStyle(MeshTheme.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(Design.Space.regular)
+                            .chatGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
                 }
-                .frame(maxWidth: 560, alignment: .leading)
+                .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
-                .padding(Design.Space.loose)
+                .padding(.horizontal, Design.Space.loose)
                 .padding(.bottom, Design.Space.section)
-                .transition(.opacity)
             }
-            .id(currentPage)
             .scrollClipDisabled()
         }
         .background(MeshTheme.background)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HStack {
-                Spacer()
-                if currentPage < lastPage {
-                    Button { complete() } label: {
-                        Text(mode == .replay ? "Close" : "Skip")
-                            .font(.body.weight(.semibold))
-                            .touchable()
-                    }
-                    .buttonStyle(.meshPlain)
-                    .foregroundStyle(MeshTheme.textSecondary)
-                    .accessibilityLabel(mode == .replay ? "Close welcome guide" : "Skip introduction")
-                }
-            }
-            .padding(.horizontal, Design.Space.loose)
-            .padding(.vertical, Design.Space.snug)
-            .background(MeshTheme.background)
-        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            navigationControls
+            actions
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, Design.Space.loose)
                 .padding(.top, Design.Space.regular)
                 .padding(.bottom, Design.Space.snug)
                 .background {
-                    LinearGradient(
-                        colors: [MeshTheme.background.opacity(0), MeshTheme.background],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .padding(.top, -Design.Space.snug)
-                    .allowsHitTesting(false)
+                    ChatFadeEdge(edge: .bottom, height: 200)
+                        .ignoresSafeArea(edges: .bottom)
                 }
         }
-        .tint(MeshTheme.interactiveGreen)
-        .meshAnimation(Design.Motion.quick, value: currentPage)
-        #if os(iOS) || os(macOS)
-        .sheet(isPresented: $showDeck) {
-            NavigationStack {
-                TDeckExperienceView()
-                    .lilysharkSheet { showDeck = false }
+        .overlay(alignment: .topTrailing) {
+            if mode == .replay {
+                Button { dismiss() } label: {
+                    GlassCircleLabel(systemImage: "xmark", size: Design.minimumTouchTarget)
+                }
+                .buttonStyle(.pressable)
+                .padding(Design.Space.regular)
+                .accessibilityLabel("Close welcome")
             }
-            .meshTheme()
         }
-        #endif
     }
 
-    @ViewBuilder
-    private func pageContent(containerHeight: CGFloat) -> some View {
-        switch currentPage {
-        case 0:
-            #if os(iOS) || os(macOS)
-            TDeckHeroView()
-                .frame(height: TDeckStage.height(
-                    in: containerHeight,
-                    accessibility: dynamicTypeSize.isAccessibilitySize,
-                    fraction: 0.56
-                ))
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, -Design.Space.loose)
-            Text("Drag sideways to turn the deck")
-                .font(Design.Text.label)
-                .foregroundStyle(MeshTheme.textSecondary.opacity(0.85))
-                .frame(maxWidth: .infinity)
-                .accessibilityHidden(true)
-            Button {
-                showDeck = true
-            } label: {
-                Text("Look around the deck")
-                    .font(.body.weight(.semibold))
+    private var actions: some View {
+        VStack(spacing: Design.Space.snug) {
+            Button { choose("connect") } label: {
+                Label("Connect my T-Deck", systemImage: "antenna.radiowaves.left.and.right")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
                     .touchable()
             }
-            .buttonStyle(.meshPlain)
-            .foregroundStyle(MeshTheme.accent)
-            .frame(maxWidth: .infinity)
-            #else
-            ZStack {
-                MeshAnimationBackdrop()
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.largeTitle)
-                    .foregroundStyle(MeshTheme.accent)
-            }
-            .frame(height: dynamicTypeSize.isAccessibilitySize ? 100 : 160)
-            .accessibilityHidden(true)
-            #endif
-            pageTitle("Welcome to Lilyshark")
-            paragraph("Message nearby people through your deck or radio, even without internet or cell service.")
-        case 1:
-            pageTitle("Connect your radio")
-            paragraph("Use a Lilyshark deck or a MeshCore radio with Bluetooth enabled.")
-            feature("Power on", symbol: "power", detail: "Keep the radio close to your phone.")
-            feature("Choose your device", symbol: "antenna.radiowaves.left.and.right", detail: "Open Connect and select its name.")
-            feature("Pair if asked", symbol: "lock", detail: "Enter the PIN displayed by your radio.")
-            paragraph("Contacts and channels appear as the radio reports them.")
-        case 2:
-            pageTitle("Start a conversation")
-            feature("Direct messages", symbol: "person", detail: "Choose a contact to send a message.")
-            feature("Channels", symbol: "number", detail: "Share messages with people using the same channel.")
-            feature("Delivery status", symbol: "checkmark.message", detail: "A send confirmation can come from your deck. It does not always confirm the recipient received your message.")
-        default:
-            pageTitle("Check your setup")
-            paragraph("Choose the radio profile used by your local mesh. Nearby radios need compatible protocol and channel settings.")
-            feature("Deck controls", symbol: "gearshape", detail: "Configure a Lilyshark deck on the deck itself. MeshCore radios also offer device controls in Settings.")
-            feature("App preferences", symbol: "slider.horizontal.3", detail: "Open Settings for appearance, notifications, and your connected device.")
-            #if !os(watchOS)
-            if navigateToSettings != nil {
-                Button {
-                    complete()
-                    navigateToSettings?()
-                } label: {
-                    Label("Open Settings", systemImage: "gearshape")
-                        .frame(maxWidth: .infinity)
-                        .touchable()
-                }
-                .buttonStyle(.meshSecondary)
-            }
-            #endif
-        }
-    }
-
-
-
-    private func pageTitle(_ title: LocalizedStringKey) -> some View {
-        Text(title)
-            .font(.title2.weight(.semibold))
-            .foregroundStyle(MeshTheme.textPrimary)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityAddTraits(.isHeader)
-    }
-
-    private func paragraph(_ text: LocalizedStringKey) -> some View {
-        Text(text)
-            .font(.subheadline)
-            .foregroundStyle(MeshTheme.textSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func feature(_ title: LocalizedStringKey, symbol: String, detail: LocalizedStringKey) -> some View {
-        VStack(alignment: .leading, spacing: Design.Space.tight) {
-            Label(title, systemImage: symbol)
-                .font(.headline)
-                .foregroundStyle(MeshTheme.textPrimary)
-            paragraph(detail)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var navigationControls: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: Design.Space.tight) { navigationButtons }
-            } else {
-                HStack(spacing: Design.Space.regular) { navigationButtons }
-            }
-        }
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
-    }
-
-    @ViewBuilder
-    private var navigationButtons: some View {
-        if currentPage > 0 {
-            Button {
-                withMeshAnimation(reduceMotion: reduceMotion) { currentPage -= 1 }
-            } label: {
-                Text("Back")
+            .buttonStyle(.meshPrimary)
+            .accessibilityHint("Turns on Bluetooth and looks for your deck")
+            Button { choose("demo") } label: {
+                Label("Explore the demo", systemImage: "play.circle")
+                    .font(.headline)
                     .frame(maxWidth: .infinity)
                     .touchable()
             }
             .buttonStyle(.meshSecondary)
-            .accessibilityLabel("Previous introduction page")
-        }
-        Button {
-            if currentPage < lastPage {
-                withMeshAnimation(reduceMotion: reduceMotion) { currentPage += 1 }
-            } else {
-                complete()
+            .accessibilityHint("Shows a simulated mesh. No radio needed.")
+            Button("No T-Deck yet? Put Lilyshark on one") {
+                if let url = URL(string: "https://lilyshark.com/flash") { openURL(url) }
             }
-        } label: {
-            Text(currentPage < lastPage ? "Continue" : (mode == .replay ? "Done" : "Get Started"))
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .touchable()
+            .font(.subheadline.weight(.semibold))
+            .buttonStyle(.meshPlain)
+            .foregroundStyle(MeshTheme.accent)
         }
-        .buttonStyle(.meshPrimary)
-        .foregroundStyle(MeshTheme.textOnAccent)
-        .accessibilityLabel(currentPage < lastPage ? "Next introduction page" : (mode == .replay ? "Close welcome guide" : "Get started with Lilyshark"))
     }
 
-    private func complete() {
+    private func choose(_ next: String) {
+        afterOnboarding = next
         if mode == .replay {
             dismiss()
             return

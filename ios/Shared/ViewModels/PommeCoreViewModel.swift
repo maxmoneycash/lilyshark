@@ -211,6 +211,16 @@ final class PommeCoreViewModel: ObservableObject {
     func requestNotificationPermissionsIfNeeded() {
         requestNotificationPermissions()
     }
+
+    /// Re-register notification categories on launch without prompting someone
+    /// who has never been asked. Their first ask waits for a connected deck,
+    /// so it does not land on top of the connect flow.
+    func refreshNotificationsIfAlreadyAsked() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus != .notDetermined else { return }
+            Task { @MainActor [weak self] in self?.requestNotificationPermissions() }
+        }
+    }
     
     /// Wire cross-store dependencies via closures (no circular references).
     private func wireStoreDependencies() {
