@@ -54,6 +54,7 @@ struct ConnectFlowView: View {
     @Environment(ContactStore.self) private var contactStore
     @Environment(ChannelStore.self) private var channelStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.openURL) private var openURL
 
     private enum Phase: Equatable {
@@ -89,7 +90,8 @@ struct ConnectFlowView: View {
                 guard ProcessInfo.processInfo.arguments.contains("--lilyshark-auto-connect"),
                       phase == .searching, let first = candidates.first else { return }
                 Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(2))
+                    // Long enough for a screenshot of the found deck.
+                    try? await Task.sleep(for: .seconds(6))
                     if phase == .searching { connect(first) }
                 }
             }
@@ -112,6 +114,7 @@ struct ConnectFlowView: View {
         screen
             .meshAnimation(ChatGlass.snap, value: phase)
             .meshAnimation(ChatGlass.snap, value: candidateIDs)
+            .meshAnimation(ChatGlass.snap, value: contactStore.contacts.count)
     }
 
     private static func arrived(_ old: Phase, _ new: Phase) -> Bool { new == Phase.connected }
@@ -203,7 +206,7 @@ struct ConnectFlowView: View {
     private var connecting: some View {
         VStack(spacing: Design.Space.loose) {
             header(
-                title: "Connecting to \(chosen?.name ?? connection.connectedDeviceName ?? "your deck")",
+                title: "Connecting to \(Self.unbroken(chosen?.name ?? connection.connectedDeviceName ?? String(localized: "your deck")))",
                 detail: "Keep the deck close until this finishes."
             )
             VStack(alignment: .leading, spacing: 0) {
@@ -220,10 +223,16 @@ struct ConnectFlowView: View {
         VStack(spacing: Design.Space.loose) {
             header(
                 title: "You're on the mesh",
-                detail: "\(deckName) is connected. Messages you send go out over its radio."
+                detail: "\(Self.unbroken(deckName)) is connected. Messages you send go out over its radio."
             )
-            stats
-            if !heardNodes.isEmpty {
+            // A lone "1 channel" says nothing to someone new; show the row
+            // once there is a node count or a battery reading beside it.
+            if !contactStore.contacts.isEmpty || batteryText != nil {
+                stats
+            }
+            if heardNodes.isEmpty {
+                listening
+            } else {
                 heardCluster
             }
             VStack(spacing: Design.Space.snug) {
@@ -310,10 +319,13 @@ struct ConnectFlowView: View {
             HStack(spacing: Design.Space.regular) {
                 candidate.orb(size: 52)
                 VStack(alignment: .leading, spacing: Design.Space.hairline) {
-                    Text(candidate.name)
+                    // "Lilyshark T-Deck Plus" otherwise breaks at its hyphen.
+                    Text(Self.unbroken(candidate.name))
                         .font(.headline)
                         .foregroundStyle(MeshTheme.textPrimary)
-                    Text("\(candidate.proximity) · \(candidate.kindLabel)")
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                        .minimumScaleFactor(0.8)
+                    Text(candidate.subtitle)
                         .font(.subheadline)
                         .foregroundStyle(MeshTheme.textSecondary)
                 }
@@ -385,6 +397,12 @@ struct ConnectFlowView: View {
         .buttonStyle(.meshPlain)
         .foregroundStyle(MeshTheme.accent)
         .frame(maxWidth: .infinity)
+    }
+
+    /// "T-Deck" with a non-breaking hyphen, so a name never wraps as
+    /// "Lilyshark T-" over "Deck Plus".
+    static func unbroken(_ name: String) -> String {
+        name.replacingOccurrences(of: "-", with: "\u{2011}")
     }
 
     // MARK: Connecting steps
@@ -477,7 +495,10 @@ struct ConnectFlowView: View {
         let nodes = contactStore.contacts.count
         let channels = channelStore.channels.count
         return HStack(spacing: Design.Space.tight) {
-            statChip(value: "\(nodes)", label: nodes == 1 ? "node heard" : "nodes heard")
+            if nodes > 0 {
+                statChip(value: "\(nodes)", label: nodes == 1 ? "node heard" : "nodes heard")
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
             statChip(value: "\(channels)", label: channels == 1 ? "channel" : "channels")
             if let battery = batteryText {
                 statChip(value: battery, label: "battery")
@@ -523,6 +544,22 @@ struct ConnectFlowView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(heardSummary)
+    }
+
+    /// Before anyone has been heard. A deck hears other radios as they send,
+    /// which can take a few minutes, so say it is listening rather than "0".
+    private var listening: some View {
+        HStack(spacing: Design.Space.snug) {
+            ListeningDot()
+            Text("Listening for other radios. They appear here as your deck hears them.")
+                .font(.subheadline)
+                .foregroundStyle(MeshTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Design.Space.regular)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .chatGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private var heardSummary: String {
@@ -739,6 +776,11 @@ private struct Candidate: Identifiable, Equatable {
     /// CoreBluetooth reports 127 when it has no reading.
     var signal: Int { rssi == 127 ? -100 : rssi }
 
+    /// A deck's name already says what it is; a MeshCore radio's may not.
+    var subtitle: String {
+        kind == .meshCore ? "\(proximity) · \(kindLabel)" : proximity
+    }
+
     var kindLabel: String {
         switch kind {
         case .deck, .simulatorDeck: String(localized: "Lilyshark deck")
@@ -788,8 +830,23 @@ private struct RadarView: View {
                 rings(radius: radius)
                     .position(center)
                 if let focus {
+                    ArrivalRipple(isSettled: isSettled, diameter: radius * 1.9)
+                        .position(center)
                     focus
                         .scaleEffect(isSettled ? 1.08 : 1)
+                        .overlay(alignment: .bottomTrailing) {
+                            if isSettled {
+                                Image(systemName: "checkmark")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(MeshTheme.accent, in: Circle())
+                                    .overlay(Circle().strokeBorder(.white, lineWidth: 3))
+                                    .offset(x: 4, y: 4)
+                                    .transition(.scale(scale: 0.2).combined(with: .opacity))
+                                    .accessibilityHidden(true)
+                            }
+                        }
                         .position(center)
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                 } else {
@@ -805,11 +862,12 @@ private struct RadarView: View {
                     Button { onTap(candidate) } label: {
                         VStack(spacing: 4) {
                             candidate.orb(size: 50)
-                            Text(candidate.name)
+                            Text(ConnectFlowView.unbroken(candidate.name))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(MeshTheme.textPrimary)
                                 .lineLimit(1)
-                                .frame(maxWidth: 110)
+                                .minimumScaleFactor(0.85)
+                                .frame(maxWidth: 150)
                         }
                     }
                     .buttonStyle(.pressable)
@@ -852,9 +910,10 @@ private struct RadarView: View {
     }
 
     private func place(_ candidate: Candidate, center: CGPoint, radius: CGFloat) -> CGPoint {
-        // -40 dBm sits a third of the way out, -100 dBm at the rim.
+        // -40 dBm sits 60% of the way out, clear of the phone in the middle;
+        // -100 dBm sits at 85%, leaving room for the name under the rim.
         let strength = min(max(Double(candidate.signal + 100) / 60, 0), 1)
-        let distance = radius * CGFloat(0.9 - 0.55 * strength)
+        let distance = radius * CGFloat(0.85 - 0.25 * strength)
         let angle = Self.angle(for: candidate.id)
         return CGPoint(x: center.x + distance * CGFloat(cos(angle)), y: center.y + distance * CGFloat(sin(angle)))
     }
@@ -867,6 +926,60 @@ private struct RadarView: View {
             hash = hash &* 16_777_619
         }
         return Double(hash % 360) * .pi / 180
+    }
+}
+// MARK: - Small pieces
+
+/// Rings leave the deck once when it connects: the moment the phone and the
+/// radio are one. Nothing moves with Reduce Motion.
+private struct ArrivalRipple: View {
+    let isSettled: Bool
+    let diameter: CGFloat
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var spread = false
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<2, id: \.self) { ring in
+                Circle()
+                    .stroke(MeshTheme.brandPink, lineWidth: 3)
+                    .frame(width: diameter, height: diameter)
+                    .scaleEffect(spread ? 1 : 0.3)
+                    .opacity(spread ? 0 : 0.6)
+                    .meshAnimation(.easeOut(duration: 1.3).delay(Double(ring) * 0.25), value: spread)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .opacity(reduceMotion ? 0 : 1)
+        .onChange(of: isSettled, initial: true) { _, settled in
+            if settled && !reduceMotion { spread = true }
+        }
+    }
+}
+
+/// A soft pulse beside "Listening for other radios".
+private struct ListeningDot: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var on = false
+
+    var body: some View {
+        Circle()
+            .fill(MeshTheme.accent)
+            .frame(width: 10, height: 10)
+            .background {
+                Circle()
+                    .fill(MeshTheme.accent.opacity(0.3))
+                    .scaleEffect(on ? 2.4 : 1)
+                    .opacity(on ? 0 : 1)
+            }
+            .frame(width: 28)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withMeshAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false), reduceMotion: reduceMotion) { on = true }
+            }
+            .accessibilityHidden(true)
     }
 }
 #endif

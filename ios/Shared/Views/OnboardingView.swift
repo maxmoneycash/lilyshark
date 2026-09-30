@@ -37,11 +37,7 @@ struct OnboardingView: View {
                 VStack(spacing: Design.Space.loose) {
                     #if os(iOS) || os(macOS)
                     TDeckHeroView()
-                        .frame(height: TDeckStage.height(
-                            in: geo.size.height,
-                            accessibility: dynamicTypeSize.isAccessibilitySize,
-                            fraction: 0.42
-                        ))
+                        .frame(height: heroHeight(visible: geo.size.height))
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, -Design.Space.loose)
                     #endif
@@ -98,8 +94,15 @@ struct OnboardingView: View {
                 .padding(.top, Design.Space.regular)
                 .padding(.bottom, Design.Space.snug)
                 .background {
-                    ChatFadeEdge(edge: .bottom, height: 200)
-                        .ignoresSafeArea(edges: .bottom)
+                    // Solid behind the buttons, with a short fade above, so
+                    // the use cases scroll away under them instead of showing
+                    // through the translucent secondary button.
+                    VStack(spacing: 0) {
+                        ChatFadeEdge(edge: .bottom, height: 40)
+                        MeshTheme.background
+                    }
+                    .padding(.top, -40)
+                    .ignoresSafeArea(edges: .bottom)
                 }
         }
         .overlay(alignment: .topTrailing) {
@@ -112,6 +115,16 @@ struct OnboardingView: View {
                 .accessibilityLabel("Close welcome")
             }
         }
+    }
+
+    /// Big enough to be the first thing seen, small enough that the title and
+    /// the sentence under it clear the buttons on a phone. TDeckStage's own
+    /// 420-point floor is for screens that have nothing else to show.
+    private func heroHeight(visible: CGFloat) -> CGFloat {
+        if dynamicTypeSize.isAccessibilitySize {
+            return TDeckStage.height(in: visible, accessibility: true, fraction: 0.42)
+        }
+        return min(max(visible * 0.6, 260), 400)
     }
 
     private var actions: some View {

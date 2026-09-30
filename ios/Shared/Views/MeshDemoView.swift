@@ -46,6 +46,7 @@ struct MeshDemoView: View {
     @State private var isAlexTyping = false
     @State private var replies = 0
     @State private var busy = false
+    @State private var sentSuggestions: Set<String> = []
 
     private let suggestions = ["Where are you now?", "Heading to the lookout", "Need any water?"]
 
@@ -75,7 +76,7 @@ struct MeshDemoView: View {
                         }
                     }
                     .padding(.horizontal, Design.Space.regular)
-                    .padding(.top, 64)
+                    .padding(.top, Design.Space.tight)
                     .padding(.bottom, Design.Space.regular)
                     .frame(maxWidth: 560)
                     .frame(maxWidth: .infinity)
@@ -103,10 +104,13 @@ struct MeshDemoView: View {
             .disabled(busy)
         }
         .background(MeshTheme.background.ignoresSafeArea())
-        .overlay(alignment: .top) { topBar }
+        // An inset rather than an overlay: the conversation scrolls under
+        // the bar and fades out, instead of running into the demo label.
+        .safeAreaInset(edge: .top, spacing: 0) { topBar }
         .meshAnimation(ChatGlass.arrival, value: messages)
         .meshAnimation(ChatGlass.snap, value: isAlexTyping)
         .meshAnimation(ChatGlass.snap, value: replies)
+        .meshAnimation(ChatGlass.snap, value: sentSuggestions)
         #if DEBUG && targetEnvironment(simulator)
         // Screenshot QA without taps (`--lilyshark-demo-autoplay`).
         .task {
@@ -137,6 +141,17 @@ struct MeshDemoView: View {
         }
         .padding(.horizontal, Design.Space.regular)
         .padding(.top, Design.Space.tight)
+        .padding(.bottom, Design.Space.snug)
+        .background {
+            // Solid behind the bar, fading out just below it.
+            VStack(spacing: 0) {
+                MeshTheme.background
+                ChatFadeEdge(edge: .top, height: 28)
+            }
+            .padding(.bottom, -28)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
+        }
     }
 
     private var intro: some View {
@@ -206,7 +221,7 @@ struct MeshDemoView: View {
     private var suggestionRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Design.Space.tight) {
-                ForEach(suggestions, id: \.self) { suggestion in
+                ForEach(suggestions.filter { !sentSuggestions.contains($0) }, id: \.self) { suggestion in
                     Button {
                         send(suggestion)
                     } label: {
@@ -220,6 +235,7 @@ struct MeshDemoView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(busy)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 }
             }
             .padding(.horizontal, Design.Space.regular)
@@ -262,6 +278,7 @@ struct MeshDemoView: View {
         guard !trimmed.isEmpty, !busy else { return }
         busy = true
         draft = ""
+        sentSuggestions.insert(trimmed)
         let outgoing = DemoMessage(text: trimmed, isOutgoing: true, status: .sending, date: .now)
         messages.append(outgoing)
         Task { @MainActor in

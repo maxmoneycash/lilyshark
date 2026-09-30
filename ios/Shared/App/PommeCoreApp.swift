@@ -93,11 +93,9 @@ struct PommeCoreApp: App {
             } else {
                 ContentView()
                     .task { presetService.fetchIfNeeded() }
-                    .onChange(of: viewModel.connectionManager.connectionState) { _, state in
-                        // First asked here, once a deck is connected. The
-                        // system shows its prompt only the first time.
-                        if state == .ready { viewModel.requestNotificationPermissionsIfNeeded() }
-                    }
+                    // First asked once a deck is connected; ContentView holds
+                    // it until the connect flow's arrival screen has closed.
+                    .environment(\.askForNotifications) { viewModel.requestNotificationPermissionsIfNeeded() }
                     .environmentObject(viewModel)
                     .environment(viewModel.deviceConfig)
                     .environment(presetService)
@@ -241,7 +239,14 @@ class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
 #endif
 
 #if !os(watchOS)
+extension EnvironmentValues {
+    /// Asks for notification permission. The system shows its prompt only
+    /// the first time; fixture hosts leave this as a no-op.
+    @Entry var askForNotifications: () -> Void = {}
+}
+
 struct ContentView: View {
+    @Environment(\.askForNotifications) private var askForNotifications
     @Environment(ContactStore.self) private var contactStore
     @Environment(ChannelStore.self) private var channelStore
     @Environment(MessageStoreManager.self) private var messageStoreManager
@@ -269,6 +274,9 @@ struct ContentView: View {
     /// The setup wizard waits for the connect flow to close instead of
     /// covering its arrival screen.
     @State private var pendingSetupWizardOffer = false
+    /// Likewise the notification prompt, which would otherwise land on top
+    /// of "You're on the mesh".
+    @State private var pendingNotificationAsk = false
     #endif
 
     var body: some View {
@@ -678,14 +686,17 @@ struct ContentView: View {
             // The connect flow closes itself after its arrival screen.
             if showScanner {
                 pendingSetupWizardOffer = true
+                if newState == .ready { pendingNotificationAsk = true }
             } else {
                 offerSetupWizardIfNeeded()
+                if newState == .ready { askForNotifications() }
             }
             #else
             // Auto-dismiss scanner when connection succeeds
             showScanner = false
             // Auto-show setup wizard on first connection with a default/unconfigured name
             offerSetupWizardIfNeeded()
+            if newState == .ready { askForNotifications() }
             #endif
         }
         // No alert on connecting → disconnected — the auto-reconnect and
@@ -716,6 +727,11 @@ struct ContentView: View {
         if pendingSetupWizardOffer {
             pendingSetupWizardOffer = false
             offerSetupWizardIfNeeded()
+        }
+        if pendingNotificationAsk {
+            pendingNotificationAsk = false
+            // After the cover has slid away and the chosen screen is showing.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { askForNotifications() }
         }
         switch finish {
         case .sayHello:

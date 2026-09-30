@@ -48,8 +48,10 @@ What it found:
    - **Timeouts:** 45 seconds for a deck, which has no Bluetooth PIN (the
      firmware enables no BLE security). 90 seconds for a MeshCore radio, which
      may raise the system PIN prompt partway through.
-   - **Arrival:** "You're on the mesh", a success haptic, nodes heard, channels,
-     battery, and the first few nodes' orbs with their names. The two buttons
+   - **Arrival:** "You're on the mesh", a success haptic, two rings leaving the
+     deck and a check on it, nodes heard and battery once there are any, and
+     the first few nodes' orbs with their names. Until the deck has heard
+     anyone it says "Listening for other radios" with a pulse, not "0 nodes". The two buttons
      are **Say hello on the public channel** (opens it with "Hello from <deck>"
      drafted) and **See who's around** (the map).
    - **Failure:** what happened, what usually fixes it (including a PIN tip for
@@ -68,9 +70,49 @@ What it found:
 4. **Permissions** now come when they mean something.
    - **Bluetooth:** switched on when someone chooses to connect.
    - **Notifications:** first asked once a deck is connected, not at first
-     launch, so the prompt never lands on the connect flow. Returning users
-     still have their notification categories registered on every launch.
+     launch, and held until the connect flow closes, so the prompt never
+     lands on "You're on the mesh". Returning users still have their
+     notification categories registered on every launch.
 5. **The disconnected home** gains a Demo button next to Connect my T-Deck.
+
+## Simulator check, evening of September 29
+
+The machine was finally quiet enough to run the flows in the iPhone 17 Pro
+simulator (iOS 26.5) and look at them. What the screenshots showed, and what
+changed:
+
+- **The notification prompt covered the arrival screen.** It fired on the
+  connection becoming ready, which is the moment "You're on the mesh"
+  appears. ContentView now holds it until the connect flow has closed.
+- **The welcome's buttons sat on top of its text.** The 3D deck has a
+  420-point floor in `TDeckStage`, so the sentence under the title ran under
+  Connect and Explore, and the use-case cards showed through the translucent
+  Explore button. The welcome now sizes the deck to 60% of the visible
+  height (260 to 400 points) and puts the buttons on a solid backdrop with a
+  short fade above it.
+- **The demo's label sat on the conversation.** The top bar was an overlay
+  with no backdrop. It is now a top inset with a solid backdrop and a fade,
+  and suggestions disappear once sent.
+- **The radar put a strong radio on top of the phone** and cut its name off.
+  Radios now sit 60 to 85% of the way out, with room for the name.
+- **The arrival screen opened on "0 nodes heard"** with the simulator's
+  preview deck, and on a lone "1 channel" card. See Arrival above.
+- **Names wrapped at their hyphen** ("Lilyshark T-" over "Deck Plus"). Names
+  in titles and cards use a non-breaking hyphen.
+
+Screenshots: [welcome](qa/connect-onboarding-2026-09-29/welcome.png),
+[found](qa/connect-onboarding-2026-09-29/found.png),
+[arrival](qa/connect-onboarding-2026-09-29/arrival.png),
+[demo in flight](qa/connect-onboarding-2026-09-29/demo-sending.png),
+[demo end](qa/connect-onboarding-2026-09-29/demo-end.png).
+
+Not checked here: anything that needs a tap (these runs use launch
+arguments), the failure screen, a real deck, and a real iPhone.
+
+Two simulator traps, for the next person: `simctl launch
+--terminate-running-process` hangs on this machine, so the capture script
+stops the app by its host process ID; and an unanswered permission prompt
+survives an uninstall, because SpringBoard owns it.
 
 ## Next
 
