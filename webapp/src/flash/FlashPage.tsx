@@ -20,9 +20,9 @@ import "./flash.css";
 const FIRMWARE = {
   version: "v0.1.0-alpha.8",
   file: "lilyshark-tdeck.factory.bin",
-  bytes: "1,000,080",
+  bytes: "999,584",
   offset: "0x0",
-  sha256: "ad7e833f85ae1d94a43b55157d4b8d641b4740a1dbd82fc66e391dd898cb68eb",
+  sha256: "5049d11224e4793b9d9a96d9148d61fdb541dd77538a00899c89b2478fe8c93c",
   manifest: "/flash/manifest.json",
 };
 
