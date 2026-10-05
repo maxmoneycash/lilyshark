@@ -4,7 +4,7 @@ title: Witness corroboration in TRAFFIC
 area: ui
 size: M
 priority: P1
-status: done
+status: todo
 depends_on:
 - PR-003
 - CO-002
@@ -20,3 +20,8 @@ eval:
 Why: The Field Receipts loop needs its first surface: see a frame, attest it,
 watch corroboration arrive when a second device uploads. TRAFFIC is where
 that story is legible frame by frame.
+
+Note: reset from done to todo. TRAFFIC carries no witness state and no
+ATTEST action at head; nothing in the rubric is met. PR-003 now provides the
+browser-side key math and a local `corroborate()` across open captures
+(webapp/src/lib/witnessKey.ts), so this task can build on it directly.
